@@ -254,7 +254,7 @@ class TestEventJourney:
 
     def test_history_updated(self, es, char_a, world):
         es.event_journey(char_a, world)
-        assert any("Travelled" in h or "jourey" in h.lower() or "Travell" in h for h in char_a.history)
+        assert any("Travelled" in h for h in char_a.history)
 
     def test_event_type(self, es, char_a, world):
         result = es.event_journey(char_a, world)
