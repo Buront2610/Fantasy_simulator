@@ -1,0 +1,297 @@
+"""
+tests/test_character.py - Unit tests for the Character class.
+"""
+
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
+import pytest
+from character import Character, random_stats
+
+
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def hero() -> Character:
+    """A basic human warrior for general-purpose testing."""
+    return Character(
+        name="Aldric Ashwood",
+        age=25,
+        gender="Male",
+        race="Human",
+        job="Warrior",
+        strength=60,
+        intelligence=30,
+        dexterity=50,
+        wisdom=35,
+        charisma=40,
+        constitution=65,
+        skills={"Swordsmanship": 2, "Shield Block": 1},
+        location="Aethoria Capital",
+    )
+
+
+@pytest.fixture
+def mage() -> Character:
+    """An elven mage."""
+    return Character(
+        name="Aelindra Moonwhisper",
+        age=120,
+        gender="Female",
+        race="Elf",
+        job="Mage",
+        strength=20,
+        intelligence=85,
+        dexterity=55,
+        wisdom=70,
+        charisma=50,
+        constitution=25,
+        skills={"Fireball": 4, "Mana Control": 3},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Construction & attributes
+# ---------------------------------------------------------------------------
+
+class TestCharacterConstruction:
+    def test_basic_attributes(self, hero):
+        assert hero.name == "Aldric Ashwood"
+        assert hero.age == 25
+        assert hero.gender == "Male"
+        assert hero.race == "Human"
+        assert hero.job == "Warrior"
+        assert hero.alive is True
+
+    def test_stat_clamping_high(self):
+        c = Character("Test", 20, "Male", "Human", "Warrior", strength=200)
+        assert c.strength == 100
+
+    def test_stat_clamping_low(self):
+        c = Character("Test", 20, "Male", "Human", "Warrior", constitution=-50)
+        assert c.constitution == 1
+
+    def test_default_location(self):
+        c = Character("Test", 20, "Male", "Human", "Warrior")
+        assert c.location == "Aethoria Capital"
+
+    def test_auto_generated_id(self, hero):
+        assert hero.char_id is not None
+        assert len(hero.char_id) > 0
+
+    def test_unique_ids(self):
+        c1 = Character("A", 20, "Male", "Human", "Warrior")
+        c2 = Character("B", 20, "Male", "Human", "Warrior")
+        assert c1.char_id != c2.char_id
+
+    def test_explicit_char_id(self):
+        c = Character("Test", 20, "Male", "Human", "Warrior", char_id="abc123")
+        assert c.char_id == "abc123"
+
+    def test_skills_default_empty(self):
+        c = Character("Test", 20, "Male", "Human", "Warrior")
+        assert c.skills == {}
+
+    def test_relationships_default_empty(self):
+        c = Character("Test", 20, "Male", "Human", "Warrior")
+        assert c.relationships == {}
+
+    def test_history_default_empty(self):
+        c = Character("Test", 20, "Male", "Human", "Warrior")
+        assert c.history == []
+
+    def test_spouse_id_default_none(self):
+        c = Character("Test", 20, "Male", "Human", "Warrior")
+        assert c.spouse_id is None
+
+
+# ---------------------------------------------------------------------------
+# Properties
+# ---------------------------------------------------------------------------
+
+class TestCharacterProperties:
+    def test_combat_power_positive(self, hero):
+        assert hero.combat_power > 0
+
+    def test_combat_power_formula(self, hero):
+        expected = (hero.strength * 2 + hero.dexterity + hero.constitution) // 4
+        assert hero.combat_power == expected
+
+    def test_max_age_human(self, hero):
+        assert hero.max_age == 80
+
+    def test_max_age_elf(self, mage):
+        assert mage.max_age == 600
+
+    def test_max_age_unknown_race(self):
+        c = Character("Test", 20, "Male", "Gnome", "Warrior")
+        assert c.max_age == 80  # fallback
+
+
+# ---------------------------------------------------------------------------
+# Methods
+# ---------------------------------------------------------------------------
+
+class TestLevelUpSkill:
+    def test_increase_existing_skill(self, hero):
+        hero.level_up_skill("Swordsmanship", 1)
+        assert hero.skills["Swordsmanship"] == 3
+
+    def test_create_new_skill(self, hero):
+        hero.level_up_skill("Archery", 2)
+        assert hero.skills["Archery"] == 2
+
+    def test_cap_at_10(self, hero):
+        hero.skills["Swordsmanship"] = 9
+        hero.level_up_skill("Swordsmanship", 5)
+        assert hero.skills["Swordsmanship"] == 10
+
+    def test_already_max_message(self, hero):
+        hero.skills["Swordsmanship"] = 10
+        msg = hero.level_up_skill("Swordsmanship", 1)
+        assert "max" in msg.lower()
+        assert hero.skills["Swordsmanship"] == 10
+
+    def test_return_message_contains_name(self, hero):
+        msg = hero.level_up_skill("Swordsmanship")
+        assert hero.name in msg
+
+
+class TestUpdateRelationship:
+    def test_positive_delta(self, hero, mage):
+        hero.update_relationship(mage.char_id, 30)
+        assert hero.relationships[mage.char_id] == 30
+
+    def test_negative_delta(self, hero, mage):
+        hero.update_relationship(mage.char_id, -40)
+        assert hero.relationships[mage.char_id] == -40
+
+    def test_clamp_max(self, hero, mage):
+        hero.update_relationship(mage.char_id, 80)
+        hero.update_relationship(mage.char_id, 80)  # would exceed 100
+        assert hero.relationships[mage.char_id] == 100
+
+    def test_clamp_min(self, hero, mage):
+        hero.update_relationship(mage.char_id, -80)
+        hero.update_relationship(mage.char_id, -80)
+        assert hero.relationships[mage.char_id] == -100
+
+    def test_get_relationship_default(self, hero, mage):
+        assert hero.get_relationship(mage.char_id) == 0
+
+    def test_get_relationship_after_update(self, hero, mage):
+        hero.update_relationship(mage.char_id, 50)
+        assert hero.get_relationship(mage.char_id) == 50
+
+
+class TestAddHistory:
+    def test_append_event(self, hero):
+        hero.add_history("Year 1: Slew a goblin.")
+        assert "Year 1: Slew a goblin." in hero.history
+
+    def test_multiple_events_ordered(self, hero):
+        hero.add_history("Event A")
+        hero.add_history("Event B")
+        assert hero.history[-1] == "Event B"
+        assert hero.history[-2] == "Event A"
+
+
+class TestApplyStatDelta:
+    def test_positive_delta(self, hero):
+        old = hero.strength
+        hero.apply_stat_delta({"strength": 10})
+        assert hero.strength == old + 10
+
+    def test_negative_delta(self, hero):
+        hero.apply_stat_delta({"constitution": -5})
+        assert hero.constitution == 60  # 65 - 5
+
+    def test_clamped_below_one(self):
+        c = Character("Test", 20, "Male", "Human", "Warrior", strength=2)
+        c.apply_stat_delta({"strength": -50})
+        assert c.strength == 1
+
+    def test_clamped_above_hundred(self, hero):
+        hero.apply_stat_delta({"intelligence": 200})
+        assert hero.intelligence == 100
+
+    def test_ignores_unknown_stats(self, hero):
+        # Should not raise
+        hero.apply_stat_delta({"luck": 10, "mana": 5})
+
+
+# ---------------------------------------------------------------------------
+# Serialisation
+# ---------------------------------------------------------------------------
+
+class TestSerialization:
+    def test_to_dict_contains_all_fields(self, hero):
+        d = hero.to_dict()
+        expected_keys = {
+            "char_id", "name", "age", "gender", "race", "job",
+            "strength", "intelligence", "dexterity", "wisdom",
+            "charisma", "constitution", "skills", "relationships",
+            "alive", "location", "history", "spouse_id",
+        }
+        assert expected_keys.issubset(set(d.keys()))
+
+    def test_round_trip(self, hero):
+        d = hero.to_dict()
+        restored = Character.from_dict(d)
+        assert restored.name == hero.name
+        assert restored.char_id == hero.char_id
+        assert restored.strength == hero.strength
+        assert restored.skills == hero.skills
+        assert restored.alive == hero.alive
+
+    def test_from_dict_minimal(self):
+        data = {
+            "name": "Test",
+            "age": 30,
+            "gender": "Male",
+            "race": "Human",
+            "job": "Warrior",
+        }
+        c = Character.from_dict(data)
+        assert c.name == "Test"
+        assert c.age == 30
+
+    def test_to_dict_alive_false(self, hero):
+        hero.alive = False
+        d = hero.to_dict()
+        assert d["alive"] is False
+
+    def test_to_dict_spouse_id(self, hero, mage):
+        hero.spouse_id = mage.char_id
+        d = hero.to_dict()
+        assert d["spouse_id"] == mage.char_id
+
+
+# ---------------------------------------------------------------------------
+# random_stats helper
+# ---------------------------------------------------------------------------
+
+class TestRandomStats:
+    def test_returns_all_six_stats(self):
+        stats = random_stats()
+        assert set(stats.keys()) == {
+            "strength", "intelligence", "dexterity",
+            "wisdom", "charisma", "constitution",
+        }
+
+    def test_values_in_range(self):
+        for _ in range(50):
+            stats = random_stats(base=10, spread=20)
+            for v in stats.values():
+                assert 1 <= v <= 100
+
+    def test_race_bonuses_applied(self):
+        import random as _random
+        _random.seed(42)
+        stats_no_bonus  = random_stats(base=50, spread=0)
+        _random.seed(42)
+        stats_with_bonus = random_stats(base=50, spread=0, race_bonuses={"strength": 10})
+        assert stats_with_bonus["strength"] == stats_no_bonus["strength"] + 10
