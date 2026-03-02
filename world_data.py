@@ -14,7 +14,7 @@ Welcome to AETHORIA — a continent shaped by ancient magic and forgotten wars.
 Long ago, the Arcane Cataclysm tore the sky open for seven days and seven nights,
 leaving behind ley-lines of wild mana that pulse through mountain, forest, and sea.
 The Great Kingdoms rose and fell atop these ley-lines, and the scars of those
-civilisations are still visible in crumbling ruins and cursed dungeons scattered
+civilizations are still visible in crumbling ruins and cursed dungeons scattered
 across the land.
 
 Today, an uneasy peace holds among the city-states. Adventurers roam freely,
@@ -251,7 +251,7 @@ DISCOVERY_ITEMS = [
 
 BATTLE_OUTCOMES_WIN = [
     "landed a decisive blow",
-    "outmanoeuvred their opponent",
+    "outmaneuvered their opponent",
     "unleashed a devastating skill",
     "held firm and wore down the enemy",
     "turned the tide with a surprise tactic",
