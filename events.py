@@ -205,7 +205,7 @@ class EventSystem:
         rel2_after = char2.get_relationship(char1.char_id)
         avg_after = round((rel1_after + rel2_after) / 2)
 
-        if delta > 10:
+        if avg_after > 10:
             desc = tr(
                 "meeting_positive",
                 name1=char1.name,
@@ -215,7 +215,7 @@ class EventSystem:
                 relationship_b=rel2_after,
                 relationship_avg=avg_after,
             )
-        elif delta > 0:
+        elif avg_after > 0:
             desc = tr(
                 "meeting_pleasant",
                 name1=char1.name,
@@ -225,7 +225,7 @@ class EventSystem:
                 relationship_b=rel2_after,
                 relationship_avg=avg_after,
             )
-        elif delta == 0:
+        elif avg_after == 0:
             desc = tr(
                 "meeting_neutral",
                 name1=char1.name,

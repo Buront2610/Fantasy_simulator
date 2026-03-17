@@ -123,6 +123,17 @@ class TestEventMeeting:
         assert f"Bob->Alice: {rel_b:+d}" in result.description
         assert f"Avg: {rel_avg:+d}" in result.description
 
+    def test_description_tone_matches_average_relationship(self, es, char_a, char_b, world):
+        result = es.event_meeting(char_a, char_b, world, rng=random.Random(3))
+
+        rel_a = char_a.get_relationship(char_b.char_id)
+        rel_b = char_b.get_relationship(char_a.char_id)
+        rel_avg = round((rel_a + rel_b) / 2)
+
+        assert rel_avg > 0
+        assert "pleasant exchange" in result.description
+        assert "polite nod" not in result.description
+
 
 # ---------------------------------------------------------------------------
 # event_battle
