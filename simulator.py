@@ -211,6 +211,52 @@ class Simulator:
         """Return all EventResults of the given type."""
         return [ev for ev in self.history if ev.event_type == event_type]
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialise simulator state, including world and history."""
+        return {
+            "world": self.world.to_dict(),
+            "characters": [char.to_dict() for char in self.world.characters],
+            "events_per_year": self.events_per_year,
+            "adventure_steps_per_year": self.adventure_steps_per_year,
+            "history": [
+                {
+                    "description": ev.description,
+                    "affected_characters": list(ev.affected_characters),
+                    "stat_changes": ev.stat_changes,
+                    "event_type": ev.event_type,
+                    "year": ev.year,
+                }
+                for ev in self.history
+            ],
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Simulator":
+        """Rebuild a simulator from a serialised snapshot."""
+        from character import Character
+        from world import World
+
+        world = World.from_dict(data["world"])
+        world.characters = [
+            Character.from_dict(char_data) for char_data in data.get("characters", [])
+        ]
+        sim = cls(
+            world,
+            events_per_year=data.get("events_per_year", 8),
+            adventure_steps_per_year=data.get("adventure_steps_per_year", 3),
+        )
+        sim.history = [
+            EventResult(
+                description=ev["description"],
+                affected_characters=list(ev.get("affected_characters", [])),
+                stat_changes=ev.get("stat_changes", {}),
+                event_type=ev.get("event_type", "generic"),
+                year=ev.get("year", 0),
+            )
+            for ev in data.get("history", [])
+        ]
+        return sim
+
     def get_adventure_summaries(self, include_active: bool = True) -> List[str]:
         """Return summary lines for known adventures."""
         runs = list(self.world.completed_adventures)

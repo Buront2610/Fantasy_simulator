@@ -10,6 +10,7 @@ import pytest
 
 from character import Character
 from character_creator import CharacterCreator
+from save_load import load_simulation, save_simulation
 from simulator import Simulator
 from world import World
 
@@ -279,3 +280,34 @@ class TestFullIntegration:
         s.run(years=5)
         story = s.get_character_story(hero.char_id)
         assert "Sir Aldric" in story
+
+
+class TestSimulatorSerialization:
+    def test_round_trip_preserves_core_state(self):
+        world = _make_world(n_chars=5)
+        sim = Simulator(world, events_per_year=2, adventure_steps_per_year=4, seed=3)
+        sim.run(years=2)
+
+        restored = Simulator.from_dict(sim.to_dict())
+
+        assert restored.world.year == sim.world.year
+        assert len(restored.world.characters) == len(sim.world.characters)
+        assert restored.events_per_year == sim.events_per_year
+        assert restored.adventure_steps_per_year == sim.adventure_steps_per_year
+        assert len(restored.history) == len(sim.history)
+        assert len(restored.world.completed_adventures) == len(sim.world.completed_adventures)
+
+    def test_save_and_load_snapshot_file(self, tmp_path):
+        world = _make_world(n_chars=4)
+        sim = Simulator(world, events_per_year=1, adventure_steps_per_year=2, seed=5)
+        sim.run(years=1)
+
+        path = tmp_path / "snapshot.json"
+        save_simulation(sim, str(path))
+        restored = load_simulation(str(path))
+
+        assert restored.world.name == sim.world.name
+        assert restored.world.event_log == sim.world.event_log
+        assert [c.name for c in restored.world.characters] == [
+            c.name for c in sim.world.characters
+        ]
