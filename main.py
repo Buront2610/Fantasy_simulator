@@ -12,6 +12,7 @@ from typing import List, Optional
 
 from character import Character
 from character_creator import CharacterCreator
+from save_load import load_simulation, save_simulation
 from simulator import Simulator
 from world import World
 from world_data import WORLD_LORE
@@ -151,6 +152,7 @@ def _show_results(sim: Simulator) -> None:
                 "Adventure summaries",
                 "Adventure details",
                 "Resolve pending adventure choice",
+                "Save simulation snapshot",
                 "Character story (choose one)",
                 "All character stories",
                 "Simulation summary",
@@ -186,6 +188,9 @@ def _show_results(sim: Simulator) -> None:
 
         elif action == "Resolve pending adventure choice":
             _resolve_pending_adventure_choice(sim)
+
+        elif action == "Save simulation snapshot":
+            _save_simulation_snapshot(sim)
 
         elif action == "Character story (choose one)":
             _show_single_story(sim)
@@ -358,6 +363,42 @@ def _resolve_pending_adventure_choice(sim: Simulator) -> None:
     _pause()
 
 
+def _save_simulation_snapshot(sim: Simulator) -> None:
+    """Save the current simulation state to a JSON file."""
+    print()
+    default_name = "simulation_snapshot.json"
+    path = input(f"  Save path (default {default_name}): ").strip() or default_name
+    try:
+        save_simulation(sim, path)
+    except OSError as exc:
+        print(red(f"  Could not save snapshot: {exc}"))
+    else:
+        print(green(f"  Snapshot saved to {path}."))
+    _pause()
+
+
+def _load_simulation_snapshot() -> Optional[Simulator]:
+    """Load a saved simulation snapshot from disk."""
+    print("\n" + _hr("笊・))
+    print(bold("  LOAD SIMULATION SNAPSHOT"))
+    print(_hr("笊・))
+    default_name = "simulation_snapshot.json"
+    path = input(f"  Load path (default {default_name}): ").strip() or default_name
+    try:
+        sim = load_simulation(path)
+    except FileNotFoundError:
+        print(red(f"  Snapshot not found: {path}"))
+        _pause()
+        return None
+    except (OSError, ValueError, KeyError) as exc:
+        print(red(f"  Could not load snapshot: {exc}"))
+        _pause()
+        return None
+
+    print(green(f"  Loaded snapshot from {path}."))
+    return sim
+
+
 # ---------------------------------------------------------------------------
 # Screens
 # ---------------------------------------------------------------------------
@@ -496,6 +537,7 @@ def main() -> None:
             [
                 "Start new simulation (default world + random characters)",
                 "Create custom characters, then simulate",
+                "Load saved simulation snapshot",
                 "Read world lore & settings",
                 "Exit",
             ],
@@ -506,6 +548,10 @@ def main() -> None:
             screen_new_simulation()
         elif choice.startswith("Create"):
             screen_custom_simulation()
+        elif choice.startswith("Load"):
+            sim = _load_simulation_snapshot()
+            if sim is not None:
+                _show_results(sim)
         elif choice.startswith("Read"):
             screen_world_lore()
         else:
