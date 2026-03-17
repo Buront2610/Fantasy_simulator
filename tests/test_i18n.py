@@ -7,7 +7,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from i18n import get_locale, set_locale, tr
+from i18n import get_locale, set_locale, tr, tr_term
 
 
 class TestI18n:
@@ -29,3 +29,13 @@ class TestI18n:
     def test_translation_interpolation(self):
         set_locale("ja")
         assert "Year 42" in tr("simulation_advanced_to_year", year=42)
+
+    def test_new_localized_labels_exist(self):
+        set_locale("ja")
+        assert tr("running_simulation_details", years=3, events=8).startswith("シミュレーション実行中")
+        assert tr("primary_skills_label") == "主要スキル"
+
+    def test_term_translation_in_japanese(self):
+        set_locale("ja")
+        assert tr_term("Warrior") == "戦士"
+        assert tr_term("Quick Wit") == "機転"

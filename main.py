@@ -12,7 +12,7 @@ from typing import List, Optional
 
 from character import Character
 from character_creator import CharacterCreator
-from i18n import set_locale, tr
+from i18n import set_locale, tr, tr_term
 from save_load import load_simulation, save_simulation
 from simulator import Simulator
 from world import World
@@ -110,13 +110,13 @@ def _build_default_world(num_characters: int = 12) -> World:
 
 def _run_simulation(world: World, years: int) -> Simulator:
     print()
-    print(f"  {bold(tr('running_simulation'))} ({years} years, ~8 events/year)")
+    print(f"  {bold(tr('running_simulation_details', years=years, events=8))}")
     sim = Simulator(world, events_per_year=8)
     for _ in range(years):
         sim.advance_years(1)
         alive = sum(1 for c in world.characters if c.alive)
         print(
-            f"  Year {world.year}  |  {green(str(alive))} {tr('alive')}",
+            f"  {tr('year_label')} {world.year}  |  {green(str(alive))} {tr('alive')}",
             end="\r",
         )
     print()
@@ -223,7 +223,7 @@ def _show_roster(world: World) -> None:
     for c in world.characters:
         status = green(tr("status_alive")) if c.alive else red(tr("status_dead"))
         name_trunc = c.name[:21]
-        racejob = f"{c.race} {c.job}"[:21]
+        racejob = f"{tr_term(c.race)} {tr_term(c.job)}"[:21]
         loc_trunc = c.location[:20]
         print(
             f"  {name_trunc:<22} {racejob:<22} {c.age:>4}  "
@@ -239,7 +239,7 @@ def _show_single_story(sim: Simulator) -> None:
     print()
     for i, c in enumerate(world.characters, 1):
         status = green(tr("status_alive")) if c.alive else red(tr("status_dead"))
-        print(f"  {i:>2}. [{status}] {c.name} ({c.race} {c.job}, age {c.age})")
+        print(f"  {i:>2}. [{status}] {c.name} ({tr_term(c.race)} {tr_term(c.job)}, {tr('age_short_label')} {c.age})")
     print()
     raw = input(f"  {tr('enter_character_number')}").strip()
     if not raw or not raw.isdigit():
@@ -265,8 +265,8 @@ def _show_adventure_summaries(sim: Simulator) -> None:
     print(_hr())
     for i, run in enumerate(runs, 1):
         status = tr(f"outcome_{run.outcome}") if run.outcome else tr(f"state_{run.state}")
-        loot = f" | loot: {', '.join(run.loot_summary)}" if run.loot_summary else ""
-        injury = f" | injury: {run.injury_status}" if run.injury_status != "none" else ""
+        loot = f" | {tr('loot_label')}: {', '.join(run.loot_summary)}" if run.loot_summary else ""
+        injury = f" | {tr('injury_label')}: {run.injury_status}" if run.injury_status != "none" else ""
         print(
             f"  {i:>2}. {run.character_name} | {run.origin} -> {run.destination} "
             f"| {status}{injury}{loot}"
@@ -285,7 +285,7 @@ def _show_adventure_details(sim: Simulator) -> None:
 
     for i, run in enumerate(runs, 1):
         status = tr(f"outcome_{run.outcome}") if run.outcome else tr(f"state_{run.state}")
-        print(f"  {i:>2}. {run.character_name} at {run.destination} [{status}]")
+        print(f"  {i:>2}. {run.character_name} {tr('at_label')} {run.destination} [{status}]")
     print()
     raw = input(f"  {tr('enter_adventure_number')}").strip()
     if not raw or not raw.isdigit():
@@ -300,7 +300,7 @@ def _show_adventure_details(sim: Simulator) -> None:
     print(_hr())
     print(bold(f"  {tr('adventure_detail_header', name=run.character_name)}"))
     print(_hr())
-    print(f"  ID          : {run.adventure_id}")
+    print(f"  {tr('id_label'):<11}: {run.adventure_id}")
     print(f"  {tr('route'):<11}: {run.origin} -> {run.destination}")
     print(f"  {tr('state'):<11}: {tr(f'state_{run.state}')}")
     print(f"  {tr('outcome'):<11}: {tr(f'outcome_{run.outcome}') if run.outcome else tr('unresolved')}")
@@ -510,7 +510,7 @@ def screen_world_lore() -> None:
     print(bold(f"  {tr('jobs_classes')}"))
     print(_hr())
     for jname, jdesc, jskills in JOBS:
-        print(f"  {cyan(jname)}  |  Primary skills: {', '.join(jskills)}")
+        print(f"  {cyan(tr_term(jname))}  |  {tr('primary_skills_label')}: {', '.join(tr_term(skill) for skill in jskills)}")
         _print_wrapped(jdesc)
         print()
     _pause()

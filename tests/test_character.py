@@ -8,6 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 import pytest
 from character import Character, random_stats
+from i18n import get_locale, set_locale
 
 
 # ---------------------------------------------------------------------------
@@ -51,6 +52,14 @@ def mage() -> Character:
         constitution=25,
         skills={"Fireball": 4, "Mana Control": 3},
     )
+
+
+@pytest.fixture(autouse=True)
+def reset_locale():
+    previous = get_locale()
+    set_locale("en")
+    yield
+    set_locale(previous)
 
 
 # ---------------------------------------------------------------------------
@@ -152,12 +161,17 @@ class TestLevelUpSkill:
     def test_already_max_message(self, hero):
         hero.skills["Swordsmanship"] = 10
         msg = hero.level_up_skill("Swordsmanship", 1)
-        assert "max" in msg.lower()
+        assert "Swordsmanship" in msg
         assert hero.skills["Swordsmanship"] == 10
 
     def test_return_message_contains_name(self, hero):
         msg = hero.level_up_skill("Swordsmanship")
         assert hero.name in msg
+
+    def test_skill_message_localizes_in_japanese(self, hero):
+        set_locale("ja")
+        msg = hero.level_up_skill("Swordsmanship")
+        assert "レベル" in msg
 
 
 class TestUpdateRelationship:

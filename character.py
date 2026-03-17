@@ -8,7 +8,7 @@ import random
 import uuid
 from typing import Any, Dict, List, Optional
 
-from i18n import tr
+from i18n import tr, tr_term
 
 
 class Character:
@@ -94,8 +94,8 @@ class Character:
         new_level = min(10, current + amount)
         self.skills[skill_name] = new_level
         if new_level > current:
-            return f"{self.name} improved {skill_name} to level {new_level}."
-        return f"{self.name}'s {skill_name} is already at max level."
+            return tr("skill_improved", name=self.name, skill=skill_name, level=new_level)
+        return tr("skill_already_max", name=self.name, skill=skill_name)
 
     def update_relationship(self, other_id: str, delta: int) -> None:
         current = self.relationships.get(other_id, 0)
@@ -166,8 +166,8 @@ class Character:
     def stat_block(self) -> str:
         lines = [
             f"  {tr('name_label'):<10}: {self.name}",
-            f"  {tr('race_job_label'):<10}: {self.race} {self.job}",
-            f"  {tr('age_gender_label'):<10}: {self.age}  |  Gender: {self.gender}",
+            f"  {tr('race_job_label'):<10}: {tr_term(self.race)} {tr_term(self.job)}",
+            f"  {tr('age_gender_label'):<10}: {self.age}  |  {tr('gender_label')}: {tr_term(self.gender)}",
             f"  {tr('location_label'):<10}: {self.location}",
             f"  {tr('status_label'):<10}: {tr('status_alive') if self.alive else tr('status_dead')}",
             f"  {tr('stats_label')}",
@@ -176,7 +176,7 @@ class Character:
         ]
         if self.skills:
             top_skills = sorted(self.skills.items(), key=lambda x: -x[1])[:5]
-            skill_str = "  |  ".join(f"{k}(Lv{v})" for k, v in top_skills)
+            skill_str = "  |  ".join(f"{tr_term(k)}(Lv{v})" for k, v in top_skills)
             lines.append(f"  {tr('top_skills_label')}")
             lines.append(f"  {skill_str}")
         if self.injury_status != "none":

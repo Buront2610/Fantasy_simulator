@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 import pytest
 from character import Character
 from events import EventResult, EventSystem
+from i18n import get_locale, set_locale
 from world import World
 
 
@@ -25,6 +26,14 @@ def world() -> World:
 @pytest.fixture
 def es() -> EventSystem:
     return EventSystem()
+
+
+@pytest.fixture(autouse=True)
+def reset_locale():
+    previous = get_locale()
+    set_locale("en")
+    yield
+    set_locale(previous)
 
 
 def _make_char(
@@ -233,6 +242,14 @@ class TestEventDiscovery:
         changed = any(after[k] != before[k] for k in before)
         assert changed
 
+    def test_japanese_locale_discovery_text_has_no_fixed_english_tail(self, es, char_a, world):
+        set_locale("ja")
+        result = es.event_discovery(char_a, world, rng=random.Random(1))
+
+        assert "The knowledge contained within" not in result.description
+        assert "The discovery will prove useful" not in result.description
+        assert "Word of the discovery spread quickly" not in result.description
+
 
 # ---------------------------------------------------------------------------
 # event_skill_training
@@ -258,6 +275,13 @@ class TestEventSkillTraining:
         assert c.skills == {}
         es.event_skill_training(c, world)
         assert len(c.skills) > 0
+
+    def test_japanese_locale_training_text_has_no_fixed_english_effort(self, es, char_a, world):
+        set_locale("ja")
+        result = es.event_skill_training(char_a, world, rng=random.Random(0))
+
+        assert "spent long hours in the training yard" not in result.description
+        assert "pushed themselves beyond their limits" not in result.description
 
 
 # ---------------------------------------------------------------------------

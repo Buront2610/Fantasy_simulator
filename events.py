@@ -18,7 +18,7 @@ from world_data import (
     DISCOVERY_ITEMS,
     JOURNEY_EVENTS,
 )
-from i18n import tr
+from i18n import tr, tr_term
 
 
 @dataclass
@@ -173,21 +173,22 @@ class EventSystem:
         roll = rng.random()
         if roll < 0.4:
             stat_gains = {"intelligence": rng.randint(1, 4), "wisdom": rng.randint(0, 3)}
-            extra = "The knowledge contained within changed their outlook forever."
+            extra = tr("discovery_extra_knowledge")
         elif roll < 0.7:
             stat_gains = {"strength": rng.randint(1, 3), "dexterity": rng.randint(0, 2)}
-            extra = "The discovery will prove useful in future battles."
+            extra = tr("discovery_extra_battle")
         else:
             stat_gains = {"charisma": rng.randint(1, 4)}
-            extra = "Word of the discovery spread quickly, raising their reputation."
+            extra = tr("discovery_extra_reputation")
 
         char.apply_stat_delta(stat_gains)
         skill_candidates = list(char.skills.keys()) or ["Dungeoneering"]
         trained_skill = rng.choice(skill_candidates)
         char.level_up_skill(trained_skill)
 
-        desc = tr("discovery_narrative", name=char.name, item=item, location=char.location, extra=extra)
-        char.add_history(tr("history_discovery", year=world.year, item=item, location=char.location))
+        localized_item = tr_term(item)
+        desc = tr("discovery_narrative", name=char.name, item=localized_item, location=char.location, extra=extra)
+        char.add_history(tr("history_discovery", year=world.year, item=localized_item, location=char.location))
         return EventResult(
             description=desc,
             affected_characters=[char.char_id],
@@ -352,16 +353,24 @@ class EventSystem:
         char.apply_stat_delta(stat_bonus)
         effort = rng.choice(
             [
-                "spent long hours in the training yard",
-                "meditated through the night",
-                "sought out an old master for guidance",
-                "practised tirelessly until their hands bled",
-                "studied ancient scrolls",
-                "pushed themselves beyond their limits",
+                tr("training_effort_yard"),
+                tr("training_effort_meditated"),
+                tr("training_effort_master"),
+                tr("training_effort_tireless"),
+                tr("training_effort_scrolls"),
+                tr("training_effort_limits"),
             ]
         )
-        desc = tr("training_narrative", name=char.name, effort=effort, skill=skill, old_level=old_level, new_level=new_level)
-        char.add_history(tr("history_trained_skill", year=world.year, skill=skill, new_level=new_level))
+        localized_skill = tr_term(skill)
+        desc = tr(
+            "training_narrative",
+            name=char.name,
+            effort=effort,
+            skill=localized_skill,
+            old_level=old_level,
+            new_level=new_level,
+        )
+        char.add_history(tr("history_trained_skill", year=world.year, skill=localized_skill, new_level=new_level))
         return EventResult(
             description=desc,
             affected_characters=[char.char_id],
