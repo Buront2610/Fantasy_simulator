@@ -148,6 +148,9 @@ def _show_results(sim: Simulator) -> None:
                 "Character roster",
                 "Event log (last 30)",
                 "Full event log",
+                "Adventure summaries",
+                "Adventure details",
+                "Resolve pending adventure choice",
                 "Character story (choose one)",
                 "All character stories",
                 "Simulation summary",
@@ -174,6 +177,15 @@ def _show_results(sim: Simulator) -> None:
             for entry in sim.get_event_log():
                 print(f"  {dim('•')} {entry}")
             _pause()
+
+        elif action == "Adventure summaries":
+            _show_adventure_summaries(sim)
+
+        elif action == "Adventure details":
+            _show_adventure_details(sim)
+
+        elif action == "Resolve pending adventure choice":
+            _resolve_pending_adventure_choice(sim)
 
         elif action == "Character story (choose one)":
             _show_single_story(sim)
@@ -233,6 +245,117 @@ def _show_single_story(sim: Simulator) -> None:
         print()
         print(sim.get_character_story(char.char_id))
         _pause()
+
+
+def _show_adventure_summaries(sim: Simulator) -> None:
+    """Display known adventures in compact summary form."""
+    runs = list(sim.world.completed_adventures) + list(sim.world.active_adventures)
+    print()
+    if not runs:
+        print(dim("  No adventures have been recorded."))
+        _pause()
+        return
+
+    print(_hr())
+    print(bold("  ADVENTURE SUMMARIES"))
+    print(_hr())
+    for i, run in enumerate(runs, 1):
+        status = run.outcome or run.state
+        loot = f" | loot: {', '.join(run.loot_summary)}" if run.loot_summary else ""
+        injury = f" | injury: {run.injury_status}" if run.injury_status != "none" else ""
+        print(
+            f"  {i:>2}. {run.character_name} | {run.origin} -> {run.destination} "
+            f"| {status}{injury}{loot}"
+        )
+    print(_hr())
+    _pause()
+
+
+def _show_adventure_details(sim: Simulator) -> None:
+    """Let the user inspect a single adventure's detailed log."""
+    runs = list(sim.world.completed_adventures) + list(sim.world.active_adventures)
+    print()
+    if not runs:
+        print(dim("  No adventures are available to inspect."))
+        _pause()
+        return
+
+    for i, run in enumerate(runs, 1):
+        status = run.outcome or run.state
+        print(f"  {i:>2}. {run.character_name} at {run.destination} [{status}]")
+    print()
+    raw = input("  Enter adventure number (or ENTER to cancel): ").strip()
+    if not raw or not raw.isdigit():
+        return
+
+    idx = int(raw) - 1
+    if not (0 <= idx < len(runs)):
+        return
+
+    run = runs[idx]
+    print()
+    print(_hr())
+    print(bold(f"  ADVENTURE DETAIL - {run.character_name}"))
+    print(_hr())
+    print(f"  ID          : {run.adventure_id}")
+    print(f"  Route       : {run.origin} -> {run.destination}")
+    print(f"  State       : {run.state}")
+    print(f"  Outcome     : {run.outcome or 'unresolved'}")
+    print(f"  Injury      : {run.injury_status}")
+    print(f"  Steps       : {run.steps_taken}")
+    if run.loot_summary:
+        print(f"  Discoveries : {', '.join(run.loot_summary)}")
+    print()
+    for entry in sim.get_adventure_details(run.adventure_id):
+        print(f"  {dim('窶｢')} {entry}")
+    _pause()
+
+
+def _resolve_pending_adventure_choice(sim: Simulator) -> None:
+    """Resolve a pending adventure choice through the CLI."""
+    pending = sim.get_pending_adventure_choices()
+    print()
+    if not pending:
+        print(dim("  No pending adventure choices."))
+        _pause()
+        return
+
+    for i, item in enumerate(pending, 1):
+        options = ", ".join(item["options"])
+        print(
+            f"  {i:>2}. {item['character_name']} | {item['prompt']} "
+            f"[{options}] default={item['default_option']}"
+        )
+    print()
+
+    raw = input("  Enter pending choice number (or ENTER to cancel): ").strip()
+    if not raw or not raw.isdigit():
+        return
+
+    idx = int(raw) - 1
+    if not (0 <= idx < len(pending)):
+        return
+
+    item = pending[idx]
+    options = item["options"]
+    print()
+    for i, option in enumerate(options, 1):
+        default_marker = " (default)" if option == item["default_option"] else ""
+        print(f"  {i:>2}. {option}{default_marker}")
+    raw_option = input("  Enter option number (or ENTER for default): ").strip()
+    chosen_option = None
+    if raw_option.isdigit():
+        option_idx = int(raw_option) - 1
+        if 0 <= option_idx < len(options):
+            chosen_option = options[option_idx]
+
+    resolved = sim.resolve_adventure_choice(item["adventure_id"], option=chosen_option)
+    print()
+    if resolved:
+        print(green("  Choice resolved."))
+    else:
+        print(red("  Could not resolve that choice."))
+    _pause()
 
 
 # ---------------------------------------------------------------------------
