@@ -5,33 +5,16 @@ world.py - World map, Location dataclass, and the World class.
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
+from i18n import tr
 from world_data import DEFAULT_LOCATIONS, WORLD_LORE
 
 
-# ---------------------------------------------------------------------------
-# Location
-# ---------------------------------------------------------------------------
-
 @dataclass
 class Location:
-    """A single cell on the world grid.
-
-    Attributes
-    ----------
-    name : str
-        Human-readable place name.
-    description : str
-        Flavour text.
-    region_type : str
-        One of: city, village, forest, dungeon, mountain, plains, sea.
-    x : int
-        Grid column (0-based, west → east).
-    y : int
-        Grid row (0-based, north → south).
-    """
+    """A single cell on the world grid."""
 
     name: str
     description: str
@@ -39,31 +22,16 @@ class Location:
     x: int
     y: int
 
-    # Icons used in ASCII map rendering
-    _ICONS: Dict[str, str] = field(default_factory=dict, init=False, repr=False, compare=False)
-
-    def __post_init__(self) -> None:
-        self._ICONS = {
-            "city":     "🏙",
-            "village":  "🏘",
-            "forest":   "🌲",
-            "dungeon":  "💀",
-            "mountain": "⛰",
-            "plains":   "🌾",
-            "sea":      "🌊",
-        }
-
     @property
     def icon(self) -> str:
-        """Single-character icon for the ASCII map (fallback to '?')."""
         icons_ascii = {
-            "city":     "C",
-            "village":  "V",
-            "forest":   "F",
-            "dungeon":  "D",
+            "city": "C",
+            "village": "V",
+            "forest": "F",
+            "dungeon": "D",
             "mountain": "M",
-            "plains":   "P",
-            "sea":      "~",
+            "plains": "P",
+            "sea": "~",
         }
         return icons_ascii.get(self.region_type, "?")
 
@@ -87,33 +55,8 @@ class Location:
         )
 
 
-# ---------------------------------------------------------------------------
-# World
-# ---------------------------------------------------------------------------
-
 class World:
-    """Represents the entire game world.
-
-    Attributes
-    ----------
-    name : str
-        World / continent name.
-    lore : str
-        Narrative background text.
-    width : int
-        Grid width (columns).
-    height : int
-        Grid height (rows).
-    grid : dict[(x, y), Location]
-        All locations keyed by grid coordinate.
-    characters : list[Character]
-        All characters currently in the world (imported lazily to avoid
-        circular imports — type hint is kept as Any).
-    year : int
-        Current in-world year.
-    event_log : list[str]
-        Global log of every notable world event.
-    """
+    """Represents the entire game world."""
 
     def __init__(
         self,
@@ -129,62 +72,43 @@ class World:
         self.height: int = height
         self.year: int = year
         self.grid: Dict[Tuple[int, int], Location] = {}
-        self.characters: List[Any] = []  # List[Character] — avoids circular import
+        self.characters: List[Any] = []
         self.event_log: List[str] = []
         self.active_adventures: List[Any] = []
         self.completed_adventures: List[Any] = []
         self._build_default_map()
 
-    # ------------------------------------------------------------------
-    # Map construction
-    # ------------------------------------------------------------------
-
     def _build_default_map(self) -> None:
-        """Populate the grid with the predefined location data."""
         for entry in DEFAULT_LOCATIONS:
             name, desc, rtype, gx, gy = entry
             loc = Location(name=name, description=desc, region_type=rtype, x=gx, y=gy)
             self.grid[(gx, gy)] = loc
 
-    # ------------------------------------------------------------------
-    # Character management
-    # ------------------------------------------------------------------
-
     def add_character(self, character: Any) -> None:
-        """Add a character to the world (and assign a starting location if unset)."""
         if character.location not in self.location_names:
-            # Pick a random non-dungeon location
-            options = [
-                loc.name for loc in self.grid.values()
-                if loc.region_type != "dungeon"
-            ]
+            options = [loc.name for loc in self.grid.values() if loc.region_type != "dungeon"]
             character.location = random.choice(options) if options else self.location_names[0]
         self.characters.append(character)
 
     def remove_character(self, char_id: str) -> None:
-        """Remove a character by ID (e.g. on death)."""
         self.characters = [c for c in self.characters if c.char_id != char_id]
 
     def get_character_by_id(self, char_id: str) -> Optional[Any]:
-        """Return the character with the matching ID, or None."""
         for c in self.characters:
             if c.char_id == char_id:
                 return c
         return None
 
     def get_adventure_by_id(self, adventure_id: str) -> Optional[Any]:
-        """Return an active or completed adventure by ID."""
         for run in self.active_adventures + self.completed_adventures:
             if run.adventure_id == adventure_id:
                 return run
         return None
 
     def add_adventure(self, run: Any) -> None:
-        """Register a newly created adventure."""
         self.active_adventures.append(run)
 
     def complete_adventure(self, adventure_id: str) -> None:
-        """Move an adventure from active to completed storage."""
         remaining: List[Any] = []
         for run in self.active_adventures:
             if run.adventure_id == adventure_id:
@@ -193,31 +117,20 @@ class World:
                 remaining.append(run)
         self.active_adventures = remaining
 
-    # ------------------------------------------------------------------
-    # Location queries
-    # ------------------------------------------------------------------
-
     @property
     def location_names(self) -> List[str]:
-        """Sorted list of all location names."""
         return sorted(loc.name for loc in self.grid.values())
 
     def get_location_by_name(self, name: str) -> Optional[Location]:
-        """Return the Location with the given name, or None."""
         for loc in self.grid.values():
             if loc.name == name:
                 return loc
         return None
 
     def get_characters_at_location(self, location_name: str) -> List[Any]:
-        """Return all *alive* characters currently at *location_name*."""
         return [c for c in self.characters if c.location == location_name and c.alive]
 
     def get_neighboring_locations(self, location_name: str) -> List[Location]:
-        """Return locations adjacent (4-directional) to *location_name*.
-
-        Diagonal neighbours are not included.
-        """
         source = self.get_location_by_name(location_name)
         if source is None:
             return []
@@ -229,79 +142,54 @@ class World:
         return neighbours
 
     def random_location(self, exclude_dungeon: bool = False) -> Location:
-        """Return a random location from the grid."""
         options = list(self.grid.values())
         if exclude_dungeon:
             options = [l for l in options if l.region_type != "dungeon"]
         return random.choice(options)
 
-    # ------------------------------------------------------------------
-    # Time
-    # ------------------------------------------------------------------
-
     def advance_time(self, years: int = 1) -> None:
-        """Advance the world clock by *years*."""
         self.year += years
 
     def log_event(self, event_text: str) -> None:
-        """Append a timestamped entry to the global event log."""
         self.event_log.append(f"[Year {self.year}] {event_text}")
 
-    # ------------------------------------------------------------------
-    # ASCII map rendering
-    # ------------------------------------------------------------------
-
     def render_map(self, highlight_location: Optional[str] = None) -> str:
-        """Return a pretty ASCII grid of the world map.
-
-        Parameters
-        ----------
-        highlight_location
-            If given, that cell is marked with '*' instead of its normal icon.
-        """
-        lines: List[str] = []
-        col_width = 14  # characters per cell (name truncated)
-
-        # Header
-        lines.append(f"  ╔{'═' * (col_width * self.width + self.width - 1)}╗")
-        lines.append(f"  ║  🗺  {self.name.upper()} — Year {self.year}".ljust(col_width * self.width + 2) + "║")
-        lines.append(f"  ╠{'═' * (col_width * self.width + self.width - 1)}╣")
+        """Return a stable ASCII grid of the world map."""
+        cell_width = 16
+        total_width = self.width * (cell_width + 1) + 1
+        border = "  +" + "-" * (total_width - 2) + "+"
+        lines: List[str] = [
+            border,
+            f"  | {tr('map_title')}: {self.name} | {tr('map_year')}: {self.year}".ljust(total_width) + "|",
+            border,
+        ]
 
         for y in range(self.height):
-            name_row: List[str] = []
-            type_row: List[str] = []
-            pop_row:  List[str] = []
+            row_names: List[str] = []
+            row_types: List[str] = []
+            row_pops: List[str] = []
             for x in range(self.width):
                 loc = self.grid.get((x, y))
                 if loc is None:
-                    name_row.append("  ???  ".ljust(col_width))
-                    type_row.append("".ljust(col_width))
-                    pop_row.append("".ljust(col_width))
+                    row_names.append(" ? ???".ljust(cell_width))
+                    row_types.append("".ljust(cell_width))
+                    row_pops.append("".ljust(cell_width))
                     continue
-                is_hl = loc.name == highlight_location
-                icon = "*" if is_hl else loc.icon
-                pop = len(self.get_characters_at_location(loc.name))
-                trunc_name = loc.name[:col_width - 4]
-                name_row.append(f" {icon} {trunc_name}".ljust(col_width))
-                type_row.append(f"  [{loc.region_type[:8]}]".ljust(col_width))
-                pop_row.append(f"  pop:{pop:>3}".ljust(col_width))
 
-            sep = "│"
-            lines.append(f"  ║{sep.join(name_row)}║")
-            lines.append(f"  ║{sep.join(type_row)}║")
-            lines.append(f"  ║{sep.join(pop_row)}║")
-            if y < self.height - 1:
-                lines.append(f"  ╠{'─' * (col_width * self.width + self.width - 1)}╣")
+                icon = "*" if loc.name == highlight_location else loc.icon
+                population = len(self.get_characters_at_location(loc.name))
+                row_names.append(f" {icon} {loc.name[:cell_width - 4]}".ljust(cell_width))
+                row_types.append(f" {tr('map_type')}: {loc.region_type[:cell_width - 8]}".ljust(cell_width))
+                row_pops.append(f" {tr('map_population')}: {population}".ljust(cell_width))
 
-        lines.append(f"  ╚{'═' * (col_width * self.width + self.width - 1)}╝")
+            lines.append("  |" + "|".join(row_names) + "|")
+            lines.append("  |" + "|".join(row_types) + "|")
+            lines.append("  |" + "|".join(row_pops) + "|")
+            lines.append(border)
+
         return "\n".join(lines)
 
-    # ------------------------------------------------------------------
-    # Serialisation
-    # ------------------------------------------------------------------
-
     def to_dict(self) -> Dict[str, Any]:
-        """Serialise world state (without characters — serialise them separately)."""
         return {
             "name": self.name,
             "lore": self.lore,
