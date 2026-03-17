@@ -8,6 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 import pytest
 
+from adventure import AdventureChoice, AdventureRun
 from character import Character
 from character_creator import CharacterCreator
 from i18n import get_locale, set_locale
@@ -361,6 +362,38 @@ class TestSimulatorSerialization:
 
         assert get_locale() == "ja"
 
+    def test_save_and_load_preserves_pending_choice_ids_across_locale_change(self, tmp_path):
+        set_locale("ja")
+        world = World()
+        char = Character("Aldric", 25, "Male", "Human", "Warrior", location="Aethoria Capital")
+        world.add_character(char)
+        sim = Simulator(world, events_per_year=0, adventure_steps_per_year=1, seed=1)
+        run = AdventureRun(
+            character_id=char.char_id,
+            character_name=char.name,
+            origin=char.location,
+            destination="Sunken Ruins",
+            year_started=world.year,
+            state="waiting_for_choice",
+        )
+        run.pending_choice = AdventureChoice(
+            prompt="test",
+            options=["press_on", "proceed_cautiously", "retreat"],
+            default_option="proceed_cautiously",
+            context="approach",
+        )
+        char.active_adventure_id = run.adventure_id
+        world.add_adventure(run)
+
+        path = tmp_path / "snapshot_pending_choice.json"
+        save_simulation(sim, str(path))
+        set_locale("en")
+        restored = load_simulation(str(path))
+
+        pending = restored.get_pending_adventure_choices()
+        assert pending
+        assert pending[0]["default_option"] == "proceed_cautiously"
+
 
 class TestInjuryRecovery:
     def test_injured_character_can_recover_during_year(self):
@@ -402,3 +435,54 @@ class TestInjuryRecovery:
         assert char.injury_status == "injured"
         assert char.active_adventure_id is None
         assert world.active_adventures == []
+
+
+class TestAdventureSafety:
+    def test_dead_character_adventure_is_not_advanced(self):
+        world = World()
+        char = Character("Aldric", 95, "Male", "Human", "Warrior", location="Aethoria Capital")
+        world.add_character(char)
+        sim = Simulator(world, events_per_year=0, adventure_steps_per_year=3, seed=1)
+
+        sim.rng = type(
+            "FixedRng",
+            (),
+            {
+                "random": lambda self: 0.0,
+                "choice": lambda self, options: options[0],
+                "randint": lambda self, lo, hi: lo,
+                "choices": lambda self, population, weights=None, k=1: [population[0]] * k,
+                "sample": lambda self, population, k: list(population[:k]),
+            },
+        )()
+
+        sim._maybe_start_adventure()
+        run = world.active_adventures[0]
+        run.steps_taken = 0
+        sim.event_system.event_death(char, world, rng=sim.rng)
+
+        sim._advance_adventures()
+
+        assert world.active_adventures == []
+        assert len(world.completed_adventures) == 1
+        assert world.completed_adventures[0].outcome == "death"
+        assert world.completed_adventures[0].steps_taken == 0
+
+    def test_adventure_summary_uses_localized_status(self):
+        set_locale("en")
+        world = World()
+        sim = Simulator(world, events_per_year=0, adventure_steps_per_year=0, seed=1)
+        run = AdventureRun(
+            character_id="hero1",
+            character_name="Aldric",
+            origin="Aethoria Capital",
+            destination="Whispering Woods",
+            year_started=1000,
+            state="waiting_for_choice",
+        )
+        world.add_adventure(run)
+
+        summaries = sim.get_adventure_summaries()
+
+        assert "[waiting_for_choice]" not in summaries[0]
+        assert "[waiting for choice]" in summaries[0]

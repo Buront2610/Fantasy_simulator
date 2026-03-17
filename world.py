@@ -141,11 +141,11 @@ class World:
                 neighbours.append(self.grid[coord])
         return neighbours
 
-    def random_location(self, exclude_dungeon: bool = False) -> Location:
+    def random_location(self, exclude_dungeon: bool = False, rng: Any = random) -> Location:
         options = list(self.grid.values())
         if exclude_dungeon:
             options = [l for l in options if l.region_type != "dungeon"]
-        return random.choice(options)
+        return rng.choice(options)
 
     def advance_time(self, years: int = 1) -> None:
         self.year += years

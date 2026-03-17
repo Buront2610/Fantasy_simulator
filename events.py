@@ -301,6 +301,7 @@ class EventSystem:
 
     def event_death(self, char: Any, world: Any, rng: Any = random) -> EventResult:
         char.alive = False
+        char.active_adventure_id = None
         if char.spouse_id:
             spouse = world.get_character_by_id(char.spouse_id)
             if spouse and spouse.alive:

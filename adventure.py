@@ -19,6 +19,11 @@ ADVENTURE_DISCOVERIES = [
     "a cache of monster trophies",
 ]
 
+CHOICE_PRESS_ON = "press_on"
+CHOICE_PROCEED_CAUTIOUSLY = "proceed_cautiously"
+CHOICE_RETREAT = "retreat"
+CHOICE_WITHDRAW = "withdraw"
+
 
 @dataclass
 class AdventureChoice:
@@ -132,8 +137,8 @@ class AdventureRun:
             if rng.random() < 0.35:
                 self.pending_choice = AdventureChoice(
                     prompt=tr("choice_dangerous_approach", name=self.character_name, destination=self.destination),
-                    options=[tr("choice_press_on"), tr("choice_proceed_cautiously"), tr("choice_retreat")],
-                    default_option=tr("choice_proceed_cautiously"),
+                    options=[CHOICE_PRESS_ON, CHOICE_PROCEED_CAUTIOUSLY, CHOICE_RETREAT],
+                    default_option=CHOICE_PROCEED_CAUTIOUSLY,
                     context="approach",
                 )
                 self.state = "waiting_for_choice"
@@ -174,8 +179,8 @@ class AdventureRun:
             if self.pending_choice is None and rng.random() < 0.40:
                 self.pending_choice = AdventureChoice(
                     prompt=tr("choice_press_deeper", name=self.character_name, destination=self.destination),
-                    options=[tr("choice_press_on"), tr("choice_withdraw")],
-                    default_option=tr("choice_withdraw"),
+                    options=[CHOICE_PRESS_ON, CHOICE_WITHDRAW],
+                    default_option=CHOICE_WITHDRAW,
                     context="depth",
                 )
                 self.state = "waiting_for_choice"
@@ -224,25 +229,25 @@ class AdventureRun:
             chosen = self.pending_choice.default_option
         self.pending_choice.selected_option = chosen
 
-        detail = tr("detail_choice_made", name=self.character_name, choice=chosen)
+        detail = tr("detail_choice_made", name=self.character_name, choice=tr(f"choice_{chosen}"))
         self.detail_log.append(detail)
 
         context = self.pending_choice.context
         self.pending_choice = None
 
-        if chosen in (tr("choice_retreat"), tr("choice_withdraw")):
+        if chosen in (CHOICE_RETREAT, CHOICE_WITHDRAW):
             self.state = "returning"
             summary = tr("summary_choice_withdraw", name=self.character_name)
             self.summary_log.append(summary)
             self.detail_log.append(tr("detail_choice_withdraw", name=self.character_name))
             return [summary]
 
-        if context == "approach" and chosen == tr("choice_proceed_cautiously"):
+        if context == "approach" and chosen == CHOICE_PROCEED_CAUTIOUSLY:
             self.state = "exploring"
             self.detail_log.append(tr("detail_choice_cautious", name=self.character_name, destination=self.destination))
             return []
 
-        if context in ("approach", "depth") and chosen == tr("choice_press_on"):
+        if context in ("approach", "depth") and chosen == CHOICE_PRESS_ON:
             self.state = "exploring"
             self.detail_log.append(tr("detail_choice_press_on", name=self.character_name, destination=self.destination))
             return []
@@ -264,7 +269,7 @@ def create_adventure_run(character: Any, world: Any, rng: Any = random) -> Adven
             loc for loc in world.grid.values()
             if loc.region_type in ("forest", "mountain", "dungeon")
         ]
-    destination = rng.choice(risky) if risky else world.random_location()
+    destination = rng.choice(risky) if risky else world.random_location(rng=rng)
 
     run = AdventureRun(
         character_id=character.char_id,

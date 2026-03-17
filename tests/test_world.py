@@ -55,3 +55,13 @@ class TestWorld:
         world.add_character(dead)
         chars = world.get_characters_at_location("Aethoria Capital")
         assert [c.name for c in chars] == ["Alive"]
+
+    def test_random_location_uses_injected_rng(self):
+        world = World()
+
+        class FixedRng:
+            def choice(self, options):
+                return options[-1]
+
+        location = world.random_location(rng=FixedRng())
+        assert location == list(world.grid.values())[-1]

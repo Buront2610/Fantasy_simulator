@@ -465,7 +465,7 @@ _TEXT: Dict[str, Dict[str, str]] = {
         "map_population": "Pop",
         "state_traveling": "traveling",
         "state_exploring": "exploring",
-        "state_waiting_for_choice": "waiting_for_choice",
+        "state_waiting_for_choice": "waiting for choice",
         "state_returning": "returning",
         "state_resolved": "resolved",
         "outcome_safe_return": "safe return",

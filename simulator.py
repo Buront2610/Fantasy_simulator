@@ -139,6 +139,9 @@ class Simulator:
                 char = self.world.get_character_by_id(run.character_id)
                 if char is None:
                     continue
+                if not char.alive:
+                    self._resolve_dead_character_adventure(run, char)
+                    continue
                 had_pending_choice = run.pending_choice is not None
                 summaries = run.step(char, self.world, rng=self.rng)
                 for entry in summaries:
@@ -147,6 +150,14 @@ class Simulator:
                     self.world.complete_adventure(run.adventure_id)
                 elif not had_pending_choice and run.pending_choice is not None:
                     paused_until_next_year.add(run.adventure_id)
+
+    def _resolve_dead_character_adventure(self, run: Any, char: Any) -> None:
+        run.pending_choice = None
+        run.state = "resolved"
+        run.outcome = "death"
+        run.resolution_year = self.world.year
+        char.active_adventure_id = None
+        self.world.complete_adventure(run.adventure_id)
 
     # ------------------------------------------------------------------
     # Summary & stories
@@ -300,7 +311,8 @@ class Simulator:
             runs.extend(self.world.active_adventures)
         summaries: List[str] = []
         for run in runs:
-            status = run.outcome or run.state
+            status_key = f"outcome_{run.outcome}" if run.outcome else f"state_{run.state}"
+            status = tr(status_key)
             summaries.append(
                 f"{run.character_name}: {run.origin} -> {run.destination} [{status}]"
             )

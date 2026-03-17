@@ -7,8 +7,17 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from adventure import AdventureChoice, AdventureRun, create_adventure_run
+from adventure import (
+    AdventureChoice,
+    AdventureRun,
+    CHOICE_PROCEED_CAUTIOUSLY,
+    CHOICE_PRESS_ON,
+    CHOICE_RETREAT,
+    CHOICE_WITHDRAW,
+    create_adventure_run,
+)
 from character import Character
+from i18n import set_locale
 from simulator import Simulator
 from world import World
 
@@ -95,6 +104,12 @@ def test_travel_step_can_enter_waiting_for_choice_state():
     assert run.state == "waiting_for_choice"
     assert run.pending_choice is not None
     assert len(run.pending_choice.options) >= 2
+    assert set(run.pending_choice.options) <= {
+        CHOICE_PRESS_ON,
+        CHOICE_PROCEED_CAUTIOUSLY,
+        CHOICE_RETREAT,
+        CHOICE_WITHDRAW,
+    }
 
 
 def test_waiting_choice_defaults_automatically_on_next_step():
@@ -172,3 +187,22 @@ def test_pending_choice_persists_until_later_year(monkeypatch):
     assert world.active_adventures == []
     assert len(world.completed_adventures) == 1
     assert world.completed_adventures[0].outcome == "safe_return"
+
+
+def test_choice_resolution_survives_locale_change():
+    world = World()
+    char = _make_character()
+    world.add_character(char)
+    run = create_adventure_run(char, world, rng=FakeRng([0.9]))
+    run.step(char, world, rng=FakeRng([0.10]))
+
+    set_locale("ja")
+    assert run.pending_choice is not None
+    assert run.pending_choice.default_option == CHOICE_PROCEED_CAUTIOUSLY
+
+    set_locale("en")
+    summaries = run.resolve_choice(world, char, option=CHOICE_RETREAT)
+
+    assert summaries
+    assert run.state == "returning"
+    assert run.pending_choice is None

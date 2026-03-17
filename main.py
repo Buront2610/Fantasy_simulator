@@ -323,10 +323,11 @@ def _resolve_pending_adventure_choice(sim: Simulator) -> None:
         return
 
     for i, item in enumerate(pending, 1):
-        options = ", ".join(item["options"])
+        options = ", ".join(tr(f"choice_{option}") for option in item["options"])
+        default_label = tr(f"choice_{item['default_option']}")
         print(
             f"  {i:>2}. {item['character_name']} | {item['prompt']} "
-            f"[{options}] {tr('choice_default_hint', default_option=item['default_option'])}"
+            f"[{options}] {tr('choice_default_hint', default_option=default_label)}"
         )
     print()
 
@@ -343,7 +344,7 @@ def _resolve_pending_adventure_choice(sim: Simulator) -> None:
     print()
     for i, option in enumerate(options, 1):
         default_marker = f" {tr('default_marker')}" if option == item["default_option"] else ""
-        print(f"  {i:>2}. {option}{default_marker}")
+        print(f"  {i:>2}. {tr(f'choice_{option}')}{default_marker}")
     raw_option = input(f"  {tr('enter_option_number')}").strip()
     chosen_option = None
     if raw_option.isdigit():
