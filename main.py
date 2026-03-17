@@ -145,6 +145,8 @@ def _show_results(sim: Simulator) -> None:
         action = _choose(
             "What would you like to see?",
             [
+                "Advance 1 year",
+                "Advance 5 years",
                 "World map",
                 "Character roster",
                 "Event log (last 30)",
@@ -160,7 +162,13 @@ def _show_results(sim: Simulator) -> None:
             ],
         )
 
-        if action == "World map":
+        if action == "Advance 1 year":
+            _advance_simulation(sim, 1)
+
+        elif action == "Advance 5 years":
+            _advance_simulation(sim, 5)
+
+        elif action == "World map":
             print()
             print(world.render_map())
             _pause()
@@ -397,6 +405,27 @@ def _load_simulation_snapshot() -> Optional[Simulator]:
 
     print(green(f"  Loaded snapshot from {path}."))
     return sim
+
+
+def _advance_simulation(sim: Simulator, years: int) -> None:
+    """Advance an existing simulation by a chosen number of years."""
+    if years <= 0:
+        return
+
+    print()
+    print(f"  {bold('Advancing simulation...')} (+{years} years)")
+    for _ in range(years):
+        sim._run_year()
+        pending = len(sim.get_pending_adventure_choices())
+        alive = sum(1 for c in sim.world.characters if c.alive)
+        print(
+            f"  Year {sim.world.year}  |  "
+            f"{green(str(alive))} alive  |  "
+            f"{yellow(str(pending))} pending choices",
+            end="\r",
+        )
+    print()
+    print(f"  {green('笨・)}  Simulation advanced to year {sim.world.year}.")
 
 
 # ---------------------------------------------------------------------------
