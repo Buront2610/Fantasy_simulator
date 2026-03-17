@@ -77,6 +77,8 @@ class Character:
         history: Optional[List[str]] = None,
         char_id: Optional[str] = None,
         spouse_id: Optional[str] = None,
+        injury_status: str = "none",
+        active_adventure_id: Optional[str] = None,
     ) -> None:
         self.char_id: str = char_id or uuid.uuid4().hex[:8]
         self.name: str = name
@@ -98,6 +100,8 @@ class Character:
         self.location: str = location
         self.history: List[str] = history if history is not None else []
         self.spouse_id: Optional[str] = spouse_id
+        self.injury_status: str = injury_status
+        self.active_adventure_id: Optional[str] = active_adventure_id
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -191,6 +195,8 @@ class Character:
             "location": self.location,
             "history": self.history,
             "spouse_id": self.spouse_id,
+            "injury_status": self.injury_status,
+            "active_adventure_id": self.active_adventure_id,
         }
 
     @classmethod
@@ -215,6 +221,8 @@ class Character:
             history=data.get("history", []),
             char_id=data.get("char_id"),
             spouse_id=data.get("spouse_id"),
+            injury_status=data.get("injury_status", "none"),
+            active_adventure_id=data.get("active_adventure_id"),
         )
 
     # ------------------------------------------------------------------
@@ -245,6 +253,8 @@ class Character:
             skill_str = "  |  ".join(f"{k}(Lv{v})" for k, v in top_skills)
             lines.append(f"  ─── Top Skills ─────────────────────────")
             lines.append(f"  {skill_str}")
+        if self.injury_status != "none":
+            lines.append(f"  Injury     : {self.injury_status}")
         return "\n".join(lines)
 
 

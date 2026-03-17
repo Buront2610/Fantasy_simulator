@@ -131,6 +131,8 @@ class World:
         self.grid: Dict[Tuple[int, int], Location] = {}
         self.characters: List[Any] = []  # List[Character] — avoids circular import
         self.event_log: List[str] = []
+        self.active_adventures: List[Any] = []
+        self.completed_adventures: List[Any] = []
         self._build_default_map()
 
     # ------------------------------------------------------------------
@@ -169,6 +171,27 @@ class World:
             if c.char_id == char_id:
                 return c
         return None
+
+    def get_adventure_by_id(self, adventure_id: str) -> Optional[Any]:
+        """Return an active or completed adventure by ID."""
+        for run in self.active_adventures + self.completed_adventures:
+            if run.adventure_id == adventure_id:
+                return run
+        return None
+
+    def add_adventure(self, run: Any) -> None:
+        """Register a newly created adventure."""
+        self.active_adventures.append(run)
+
+    def complete_adventure(self, adventure_id: str) -> None:
+        """Move an adventure from active to completed storage."""
+        remaining: List[Any] = []
+        for run in self.active_adventures:
+            if run.adventure_id == adventure_id:
+                self.completed_adventures.append(run)
+            else:
+                remaining.append(run)
+        self.active_adventures = remaining
 
     # ------------------------------------------------------------------
     # Location queries
@@ -287,10 +310,14 @@ class World:
             "year": self.year,
             "grid": [loc.to_dict() for loc in self.grid.values()],
             "event_log": self.event_log,
+            "active_adventures": [run.to_dict() for run in self.active_adventures],
+            "completed_adventures": [run.to_dict() for run in self.completed_adventures],
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "World":
+        from adventure import AdventureRun
+
         world = cls(
             name=data["name"],
             lore=data.get("lore", WORLD_LORE),
@@ -303,6 +330,12 @@ class World:
             loc = Location.from_dict(loc_data)
             world.grid[(loc.x, loc.y)] = loc
         world.event_log = data.get("event_log", [])
+        world.active_adventures = [
+            AdventureRun.from_dict(run) for run in data.get("active_adventures", [])
+        ]
+        world.completed_adventures = [
+            AdventureRun.from_dict(run) for run in data.get("completed_adventures", [])
+        ]
         return world
 
     def __repr__(self) -> str:  # pragma: no cover

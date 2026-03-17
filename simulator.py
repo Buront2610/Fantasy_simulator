@@ -7,6 +7,7 @@ from __future__ import annotations
 import random
 from typing import Any, Dict, List, Optional
 
+from adventure import create_adventure_run
 from events import EventResult, EventSystem
 
 
@@ -27,10 +28,12 @@ class Simulator:
         self,
         world: Any,
         events_per_year: int = 8,
+        adventure_steps_per_year: int = 3,
         seed: Optional[int] = None,
     ) -> None:
         self.world = world
         self.events_per_year = events_per_year
+        self.adventure_steps_per_year = adventure_steps_per_year
         self.event_system = EventSystem()
         self.history: List[EventResult] = []  # all events across all years
         if seed is not None:
@@ -60,6 +63,10 @@ class Simulator:
                 self.history.append(result)
                 self.world.log_event(result.description)
 
+        # --- Adventure start / progression ---
+        self._maybe_start_adventure()
+        self._advance_adventures()
+
         # --- Random events ---
         alive = [c for c in self.world.characters if c.alive]
         if not alive:
@@ -75,6 +82,41 @@ class Simulator:
                 self.world.log_event(result.description)
 
         self.world.advance_time(1)
+
+    def _maybe_start_adventure(self) -> None:
+        """Start at most one new adventure in the current year."""
+        candidates = [
+            c for c in self.world.characters
+            if c.alive and c.active_adventure_id is None and c.injury_status != "injured"
+        ]
+        if not candidates or random.random() >= 0.25:
+            return
+
+        char = random.choice(candidates)
+        run = create_adventure_run(char, self.world, rng=random)
+        char.active_adventure_id = run.adventure_id
+        char.add_history(
+            f"Year {self.world.year}: Set out from {run.origin} toward {run.destination}."
+        )
+        self.world.add_adventure(run)
+        self.world.log_event(run.summary_log[-1])
+
+    def _advance_adventures(self) -> None:
+        """Advance active adventures by multiple internal steps per year."""
+        for _ in range(self.adventure_steps_per_year):
+            active_ids = [run.adventure_id for run in self.world.active_adventures]
+            for adventure_id in active_ids:
+                run = self.world.get_adventure_by_id(adventure_id)
+                if run is None or run.is_resolved:
+                    continue
+                char = self.world.get_character_by_id(run.character_id)
+                if char is None:
+                    continue
+                summaries = run.step(char, self.world, rng=random)
+                for entry in summaries:
+                    self.world.log_event(entry)
+                if run.is_resolved:
+                    self.world.complete_adventure(run.adventure_id)
 
     # ------------------------------------------------------------------
     # Summary & stories
@@ -168,3 +210,57 @@ class Simulator:
     def events_by_type(self, event_type: str) -> List[EventResult]:
         """Return all EventResults of the given type."""
         return [ev for ev in self.history if ev.event_type == event_type]
+
+    def get_adventure_summaries(self, include_active: bool = True) -> List[str]:
+        """Return summary lines for known adventures."""
+        runs = list(self.world.completed_adventures)
+        if include_active:
+            runs.extend(self.world.active_adventures)
+        summaries: List[str] = []
+        for run in runs:
+            status = run.outcome or run.state
+            summaries.append(
+                f"{run.character_name}: {run.origin} -> {run.destination} [{status}]"
+            )
+        return summaries
+
+    def get_adventure_details(self, adventure_id: str) -> List[str]:
+        """Return detailed log entries for a specific adventure."""
+        run = self.world.get_adventure_by_id(adventure_id)
+        if run is None:
+            return []
+        return list(run.detail_log)
+
+    def get_pending_adventure_choices(self) -> List[Dict[str, Any]]:
+        """Return all unresolved adventure choices."""
+        pending: List[Dict[str, Any]] = []
+        for run in self.world.active_adventures:
+            if run.pending_choice is not None:
+                pending.append(
+                    {
+                        "adventure_id": run.adventure_id,
+                        "character_id": run.character_id,
+                        "character_name": run.character_name,
+                        "prompt": run.pending_choice.prompt,
+                        "options": list(run.pending_choice.options),
+                        "default_option": run.pending_choice.default_option,
+                    }
+                )
+        return pending
+
+    def resolve_adventure_choice(
+        self,
+        adventure_id: str,
+        option: Optional[str] = None,
+    ) -> bool:
+        """Resolve a pending choice on a specific adventure."""
+        run = self.world.get_adventure_by_id(adventure_id)
+        if run is None or run.pending_choice is None:
+            return False
+        char = self.world.get_character_by_id(run.character_id)
+        if char is None:
+            return False
+        summaries = run.resolve_choice(self.world, char, option=option)
+        for entry in summaries:
+            self.world.log_event(entry)
+        return True

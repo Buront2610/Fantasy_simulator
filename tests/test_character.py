@@ -235,6 +235,7 @@ class TestSerialization:
             "strength", "intelligence", "dexterity", "wisdom",
             "charisma", "constitution", "skills", "relationships",
             "alive", "location", "history", "spouse_id",
+            "injury_status", "active_adventure_id",
         }
         assert expected_keys.issubset(set(d.keys()))
 
