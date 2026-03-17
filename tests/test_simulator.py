@@ -136,6 +136,11 @@ class TestSimulatorRun:
         s.run(years=5)
         assert world.year == 1005
 
+    def test_advance_years_public_api(self, sim_small, small_world):
+        start_year = small_world.year
+        sim_small.advance_years(2)
+        assert small_world.year == start_year + 2
+
 
 # ---------------------------------------------------------------------------
 # get_summary()

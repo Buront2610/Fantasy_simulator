@@ -51,6 +51,10 @@ class Simulator:
         2. Generate *events_per_year* random events.
         3. Advance the world clock.
         """
+        self.advance_years(years)
+
+    def advance_years(self, years: int = 1) -> None:
+        """Advance the simulation by a public number of whole years."""
         for _ in range(years):
             self._run_year()
 

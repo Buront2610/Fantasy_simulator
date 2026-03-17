@@ -113,7 +113,7 @@ def _run_simulation(world: World, years: int) -> Simulator:
     print(f"  {bold(tr('running_simulation'))} ({years} years, ~8 events/year)")
     sim = Simulator(world, events_per_year=8)
     for _ in range(years):
-        sim._run_year()
+        sim.advance_years(1)
         alive = sum(1 for c in world.characters if c.alive)
         print(
             f"  Year {world.year}  |  {green(str(alive))} {tr('alive')}",
@@ -131,7 +131,7 @@ def _advance_simulation(sim: Simulator, years: int) -> None:
     print()
     print(f"  {bold(tr('advancing_simulation'))} (+{years} years)")
     for _ in range(years):
-        sim._run_year()
+        sim.advance_years(1)
         pending = len(sim.get_pending_adventure_choices())
         alive = sum(1 for c in sim.world.characters if c.alive)
         print(

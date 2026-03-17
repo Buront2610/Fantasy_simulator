@@ -167,7 +167,7 @@ class CharacterCreator:
             name=name, age=age, gender=gender, race=race, job=job,
             skills=skills, **stats,
         )
-        char.add_history(f"Year 0: Born into the world as a {race} {job}.")
+        char.add_history(f"Born into the world as a {race} {job}.")
         print("\n  ✅  Character created!")
         print(char.stat_block())
         return char
@@ -207,7 +207,7 @@ class CharacterCreator:
             name=char_name, age=age, gender=gender, race=race, job=job,
             skills=skills, **stats,
         )
-        char.add_history(f"Year 0: Born into the world as a {race} {job}.")
+        char.add_history(f"Born into the world as a {race} {job}.")
         return char
 
     def create_from_template(self, template_name: str, name: Optional[str] = None) -> Character:
@@ -240,7 +240,7 @@ class CharacterCreator:
             name=char_name, age=age, gender=gender, race=race, job=job,
             skills=skills, **stats,
         )
-        char.add_history(f"Year 0: Born into the world as a {race} {job}.")
+        char.add_history(f"Born into the world as a {race} {job}.")
         return char
 
     # ------------------------------------------------------------------

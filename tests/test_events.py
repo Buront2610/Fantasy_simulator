@@ -338,6 +338,19 @@ class TestEventMarriage:
         result = es.event_marriage(char_a, char_b, world)
         assert result.event_type == "anniversary"
 
+    def test_existing_spouse_blocks_new_marriage(self, es, char_a, char_b, world):
+        outsider = _make_char("Cara", location="Aethoria Capital")
+        world.add_character(outsider)
+        char_a.spouse_id = outsider.char_id
+        char_a.update_relationship(char_b.char_id, 90)
+        char_b.update_relationship(char_a.char_id, 90)
+
+        result = es.event_marriage(char_a, char_b, world)
+
+        assert result.event_type == "romance"
+        assert char_a.spouse_id == outsider.char_id
+        assert char_b.spouse_id is None
+
 
 # ---------------------------------------------------------------------------
 # check_natural_death
@@ -408,3 +421,6 @@ class TestGenerateRandomEvent:
         for _ in range(10):
             result = es.generate_random_event([c], world)
             assert result is None or isinstance(result, EventResult)
+
+    def test_random_event_table_excludes_direct_death(self, es):
+        assert "death" not in es._EVENT_WEIGHTS
