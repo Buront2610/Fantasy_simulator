@@ -4,6 +4,7 @@ simulator.py - Orchestrates the world simulation loop.
 
 from __future__ import annotations
 
+import ast
 from typing import Any, Dict, List, Optional
 import random
 
@@ -241,6 +242,7 @@ class Simulator:
             "characters": [char.to_dict() for char in self.world.characters],
             "events_per_year": self.events_per_year,
             "adventure_steps_per_year": self.adventure_steps_per_year,
+            "rng_state": repr(self.rng.getstate()),
             "history": [
                 {
                     "description": ev.description,
@@ -268,6 +270,9 @@ class Simulator:
             events_per_year=data.get("events_per_year", 8),
             adventure_steps_per_year=data.get("adventure_steps_per_year", 3),
         )
+        rng_state = data.get("rng_state")
+        if rng_state is not None:
+            sim.rng.setstate(ast.literal_eval(rng_state))
         sim.history = [
             EventResult(
                 description=ev["description"],

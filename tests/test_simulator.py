@@ -317,6 +317,29 @@ class TestSimulatorSerialization:
             c.name for c in sim.world.characters
         ]
 
+    def test_loaded_snapshot_continues_with_same_rng_sequence(self, tmp_path):
+        world_a = _make_world(n_chars=5)
+        world_b = _make_world(n_chars=5)
+        for c1, c2 in zip(world_a.characters, world_b.characters):
+            c2.char_id = c1.char_id
+
+        sim_a = Simulator(world_a, events_per_year=3, adventure_steps_per_year=2, seed=17)
+        sim_b = Simulator(world_b, events_per_year=3, adventure_steps_per_year=2, seed=17)
+
+        sim_a.run(years=2)
+        sim_b.run(years=2)
+
+        path = tmp_path / "snapshot_rng.json"
+        save_simulation(sim_a, str(path))
+        restored = load_simulation(str(path))
+
+        restored.run(years=3)
+        sim_b.run(years=3)
+
+        assert restored.world.year == sim_b.world.year
+        assert restored.world.event_log == sim_b.world.event_log
+        assert [ev.description for ev in restored.history] == [ev.description for ev in sim_b.history]
+
 
 class TestInjuryRecovery:
     def test_injured_character_can_recover_during_year(self):
