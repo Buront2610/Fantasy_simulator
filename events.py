@@ -201,24 +201,50 @@ class EventSystem:
         char1.update_relationship(char2.char_id, delta)
         char2.update_relationship(char1.char_id, delta + rng.randint(-5, 5))
 
-        rel_after = char1.get_relationship(char2.char_id)
-        if delta > 10:
-            tone = "hit it off splendidly"
-        elif delta > 0:
-            tone = "had a pleasant exchange"
-        elif delta == 0:
-            tone = "exchanged a polite nod"
-        else:
-            tone = "had a tense, uncomfortable encounter"
+        rel1_after = char1.get_relationship(char2.char_id)
+        rel2_after = char2.get_relationship(char1.char_id)
+        avg_after = round((rel1_after + rel2_after) / 2)
 
         if delta > 10:
-            desc = tr("meeting_positive", name1=char1.name, name2=char2.name, location=char1.location, relationship=rel_after)
+            desc = tr(
+                "meeting_positive",
+                name1=char1.name,
+                name2=char2.name,
+                location=char1.location,
+                relationship_a=rel1_after,
+                relationship_b=rel2_after,
+                relationship_avg=avg_after,
+            )
         elif delta > 0:
-            desc = tr("meeting_pleasant", name1=char1.name, name2=char2.name, location=char1.location, relationship=rel_after)
+            desc = tr(
+                "meeting_pleasant",
+                name1=char1.name,
+                name2=char2.name,
+                location=char1.location,
+                relationship_a=rel1_after,
+                relationship_b=rel2_after,
+                relationship_avg=avg_after,
+            )
         elif delta == 0:
-            desc = tr("meeting_neutral", name1=char1.name, name2=char2.name, location=char1.location, relationship=rel_after)
+            desc = tr(
+                "meeting_neutral",
+                name1=char1.name,
+                name2=char2.name,
+                location=char1.location,
+                relationship_a=rel1_after,
+                relationship_b=rel2_after,
+                relationship_avg=avg_after,
+            )
         else:
-            desc = tr("meeting_negative", name1=char1.name, name2=char2.name, location=char1.location, relationship=rel_after)
+            desc = tr(
+                "meeting_negative",
+                name1=char1.name,
+                name2=char2.name,
+                location=char1.location,
+                relationship_a=rel1_after,
+                relationship_b=rel2_after,
+                relationship_avg=avg_after,
+            )
         char1.add_history(tr("history_met", year=world.year, name=char2.name, location=char1.location))
         char2.add_history(tr("history_met", year=world.year, name=char1.name, location=char2.location))
         return EventResult(

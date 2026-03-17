@@ -4,6 +4,7 @@ tests/test_events.py - Unit tests for the EventSystem.
 
 import sys
 import os
+import random
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 import pytest
@@ -110,6 +111,17 @@ class TestEventMeeting:
     def test_event_type(self, es, char_a, char_b, world):
         result = es.event_meeting(char_a, char_b, world)
         assert result.event_type == "meeting"
+
+    def test_description_reports_bidirectional_relationships(self, es, char_a, char_b, world):
+        result = es.event_meeting(char_a, char_b, world, rng=random.Random(0))
+
+        rel_a = char_a.get_relationship(char_b.char_id)
+        rel_b = char_b.get_relationship(char_a.char_id)
+        rel_avg = round((rel_a + rel_b) / 2)
+
+        assert f"Alice->Bob: {rel_a:+d}" in result.description
+        assert f"Bob->Alice: {rel_b:+d}" in result.description
+        assert f"Avg: {rel_avg:+d}" in result.description
 
 
 # ---------------------------------------------------------------------------
