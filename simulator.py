@@ -4,8 +4,8 @@ simulator.py - Orchestrates the world simulation loop.
 
 from __future__ import annotations
 
-import random
 from typing import Any, Dict, List, Optional
+import random
 
 from adventure import create_adventure_run
 from events import EventResult, EventSystem
@@ -36,8 +36,7 @@ class Simulator:
         self.adventure_steps_per_year = adventure_steps_per_year
         self.event_system = EventSystem()
         self.history: List[EventResult] = []  # all events across all years
-        if seed is not None:
-            random.seed(seed)
+        self.rng = random.Random(seed)
 
     # ------------------------------------------------------------------
     # Main simulation loop
@@ -62,7 +61,7 @@ class Simulator:
         """Process a single year."""
         # --- Natural death checks ---
         for char in list(self.world.characters):
-            result = self.event_system.check_natural_death(char, self.world)
+            result = self.event_system.check_natural_death(char, self.world, rng=self.rng)
             if result is not None:
                 self.history.append(result)
                 self.world.log_event(result.description)
@@ -82,7 +81,7 @@ class Simulator:
 
         for _ in range(self.events_per_year):
             result = self.event_system.generate_random_event(
-                self.world.characters, self.world
+                self.world.characters, self.world, rng=self.rng
             )
             if result is not None:
                 self.history.append(result)
@@ -95,7 +94,7 @@ class Simulator:
         for char in self.world.characters:
             if not char.alive or char.injury_status != "injured":
                 continue
-            if random.random() < 0.5:
+            if self.rng.random() < 0.5:
                 char.injury_status = "none"
                 message = f"{char.name} recovered from earlier adventure injuries."
                 char.add_history(f"Year {self.world.year}: Recovered from earlier adventure injuries.")
@@ -107,11 +106,11 @@ class Simulator:
             c for c in self.world.characters
             if c.alive and c.active_adventure_id is None and c.injury_status != "injured"
         ]
-        if not candidates or random.random() >= 0.25:
+        if not candidates or self.rng.random() >= 0.25:
             return
 
-        char = random.choice(candidates)
-        run = create_adventure_run(char, self.world, rng=random)
+        char = self.rng.choice(candidates)
+        run = create_adventure_run(char, self.world, rng=self.rng)
         char.active_adventure_id = run.adventure_id
         char.add_history(
             f"Year {self.world.year}: Set out from {run.origin} toward {run.destination}."
@@ -134,7 +133,7 @@ class Simulator:
                 if char is None:
                     continue
                 had_pending_choice = run.pending_choice is not None
-                summaries = run.step(char, self.world, rng=random)
+                summaries = run.step(char, self.world, rng=self.rng)
                 for entry in summaries:
                     self.world.log_event(entry)
                 if run.is_resolved:

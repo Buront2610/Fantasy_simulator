@@ -44,7 +44,7 @@ class EventSystem:
         "marriage": 5,
     }
 
-    def event_marriage(self, char1: Any, char2: Any, world: Any) -> EventResult:
+    def event_marriage(self, char1: Any, char2: Any, world: Any, rng: Any = random) -> EventResult:
         """Two characters with strong mutual affection may get married."""
         rel1 = char1.get_relationship(char2.char_id)
         rel2 = char2.get_relationship(char1.char_id)
@@ -117,25 +117,25 @@ class EventSystem:
             year=world.year,
         )
 
-    def event_battle(self, char1: Any, char2: Any, world: Any) -> EventResult:
+    def event_battle(self, char1: Any, char2: Any, world: Any, rng: Any = random) -> EventResult:
         """Two characters fight. Winner is determined by combat power + luck."""
-        power1 = char1.combat_power + random.randint(0, 30)
-        power2 = char2.combat_power + random.randint(0, 30)
+        power1 = char1.combat_power + rng.randint(0, 30)
+        power2 = char2.combat_power + rng.randint(0, 30)
         winner, loser = (char1, char2) if power1 >= power2 else (char2, char1)
 
-        win_desc = random.choice(BATTLE_OUTCOMES_WIN)
-        lose_desc = random.choice(BATTLE_OUTCOMES_LOSE)
+        win_desc = rng.choice(BATTLE_OUTCOMES_WIN)
+        lose_desc = rng.choice(BATTLE_OUTCOMES_LOSE)
 
-        winner_gains = {"strength": random.randint(1, 3), "constitution": random.randint(0, 2)}
-        loser_losses = {"constitution": -random.randint(2, 8), "strength": -random.randint(0, 3)}
+        winner_gains = {"strength": rng.randint(1, 3), "constitution": rng.randint(0, 2)}
+        loser_losses = {"constitution": -rng.randint(2, 8), "strength": -rng.randint(0, 3)}
         winner.apply_stat_delta(winner_gains)
         loser.apply_stat_delta(loser_losses)
         winner.update_relationship(loser.char_id, -20)
         loser.update_relationship(winner.char_id, -30)
 
-        loser_died = loser.constitution <= 5 and random.random() < 0.4
+        loser_died = loser.constitution <= 5 and rng.random() < 0.4
         if loser_died:
-            self.event_death(loser, world)
+            self.event_death(loser, world, rng=rng)
             desc = (
                 f"{winner.name} {win_desc} against {loser.name}, "
                 f"who {lose_desc} and did not survive the encounter."
@@ -160,23 +160,23 @@ class EventSystem:
             year=world.year,
         )
 
-    def event_discovery(self, char: Any, world: Any) -> EventResult:
-        item = random.choice(DISCOVERY_ITEMS)
+    def event_discovery(self, char: Any, world: Any, rng: Any = random) -> EventResult:
+        item = rng.choice(DISCOVERY_ITEMS)
         stat_gains: Dict[str, int]
-        roll = random.random()
+        roll = rng.random()
         if roll < 0.4:
-            stat_gains = {"intelligence": random.randint(1, 4), "wisdom": random.randint(0, 3)}
+            stat_gains = {"intelligence": rng.randint(1, 4), "wisdom": rng.randint(0, 3)}
             extra = "The knowledge contained within changed their outlook forever."
         elif roll < 0.7:
-            stat_gains = {"strength": random.randint(1, 3), "dexterity": random.randint(0, 2)}
+            stat_gains = {"strength": rng.randint(1, 3), "dexterity": rng.randint(0, 2)}
             extra = "The discovery will prove useful in future battles."
         else:
-            stat_gains = {"charisma": random.randint(1, 4)}
+            stat_gains = {"charisma": rng.randint(1, 4)}
             extra = "Word of the discovery spread quickly, raising their reputation."
 
         char.apply_stat_delta(stat_gains)
         skill_candidates = list(char.skills.keys()) or ["Dungeoneering"]
-        trained_skill = random.choice(skill_candidates)
+        trained_skill = rng.choice(skill_candidates)
         char.level_up_skill(trained_skill)
 
         desc = f"{char.name} discovered {item} near {char.location}. {extra}"
@@ -189,10 +189,10 @@ class EventSystem:
             year=world.year,
         )
 
-    def event_meeting(self, char1: Any, char2: Any, world: Any) -> EventResult:
-        delta = random.randint(-15, 25)
+    def event_meeting(self, char1: Any, char2: Any, world: Any, rng: Any = random) -> EventResult:
+        delta = rng.randint(-15, 25)
         char1.update_relationship(char2.char_id, delta)
-        char2.update_relationship(char1.char_id, delta + random.randint(-5, 5))
+        char2.update_relationship(char1.char_id, delta + rng.randint(-5, 5))
 
         rel_after = char1.get_relationship(char2.char_id)
         if delta > 10:
@@ -217,37 +217,37 @@ class EventSystem:
             year=world.year,
         )
 
-    def event_aging(self, char: Any, world: Any) -> EventResult:
+    def event_aging(self, char: Any, world: Any, rng: Any = random) -> EventResult:
         char.age += 1
         if char.age < 30:
             stat_changes = {
-                "strength": random.randint(0, 2),
-                "intelligence": random.randint(0, 2),
-                "dexterity": random.randint(0, 1),
-                "wisdom": random.randint(0, 1),
+                "strength": rng.randint(0, 2),
+                "intelligence": rng.randint(0, 2),
+                "dexterity": rng.randint(0, 1),
+                "wisdom": rng.randint(0, 1),
             }
             desc = f"{char.name} turned {char.age}. Youth still drives them forward."
         elif char.age < 50:
             stat_changes = {
-                "intelligence": random.randint(0, 2),
-                "wisdom": random.randint(0, 2),
-                "strength": random.randint(-1, 1),
+                "intelligence": rng.randint(0, 2),
+                "wisdom": rng.randint(0, 2),
+                "strength": rng.randint(-1, 1),
             }
             desc = f"{char.name} turned {char.age}, entering the prime of life."
         elif char.age < char.max_age * 0.75:
             stat_changes = {
-                "wisdom": random.randint(1, 3),
-                "charisma": random.randint(0, 1),
-                "dexterity": -random.randint(0, 2),
-                "strength": -random.randint(0, 1),
+                "wisdom": rng.randint(1, 3),
+                "charisma": rng.randint(0, 1),
+                "dexterity": -rng.randint(0, 2),
+                "strength": -rng.randint(0, 1),
             }
             desc = f"{char.name} turned {char.age}. Silver threads appear in their hair."
         else:
             stat_changes = {
-                "wisdom": random.randint(0, 2),
-                "strength": -random.randint(1, 3),
-                "dexterity": -random.randint(1, 3),
-                "constitution": -random.randint(1, 4),
+                "wisdom": rng.randint(0, 2),
+                "strength": -rng.randint(1, 3),
+                "dexterity": -rng.randint(1, 3),
+                "constitution": -rng.randint(1, 4),
             }
             desc = f"{char.name} turned {char.age}. The weight of years shows clearly now."
 
@@ -261,7 +261,7 @@ class EventSystem:
             year=world.year,
         )
 
-    def event_death(self, char: Any, world: Any) -> EventResult:
+    def event_death(self, char: Any, world: Any, rng: Any = random) -> EventResult:
         char.alive = False
         if char.spouse_id:
             spouse = world.get_character_by_id(char.spouse_id)
@@ -278,7 +278,7 @@ class EventSystem:
             "while exploring the depths of a dungeon",
             "in a tragic accident on the road",
         ]
-        cause = cause_options[0] if char.age >= char.max_age * 0.9 else random.choice(cause_options[1:])
+        cause = cause_options[0] if char.age >= char.max_age * 0.9 else rng.choice(cause_options[1:])
         desc = f"{char.name} ({char.race} {char.job}, age {char.age}) died {cause}."
         char.add_history(f"Year {world.year}: Passed away {cause}.")
         return EventResult(
@@ -288,14 +288,14 @@ class EventSystem:
             year=world.year,
         )
 
-    def event_skill_training(self, char: Any, world: Any) -> EventResult:
+    def event_skill_training(self, char: Any, world: Any, rng: Any = random) -> EventResult:
         if not char.skills:
             from world_data import ALL_SKILLS
 
-            starter = random.choice(ALL_SKILLS)
+            starter = rng.choice(ALL_SKILLS)
             char.skills[starter] = 0
 
-        skill = random.choice(list(char.skills.keys()))
+        skill = rng.choice(list(char.skills.keys()))
         old_level = char.skills[skill]
         char.level_up_skill(skill)
         new_level = char.skills[skill]
@@ -313,7 +313,7 @@ class EventSystem:
             stat_bonus = {"charisma": 1}
 
         char.apply_stat_delta(stat_bonus)
-        effort = random.choice(
+        effort = rng.choice(
             [
                 "spent long hours in the training yard",
                 "meditated through the night",
@@ -333,16 +333,16 @@ class EventSystem:
             year=world.year,
         )
 
-    def event_journey(self, char: Any, world: Any) -> EventResult:
+    def event_journey(self, char: Any, world: Any, rng: Any = random) -> EventResult:
         neighbours = world.get_neighboring_locations(char.location)
         if not neighbours:
             neighbours = list(world.grid.values())
 
-        destination = random.choice(neighbours)
+        destination = rng.choice(neighbours)
         old_location = char.location
         char.location = destination.name
 
-        road_event = random.choice(JOURNEY_EVENTS)
+        road_event = rng.choice(JOURNEY_EVENTS)
         desc = (
             f"{char.name} journeyed from {old_location} to "
             f"{destination.name} ({destination.region_type}) and {road_event}."
@@ -351,8 +351,8 @@ class EventSystem:
 
         extra_changes: Dict[str, int] = {}
         if destination.region_type == "dungeon":
-            bonus = random.choice(["strength", "dexterity", "intelligence"])
-            extra_changes[bonus] = random.randint(1, 4)
+            bonus = rng.choice(["strength", "dexterity", "intelligence"])
+            extra_changes[bonus] = rng.randint(1, 4)
             char.apply_stat_delta(extra_changes)
             desc += f" The dungeon hardened them (+{extra_changes[bonus]} {bonus})."
 
@@ -364,56 +364,56 @@ class EventSystem:
             year=world.year,
         )
 
-    def check_natural_death(self, char: Any, world: Any) -> Optional[EventResult]:
+    def check_natural_death(self, char: Any, world: Any, rng: Any = random) -> Optional[EventResult]:
         if not char.alive:
             return None
         age_ratio = char.age / max(char.max_age, 1)
         con_factor = (100 - char.constitution) / 100 * 0.5 + 0.5
         death_chance = max(0.0, (age_ratio - 0.6) / 0.4) ** 2 * con_factor
-        if random.random() < death_chance:
-            return self.event_death(char, world)
+        if rng.random() < death_chance:
+            return self.event_death(char, world, rng=rng)
         return None
 
-    def generate_random_event(self, characters: List[Any], world: Any) -> Optional[EventResult]:
+    def generate_random_event(self, characters: List[Any], world: Any, rng: Any = random) -> Optional[EventResult]:
         alive = [c for c in characters if c.alive]
         if not alive:
             return None
 
         event_types = list(self._EVENT_WEIGHTS.keys())
         weights = [self._EVENT_WEIGHTS[e] for e in event_types]
-        chosen_type = random.choices(event_types, weights=weights, k=1)[0]
+        chosen_type = rng.choices(event_types, weights=weights, k=1)[0]
 
         if chosen_type in ("marriage", "battle", "meeting"):
-            pair = self._find_collocated_pair(alive)
+            pair = self._find_collocated_pair(alive, rng=rng)
             if pair is None:
-                chosen_type = random.choice(["skill_training", "discovery", "journey", "aging"])
+                chosen_type = rng.choice(["skill_training", "discovery", "journey", "aging"])
             else:
                 char1, char2 = pair
                 if chosen_type == "marriage":
-                    return self.event_marriage(char1, char2, world)
+                    return self.event_marriage(char1, char2, world, rng=rng)
                 if chosen_type == "battle":
-                    return self.event_battle(char1, char2, world)
-                return self.event_meeting(char1, char2, world)
+                    return self.event_battle(char1, char2, world, rng=rng)
+                return self.event_meeting(char1, char2, world, rng=rng)
 
-        char = random.choice(alive)
+        char = rng.choice(alive)
         if chosen_type == "discovery":
-            return self.event_discovery(char, world)
+            return self.event_discovery(char, world, rng=rng)
         if chosen_type == "skill_training":
-            return self.event_skill_training(char, world)
+            return self.event_skill_training(char, world, rng=rng)
         if chosen_type == "journey":
-            return self.event_journey(char, world)
+            return self.event_journey(char, world, rng=rng)
         if chosen_type == "aging":
-            return self.event_aging(char, world)
-        return self.event_skill_training(char, world)
+            return self.event_aging(char, world, rng=rng)
+        return self.event_skill_training(char, world, rng=rng)
 
     @staticmethod
-    def _find_collocated_pair(alive: List[Any]) -> Optional[Tuple[Any, Any]]:
+    def _find_collocated_pair(alive: List[Any], rng: Any = random) -> Optional[Tuple[Any, Any]]:
         by_loc: Dict[str, List[Any]] = {}
         for c in alive:
             by_loc.setdefault(c.location, []).append(c)
         valid = [chars for chars in by_loc.values() if len(chars) >= 2]
         if not valid:
             return None
-        group = random.choice(valid)
-        pair = random.sample(group, 2)
+        group = rng.choice(valid)
+        pair = rng.sample(group, 2)
         return pair[0], pair[1]

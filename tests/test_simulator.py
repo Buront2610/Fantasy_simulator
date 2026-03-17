@@ -70,7 +70,6 @@ class TestSimulatorConstruction:
 
     def test_seed_reproducibility(self, small_world):
         """Two simulators with the same seed should produce the same history."""
-        import copy
         w1 = _make_world(n_chars=4)
         w2 = _make_world(n_chars=4)
         # Ensure same starting state by syncing char IDs
@@ -81,7 +80,8 @@ class TestSimulatorConstruction:
         s2 = Simulator(w2, events_per_year=4, seed=99)
         s1.run(years=3)
         s2.run(years=3)
-        assert len(s1.history) == len(s2.history)
+        assert [ev.description for ev in s1.history] == [ev.description for ev in s2.history]
+        assert s1.world.event_log == s2.world.event_log
 
 
 # ---------------------------------------------------------------------------
@@ -319,27 +319,40 @@ class TestSimulatorSerialization:
 
 
 class TestInjuryRecovery:
-    def test_injured_character_can_recover_during_year(self, monkeypatch):
+    def test_injured_character_can_recover_during_year(self):
         world = _make_world(n_chars=1)
         char = world.characters[0]
         char.injury_status = "injured"
         sim = Simulator(world, events_per_year=0, adventure_steps_per_year=0, seed=1)
 
-        monkeypatch.setattr("simulator.random.random", lambda: 0.1)
+        sim.rng = type(
+            "FixedRng",
+            (),
+            {
+                "random": lambda self: 0.1,
+                "choice": lambda self, options: options[0],
+            },
+        )()
         sim._run_year()
 
         assert char.injury_status == "none"
         assert any("recovered from earlier adventure injuries" in entry.lower() for entry in world.event_log)
         assert any("Recovered from earlier adventure injuries." in entry for entry in char.history)
 
-    def test_injured_character_does_not_start_adventure_before_recovery(self, monkeypatch):
+    def test_injured_character_does_not_start_adventure_before_recovery(self):
         world = _make_world(n_chars=1)
         char = world.characters[0]
         char.injury_status = "injured"
         sim = Simulator(world, events_per_year=0, adventure_steps_per_year=0, seed=1)
 
-        monkeypatch.setattr("simulator.random.random", lambda: 0.9)
-        monkeypatch.setattr("simulator.random.choice", lambda options: options[0])
+        sim.rng = type(
+            "FixedRng",
+            (),
+            {
+                "random": lambda self: 0.9,
+                "choice": lambda self, options: options[0],
+            },
+        )()
         sim._run_year()
 
         assert char.injury_status == "injured"

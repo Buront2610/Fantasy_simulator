@@ -28,6 +28,15 @@ class FakeRng:
             return self.choice_value
         return options[0]
 
+    def randint(self, lo, hi):
+        return lo
+
+    def choices(self, population, weights=None, k=1):
+        return [population[0]] * k
+
+    def sample(self, population, k):
+        return list(population[:k])
+
 
 def _make_character(name="Aldric") -> Character:
     return Character(
@@ -132,13 +141,7 @@ def test_simulator_integrates_adventures_into_normal_year_loop(monkeypatch):
     world.add_character(char)
     sim = Simulator(world, events_per_year=0, adventure_steps_per_year=4, seed=1)
 
-    random_values = iter([0.9, 0.0, 0.9, 0.3, 0.9])
-
-    def fake_random():
-        return next(random_values)
-
-    monkeypatch.setattr("simulator.random.random", fake_random)
-    monkeypatch.setattr("simulator.random.choice", lambda options: options[0])
+    sim.rng = FakeRng([0.9, 0.0, 0.9, 0.3, 0.9])
 
     sim._run_year()
 
@@ -155,10 +158,7 @@ def test_pending_choice_persists_until_later_year(monkeypatch):
     world.add_character(char)
     sim = Simulator(world, events_per_year=0, adventure_steps_per_year=4, seed=1)
 
-    random_values = iter([0.9, 0.0, 0.10, 0.9, 0.9, 0.9])
-
-    monkeypatch.setattr("simulator.random.random", lambda: next(random_values))
-    monkeypatch.setattr("simulator.random.choice", lambda options: options[0])
+    sim.rng = FakeRng([0.9, 0.0, 0.10, 0.9, 0.9, 0.9])
 
     sim._run_year()
 
