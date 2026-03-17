@@ -10,6 +10,7 @@ import pytest
 
 from character import Character
 from character_creator import CharacterCreator
+from i18n import get_locale, set_locale
 from save_load import load_simulation, save_simulation
 from simulator import Simulator
 from world import World
@@ -51,6 +52,14 @@ def sim_small(small_world) -> Simulator:
 @pytest.fixture
 def sim_medium(medium_world) -> Simulator:
     return Simulator(medium_world, events_per_year=6, seed=7)
+
+
+@pytest.fixture(autouse=True)
+def reset_locale():
+    previous = get_locale()
+    set_locale("en")
+    yield
+    set_locale(previous)
 
 
 # ---------------------------------------------------------------------------
@@ -339,6 +348,18 @@ class TestSimulatorSerialization:
         assert restored.world.year == sim_b.world.year
         assert restored.world.event_log == sim_b.world.event_log
         assert [ev.description for ev in restored.history] == [ev.description for ev in sim_b.history]
+
+    def test_save_and_load_preserves_locale(self, tmp_path):
+        set_locale("ja")
+        world = _make_world(n_chars=3)
+        sim = Simulator(world, events_per_year=1, adventure_steps_per_year=1, seed=11)
+
+        path = tmp_path / "snapshot_locale.json"
+        save_simulation(sim, str(path))
+        set_locale("en")
+        load_simulation(str(path))
+
+        assert get_locale() == "ja"
 
 
 class TestInjuryRecovery:

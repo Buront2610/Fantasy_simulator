@@ -10,6 +10,7 @@ import random
 
 from adventure import create_adventure_run
 from events import EventResult, EventSystem
+from i18n import get_locale, set_locale, tr
 
 
 class Simulator:
@@ -97,8 +98,8 @@ class Simulator:
                 continue
             if self.rng.random() < 0.5:
                 char.injury_status = "none"
-                message = f"{char.name} recovered from earlier adventure injuries."
-                char.add_history(f"Year {self.world.year}: Recovered from earlier adventure injuries.")
+                message = tr("recovered_from_injuries", name=char.name)
+                char.add_history(tr("history_recovered_from_injuries", year=self.world.year))
                 self.world.log_event(message)
 
     def _maybe_start_adventure(self) -> None:
@@ -114,7 +115,12 @@ class Simulator:
         run = create_adventure_run(char, self.world, rng=self.rng)
         char.active_adventure_id = run.adventure_id
         char.add_history(
-            f"Year {self.world.year}: Set out from {run.origin} toward {run.destination}."
+            tr(
+                "set_out_for_adventure",
+                year=self.world.year,
+                origin=run.origin,
+                destination=run.destination,
+            )
         )
         self.world.add_adventure(run)
         self.world.log_event(run.summary_log[-1])
@@ -158,20 +164,20 @@ class Simulator:
 
         lines = [
             "=" * 60,
-            f"  SIMULATION SUMMARY — {self.world.name}",
-            f"  Final year: {self.world.year}",
+            f"  {tr('summary_title', world=self.world.name)}",
+            f"  {tr('final_year')}: {self.world.year}",
             "=" * 60,
-            f"  Total events recorded : {total}",
-            f"  Characters alive      : {alive}",
-            f"  Characters deceased   : {dead}",
+            f"  {tr('total_events'):<22}: {total}",
+            f"  {tr('characters_alive'):<22}: {alive}",
+            f"  {tr('characters_deceased'):<22}: {dead}",
             "",
-            "  Event breakdown:",
+            f"  {tr('event_breakdown')}:",
         ]
         for etype, count in sorted(type_counts.items(), key=lambda x: -x[1]):
             lines.append(f"    {etype:<20} {count:>4} times")
 
         lines.append("")
-        lines.append("  Notable moments:")
+        lines.append(f"  {tr('notable_moments')}:")
         # Pick up to 5 dramatic events
         dramatic = [
             ev for ev in self.history
@@ -194,11 +200,11 @@ class Simulator:
         """
         char = self.world.get_character_by_id(char_id)
         if char is None:
-            return f"No character with ID '{char_id}' found."
+            return tr("no_character_found", char_id=char_id)
 
         lines = [
             "─" * 50,
-            f"  The Story of {char.name}",
+            f"  {tr('story_of', name=char.name)}",
             f"  {char.race} {char.job}",
             "─" * 50,
         ]
@@ -206,7 +212,7 @@ class Simulator:
             for entry in char.history:
                 lines.append(f"  • {entry}")
         else:
-            lines.append("  (No notable events recorded.)")
+            lines.append(f"  {tr('no_notable_events')}")
 
         lines.append("")
         lines.append(char.stat_block())
@@ -242,6 +248,7 @@ class Simulator:
             "characters": [char.to_dict() for char in self.world.characters],
             "events_per_year": self.events_per_year,
             "adventure_steps_per_year": self.adventure_steps_per_year,
+            "locale": get_locale(),
             "rng_state": repr(self.rng.getstate()),
             "history": [
                 {
@@ -270,6 +277,7 @@ class Simulator:
             events_per_year=data.get("events_per_year", 8),
             adventure_steps_per_year=data.get("adventure_steps_per_year", 3),
         )
+        set_locale(data.get("locale", get_locale()))
         rng_state = data.get("rng_state")
         if rng_state is not None:
             sim.rng.setstate(ast.literal_eval(rng_state))

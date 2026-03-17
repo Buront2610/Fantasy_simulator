@@ -18,6 +18,7 @@ from world_data import (
     DISCOVERY_ITEMS,
     JOURNEY_EVENTS,
 )
+from i18n import tr
 
 
 @dataclass
@@ -51,9 +52,9 @@ class EventSystem:
         avg_rel = (rel1 + rel2) / 2
 
         if char1.spouse_id == char2.char_id and char2.spouse_id == char1.char_id:
-            desc = f"{char1.name} and {char2.name} celebrated another year of their marriage."
-            char1.add_history(f"Year {world.year}: Celebrated marriage anniversary with {char2.name}.")
-            char2.add_history(f"Year {world.year}: Celebrated marriage anniversary with {char1.name}.")
+            desc = tr("marriage_anniversary", name1=char1.name, name2=char2.name)
+            char1.add_history(tr("history_anniversary", year=world.year, name=char2.name))
+            char2.add_history(tr("history_anniversary", year=world.year, name=char1.name))
             return EventResult(
                 description=desc,
                 affected_characters=[char1.char_id, char2.char_id],
@@ -64,9 +65,11 @@ class EventSystem:
         if char1.spouse_id not in (None, char2.char_id) or char2.spouse_id not in (None, char1.char_id):
             char1.update_relationship(char2.char_id, 3)
             char2.update_relationship(char1.char_id, 3)
-            desc = (
-                f"{char1.name} and {char2.name} shared a meaningful moment at "
-                f"{char1.location}, but existing commitments kept the relationship from deepening."
+            desc = tr(
+                "romance_commitments_blocked",
+                name1=char1.name,
+                name2=char2.name,
+                location=char1.location,
             )
             return EventResult(
                 description=desc,
@@ -79,9 +82,11 @@ class EventSystem:
         if char1.age < 18 or char2.age < 18 or rel1 < 60 or rel2 < 60 or avg_rel < 70:
             char1.update_relationship(char2.char_id, 10)
             char2.update_relationship(char1.char_id, 10)
-            desc = (
-                f"{char1.name} and {char2.name} spent time together at "
-                f"{char1.location}, growing closer (relationship improved)."
+            desc = tr(
+                "romance_growing_closer",
+                name1=char1.name,
+                name2=char2.name,
+                location=char1.location,
             )
             return EventResult(
                 description=desc,
@@ -102,13 +107,18 @@ class EventSystem:
         char1.apply_stat_delta(stat_changes[char1.char_id])
         char2.apply_stat_delta(stat_changes[char2.char_id])
 
-        desc = (
-            f"{char1.name} ({char1.race} {char1.job}) and "
-            f"{char2.name} ({char2.race} {char2.job}) were married in "
-            f"{char1.location} amid great celebration!"
+        desc = tr(
+            "marriage_happened",
+            name1=char1.name,
+            race1=char1.race,
+            job1=char1.job,
+            name2=char2.name,
+            race2=char2.race,
+            job2=char2.job,
+            location=char1.location,
         )
-        char1.add_history(f"Year {world.year}: Married {char2.name} in {char1.location}.")
-        char2.add_history(f"Year {world.year}: Married {char1.name} in {char2.location}.")
+        char1.add_history(tr("history_married", year=world.year, name=char2.name, location=char1.location))
+        char2.add_history(tr("history_married", year=world.year, name=char1.name, location=char2.location))
         return EventResult(
             description=desc,
             affected_characters=[char1.char_id, char2.char_id],
@@ -136,11 +146,8 @@ class EventSystem:
         loser_died = loser.constitution <= 5 and rng.random() < 0.4
         if loser_died:
             self.event_death(loser, world, rng=rng)
-            desc = (
-                f"{winner.name} {win_desc} against {loser.name}, "
-                f"who {lose_desc} and did not survive the encounter."
-            )
-            winner.add_history(f"Year {world.year}: Defeated {loser.name} in battle at {winner.location} (fatal).")
+            desc = tr("battle_fatal", winner=winner.name, loser=loser.name)
+            winner.add_history(tr("history_battle_fatal", year=world.year, name=loser.name, location=winner.location))
             return EventResult(
                 description=desc,
                 affected_characters=[winner.char_id, loser.char_id],
@@ -149,9 +156,9 @@ class EventSystem:
                 year=world.year,
             )
 
-        desc = f"{winner.name} {win_desc} against {loser.name}, who {lose_desc}."
-        winner.add_history(f"Year {world.year}: Won a battle against {loser.name} at {winner.location}.")
-        loser.add_history(f"Year {world.year}: Lost a battle against {winner.name} at {loser.location}.")
+        desc = tr("battle_normal", winner=winner.name, loser=loser.name)
+        winner.add_history(tr("history_battle_win", year=world.year, name=loser.name, location=winner.location))
+        loser.add_history(tr("history_battle_loss", year=world.year, name=winner.name, location=loser.location))
         return EventResult(
             description=desc,
             affected_characters=[winner.char_id, loser.char_id],
@@ -179,8 +186,8 @@ class EventSystem:
         trained_skill = rng.choice(skill_candidates)
         char.level_up_skill(trained_skill)
 
-        desc = f"{char.name} discovered {item} near {char.location}. {extra}"
-        char.add_history(f"Year {world.year}: Discovered {item} near {char.location}.")
+        desc = tr("discovery_narrative", name=char.name, item=item, location=char.location, extra=extra)
+        char.add_history(tr("history_discovery", year=world.year, item=item, location=char.location))
         return EventResult(
             description=desc,
             affected_characters=[char.char_id],
@@ -204,12 +211,16 @@ class EventSystem:
         else:
             tone = "had a tense, uncomfortable encounter"
 
-        desc = (
-            f"{char1.name} and {char2.name} met in {char1.location} "
-            f"and {tone}. (Relationship: {rel_after:+d})"
-        )
-        char1.add_history(f"Year {world.year}: Met {char2.name} in {char1.location}.")
-        char2.add_history(f"Year {world.year}: Met {char1.name} in {char2.location}.")
+        if delta > 10:
+            desc = tr("meeting_positive", name1=char1.name, name2=char2.name, location=char1.location, relationship=rel_after)
+        elif delta > 0:
+            desc = tr("meeting_pleasant", name1=char1.name, name2=char2.name, location=char1.location, relationship=rel_after)
+        elif delta == 0:
+            desc = tr("meeting_neutral", name1=char1.name, name2=char2.name, location=char1.location, relationship=rel_after)
+        else:
+            desc = tr("meeting_negative", name1=char1.name, name2=char2.name, location=char1.location, relationship=rel_after)
+        char1.add_history(tr("history_met", year=world.year, name=char2.name, location=char1.location))
+        char2.add_history(tr("history_met", year=world.year, name=char1.name, location=char2.location))
         return EventResult(
             description=desc,
             affected_characters=[char1.char_id, char2.char_id],
@@ -226,14 +237,14 @@ class EventSystem:
                 "dexterity": rng.randint(0, 1),
                 "wisdom": rng.randint(0, 1),
             }
-            desc = f"{char.name} turned {char.age}. Youth still drives them forward."
+            desc = tr("aging_young", name=char.name, age=char.age)
         elif char.age < 50:
             stat_changes = {
                 "intelligence": rng.randint(0, 2),
                 "wisdom": rng.randint(0, 2),
                 "strength": rng.randint(-1, 1),
             }
-            desc = f"{char.name} turned {char.age}, entering the prime of life."
+            desc = tr("aging_prime", name=char.name, age=char.age)
         elif char.age < char.max_age * 0.75:
             stat_changes = {
                 "wisdom": rng.randint(1, 3),
@@ -241,7 +252,7 @@ class EventSystem:
                 "dexterity": -rng.randint(0, 2),
                 "strength": -rng.randint(0, 1),
             }
-            desc = f"{char.name} turned {char.age}. Silver threads appear in their hair."
+            desc = tr("aging_middle", name=char.name, age=char.age)
         else:
             stat_changes = {
                 "wisdom": rng.randint(0, 2),
@@ -249,10 +260,10 @@ class EventSystem:
                 "dexterity": -rng.randint(1, 3),
                 "constitution": -rng.randint(1, 4),
             }
-            desc = f"{char.name} turned {char.age}. The weight of years shows clearly now."
+            desc = tr("aging_old", name=char.name, age=char.age)
 
         char.apply_stat_delta(stat_changes)
-        char.add_history(f"Year {world.year}: Turned {char.age}.")
+        char.add_history(tr("history_turned_age", year=world.year, age=char.age))
         return EventResult(
             description=desc,
             affected_characters=[char.char_id],
@@ -267,20 +278,20 @@ class EventSystem:
             spouse = world.get_character_by_id(char.spouse_id)
             if spouse and spouse.alive:
                 spouse.update_relationship(char.char_id, -50)
-                spouse.add_history(f"Year {world.year}: Lost beloved spouse {char.name}.")
+                spouse.add_history(tr("history_lost_spouse", year=world.year, name=char.name))
                 spouse.spouse_id = None
 
         cause_options = [
-            "of old age, surrounded by those who loved them",
-            "in a monster attack near " + char.location,
-            "from a mysterious illness",
-            "protecting others from a great danger",
-            "while exploring the depths of a dungeon",
-            "in a tragic accident on the road",
+            tr("death_cause_old_age"),
+            tr("death_cause_monster", location=char.location),
+            tr("death_cause_illness"),
+            tr("death_cause_protecting"),
+            tr("death_cause_dungeon"),
+            tr("death_cause_road"),
         ]
         cause = cause_options[0] if char.age >= char.max_age * 0.9 else rng.choice(cause_options[1:])
-        desc = f"{char.name} ({char.race} {char.job}, age {char.age}) died {cause}."
-        char.add_history(f"Year {world.year}: Passed away {cause}.")
+        desc = tr("death_narrative", name=char.name, race=char.race, job=char.job, age=char.age, cause=cause)
+        char.add_history(tr("history_passed_away", year=world.year, cause=cause))
         return EventResult(
             description=desc,
             affected_characters=[char.char_id],
@@ -323,8 +334,8 @@ class EventSystem:
                 "pushed themselves beyond their limits",
             ]
         )
-        desc = f"{char.name} {effort} and improved {skill} (Lv {old_level} -> Lv {new_level})."
-        char.add_history(f"Year {world.year}: Trained {skill} to level {new_level}.")
+        desc = tr("training_narrative", name=char.name, effort=effort, skill=skill, old_level=old_level, new_level=new_level)
+        char.add_history(tr("history_trained_skill", year=world.year, skill=skill, new_level=new_level))
         return EventResult(
             description=desc,
             affected_characters=[char.char_id],
@@ -343,18 +354,22 @@ class EventSystem:
         char.location = destination.name
 
         road_event = rng.choice(JOURNEY_EVENTS)
-        desc = (
-            f"{char.name} journeyed from {old_location} to "
-            f"{destination.name} ({destination.region_type}) and {road_event}."
+        desc = tr(
+            "journey_narrative",
+            name=char.name,
+            old_location=old_location,
+            destination=destination.name,
+            region_type=destination.region_type,
+            road_event=road_event,
         )
-        char.add_history(f"Year {world.year}: Travelled from {old_location} to {destination.name}.")
+        char.add_history(tr("history_travelled", year=world.year, old_location=old_location, destination=destination.name))
 
         extra_changes: Dict[str, int] = {}
         if destination.region_type == "dungeon":
             bonus = rng.choice(["strength", "dexterity", "intelligence"])
             extra_changes[bonus] = rng.randint(1, 4)
             char.apply_stat_delta(extra_changes)
-            desc += f" The dungeon hardened them (+{extra_changes[bonus]} {bonus})."
+            desc += " " + tr("journey_dungeon_bonus", amount=extra_changes[bonus], stat=bonus)
 
         return EventResult(
             description=desc,

@@ -9,6 +9,8 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+from i18n import tr
+
 
 ADVENTURE_DISCOVERIES = [
     "an ancient relic",
@@ -124,25 +126,18 @@ class AdventureRun:
 
         if self.state == "traveling":
             self.steps_taken += 1
-            summary = (
-                f"{self.character_name} reached {self.destination} and began the expedition."
-            )
-            detail = (
-                f"{self.character_name} left {self.origin}, arrived at {self.destination}, "
-                "and started scouting the area."
-            )
+            summary = tr("summary_adventure_arrived", name=self.character_name, destination=self.destination)
+            detail = tr("detail_adventure_arrived", name=self.character_name, origin=self.origin, destination=self.destination)
             self._record(summary, detail)
             if rng.random() < 0.35:
                 self.pending_choice = AdventureChoice(
-                    prompt=f"{self.character_name} found a dangerous approach into {self.destination}.",
-                    options=["press_on", "proceed_cautiously", "retreat"],
-                    default_option="proceed_cautiously",
+                    prompt=tr("choice_dangerous_approach", name=self.character_name, destination=self.destination),
+                    options=[tr("choice_press_on"), tr("choice_proceed_cautiously"), tr("choice_retreat")],
+                    default_option=tr("choice_proceed_cautiously"),
                     context="approach",
                 )
                 self.state = "waiting_for_choice"
-                self.detail_log.append(
-                    f"{self.character_name} paused for a decision at the entrance."
-                )
+                self.detail_log.append(tr("detail_paused_at_entrance", name=self.character_name))
             else:
                 self.state = "exploring"
             return [summary]
@@ -152,11 +147,8 @@ class AdventureRun:
             roll = rng.random()
             if roll < 0.18:
                 self.injury_status = "injured"
-                summary = f"{self.character_name} was injured during the expedition and pulled back."
-                detail = (
-                    f"{self.character_name} suffered an injury while exploring {self.destination} "
-                    "and decided to withdraw."
-                )
+                summary = tr("summary_adventure_injured", name=self.character_name)
+                detail = tr("detail_adventure_injured", name=self.character_name, destination=self.destination)
                 self._record(summary, detail)
                 self.state = "returning"
                 return [summary]
@@ -167,32 +159,27 @@ class AdventureRun:
                 self.resolution_year = world.year
                 character.alive = False
                 character.active_adventure_id = None
-                summary = f"{self.character_name} died on an adventure near {self.destination}."
-                detail = (
-                    f"{self.character_name} was lost during the expedition at {self.destination} "
-                    "and never returned."
-                )
+                summary = tr("summary_adventure_died", name=self.character_name, destination=self.destination)
+                detail = tr("detail_adventure_died", name=self.character_name, destination=self.destination)
                 self._record(summary, detail)
-                character.add_history(f"Year {world.year}: {detail}")
+                character.add_history(tr("history_adventure_detail", year=world.year, detail=detail))
                 return [summary]
 
             discovery = rng.choice(ADVENTURE_DISCOVERIES)
             self.loot_summary.append(discovery)
-            summary = f"{self.character_name} made a discovery at {self.destination}."
-            detail = f"{self.character_name} discovered {discovery} at {self.destination}."
+            summary = tr("summary_adventure_discovery", name=self.character_name, destination=self.destination)
+            detail = tr("detail_adventure_discovery", name=self.character_name, discovery=discovery, destination=self.destination)
             self._record(summary, detail)
 
             if self.pending_choice is None and rng.random() < 0.40:
                 self.pending_choice = AdventureChoice(
-                    prompt=f"{self.character_name} can press deeper into {self.destination}.",
-                    options=["press_on", "withdraw"],
-                    default_option="withdraw",
+                    prompt=tr("choice_press_deeper", name=self.character_name, destination=self.destination),
+                    options=[tr("choice_press_on"), tr("choice_withdraw")],
+                    default_option=tr("choice_withdraw"),
                     context="depth",
                 )
                 self.state = "waiting_for_choice"
-                self.detail_log.append(
-                    f"{self.character_name} paused to decide whether to delve deeper."
-                )
+                self.detail_log.append(tr("detail_paused_to_delve", name=self.character_name))
             else:
                 self.state = "returning"
             return [summary]
@@ -205,35 +192,19 @@ class AdventureRun:
                 if self.injury_status != "none":
                     self.outcome = "injury"
                     character.injury_status = self.injury_status
-                    summary = (
-                        f"{self.character_name} returned from {self.destination} injured."
-                    )
-                    detail = (
-                        f"{self.character_name} made it back to {self.origin}, but carried injuries "
-                        "from the expedition."
-                    )
+                    summary = tr("summary_returned_injured", name=self.character_name, destination=self.destination)
+                    detail = tr("detail_returned_injured", name=self.character_name, origin=self.origin)
                 elif self.loot_summary:
                     self.outcome = "safe_return"
-                    summary = (
-                        f"{self.character_name} returned safely from {self.destination} "
-                        f"with {self.loot_summary[-1]}."
-                    )
-                    detail = (
-                        f"{self.character_name} returned safely to {self.origin} after recovering "
-                        f"{', '.join(self.loot_summary)}."
-                    )
+                    summary = tr("summary_returned_safely", name=self.character_name, destination=self.destination, loot=self.loot_summary[-1])
+                    detail = tr("detail_returned_safely", name=self.character_name, origin=self.origin, items=", ".join(self.loot_summary))
                 else:
                     self.outcome = "retreat"
-                    summary = (
-                        f"{self.character_name} retreated from {self.destination} and returned safely."
-                    )
-                    detail = (
-                        f"{self.character_name} abandoned the expedition and returned to {self.origin} "
-                        "without major findings."
-                    )
+                    summary = tr("summary_retreated_safely", name=self.character_name, destination=self.destination)
+                    detail = tr("detail_retreated_safely", name=self.character_name, origin=self.origin)
                 self._record(summary, detail)
             character.active_adventure_id = None
-            character.add_history(f"Year {world.year}: {self.detail_log[-1]}")
+            character.add_history(tr("history_adventure_detail", year=world.year, detail=self.detail_log[-1]))
             return [self.summary_log[-1]]
 
         return []
@@ -253,33 +224,27 @@ class AdventureRun:
             chosen = self.pending_choice.default_option
         self.pending_choice.selected_option = chosen
 
-        detail = f"{self.character_name} chose '{chosen}' during the expedition."
+        detail = tr("detail_choice_made", name=self.character_name, choice=chosen)
         self.detail_log.append(detail)
 
         context = self.pending_choice.context
         self.pending_choice = None
 
-        if chosen in ("retreat", "withdraw"):
+        if chosen in (tr("choice_retreat"), tr("choice_withdraw")):
             self.state = "returning"
-            summary = f"{self.character_name} chose to withdraw from the expedition."
+            summary = tr("summary_choice_withdraw", name=self.character_name)
             self.summary_log.append(summary)
-            self.detail_log.append(
-                f"{self.character_name} stopped pushing deeper and began the return journey."
-            )
+            self.detail_log.append(tr("detail_choice_withdraw", name=self.character_name))
             return [summary]
 
-        if context == "approach" and chosen == "proceed_cautiously":
+        if context == "approach" and chosen == tr("choice_proceed_cautiously"):
             self.state = "exploring"
-            self.detail_log.append(
-                f"{self.character_name} took a cautious route into {self.destination}."
-            )
+            self.detail_log.append(tr("detail_choice_cautious", name=self.character_name, destination=self.destination))
             return []
 
-        if context in ("approach", "depth") and chosen == "press_on":
+        if context in ("approach", "depth") and chosen == tr("choice_press_on"):
             self.state = "exploring"
-            self.detail_log.append(
-                f"{self.character_name} pressed deeper into {self.destination}."
-            )
+            self.detail_log.append(tr("detail_choice_press_on", name=self.character_name, destination=self.destination))
             return []
 
         self.state = "exploring"
@@ -309,7 +274,7 @@ def create_adventure_run(character: Any, world: Any, rng: Any = random) -> Adven
         year_started=world.year,
     )
     run._record(
-        f"{character.name} set out from {character.location} toward {destination.name}.",
-        f"{character.name} began an expedition from {character.location} toward {destination.name}.",
+        tr("summary_adventure_set_out", name=character.name, origin=character.location, destination=destination.name),
+        tr("detail_adventure_set_out", name=character.name, origin=character.location, destination=destination.name),
     )
     return run

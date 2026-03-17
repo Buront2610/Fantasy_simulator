@@ -215,8 +215,8 @@ def _show_roster(world: World) -> None:
     print()
     print(_hr())
     header = (
-        f"  {'Name':<22} {'Race/Job':<22} {'Age':>4}  "
-        f"{'STR':>4}{'INT':>4}{'DEX':>4}  {'Status':<10}  Location"
+        f"  {tr('roster_header_name'):<22} {tr('roster_header_race_job'):<22} {tr('roster_header_age'):>4}  "
+        f"{tr('stat_str'):>4}{tr('stat_int'):>4}{tr('stat_dex'):>4}  {tr('roster_header_status'):<10}  {tr('roster_header_location')}"
     )
     print(bold(header))
     print(_hr())
@@ -264,7 +264,7 @@ def _show_adventure_summaries(sim: Simulator) -> None:
     print(bold(f"  {tr('adventure_summaries_header')}"))
     print(_hr())
     for i, run in enumerate(runs, 1):
-        status = run.outcome or run.state
+        status = tr(f"outcome_{run.outcome}") if run.outcome else tr(f"state_{run.state}")
         loot = f" | loot: {', '.join(run.loot_summary)}" if run.loot_summary else ""
         injury = f" | injury: {run.injury_status}" if run.injury_status != "none" else ""
         print(
@@ -284,7 +284,7 @@ def _show_adventure_details(sim: Simulator) -> None:
         return
 
     for i, run in enumerate(runs, 1):
-        status = run.outcome or run.state
+        status = tr(f"outcome_{run.outcome}") if run.outcome else tr(f"state_{run.state}")
         print(f"  {i:>2}. {run.character_name} at {run.destination} [{status}]")
     print()
     raw = input(f"  {tr('enter_adventure_number')}").strip()
@@ -302,8 +302,8 @@ def _show_adventure_details(sim: Simulator) -> None:
     print(_hr())
     print(f"  ID          : {run.adventure_id}")
     print(f"  {tr('route'):<11}: {run.origin} -> {run.destination}")
-    print(f"  {tr('state'):<11}: {run.state}")
-    print(f"  {tr('outcome'):<11}: {run.outcome or tr('unresolved')}")
+    print(f"  {tr('state'):<11}: {tr(f'state_{run.state}')}")
+    print(f"  {tr('outcome'):<11}: {tr(f'outcome_{run.outcome}') if run.outcome else tr('unresolved')}")
     print(f"  {tr('injury'):<11}: {run.injury_status}")
     print(f"  {tr('steps'):<11}: {run.steps_taken}")
     if run.loot_summary:
@@ -326,7 +326,7 @@ def _resolve_pending_adventure_choice(sim: Simulator) -> None:
         options = ", ".join(item["options"])
         print(
             f"  {i:>2}. {item['character_name']} | {item['prompt']} "
-            f"[{options}] default={item['default_option']}"
+            f"[{options}] {tr('choice_default_hint', default_option=item['default_option'])}"
         )
     print()
 
