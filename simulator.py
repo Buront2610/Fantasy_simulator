@@ -63,6 +63,9 @@ class Simulator:
                 self.history.append(result)
                 self.world.log_event(result.description)
 
+        # --- Injury recovery ---
+        self._recover_injuries()
+
         # --- Adventure start / progression ---
         self._maybe_start_adventure()
         self._advance_adventures()
@@ -82,6 +85,17 @@ class Simulator:
                 self.world.log_event(result.description)
 
         self.world.advance_time(1)
+
+    def _recover_injuries(self) -> None:
+        """Give injured characters a chance to recover during normal life."""
+        for char in self.world.characters:
+            if not char.alive or char.injury_status != "injured":
+                continue
+            if random.random() < 0.5:
+                char.injury_status = "none"
+                message = f"{char.name} recovered from earlier adventure injuries."
+                char.add_history(f"Year {self.world.year}: Recovered from earlier adventure injuries.")
+                self.world.log_event(message)
 
     def _maybe_start_adventure(self) -> None:
         """Start at most one new adventure in the current year."""

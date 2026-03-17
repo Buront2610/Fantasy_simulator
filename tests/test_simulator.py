@@ -311,3 +311,32 @@ class TestSimulatorSerialization:
         assert [c.name for c in restored.world.characters] == [
             c.name for c in sim.world.characters
         ]
+
+
+class TestInjuryRecovery:
+    def test_injured_character_can_recover_during_year(self, monkeypatch):
+        world = _make_world(n_chars=1)
+        char = world.characters[0]
+        char.injury_status = "injured"
+        sim = Simulator(world, events_per_year=0, adventure_steps_per_year=0, seed=1)
+
+        monkeypatch.setattr("simulator.random.random", lambda: 0.1)
+        sim._run_year()
+
+        assert char.injury_status == "none"
+        assert any("recovered from earlier adventure injuries" in entry.lower() for entry in world.event_log)
+        assert any("Recovered from earlier adventure injuries." in entry for entry in char.history)
+
+    def test_injured_character_does_not_start_adventure_before_recovery(self, monkeypatch):
+        world = _make_world(n_chars=1)
+        char = world.characters[0]
+        char.injury_status = "injured"
+        sim = Simulator(world, events_per_year=0, adventure_steps_per_year=0, seed=1)
+
+        monkeypatch.setattr("simulator.random.random", lambda: 0.9)
+        monkeypatch.setattr("simulator.random.choice", lambda options: options[0])
+        sim._run_year()
+
+        assert char.injury_status == "injured"
+        assert char.active_adventure_id is None
+        assert world.active_adventures == []
