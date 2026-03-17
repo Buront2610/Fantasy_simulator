@@ -147,3 +147,28 @@ def test_simulator_integrates_adventures_into_normal_year_loop(monkeypatch):
     assert run.outcome == "safe_return"
     assert any("set out" in entry.lower() for entry in world.event_log)
     assert sim.get_adventure_summaries()
+
+
+def test_pending_choice_persists_until_later_year(monkeypatch):
+    world = World()
+    char = _make_character()
+    world.add_character(char)
+    sim = Simulator(world, events_per_year=0, adventure_steps_per_year=4, seed=1)
+
+    random_values = iter([0.9, 0.0, 0.10, 0.9, 0.9, 0.9])
+
+    monkeypatch.setattr("simulator.random.random", lambda: next(random_values))
+    monkeypatch.setattr("simulator.random.choice", lambda options: options[0])
+
+    sim._run_year()
+
+    assert len(world.active_adventures) == 1
+    run = world.active_adventures[0]
+    assert run.pending_choice is not None
+    assert run.state == "waiting_for_choice"
+
+    sim._run_year()
+
+    assert world.active_adventures == []
+    assert len(world.completed_adventures) == 1
+    assert world.completed_adventures[0].outcome == "safe_return"

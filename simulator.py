@@ -117,20 +117,26 @@ class Simulator:
 
     def _advance_adventures(self) -> None:
         """Advance active adventures by multiple internal steps per year."""
+        paused_until_next_year = set()
         for _ in range(self.adventure_steps_per_year):
             active_ids = [run.adventure_id for run in self.world.active_adventures]
             for adventure_id in active_ids:
+                if adventure_id in paused_until_next_year:
+                    continue
                 run = self.world.get_adventure_by_id(adventure_id)
                 if run is None or run.is_resolved:
                     continue
                 char = self.world.get_character_by_id(run.character_id)
                 if char is None:
                     continue
+                had_pending_choice = run.pending_choice is not None
                 summaries = run.step(char, self.world, rng=random)
                 for entry in summaries:
                     self.world.log_event(entry)
                 if run.is_resolved:
                     self.world.complete_adventure(run.adventure_id)
+                elif not had_pending_choice and run.pending_choice is not None:
+                    paused_until_next_year.add(run.adventure_id)
 
     # ------------------------------------------------------------------
     # Summary & stories
