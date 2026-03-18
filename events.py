@@ -426,8 +426,8 @@ class EventSystem:
         return None
 
     def generate_random_event(self, characters: List[Any], world: Any, rng: Any = random) -> Optional[EventResult]:
-        alive = [c for c in characters if c.alive]
-        if not alive:
+        eligible = [c for c in characters if c.alive and c.active_adventure_id is None]
+        if not eligible:
             return None
 
         event_types = list(self._EVENT_WEIGHTS.keys())
@@ -435,7 +435,7 @@ class EventSystem:
         chosen_type = rng.choices(event_types, weights=weights, k=1)[0]
 
         if chosen_type in ("marriage", "battle", "meeting"):
-            pair = self._find_collocated_pair(alive, rng=rng)
+            pair = self._find_collocated_pair(eligible, rng=rng)
             if pair is None:
                 chosen_type = rng.choice(["skill_training", "discovery", "journey", "aging"])
             else:
@@ -446,7 +446,7 @@ class EventSystem:
                     return self.event_battle(char1, char2, world, rng=rng)
                 return self.event_meeting(char1, char2, world, rng=rng)
 
-        char = rng.choice(alive)
+        char = rng.choice(eligible)
         if chosen_type == "discovery":
             return self.event_discovery(char, world, rng=rng)
         if chosen_type == "skill_training":

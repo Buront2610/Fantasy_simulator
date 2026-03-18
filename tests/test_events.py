@@ -458,6 +458,13 @@ class TestGenerateRandomEvent:
         result = es.generate_random_event([dead], world)
         assert result is None
 
+    def test_chars_on_adventure_are_skipped(self, es, world):
+        adventurer = _make_char("Away")
+        adventurer.active_adventure_id = "adv-1"
+        world.add_character(adventurer)
+        result = es.generate_random_event([adventurer], world)
+        assert result is None
+
     def test_single_char_solo_event(self, es, world):
         """With only one character, a solo event should fire (no crash)."""
         c = _make_char("Solo", location="Aethoria Capital")
