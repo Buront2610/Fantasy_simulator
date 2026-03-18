@@ -31,13 +31,13 @@ from world_data import JOBS, RACES, WORLD_LORE
 # Simulation helpers
 # ---------------------------------------------------------------------------
 
-def _build_default_world(num_characters: int = 12) -> World:
+def _build_default_world(num_characters: int = 12, seed: int | None = None) -> World:
     world = World()
     creator = CharacterCreator()
     locations = [loc.name for loc in world.grid.values() if loc.region_type != "dungeon"]
 
     import random as _random
-    rng = _random.Random()
+    rng = _random.Random(seed)
     for _ in range(num_characters):
         char = creator.create_random(rng=rng)
         char.location = rng.choice(locations)
