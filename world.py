@@ -6,10 +6,14 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from i18n import tr
 from world_data import DEFAULT_LOCATIONS, WORLD_LORE
+
+if TYPE_CHECKING:
+    from adventure import AdventureRun
+    from character import Character
 
 
 @dataclass
@@ -72,10 +76,13 @@ class World:
         self.height: int = height
         self.year: int = year
         self.grid: Dict[Tuple[int, int], Location] = {}
-        self.characters: List[Any] = []
+        self.characters: List[Character] = []
+        self._char_index: Dict[str, Character] = {}
+        self._adventure_index: Dict[str, AdventureRun] = {}
+        self._location_name_index: Dict[str, Location] = {}
         self.event_log: List[str] = []
-        self.active_adventures: List[Any] = []
-        self.completed_adventures: List[Any] = []
+        self.active_adventures: List[AdventureRun] = []
+        self.completed_adventures: List[AdventureRun] = []
         self._build_default_map()
 
     def _build_default_map(self) -> None:
@@ -83,33 +90,41 @@ class World:
             name, desc, rtype, gx, gy = entry
             loc = Location(name=name, description=desc, region_type=rtype, x=gx, y=gy)
             self.grid[(gx, gy)] = loc
+            self._location_name_index[name] = loc
 
-    def add_character(self, character: Any, rng: Any = random) -> None:
-        if character.location not in self.location_names:
+    def add_character(self, character: Character, rng: Any = random) -> None:
+        if character.location not in self._location_name_index:
             options = [loc.name for loc in self.grid.values() if loc.region_type != "dungeon"]
             character.location = rng.choice(options) if options else self.location_names[0]
+        if character.char_id in self._char_index:
+            raise ValueError(
+                f"Duplicate character ID: {character.char_id!r} "
+                f"(existing: {self._char_index[character.char_id].name!r}, "
+                f"new: {character.name!r})"
+            )
         self.characters.append(character)
+        self._char_index[character.char_id] = character
+
+    def rebuild_char_index(self) -> None:
+        """Rebuild the character ID index after external mutations."""
+        self._char_index = {c.char_id: c for c in self.characters}
 
     def remove_character(self, char_id: str) -> None:
         self.characters = [c for c in self.characters if c.char_id != char_id]
+        self._char_index.pop(char_id, None)
 
-    def get_character_by_id(self, char_id: str) -> Optional[Any]:
-        for c in self.characters:
-            if c.char_id == char_id:
-                return c
-        return None
+    def get_character_by_id(self, char_id: str) -> Optional[Character]:
+        return self._char_index.get(char_id)
 
-    def get_adventure_by_id(self, adventure_id: str) -> Optional[Any]:
-        for run in self.active_adventures + self.completed_adventures:
-            if run.adventure_id == adventure_id:
-                return run
-        return None
+    def get_adventure_by_id(self, adventure_id: str) -> Optional[AdventureRun]:
+        return self._adventure_index.get(adventure_id)
 
-    def add_adventure(self, run: Any) -> None:
+    def add_adventure(self, run: AdventureRun) -> None:
         self.active_adventures.append(run)
+        self._adventure_index[run.adventure_id] = run
 
     def complete_adventure(self, adventure_id: str) -> None:
-        remaining: List[Any] = []
+        remaining: List[AdventureRun] = []
         for run in self.active_adventures:
             if run.adventure_id == adventure_id:
                 self.completed_adventures.append(run)
@@ -122,12 +137,9 @@ class World:
         return sorted(loc.name for loc in self.grid.values())
 
     def get_location_by_name(self, name: str) -> Optional[Location]:
-        for loc in self.grid.values():
-            if loc.name == name:
-                return loc
-        return None
+        return self._location_name_index.get(name)
 
-    def get_characters_at_location(self, location_name: str) -> List[Any]:
+    def get_characters_at_location(self, location_name: str) -> List[Character]:
         return [c for c in self.characters if c.location == location_name and c.alive]
 
     def get_neighboring_locations(self, location_name: str) -> List[Location]:
@@ -215,9 +227,11 @@ class World:
             year=data.get("year", 1000),
         )
         world.grid = {}
+        world._location_name_index = {}
         for loc_data in data.get("grid", []):
             loc = Location.from_dict(loc_data)
             world.grid[(loc.x, loc.y)] = loc
+            world._location_name_index[loc.name] = loc
         world.event_log = data.get("event_log", [])
         world.active_adventures = [
             AdventureRun.from_dict(run) for run in data.get("active_adventures", [])
@@ -225,6 +239,10 @@ class World:
         world.completed_adventures = [
             AdventureRun.from_dict(run) for run in data.get("completed_adventures", [])
         ]
+        world._adventure_index = {
+            run.adventure_id: run
+            for run in world.active_adventures + world.completed_adventures
+        }
         return world
 
     def __repr__(self) -> str:  # pragma: no cover

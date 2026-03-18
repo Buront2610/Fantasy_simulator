@@ -7,9 +7,13 @@ from __future__ import annotations
 import random
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from i18n import tr, tr_term
+
+if TYPE_CHECKING:
+    from character import Character
+    from world import World
 
 
 ADVENTURE_DISCOVERIES = [
@@ -121,7 +125,7 @@ class AdventureRun:
             resolution_year=data.get("resolution_year"),
         )
 
-    def step(self, character: Any, world: Any, rng: Any = random) -> List[str]:
+    def step(self, character: Character, world: World, rng: Any = random) -> List[str]:
         """Advance the adventure by one internal step."""
         if self.is_resolved:
             return []
@@ -216,8 +220,8 @@ class AdventureRun:
 
     def resolve_choice(
         self,
-        world: Any,
-        character: Any,
+        world: World,
+        character: Character,
         option: Optional[str] = None,
     ) -> List[str]:
         """Resolve the current pending choice or apply its default option."""
@@ -260,7 +264,7 @@ class AdventureRun:
         self.detail_log.append(detail)
 
 
-def create_adventure_run(character: Any, world: Any, rng: Any = random) -> AdventureRun:
+def create_adventure_run(character: Character, world: World, rng: Any = random) -> AdventureRun:
     """Create a new adventure for a character using nearby risky terrain when possible."""
     neighbors = world.get_neighboring_locations(character.location)
     risky = [loc for loc in neighbors if loc.region_type in ("forest", "mountain", "dungeon")]

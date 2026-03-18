@@ -5,12 +5,16 @@ simulator.py - Orchestrates the world simulation loop.
 from __future__ import annotations
 
 import ast
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 import random
 
-from adventure import create_adventure_run
+from adventure import AdventureRun, create_adventure_run
 from events import EventResult, EventSystem
 from i18n import get_locale, set_locale, tr, tr_term
+
+if TYPE_CHECKING:
+    from character import Character
+    from world import World
 
 
 class Simulator:
@@ -28,7 +32,7 @@ class Simulator:
 
     def __init__(
         self,
-        world: Any,
+        world: World,
         events_per_year: int = 8,
         adventure_steps_per_year: int = 3,
         seed: Optional[int] = None,
@@ -149,7 +153,7 @@ class Simulator:
                 elif not had_pending_choice and run.pending_choice is not None:
                     paused_until_next_year.add(run.adventure_id)
 
-    def _resolve_dead_character_adventure(self, run: Any, char: Any) -> None:
+    def _resolve_dead_character_adventure(self, run: AdventureRun, char: Character) -> None:
         run.pending_choice = None
         run.state = "resolved"
         run.outcome = "death"
@@ -279,9 +283,11 @@ class Simulator:
         from world import World
 
         world = World.from_dict(data["world"])
-        world.characters = [
+        characters = [
             Character.from_dict(char_data) for char_data in data.get("characters", [])
         ]
+        world.characters = characters
+        world._char_index = {c.char_id: c for c in characters}
         sim = cls(
             world,
             events_per_year=data.get("events_per_year", 8),
@@ -290,7 +296,18 @@ class Simulator:
         set_locale(data.get("locale", get_locale()))
         rng_state = data.get("rng_state")
         if rng_state is not None:
-            sim.rng.setstate(ast.literal_eval(rng_state))
+            try:
+                parsed = ast.literal_eval(rng_state)
+                # Validate Mersenne Twister state structure: (version, internalstate, gauss_next)
+                if (
+                    isinstance(parsed, tuple)
+                    and len(parsed) == 3
+                    and isinstance(parsed[0], int)
+                    and isinstance(parsed[1], tuple)
+                ):
+                    sim.rng.setstate(parsed)
+            except (ValueError, SyntaxError, TypeError):
+                pass  # Ignore corrupted RNG state; start with fresh RNG
         sim.history = [
             EventResult(
                 description=ev["description"],

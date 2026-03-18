@@ -310,12 +310,10 @@ def _save_simulation_snapshot(sim: Simulator) -> None:
     print()
     default_name = "simulation_snapshot.json"
     path = input(f"  {tr('save_path_prompt', default_name=default_name)}").strip() or default_name
-    try:
-        save_simulation(sim, path)
-    except OSError as exc:
-        print(red(f"  {tr('save_failed', error=exc)}"))
-    else:
+    if save_simulation(sim, path):
         print(green(f"  {tr('save_succeeded', path=path)}"))
+    else:
+        print(red(f"  {tr('save_failed', error='I/O or serialization error')}"))
     _pause()
 
 
@@ -325,14 +323,9 @@ def _load_simulation_snapshot() -> Optional[Simulator]:
     print(_hr("="))
     default_name = "simulation_snapshot.json"
     path = input(f"  {tr('load_path_prompt', default_name=default_name)}").strip() or default_name
-    try:
-        sim = load_simulation(path)
-    except FileNotFoundError:
-        print(red(f"  {tr('load_not_found', path=path)}"))
-        _pause()
-        return None
-    except (OSError, ValueError, KeyError) as exc:
-        print(red(f"  {tr('load_failed', error=exc)}"))
+    sim = load_simulation(path)
+    if sim is None:
+        print(red(f"  {tr('load_failed', error='file not found or corrupted')}"))
         _pause()
         return None
 

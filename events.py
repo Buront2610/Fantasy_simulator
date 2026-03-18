@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from world_data import (
     BATTLE_OUTCOMES_LOSE,
@@ -19,6 +19,10 @@ from world_data import (
     JOURNEY_EVENTS,
 )
 from i18n import tr, tr_term
+
+if TYPE_CHECKING:
+    from character import Character
+    from world import World
 
 
 @dataclass
@@ -45,7 +49,7 @@ class EventSystem:
         "marriage": 5,
     }
 
-    def event_marriage(self, char1: Any, char2: Any, world: Any, rng: Any = random) -> EventResult:
+    def event_marriage(self, char1: Character, char2: Character, world: World, rng: Any = random) -> EventResult:
         """Two characters with strong mutual affection may get married."""
         rel1 = char1.get_relationship(char2.char_id)
         rel2 = char2.get_relationship(char1.char_id)
@@ -127,7 +131,7 @@ class EventSystem:
             year=world.year,
         )
 
-    def event_battle(self, char1: Any, char2: Any, world: Any, rng: Any = random) -> EventResult:
+    def event_battle(self, char1: Character, char2: Character, world: World, rng: Any = random) -> EventResult:
         """Two characters fight. Winner is determined by combat power + luck."""
         power1 = char1.combat_power + rng.randint(0, 30)
         power2 = char2.combat_power + rng.randint(0, 30)
@@ -167,7 +171,7 @@ class EventSystem:
             year=world.year,
         )
 
-    def event_discovery(self, char: Any, world: Any, rng: Any = random) -> EventResult:
+    def event_discovery(self, char: Character, world: World, rng: Any = random) -> EventResult:
         item = rng.choice(DISCOVERY_ITEMS)
         stat_gains: Dict[str, int]
         roll = rng.random()
@@ -197,7 +201,7 @@ class EventSystem:
             year=world.year,
         )
 
-    def event_meeting(self, char1: Any, char2: Any, world: Any, rng: Any = random) -> EventResult:
+    def event_meeting(self, char1: Character, char2: Character, world: World, rng: Any = random) -> EventResult:
         delta = rng.randint(-15, 25)
         char1.update_relationship(char2.char_id, delta)
         char2.update_relationship(char1.char_id, delta + rng.randint(-5, 5))
@@ -255,7 +259,7 @@ class EventSystem:
             year=world.year,
         )
 
-    def event_aging(self, char: Any, world: Any, rng: Any = random) -> EventResult:
+    def event_aging(self, char: Character, world: World, rng: Any = random) -> EventResult:
         char.age += 1
         if char.age < 30:
             stat_changes = {
@@ -299,7 +303,7 @@ class EventSystem:
             year=world.year,
         )
 
-    def handle_death_side_effects(self, char: Any, world: Any) -> None:
+    def handle_death_side_effects(self, char: Character, world: World) -> None:
         """Apply post-death side effects such as notifying the surviving spouse.
 
         This is safe to call on any dead character; it is idempotent with
@@ -313,7 +317,7 @@ class EventSystem:
                 spouse.add_history(tr("history_lost_spouse", year=world.year, name=char.name))
                 spouse.spouse_id = None
 
-    def event_death(self, char: Any, world: Any, rng: Any = random) -> EventResult:
+    def event_death(self, char: Character, world: World, rng: Any = random) -> EventResult:
         char.alive = False
         char.active_adventure_id = None
         self.handle_death_side_effects(char, world)
@@ -336,7 +340,7 @@ class EventSystem:
             year=world.year,
         )
 
-    def event_skill_training(self, char: Any, world: Any, rng: Any = random) -> EventResult:
+    def event_skill_training(self, char: Character, world: World, rng: Any = random) -> EventResult:
         if not char.skills:
             from world_data import ALL_SKILLS
 
@@ -389,7 +393,7 @@ class EventSystem:
             year=world.year,
         )
 
-    def event_journey(self, char: Any, world: Any, rng: Any = random) -> EventResult:
+    def event_journey(self, char: Character, world: World, rng: Any = random) -> EventResult:
         neighbours = world.get_neighboring_locations(char.location)
         if not neighbours:
             neighbours = list(world.grid.values())
@@ -424,7 +428,7 @@ class EventSystem:
             year=world.year,
         )
 
-    def check_natural_death(self, char: Any, world: Any, rng: Any = random) -> Optional[EventResult]:
+    def check_natural_death(self, char: Character, world: World, rng: Any = random) -> Optional[EventResult]:
         if not char.alive:
             return None
         age_ratio = char.age / max(char.max_age, 1)
@@ -434,7 +438,7 @@ class EventSystem:
             return self.event_death(char, world, rng=rng)
         return None
 
-    def generate_random_event(self, characters: List[Any], world: Any, rng: Any = random) -> Optional[EventResult]:
+    def generate_random_event(self, characters: List[Character], world: World, rng: Any = random) -> Optional[EventResult]:
         eligible = [c for c in characters if c.alive and c.active_adventure_id is None]
         if not eligible:
             return None
@@ -467,7 +471,7 @@ class EventSystem:
         return self.event_skill_training(char, world, rng=rng)
 
     @staticmethod
-    def _find_collocated_pair(alive: List[Any], rng: Any = random) -> Optional[Tuple[Any, Any]]:
+    def _find_collocated_pair(alive: List[Character], rng: Any = random) -> Optional[Tuple[Character, Character]]:
         by_loc: Dict[str, List[Any]] = {}
         for c in alive:
             by_loc.setdefault(c.location, []).append(c)
