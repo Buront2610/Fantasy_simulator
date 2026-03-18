@@ -10,7 +10,7 @@ import random
 
 from adventure import create_adventure_run
 from events import EventResult, EventSystem
-from i18n import get_locale, set_locale, tr
+from i18n import get_locale, set_locale, tr, tr_term
 
 
 class Simulator:
@@ -142,6 +142,8 @@ class Simulator:
                 summaries = run.step(char, self.world, rng=self.rng)
                 for entry in summaries:
                     self.world.log_event(entry)
+                if not char.alive:
+                    self.event_system.handle_death_side_effects(char, self.world)
                 if run.is_resolved:
                     self.world.complete_adventure(run.adventure_id)
                 elif not had_pending_choice and run.pending_choice is not None:
@@ -181,7 +183,8 @@ class Simulator:
             f"  {tr('event_breakdown')}:",
         ]
         for etype, count in sorted(type_counts.items(), key=lambda x: -x[1]):
-            lines.append(f"    {etype:<20} {count:>4} times")
+            localized_type = tr(f"event_type_{etype}")
+            lines.append(f"    {localized_type:<20} {count:>4} {tr('times_suffix')}")
 
         lines.append("")
         lines.append(f"  {tr('notable_moments')}:")
@@ -212,7 +215,7 @@ class Simulator:
         lines = [
             "─" * 50,
             f"  {tr('story_of', name=char.name)}",
-            f"  {char.race} {char.job}",
+            f"  {tr_term(char.race)} {tr_term(char.job)}",
             "─" * 50,
         ]
         if char.history:
