@@ -84,10 +84,10 @@ class World:
             loc = Location(name=name, description=desc, region_type=rtype, x=gx, y=gy)
             self.grid[(gx, gy)] = loc
 
-    def add_character(self, character: Any) -> None:
+    def add_character(self, character: Any, rng: Any = random) -> None:
         if character.location not in self.location_names:
             options = [loc.name for loc in self.grid.values() if loc.region_type != "dungeon"]
-            character.location = random.choice(options) if options else self.location_names[0]
+            character.location = rng.choice(options) if options else self.location_names[0]
         self.characters.append(character)
 
     def remove_character(self, char_id: str) -> None:

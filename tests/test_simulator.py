@@ -93,6 +93,44 @@ class TestSimulatorConstruction:
         assert [ev.description for ev in s1.history] == [ev.description for ev in s2.history]
         assert s1.world.event_log == s2.world.event_log
 
+    def test_initial_generation_reproducibility_with_rng(self):
+        """Using injected RNG for character creation produces identical worlds."""
+        import random as _random
+
+        def _make_seeded_world(seed):
+            rng = _random.Random(seed)
+            world = World()
+            creator = CharacterCreator()
+            locs = [loc.name for loc in world.grid.values() if loc.region_type != "dungeon"]
+            for _ in range(4):
+                c = creator.create_random(rng=rng)
+                c.location = rng.choice(locs)
+                world.add_character(c)
+            return world
+
+        w1 = _make_seeded_world(seed=555)
+        w2 = _make_seeded_world(seed=555)
+        # Sync char_ids (UUIDs are generated outside the RNG)
+        for c1, c2 in zip(w1.characters, w2.characters):
+            c2.char_id = c1.char_id
+
+        assert len(w1.characters) == len(w2.characters)
+        for c1, c2 in zip(w1.characters, w2.characters):
+            assert c1.name == c2.name
+            assert c1.race == c2.race
+            assert c1.job == c2.job
+            assert c1.age == c2.age
+            assert c1.strength == c2.strength
+            assert c1.intelligence == c2.intelligence
+            assert c1.location == c2.location
+
+        # Full simulation should also match
+        s1 = Simulator(w1, events_per_year=4, seed=99)
+        s2 = Simulator(w2, events_per_year=4, seed=99)
+        s1.run(years=3)
+        s2.run(years=3)
+        assert [ev.description for ev in s1.history] == [ev.description for ev in s2.history]
+
 
 # ---------------------------------------------------------------------------
 # run()

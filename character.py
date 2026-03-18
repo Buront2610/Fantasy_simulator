@@ -188,10 +188,11 @@ def random_stats(
     base: int = 30,
     spread: int = 40,
     race_bonuses: Optional[Dict[str, int]] = None,
+    rng: Any = random,
 ) -> Dict[str, int]:
     bonuses = race_bonuses or {}
     result: Dict[str, int] = {}
     for stat in ("strength", "intelligence", "dexterity", "wisdom", "charisma", "constitution"):
-        raw = random.randint(base, base + spread) + bonuses.get(stat, 0)
+        raw = rng.randint(base, base + spread) + bonuses.get(stat, 0)
         result[stat] = max(1, min(100, raw))
     return result

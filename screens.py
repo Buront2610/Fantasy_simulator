@@ -36,10 +36,11 @@ def _build_default_world(num_characters: int = 12) -> World:
     creator = CharacterCreator()
     locations = [loc.name for loc in world.grid.values() if loc.region_type != "dungeon"]
 
-    import random
+    import random as _random
+    rng = _random.Random()
     for _ in range(num_characters):
-        char = creator.create_random()
-        char.location = random.choice(locations)
+        char = creator.create_random(rng=rng)
+        char.location = rng.choice(locations)
         world.add_character(char)
     return world
 

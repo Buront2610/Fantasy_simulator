@@ -5,7 +5,7 @@ character_creator.py - Interactive and programmatic character creation.
 from __future__ import annotations
 
 import random
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from character import Character, random_stats
 from i18n import tr
@@ -65,14 +65,14 @@ _FIRST_NAMES_NB = _FIRST_NAMES_M + _FIRST_NAMES_F
 _LAST_NAMES = ["Ashwood", "Blackthorn", "Coldwater", "Dawnbringer", "Emberveil", "Frostmantle", "Goldvein", "Hawkridge", "Ironforge", "Jadewood", "Kindlewick", "Lightborn", "Moonwhisper", "Nightshade", "Oakheart", "Proudmoor", "Quicksilver", "Riverstone", "Shadowmere", "Thornwall", "Underhill", "Voidwalker", "Windmere", "Yarrow", "Zephyrhaven"]
 
 
-def _random_name(gender: str) -> str:
+def _random_name(gender: str, rng: Any = random) -> str:
     if gender == "Male":
-        first = random.choice(_FIRST_NAMES_M)
+        first = rng.choice(_FIRST_NAMES_M)
     elif gender == "Female":
-        first = random.choice(_FIRST_NAMES_F)
+        first = rng.choice(_FIRST_NAMES_F)
     else:
-        first = random.choice(_FIRST_NAMES_NB)
-    last = random.choice(_LAST_NAMES)
+        first = rng.choice(_FIRST_NAMES_NB)
+    last = rng.choice(_LAST_NAMES)
     return f"{first} {last}"
 
 
@@ -123,24 +123,24 @@ class CharacterCreator:
         print(char.stat_block())
         return char
 
-    def create_random(self, name: Optional[str] = None) -> Character:
-        gender = random.choice(_GENDERS)
-        race_entry = random.choice(RACES)
+    def create_random(self, name: Optional[str] = None, rng: Any = random) -> Character:
+        gender = rng.choice(_GENDERS)
+        race_entry = rng.choice(RACES)
         race = race_entry[0]
         race_bonuses = race_entry[2]
 
-        job_entry = random.choice(JOBS)
+        job_entry = rng.choice(JOBS)
         job = job_entry[0]
         job_skills = job_entry[2]
 
-        age = random.randint(16, 55)
-        char_name = name or _random_name(gender)
-        stats = random_stats(base=25, spread=45, race_bonuses=race_bonuses)
+        age = rng.randint(16, 55)
+        char_name = name or _random_name(gender, rng=rng)
+        stats = random_stats(base=25, spread=45, race_bonuses=race_bonuses, rng=rng)
 
         skills: Dict[str, int] = {}
         for s in job_skills:
-            skills[s] = random.randint(1, 3)
-        extra_skills = random.sample(ALL_SKILLS, k=min(2, len(ALL_SKILLS)))
+            skills[s] = rng.randint(1, 3)
+        extra_skills = rng.sample(ALL_SKILLS, k=min(2, len(ALL_SKILLS)))
         for s in extra_skills:
             if s not in skills:
                 skills[s] = 1
@@ -149,7 +149,7 @@ class CharacterCreator:
         char.add_history(f"Born into the world as a {race} {job}.")
         return char
 
-    def create_from_template(self, template_name: str, name: Optional[str] = None) -> Character:
+    def create_from_template(self, template_name: str, name: Optional[str] = None, rng: Any = random) -> Character:
         key = template_name.lower().strip()
         if key not in _TEMPLATES:
             available = ", ".join(_TEMPLATES.keys())
@@ -158,11 +158,11 @@ class CharacterCreator:
         tmpl = _TEMPLATES[key]
         race = tmpl["race"]
         job = tmpl["job"]
-        gender = random.choice(_GENDERS)
-        char_name = name or _random_name(gender)
-        age = random.randint(20, 40)
+        gender = rng.choice(_GENDERS)
+        char_name = name or _random_name(gender, rng=rng)
+        age = rng.randint(20, 40)
 
-        stats = {k: max(1, min(100, v + random.randint(-5, 5))) for k, v in tmpl["base_stats"].items()}
+        stats = {k: max(1, min(100, v + rng.randint(-5, 5))) for k, v in tmpl["base_stats"].items()}
         skills = dict(tmpl["skills"])
 
         char = Character(name=char_name, age=age, gender=gender, race=race, job=job, skills=skills, **stats)
