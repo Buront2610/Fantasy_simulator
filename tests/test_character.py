@@ -310,3 +310,11 @@ class TestRandomStats:
         _random.seed(42)
         stats_with_bonus = random_stats(base=50, spread=0, race_bonuses={"strength": 10})
         assert stats_with_bonus["strength"] == stats_no_bonus["strength"] + 10
+
+    def test_rng_injection_reproducibility(self):
+        import random as _random
+        rng1 = _random.Random(123)
+        rng2 = _random.Random(123)
+        stats1 = random_stats(rng=rng1)
+        stats2 = random_stats(rng=rng2)
+        assert stats1 == stats2
