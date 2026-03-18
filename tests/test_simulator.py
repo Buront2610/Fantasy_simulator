@@ -8,8 +8,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 import pytest
 
+from adventure import AdventureChoice, AdventureRun
 from character import Character
 from character_creator import CharacterCreator
+from i18n import get_locale, set_locale
+from save_load import load_simulation, save_simulation
 from simulator import Simulator
 from world import World
 
@@ -52,6 +55,14 @@ def sim_medium(medium_world) -> Simulator:
     return Simulator(medium_world, events_per_year=6, seed=7)
 
 
+@pytest.fixture(autouse=True)
+def reset_locale():
+    previous = get_locale()
+    set_locale("en")
+    yield
+    set_locale(previous)
+
+
 # ---------------------------------------------------------------------------
 # Construction
 # ---------------------------------------------------------------------------
@@ -69,7 +80,6 @@ class TestSimulatorConstruction:
 
     def test_seed_reproducibility(self, small_world):
         """Two simulators with the same seed should produce the same history."""
-        import copy
         w1 = _make_world(n_chars=4)
         w2 = _make_world(n_chars=4)
         # Ensure same starting state by syncing char IDs
@@ -80,7 +90,8 @@ class TestSimulatorConstruction:
         s2 = Simulator(w2, events_per_year=4, seed=99)
         s1.run(years=3)
         s2.run(years=3)
-        assert len(s1.history) == len(s2.history)
+        assert [ev.description for ev in s1.history] == [ev.description for ev in s2.history]
+        assert s1.world.event_log == s2.world.event_log
 
 
 # ---------------------------------------------------------------------------
@@ -134,6 +145,11 @@ class TestSimulatorRun:
         s = Simulator(world, events_per_year=4, seed=0)
         s.run(years=5)
         assert world.year == 1005
+
+    def test_advance_years_public_api(self, sim_small, small_world):
+        start_year = small_world.year
+        sim_small.advance_years(2)
+        assert small_world.year == start_year + 2
 
 
 # ---------------------------------------------------------------------------
@@ -279,3 +295,194 @@ class TestFullIntegration:
         s.run(years=5)
         story = s.get_character_story(hero.char_id)
         assert "Sir Aldric" in story
+
+
+class TestSimulatorSerialization:
+    def test_round_trip_preserves_core_state(self):
+        world = _make_world(n_chars=5)
+        sim = Simulator(world, events_per_year=2, adventure_steps_per_year=4, seed=3)
+        sim.run(years=2)
+
+        restored = Simulator.from_dict(sim.to_dict())
+
+        assert restored.world.year == sim.world.year
+        assert len(restored.world.characters) == len(sim.world.characters)
+        assert restored.events_per_year == sim.events_per_year
+        assert restored.adventure_steps_per_year == sim.adventure_steps_per_year
+        assert len(restored.history) == len(sim.history)
+        assert len(restored.world.completed_adventures) == len(sim.world.completed_adventures)
+
+    def test_save_and_load_snapshot_file(self, tmp_path):
+        world = _make_world(n_chars=4)
+        sim = Simulator(world, events_per_year=1, adventure_steps_per_year=2, seed=5)
+        sim.run(years=1)
+
+        path = tmp_path / "snapshot.json"
+        save_simulation(sim, str(path))
+        restored = load_simulation(str(path))
+
+        assert restored.world.name == sim.world.name
+        assert restored.world.event_log == sim.world.event_log
+        assert [c.name for c in restored.world.characters] == [
+            c.name for c in sim.world.characters
+        ]
+
+    def test_loaded_snapshot_continues_with_same_rng_sequence(self, tmp_path):
+        world_a = _make_world(n_chars=5)
+        world_b = _make_world(n_chars=5)
+        for c1, c2 in zip(world_a.characters, world_b.characters):
+            c2.char_id = c1.char_id
+
+        sim_a = Simulator(world_a, events_per_year=3, adventure_steps_per_year=2, seed=17)
+        sim_b = Simulator(world_b, events_per_year=3, adventure_steps_per_year=2, seed=17)
+
+        sim_a.run(years=2)
+        sim_b.run(years=2)
+
+        path = tmp_path / "snapshot_rng.json"
+        save_simulation(sim_a, str(path))
+        restored = load_simulation(str(path))
+
+        restored.run(years=3)
+        sim_b.run(years=3)
+
+        assert restored.world.year == sim_b.world.year
+        assert restored.world.event_log == sim_b.world.event_log
+        assert [ev.description for ev in restored.history] == [ev.description for ev in sim_b.history]
+
+    def test_save_and_load_preserves_locale(self, tmp_path):
+        set_locale("ja")
+        world = _make_world(n_chars=3)
+        sim = Simulator(world, events_per_year=1, adventure_steps_per_year=1, seed=11)
+
+        path = tmp_path / "snapshot_locale.json"
+        save_simulation(sim, str(path))
+        set_locale("en")
+        load_simulation(str(path))
+
+        assert get_locale() == "ja"
+
+    def test_save_and_load_preserves_pending_choice_ids_across_locale_change(self, tmp_path):
+        set_locale("ja")
+        world = World()
+        char = Character("Aldric", 25, "Male", "Human", "Warrior", location="Aethoria Capital")
+        world.add_character(char)
+        sim = Simulator(world, events_per_year=0, adventure_steps_per_year=1, seed=1)
+        run = AdventureRun(
+            character_id=char.char_id,
+            character_name=char.name,
+            origin=char.location,
+            destination="Sunken Ruins",
+            year_started=world.year,
+            state="waiting_for_choice",
+        )
+        run.pending_choice = AdventureChoice(
+            prompt="test",
+            options=["press_on", "proceed_cautiously", "retreat"],
+            default_option="proceed_cautiously",
+            context="approach",
+        )
+        char.active_adventure_id = run.adventure_id
+        world.add_adventure(run)
+
+        path = tmp_path / "snapshot_pending_choice.json"
+        save_simulation(sim, str(path))
+        set_locale("en")
+        restored = load_simulation(str(path))
+
+        pending = restored.get_pending_adventure_choices()
+        assert pending
+        assert pending[0]["default_option"] == "proceed_cautiously"
+
+
+class TestInjuryRecovery:
+    def test_injured_character_can_recover_during_year(self):
+        world = _make_world(n_chars=1)
+        char = world.characters[0]
+        char.injury_status = "injured"
+        sim = Simulator(world, events_per_year=0, adventure_steps_per_year=0, seed=1)
+
+        sim.rng = type(
+            "FixedRng",
+            (),
+            {
+                "random": lambda self: 0.1,
+                "choice": lambda self, options: options[0],
+            },
+        )()
+        sim._run_year()
+
+        assert char.injury_status == "none"
+        assert any("recovered from earlier adventure injuries" in entry.lower() for entry in world.event_log)
+        assert any("Recovered from earlier adventure injuries." in entry for entry in char.history)
+
+    def test_injured_character_does_not_start_adventure_before_recovery(self):
+        world = _make_world(n_chars=1)
+        char = world.characters[0]
+        char.injury_status = "injured"
+        sim = Simulator(world, events_per_year=0, adventure_steps_per_year=0, seed=1)
+
+        sim.rng = type(
+            "FixedRng",
+            (),
+            {
+                "random": lambda self: 0.9,
+                "choice": lambda self, options: options[0],
+            },
+        )()
+        sim._run_year()
+
+        assert char.injury_status == "injured"
+        assert char.active_adventure_id is None
+        assert world.active_adventures == []
+
+
+class TestAdventureSafety:
+    def test_dead_character_adventure_is_not_advanced(self):
+        world = World()
+        char = Character("Aldric", 95, "Male", "Human", "Warrior", location="Aethoria Capital")
+        world.add_character(char)
+        sim = Simulator(world, events_per_year=0, adventure_steps_per_year=3, seed=1)
+
+        sim.rng = type(
+            "FixedRng",
+            (),
+            {
+                "random": lambda self: 0.0,
+                "choice": lambda self, options: options[0],
+                "randint": lambda self, lo, hi: lo,
+                "choices": lambda self, population, weights=None, k=1: [population[0]] * k,
+                "sample": lambda self, population, k: list(population[:k]),
+            },
+        )()
+
+        sim._maybe_start_adventure()
+        run = world.active_adventures[0]
+        run.steps_taken = 0
+        sim.event_system.event_death(char, world, rng=sim.rng)
+
+        sim._advance_adventures()
+
+        assert world.active_adventures == []
+        assert len(world.completed_adventures) == 1
+        assert world.completed_adventures[0].outcome == "death"
+        assert world.completed_adventures[0].steps_taken == 0
+
+    def test_adventure_summary_uses_localized_status(self):
+        set_locale("en")
+        world = World()
+        sim = Simulator(world, events_per_year=0, adventure_steps_per_year=0, seed=1)
+        run = AdventureRun(
+            character_id="hero1",
+            character_name="Aldric",
+            origin="Aethoria Capital",
+            destination="Whispering Woods",
+            year_started=1000,
+            state="waiting_for_choice",
+        )
+        world.add_adventure(run)
+
+        summaries = sim.get_adventure_summaries()
+
+        assert "[waiting_for_choice]" not in summaries[0]
+        assert "[waiting for choice]" in summaries[0]

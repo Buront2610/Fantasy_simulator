@@ -12,93 +12,90 @@ from typing import List, Optional
 
 from character import Character
 from character_creator import CharacterCreator
+from i18n import set_locale, tr, tr_term
+from save_load import load_simulation, save_simulation
 from simulator import Simulator
 from world import World
-from world_data import WORLD_LORE
+from world_data import JOBS, RACES, WORLD_LORE
 
-
-# ---------------------------------------------------------------------------
-# ANSI colour helpers (no external deps)
-# ---------------------------------------------------------------------------
 
 def _c(text: str, code: str) -> str:
-    """Wrap text in an ANSI colour/style code (reset after)."""
     return f"\033[{code}m{text}\033[0m"
 
-def bold(t: str)    -> str: return _c(t, "1")
-def red(t: str)     -> str: return _c(t, "31")
-def green(t: str)   -> str: return _c(t, "32")
-def yellow(t: str)  -> str: return _c(t, "33")
-def cyan(t: str)    -> str: return _c(t, "36")
-def magenta(t: str) -> str: return _c(t, "35")
-def blue(t: str)    -> str: return _c(t, "34")
-def dim(t: str)     -> str: return _c(t, "2")
+
+def bold(t: str) -> str:
+    return _c(t, "1")
 
 
-# ---------------------------------------------------------------------------
-# ASCII art header
-# ---------------------------------------------------------------------------
+def red(t: str) -> str:
+    return _c(t, "31")
+
+
+def green(t: str) -> str:
+    return _c(t, "32")
+
+
+def yellow(t: str) -> str:
+    return _c(t, "33")
+
+
+def cyan(t: str) -> str:
+    return _c(t, "36")
+
+
+def dim(t: str) -> str:
+    return _c(t, "2")
+
 
 HEADER = r"""
-  ╔══════════════════════════════════════════════════════════════╗
-  ║                                                              ║
-  ║    █████╗ ███████╗████████╗██╗  ██╗ ██████╗ ██████╗ ██╗ █╗  ║
-  ║   ██╔══██╗██╔════╝╚══██╔══╝██║  ██║██╔═══██╗██╔══██╗██║ ██║  ║
-  ║   ███████║█████╗     ██║   ███████║██║   ██║██████╔╝██║ ██║  ║
-  ║   ██╔══██║██╔══╝     ██║   ██╔══██║██║   ██║██╔══██╗██║ ██║  ║
-  ║   ██║  ██║███████╗   ██║   ██║  ██║╚██████╔╝██║  ██║██║ ██║  ║
-  ║                                                              ║
-  ║        ✦  W O R L D   S I M U L A T O R  ✦                  ║
-  ║                   ── A E T H O R I A ──                      ║
-  ╚══════════════════════════════════════════════════════════════╝
+  ======================================================================
+    FANTASY SIMULATOR
+    AETHORIA
+  ======================================================================
 """
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
-def _hr(char: str = "─", width: int = 62) -> str:
+def _hr(char: str = "=",
+        width: int = 62) -> str:
     return "  " + char * width
 
 
 def _pause() -> None:
-    input(dim("\n  [Press ENTER to continue] "))
+    input(dim(f"\n  {tr('press_enter')} "))
 
 
 def _print_wrapped(text: str, indent: int = 4) -> None:
     prefix = " " * indent
     for line in text.splitlines():
         if line.strip():
-            for wrapped in textwrap.wrap(line, width=70, initial_indent=prefix,
-                                         subsequent_indent=prefix):
+            for wrapped in textwrap.wrap(
+                line,
+                width=70,
+                initial_indent=prefix,
+                subsequent_indent=prefix,
+            ):
                 print(wrapped)
         else:
             print()
 
 
 def _choose(prompt: str, options: List[str], default: Optional[str] = None) -> str:
-    """Simple numbered-choice prompt. Returns chosen option string."""
     print()
     for i, opt in enumerate(options, 1):
-        marker = green("►") if str(i) == default else " "
+        marker = green(">") if str(i) == default else " "
         print(f"  {marker} {cyan(str(i))}.  {opt}")
     print()
     while True:
         hint = f" (default {default})" if default else ""
-        raw = input(f"  {bold('Your choice')}{hint}: ").strip()
+        raw = input(f"  {bold(tr('your_choice'))}{hint}: ").strip()
         if not raw and default:
             raw = default
         if raw.isdigit() and 1 <= int(raw) <= len(options):
             return options[int(raw) - 1]
-        print(red("  Invalid choice. Please enter a number."))
+        print(red(f"  {tr('invalid_choice')}"))
 
-
-# ---------------------------------------------------------------------------
-# Simulation helpers
-# ---------------------------------------------------------------------------
 
 def _build_default_world(num_characters: int = 12) -> World:
-    """Create a fresh World with random adventurers."""
     world = World()
     creator = CharacterCreator()
     locations = [loc.name for loc in world.grid.values() if loc.region_type != "dungeon"]
@@ -108,104 +105,125 @@ def _build_default_world(num_characters: int = 12) -> World:
         char = creator.create_random()
         char.location = random.choice(locations)
         world.add_character(char)
-
     return world
 
 
 def _run_simulation(world: World, years: int) -> Simulator:
-    """Run the simulation and return the Simulator with full history."""
     print()
-    print(f"  {bold('Running simulation...')} ({years} years × ~8 events/year)")
+    print(f"  {bold(tr('running_simulation_details', years=years, events=8))}")
     sim = Simulator(world, events_per_year=8)
-    for y in range(years):
-        sim._run_year()
+    for _ in range(years):
+        sim.advance_years(1)
         alive = sum(1 for c in world.characters if c.alive)
-        bar_len = 30
-        filled = int(bar_len * (y + 1) / years)
-        bar = "█" * filled + "░" * (bar_len - filled)
         print(
-            f"  [{bar}] Year {world.year}  |  "
-            f"{green(str(alive))} alive",
+            f"  {tr('year_label')} {world.year}  |  {green(str(alive))} {tr('alive')}",
             end="\r",
         )
     print()
-    print(f"  {green('✓')}  Simulation complete.")
+    print(f"  {green('*')}  {tr('simulation_complete')}")
     return sim
 
 
-def _show_results(sim: Simulator) -> None:
-    """Interactive results viewer after simulation finishes."""
-    world = sim.world
+def _advance_simulation(sim: Simulator, years: int) -> None:
+    if years <= 0:
+        return
 
+    print()
+    print(f"  {bold(tr('advancing_simulation'))} (+{years} years)")
+    for _ in range(years):
+        sim.advance_years(1)
+        pending = len(sim.get_pending_adventure_choices())
+        alive = sum(1 for c in sim.world.characters if c.alive)
+        print(
+            f"  Year {sim.world.year}  |  {green(str(alive))} {tr('alive')}  |  "
+            f"{yellow(str(pending))} {tr('pending_choices')}",
+            end="\r",
+        )
+    print()
+    print(f"  {green('*')}  {tr('simulation_advanced_to_year', year=sim.world.year)}")
+
+
+def _show_results(sim: Simulator) -> None:
+    world = sim.world
     while True:
-        print("\n" + _hr("═"))
-        print(bold("  POST-SIMULATION RESULTS"))
-        print(_hr("═"))
+        print("\n" + _hr("="))
+        print(bold(f"  {tr('post_results')}"))
+        print(_hr("="))
         action = _choose(
-            "What would you like to see?",
+            tr("what_to_view"),
             [
-                "World map",
-                "Character roster",
-                "Event log (last 30)",
-                "Full event log",
-                "Character story (choose one)",
-                "All character stories",
-                "Simulation summary",
-                "Back to main menu",
+                tr("advance_1_year"),
+                tr("advance_5_years"),
+                tr("world_map"),
+                tr("character_roster"),
+                tr("event_log_last_30"),
+                tr("full_event_log"),
+                tr("adventure_summaries"),
+                tr("adventure_details"),
+                tr("resolve_pending_choice"),
+                tr("save_snapshot"),
+                tr("character_story"),
+                tr("all_character_stories"),
+                tr("simulation_summary"),
+                tr("back_to_main"),
             ],
         )
 
-        if action == "World map":
+        if action == tr("advance_1_year"):
+            _advance_simulation(sim, 1)
+        elif action == tr("advance_5_years"):
+            _advance_simulation(sim, 5)
+        elif action == tr("world_map"):
             print()
             print(world.render_map())
             _pause()
-
-        elif action == "Character roster":
+        elif action == tr("character_roster"):
             _show_roster(world)
-
-        elif action == "Event log (last 30)":
+        elif action == tr("event_log_last_30"):
             print()
             for entry in sim.get_event_log(last_n=30):
-                print(f"  {dim('•')} {entry}")
+                print(f"  - {entry}")
             _pause()
-
-        elif action == "Full event log":
+        elif action == tr("full_event_log"):
             print()
             for entry in sim.get_event_log():
-                print(f"  {dim('•')} {entry}")
+                print(f"  - {entry}")
             _pause()
-
-        elif action == "Character story (choose one)":
+        elif action == tr("adventure_summaries"):
+            _show_adventure_summaries(sim)
+        elif action == tr("adventure_details"):
+            _show_adventure_details(sim)
+        elif action == tr("resolve_pending_choice"):
+            _resolve_pending_adventure_choice(sim)
+        elif action == tr("save_snapshot"):
+            _save_simulation_snapshot(sim)
+        elif action == tr("character_story"):
             _show_single_story(sim)
-
-        elif action == "All character stories":
+        elif action == tr("all_character_stories"):
             print()
             print(sim.get_all_stories())
             _pause()
-
-        elif action == "Simulation summary":
+        elif action == tr("simulation_summary"):
             print()
             print(sim.get_summary())
             _pause()
-
         else:
             break
 
 
 def _show_roster(world: World) -> None:
-    """Display every character's basic stats in a table."""
     print()
     print(_hr())
     header = (
-        f"  {'Name':<22} {'Race/Job':<22} {'Age':>4}  "
-        f"{'STR':>4}{'INT':>4}{'DEX':>4}  {'Status':<10}  Location"
+        f"  {tr('roster_header_name'):<22} {tr('roster_header_race_job'):<22} {tr('roster_header_age'):>4}  "
+        f"{tr('stat_str'):>4}{tr('stat_int'):>4}{tr('stat_dex'):>4}  {tr('roster_header_status'):<10}  {tr('roster_header_location')}"
     )
     print(bold(header))
     print(_hr())
     for c in world.characters:
-        status = green("Alive") if c.alive else red("Dead ")
+        status = green(tr("status_alive")) if c.alive else red(tr("status_dead"))
         name_trunc = c.name[:21]
-        racejob = f"{c.race} {c.job}"[:21]
+        racejob = f"{tr_term(c.race)} {tr_term(c.job)}"[:21]
         loc_trunc = c.location[:20]
         print(
             f"  {name_trunc:<22} {racejob:<22} {c.age:>4}  "
@@ -217,14 +235,13 @@ def _show_roster(world: World) -> None:
 
 
 def _show_single_story(sim: Simulator) -> None:
-    """Let the user pick a character and show their story."""
     world = sim.world
     print()
     for i, c in enumerate(world.characters, 1):
-        status = green("✓") if c.alive else red("✗")
-        print(f"  {i:>2}. [{status}] {c.name} ({c.race} {c.job}, age {c.age})")
+        status = green(tr("status_alive")) if c.alive else red(tr("status_dead"))
+        print(f"  {i:>2}. [{status}] {c.name} ({tr_term(c.race)} {tr_term(c.job)}, {tr('age_short_label')} {c.age})")
     print()
-    raw = input("  Enter character number (or ENTER to cancel): ").strip()
+    raw = input(f"  {tr('enter_character_number')}").strip()
     if not raw or not raw.isdigit():
         return
     idx = int(raw) - 1
@@ -235,90 +252,237 @@ def _show_single_story(sim: Simulator) -> None:
         _pause()
 
 
-# ---------------------------------------------------------------------------
-# Screens
-# ---------------------------------------------------------------------------
+def _show_adventure_summaries(sim: Simulator) -> None:
+    runs = list(sim.world.completed_adventures) + list(sim.world.active_adventures)
+    print()
+    if not runs:
+        print(dim(f"  {tr('no_adventures_recorded')}"))
+        _pause()
+        return
+
+    print(_hr())
+    print(bold(f"  {tr('adventure_summaries_header')}"))
+    print(_hr())
+    for i, run in enumerate(runs, 1):
+        status = tr(f"outcome_{run.outcome}") if run.outcome else tr(f"state_{run.state}")
+        loot = f" | {tr('loot_label')}: {', '.join(run.loot_summary)}" if run.loot_summary else ""
+        injury = f" | {tr('injury_label')}: {run.injury_status}" if run.injury_status != "none" else ""
+        print(
+            f"  {i:>2}. {run.character_name} | {run.origin} -> {run.destination} "
+            f"| {status}{injury}{loot}"
+        )
+    print(_hr())
+    _pause()
+
+
+def _show_adventure_details(sim: Simulator) -> None:
+    runs = list(sim.world.completed_adventures) + list(sim.world.active_adventures)
+    print()
+    if not runs:
+        print(dim(f"  {tr('no_adventures_to_inspect')}"))
+        _pause()
+        return
+
+    for i, run in enumerate(runs, 1):
+        status = tr(f"outcome_{run.outcome}") if run.outcome else tr(f"state_{run.state}")
+        print(f"  {i:>2}. {run.character_name} {tr('at_label')} {run.destination} [{status}]")
+    print()
+    raw = input(f"  {tr('enter_adventure_number')}").strip()
+    if not raw or not raw.isdigit():
+        return
+
+    idx = int(raw) - 1
+    if not (0 <= idx < len(runs)):
+        return
+
+    run = runs[idx]
+    print()
+    print(_hr())
+    print(bold(f"  {tr('adventure_detail_header', name=run.character_name)}"))
+    print(_hr())
+    print(f"  {tr('id_label'):<11}: {run.adventure_id}")
+    print(f"  {tr('route'):<11}: {run.origin} -> {run.destination}")
+    print(f"  {tr('state'):<11}: {tr(f'state_{run.state}')}")
+    print(f"  {tr('outcome'):<11}: {tr(f'outcome_{run.outcome}') if run.outcome else tr('unresolved')}")
+    print(f"  {tr('injury'):<11}: {run.injury_status}")
+    print(f"  {tr('steps'):<11}: {run.steps_taken}")
+    if run.loot_summary:
+        print(f"  {tr('discoveries'):<11}: {', '.join(run.loot_summary)}")
+    print()
+    for entry in sim.get_adventure_details(run.adventure_id):
+        print(f"  - {entry}")
+    _pause()
+
+
+def _resolve_pending_adventure_choice(sim: Simulator) -> None:
+    pending = sim.get_pending_adventure_choices()
+    print()
+    if not pending:
+        print(dim(f"  {tr('no_pending_choices')}"))
+        _pause()
+        return
+
+    for i, item in enumerate(pending, 1):
+        options = ", ".join(tr(f"choice_{option}") for option in item["options"])
+        default_label = tr(f"choice_{item['default_option']}")
+        print(
+            f"  {i:>2}. {item['character_name']} | {item['prompt']} "
+            f"[{options}] {tr('choice_default_hint', default_option=default_label)}"
+        )
+    print()
+
+    raw = input(f"  {tr('enter_pending_choice_number')}").strip()
+    if not raw or not raw.isdigit():
+        return
+
+    idx = int(raw) - 1
+    if not (0 <= idx < len(pending)):
+        return
+
+    item = pending[idx]
+    options = item["options"]
+    print()
+    for i, option in enumerate(options, 1):
+        default_marker = f" {tr('default_marker')}" if option == item["default_option"] else ""
+        print(f"  {i:>2}. {tr(f'choice_{option}')}{default_marker}")
+    raw_option = input(f"  {tr('enter_option_number')}").strip()
+    chosen_option = None
+    if raw_option.isdigit():
+        option_idx = int(raw_option) - 1
+        if 0 <= option_idx < len(options):
+            chosen_option = options[option_idx]
+
+    resolved = sim.resolve_adventure_choice(item["adventure_id"], option=chosen_option)
+    print()
+    if resolved:
+        print(green(f"  {tr('choice_resolved')}"))
+    else:
+        print(red(f"  {tr('choice_resolve_failed')}"))
+    _pause()
+
+
+def _save_simulation_snapshot(sim: Simulator) -> None:
+    print()
+    default_name = "simulation_snapshot.json"
+    path = input(f"  {tr('save_path_prompt', default_name=default_name)}").strip() or default_name
+    try:
+        save_simulation(sim, path)
+    except OSError as exc:
+        print(red(f"  {tr('save_failed', error=exc)}"))
+    else:
+        print(green(f"  {tr('save_succeeded', path=path)}"))
+    _pause()
+
+
+def _load_simulation_snapshot() -> Optional[Simulator]:
+    print("\n" + _hr("="))
+    print(bold(f"  {tr('load_snapshot_header')}"))
+    print(_hr("="))
+    default_name = "simulation_snapshot.json"
+    path = input(f"  {tr('load_path_prompt', default_name=default_name)}").strip() or default_name
+    try:
+        sim = load_simulation(path)
+    except FileNotFoundError:
+        print(red(f"  {tr('load_not_found', path=path)}"))
+        _pause()
+        return None
+    except (OSError, ValueError, KeyError) as exc:
+        print(red(f"  {tr('load_failed', error=exc)}"))
+        _pause()
+        return None
+
+    print(green(f"  {tr('load_succeeded', path=path)}"))
+    return sim
+
+
+def _select_language() -> None:
+    action = _choose(
+        tr("load_language_prompt"),
+        [tr("language_option_ja"), tr("language_option_en")],
+        default="1",
+    )
+    if action == tr("language_option_ja"):
+        set_locale("ja")
+        print(green(f"  {tr('language_set_ja')}"))
+    else:
+        set_locale("en")
+        print(green(f"  {tr('language_set_en')}"))
+
 
 def screen_new_simulation() -> None:
-    """Option 1 — run with default world and random characters."""
-    print("\n" + _hr("═"))
-    print(bold("  NEW SIMULATION — Default World"))
-    print(_hr("═"))
+    print("\n" + _hr("="))
+    print(bold(f"  {tr('new_simulation')} - {tr('default_world')}"))
+    print(_hr("="))
 
-    raw = input("  > Number of characters (default 12): ").strip()
+    raw = input(f"  > {tr('number_of_characters')}: ").strip()
     num = int(raw) if raw.isdigit() else 12
     num = max(4, min(30, num))
 
-    raw = input("  > Simulation length in years (default 20): ").strip()
+    raw = input(f"  > {tr('simulation_length')}: ").strip()
     years = int(raw) if raw.isdigit() else 20
     years = max(1, min(200, years))
 
     world = _build_default_world(num_characters=num)
-    print(f"\n  {green('✓')}  World '{world.name}' created with {num} adventurers.")
+    print(f"\n  {green('*')}  {tr('world_created', world=world.name, count=num)}")
     sim = _run_simulation(world, years)
     _show_results(sim)
 
 
 def screen_custom_simulation() -> None:
-    """Option 2 — create custom characters, then simulate."""
-    print("\n" + _hr("═"))
-    print(bold("  CUSTOM CHARACTER SIMULATION"))
-    print(_hr("═"))
+    print("\n" + _hr("="))
+    print(bold(f"  {tr('custom_character_simulation')}"))
+    print(_hr("="))
     creator = CharacterCreator()
     world = World()
     custom_chars: List[Character] = []
 
     while True:
         action = _choose(
-            "Add a character or start simulation",
+            tr("add_character_or_start"),
             [
-                "Create character interactively",
-                "Create random character",
-                "Create from template",
-                f"Start simulation (current roster: {len(custom_chars)} characters)",
+                tr("create_character_interactively"),
+                tr("create_random_character"),
+                tr("create_from_template"),
+                tr("start_simulation_with_roster", count=len(custom_chars)),
             ],
         )
 
-        if action == "Create character interactively":
+        if action == tr("create_character_interactively"):
             char = creator.create_interactive()
             world.add_character(char)
             custom_chars.append(char)
-            print(f"\n  {green('✓')}  {char.name} added to the world.")
-
-        elif action == "Create random character":
+            print(f"\n  {green('*')}  {tr('character_added', name=char.name)}")
+        elif action == tr("create_random_character"):
             char = creator.create_random()
             world.add_character(char)
             custom_chars.append(char)
-            print(f"\n  {green('✓')}  {char.name} ({char.race} {char.job}) added randomly.")
-
-        elif action == "Create from template":
+            print(f"\n  {green('*')}  {tr('random_character_added', name=char.name, race=char.race, job=char.job)}")
+        elif action == tr("create_from_template"):
             templates = CharacterCreator.list_templates()
-            print("\n  Available templates: " + ", ".join(templates))
-            tmpl_name = input("  > Template name: ").strip()
-            char_name = input("  > Character name (leave blank for random): ").strip() or None
+            print(f"\n  {tr('available_templates')}: " + ", ".join(templates))
+            tmpl_name = input(f"  > {tr('template_name')}: ").strip()
+            char_name = input(f"  > {tr('character_name_optional')}: ").strip() or None
             try:
                 char = creator.create_from_template(tmpl_name, name=char_name)
                 world.add_character(char)
                 custom_chars.append(char)
-                print(f"\n  {green('✓')}  {char.name} ({char.race} {char.job}) added from template.")
+                print(
+                    f"\n  {green('*')}  "
+                    f"{tr('template_character_added', name=char.name, race=char.race, job=char.job)}"
+                )
             except ValueError as exc:
-                print(red(f"  Error: {exc}"))
-
+                print(red(f"  {tr('error_prefix')}: {exc}"))
         else:
-            # Start simulation
             if not custom_chars:
-                print(yellow("  You need at least one character. Adding 5 random ones."))
+                print(yellow(f"  {tr('need_one_character')}"))
                 for _ in range(5):
-                    c = creator.create_random()
-                    world.add_character(c)
+                    world.add_character(creator.create_random())
 
-            # Fill up world with random NPCs to make it more interesting
             fill = max(0, 8 - len(world.characters))
             for _ in range(fill):
-                npc = creator.create_random()
-                world.add_character(npc)
+                world.add_character(creator.create_random())
 
-            raw = input("  > Simulation length in years (default 20): ").strip()
+            raw = input(f"  > {tr('simulation_length')}: ").strip()
             years = int(raw) if raw.isdigit() else 20
             years = max(1, min(200, years))
 
@@ -328,65 +492,66 @@ def screen_custom_simulation() -> None:
 
 
 def screen_world_lore() -> None:
-    """Option 3 — display world lore."""
-    print("\n" + _hr("═"))
-    print(bold("  WORLD LORE — AETHORIA"))
-    print(_hr("═"))
+    print("\n" + _hr("="))
+    print(bold(f"  {tr('world_lore')}"))
+    print(_hr("="))
     _print_wrapped(WORLD_LORE)
     print()
-    from world_data import RACES, JOBS
-    print(bold("  RACES OF AETHORIA"))
+    print(bold(f"  {tr('races_of_aethoria')}"))
     print(_hr())
     for rname, rdesc, bonuses in RACES:
         bonus_str = ", ".join(
-            f"{stat} {'+' if v >= 0 else ''}{v}"
-            for stat, v in bonuses.items() if v != 0
+            f"{stat} {'+' if v >= 0 else ''}{v}" for stat, v in bonuses.items() if v != 0
         )
         print(f"  {cyan(rname)}")
         _print_wrapped(rdesc)
         if bonus_str:
-            print(f"    {dim('Bonuses:')} {bonus_str}")
+            print(f"    {dim(tr('bonuses') + ':')} {bonus_str}")
         print()
-    print(bold("  JOBS / CLASSES"))
+    print(bold(f"  {tr('jobs_classes')}"))
     print(_hr())
-    from world_data import JOBS
     for jname, jdesc, jskills in JOBS:
-        print(f"  {cyan(jname)}  |  Primary skills: {', '.join(jskills)}")
+        print(f"  {cyan(tr_term(jname))}  |  {tr('primary_skills_label')}: {', '.join(tr_term(skill) for skill in jskills)}")
         _print_wrapped(jdesc)
         print()
     _pause()
 
 
-# ---------------------------------------------------------------------------
-# Main menu
-# ---------------------------------------------------------------------------
-
 def main() -> None:
+    set_locale("ja")
     print(yellow(HEADER))
 
     while True:
-        print("\n" + _hr("═"))
-        print(bold("  MAIN MENU"))
-        print(_hr("═"))
+        print("\n" + _hr("="))
+        print(bold(f"  {tr('main_menu')}"))
+        print(_hr("="))
         choice = _choose(
-            "Choose an option",
+            tr("main_menu_prompt"),
             [
-                "Start new simulation (default world + random characters)",
-                "Create custom characters, then simulate",
-                "Read world lore & settings",
-                "Exit",
+                tr("start_new_sim"),
+                tr("create_custom_sim"),
+                tr("load_saved_sim"),
+                tr("read_world_lore"),
+                tr("language_menu"),
+                tr("exit"),
             ],
             default="1",
         )
 
-        if choice.startswith("Start"):
+        if choice == tr("start_new_sim"):
             screen_new_simulation()
-        elif choice.startswith("Create"):
+        elif choice == tr("create_custom_sim"):
             screen_custom_simulation()
-        elif choice.startswith("Read"):
+        elif choice == tr("load_saved_sim"):
+            sim = _load_simulation_snapshot()
+            if sim is not None:
+                _show_results(sim)
+        elif choice == tr("read_world_lore"):
             screen_world_lore()
+        elif choice == tr("language_menu"):
+            _select_language()
         else:
-            print(f"\n  {bold(yellow('Farewell, traveller. May the ley-lines guide your path.'))}\n")
+            print(f"\n  {bold(yellow(tr('farewell')))}\n")
             sys.exit(0)
 
 

@@ -4,11 +4,13 @@ tests/test_events.py - Unit tests for the EventSystem.
 
 import sys
 import os
+import random
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 import pytest
 from character import Character
 from events import EventResult, EventSystem
+from i18n import get_locale, set_locale
 from world import World
 
 
@@ -24,6 +26,14 @@ def world() -> World:
 @pytest.fixture
 def es() -> EventSystem:
     return EventSystem()
+
+
+@pytest.fixture(autouse=True)
+def reset_locale():
+    previous = get_locale()
+    set_locale("en")
+    yield
+    set_locale(previous)
 
 
 def _make_char(
@@ -110,6 +120,28 @@ class TestEventMeeting:
     def test_event_type(self, es, char_a, char_b, world):
         result = es.event_meeting(char_a, char_b, world)
         assert result.event_type == "meeting"
+
+    def test_description_reports_bidirectional_relationships(self, es, char_a, char_b, world):
+        result = es.event_meeting(char_a, char_b, world, rng=random.Random(0))
+
+        rel_a = char_a.get_relationship(char_b.char_id)
+        rel_b = char_b.get_relationship(char_a.char_id)
+        rel_avg = round((rel_a + rel_b) / 2)
+
+        assert f"Alice->Bob: {rel_a:+d}" in result.description
+        assert f"Bob->Alice: {rel_b:+d}" in result.description
+        assert f"Avg: {rel_avg:+d}" in result.description
+
+    def test_description_tone_matches_average_relationship(self, es, char_a, char_b, world):
+        result = es.event_meeting(char_a, char_b, world, rng=random.Random(3))
+
+        rel_a = char_a.get_relationship(char_b.char_id)
+        rel_b = char_b.get_relationship(char_a.char_id)
+        rel_avg = round((rel_a + rel_b) / 2)
+
+        assert rel_avg > 0
+        assert "pleasant exchange" in result.description
+        assert "polite nod" not in result.description
 
 
 # ---------------------------------------------------------------------------
@@ -210,6 +242,14 @@ class TestEventDiscovery:
         changed = any(after[k] != before[k] for k in before)
         assert changed
 
+    def test_japanese_locale_discovery_text_has_no_fixed_english_tail(self, es, char_a, world):
+        set_locale("ja")
+        result = es.event_discovery(char_a, world, rng=random.Random(1))
+
+        assert "The knowledge contained within" not in result.description
+        assert "The discovery will prove useful" not in result.description
+        assert "Word of the discovery spread quickly" not in result.description
+
 
 # ---------------------------------------------------------------------------
 # event_skill_training
@@ -235,6 +275,13 @@ class TestEventSkillTraining:
         assert c.skills == {}
         es.event_skill_training(c, world)
         assert len(c.skills) > 0
+
+    def test_japanese_locale_training_text_has_no_fixed_english_effort(self, es, char_a, world):
+        set_locale("ja")
+        result = es.event_skill_training(char_a, world, rng=random.Random(0))
+
+        assert "spent long hours in the training yard" not in result.description
+        assert "pushed themselves beyond their limits" not in result.description
 
 
 # ---------------------------------------------------------------------------
@@ -338,6 +385,19 @@ class TestEventMarriage:
         result = es.event_marriage(char_a, char_b, world)
         assert result.event_type == "anniversary"
 
+    def test_existing_spouse_blocks_new_marriage(self, es, char_a, char_b, world):
+        outsider = _make_char("Cara", location="Aethoria Capital")
+        world.add_character(outsider)
+        char_a.spouse_id = outsider.char_id
+        char_a.update_relationship(char_b.char_id, 90)
+        char_b.update_relationship(char_a.char_id, 90)
+
+        result = es.event_marriage(char_a, char_b, world)
+
+        assert result.event_type == "romance"
+        assert char_a.spouse_id == outsider.char_id
+        assert char_b.spouse_id is None
+
 
 # ---------------------------------------------------------------------------
 # check_natural_death
@@ -398,6 +458,13 @@ class TestGenerateRandomEvent:
         result = es.generate_random_event([dead], world)
         assert result is None
 
+    def test_chars_on_adventure_are_skipped(self, es, world):
+        adventurer = _make_char("Away")
+        adventurer.active_adventure_id = "adv-1"
+        world.add_character(adventurer)
+        result = es.generate_random_event([adventurer], world)
+        assert result is None
+
     def test_single_char_solo_event(self, es, world):
         """With only one character, a solo event should fire (no crash)."""
         c = _make_char("Solo", location="Aethoria Capital")
@@ -408,3 +475,6 @@ class TestGenerateRandomEvent:
         for _ in range(10):
             result = es.generate_random_event([c], world)
             assert result is None or isinstance(result, EventResult)
+
+    def test_random_event_table_excludes_direct_death(self, es):
+        assert "death" not in es._EVENT_WEIGHTS

@@ -4,10 +4,13 @@ simulator.py - Orchestrates the world simulation loop.
 
 from __future__ import annotations
 
-import random
+import ast
 from typing import Any, Dict, List, Optional
+import random
 
+from adventure import create_adventure_run
 from events import EventResult, EventSystem
+from i18n import get_locale, set_locale, tr
 
 
 class Simulator:
@@ -27,14 +30,15 @@ class Simulator:
         self,
         world: Any,
         events_per_year: int = 8,
+        adventure_steps_per_year: int = 3,
         seed: Optional[int] = None,
     ) -> None:
         self.world = world
         self.events_per_year = events_per_year
+        self.adventure_steps_per_year = adventure_steps_per_year
         self.event_system = EventSystem()
         self.history: List[EventResult] = []  # all events across all years
-        if seed is not None:
-            random.seed(seed)
+        self.rng = random.Random(seed)
 
     # ------------------------------------------------------------------
     # Main simulation loop
@@ -48,6 +52,10 @@ class Simulator:
         2. Generate *events_per_year* random events.
         3. Advance the world clock.
         """
+        self.advance_years(years)
+
+    def advance_years(self, years: int = 1) -> None:
+        """Advance the simulation by a public number of whole years."""
         for _ in range(years):
             self._run_year()
 
@@ -55,26 +63,97 @@ class Simulator:
         """Process a single year."""
         # --- Natural death checks ---
         for char in list(self.world.characters):
-            result = self.event_system.check_natural_death(char, self.world)
+            result = self.event_system.check_natural_death(char, self.world, rng=self.rng)
             if result is not None:
                 self.history.append(result)
                 self.world.log_event(result.description)
+
+        # --- Injury recovery ---
+        self._recover_injuries()
+
+        # --- Adventure start / progression ---
+        self._maybe_start_adventure()
+        self._advance_adventures()
 
         # --- Random events ---
-        alive = [c for c in self.world.characters if c.alive]
-        if not alive:
-            self.world.advance_time(1)
-            return
-
         for _ in range(self.events_per_year):
             result = self.event_system.generate_random_event(
-                self.world.characters, self.world
+                self.world.characters, self.world, rng=self.rng
             )
-            if result is not None:
-                self.history.append(result)
-                self.world.log_event(result.description)
+            if result is None:
+                break
+            self.history.append(result)
+            self.world.log_event(result.description)
 
         self.world.advance_time(1)
+
+    def _recover_injuries(self) -> None:
+        """Give injured characters a chance to recover during normal life."""
+        for char in self.world.characters:
+            if not char.alive or char.injury_status != "injured":
+                continue
+            if self.rng.random() < 0.5:
+                char.injury_status = "none"
+                message = tr("recovered_from_injuries", name=char.name)
+                char.add_history(tr("history_recovered_from_injuries", year=self.world.year))
+                self.world.log_event(message)
+
+    def _maybe_start_adventure(self) -> None:
+        """Start at most one new adventure in the current year."""
+        candidates = [
+            c for c in self.world.characters
+            if c.alive and c.active_adventure_id is None and c.injury_status != "injured"
+        ]
+        if not candidates or self.rng.random() >= 0.25:
+            return
+
+        char = self.rng.choice(candidates)
+        run = create_adventure_run(char, self.world, rng=self.rng)
+        char.active_adventure_id = run.adventure_id
+        char.add_history(
+            tr(
+                "set_out_for_adventure",
+                year=self.world.year,
+                origin=run.origin,
+                destination=run.destination,
+            )
+        )
+        self.world.add_adventure(run)
+        self.world.log_event(run.summary_log[-1])
+
+    def _advance_adventures(self) -> None:
+        """Advance active adventures by multiple internal steps per year."""
+        paused_until_next_year = set()
+        for _ in range(self.adventure_steps_per_year):
+            active_ids = [run.adventure_id for run in self.world.active_adventures]
+            for adventure_id in active_ids:
+                if adventure_id in paused_until_next_year:
+                    continue
+                run = self.world.get_adventure_by_id(adventure_id)
+                if run is None or run.is_resolved:
+                    continue
+                char = self.world.get_character_by_id(run.character_id)
+                if char is None:
+                    continue
+                if not char.alive:
+                    self._resolve_dead_character_adventure(run, char)
+                    continue
+                had_pending_choice = run.pending_choice is not None
+                summaries = run.step(char, self.world, rng=self.rng)
+                for entry in summaries:
+                    self.world.log_event(entry)
+                if run.is_resolved:
+                    self.world.complete_adventure(run.adventure_id)
+                elif not had_pending_choice and run.pending_choice is not None:
+                    paused_until_next_year.add(run.adventure_id)
+
+    def _resolve_dead_character_adventure(self, run: Any, char: Any) -> None:
+        run.pending_choice = None
+        run.state = "resolved"
+        run.outcome = "death"
+        run.resolution_year = self.world.year
+        char.active_adventure_id = None
+        self.world.complete_adventure(run.adventure_id)
 
     # ------------------------------------------------------------------
     # Summary & stories
@@ -92,20 +171,20 @@ class Simulator:
 
         lines = [
             "=" * 60,
-            f"  SIMULATION SUMMARY — {self.world.name}",
-            f"  Final year: {self.world.year}",
+            f"  {tr('summary_title', world=self.world.name)}",
+            f"  {tr('final_year')}: {self.world.year}",
             "=" * 60,
-            f"  Total events recorded : {total}",
-            f"  Characters alive      : {alive}",
-            f"  Characters deceased   : {dead}",
+            f"  {tr('total_events'):<22}: {total}",
+            f"  {tr('characters_alive'):<22}: {alive}",
+            f"  {tr('characters_deceased'):<22}: {dead}",
             "",
-            "  Event breakdown:",
+            f"  {tr('event_breakdown')}:",
         ]
         for etype, count in sorted(type_counts.items(), key=lambda x: -x[1]):
             lines.append(f"    {etype:<20} {count:>4} times")
 
         lines.append("")
-        lines.append("  Notable moments:")
+        lines.append(f"  {tr('notable_moments')}:")
         # Pick up to 5 dramatic events
         dramatic = [
             ev for ev in self.history
@@ -128,11 +207,11 @@ class Simulator:
         """
         char = self.world.get_character_by_id(char_id)
         if char is None:
-            return f"No character with ID '{char_id}' found."
+            return tr("no_character_found", char_id=char_id)
 
         lines = [
             "─" * 50,
-            f"  The Story of {char.name}",
+            f"  {tr('story_of', name=char.name)}",
             f"  {char.race} {char.job}",
             "─" * 50,
         ]
@@ -140,7 +219,7 @@ class Simulator:
             for entry in char.history:
                 lines.append(f"  • {entry}")
         else:
-            lines.append("  (No notable events recorded.)")
+            lines.append(f"  {tr('no_notable_events')}")
 
         lines.append("")
         lines.append(char.stat_block())
@@ -168,3 +247,110 @@ class Simulator:
     def events_by_type(self, event_type: str) -> List[EventResult]:
         """Return all EventResults of the given type."""
         return [ev for ev in self.history if ev.event_type == event_type]
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialise simulator state, including world and history."""
+        return {
+            "world": self.world.to_dict(),
+            "characters": [char.to_dict() for char in self.world.characters],
+            "events_per_year": self.events_per_year,
+            "adventure_steps_per_year": self.adventure_steps_per_year,
+            "locale": get_locale(),
+            "rng_state": repr(self.rng.getstate()),
+            "history": [
+                {
+                    "description": ev.description,
+                    "affected_characters": list(ev.affected_characters),
+                    "stat_changes": ev.stat_changes,
+                    "event_type": ev.event_type,
+                    "year": ev.year,
+                }
+                for ev in self.history
+            ],
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Simulator":
+        """Rebuild a simulator from a serialised snapshot."""
+        from character import Character
+        from world import World
+
+        world = World.from_dict(data["world"])
+        world.characters = [
+            Character.from_dict(char_data) for char_data in data.get("characters", [])
+        ]
+        sim = cls(
+            world,
+            events_per_year=data.get("events_per_year", 8),
+            adventure_steps_per_year=data.get("adventure_steps_per_year", 3),
+        )
+        set_locale(data.get("locale", get_locale()))
+        rng_state = data.get("rng_state")
+        if rng_state is not None:
+            sim.rng.setstate(ast.literal_eval(rng_state))
+        sim.history = [
+            EventResult(
+                description=ev["description"],
+                affected_characters=list(ev.get("affected_characters", [])),
+                stat_changes=ev.get("stat_changes", {}),
+                event_type=ev.get("event_type", "generic"),
+                year=ev.get("year", 0),
+            )
+            for ev in data.get("history", [])
+        ]
+        return sim
+
+    def get_adventure_summaries(self, include_active: bool = True) -> List[str]:
+        """Return summary lines for known adventures."""
+        runs = list(self.world.completed_adventures)
+        if include_active:
+            runs.extend(self.world.active_adventures)
+        summaries: List[str] = []
+        for run in runs:
+            status_key = f"outcome_{run.outcome}" if run.outcome else f"state_{run.state}"
+            status = tr(status_key)
+            summaries.append(
+                f"{run.character_name}: {run.origin} -> {run.destination} [{status}]"
+            )
+        return summaries
+
+    def get_adventure_details(self, adventure_id: str) -> List[str]:
+        """Return detailed log entries for a specific adventure."""
+        run = self.world.get_adventure_by_id(adventure_id)
+        if run is None:
+            return []
+        return list(run.detail_log)
+
+    def get_pending_adventure_choices(self) -> List[Dict[str, Any]]:
+        """Return all unresolved adventure choices."""
+        pending: List[Dict[str, Any]] = []
+        for run in self.world.active_adventures:
+            if run.pending_choice is not None:
+                pending.append(
+                    {
+                        "adventure_id": run.adventure_id,
+                        "character_id": run.character_id,
+                        "character_name": run.character_name,
+                        "prompt": run.pending_choice.prompt,
+                        "options": list(run.pending_choice.options),
+                        "default_option": run.pending_choice.default_option,
+                    }
+                )
+        return pending
+
+    def resolve_adventure_choice(
+        self,
+        adventure_id: str,
+        option: Optional[str] = None,
+    ) -> bool:
+        """Resolve a pending choice on a specific adventure."""
+        run = self.world.get_adventure_by_id(adventure_id)
+        if run is None or run.pending_choice is None:
+            return False
+        char = self.world.get_character_by_id(run.character_id)
+        if char is None:
+            return False
+        summaries = run.resolve_choice(self.world, char, option=option)
+        for entry in summaries:
+            self.world.log_event(entry)
+        return True
