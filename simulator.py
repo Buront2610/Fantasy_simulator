@@ -77,18 +77,13 @@ class Simulator:
 
         # --- Random events ---
         for _ in range(self.events_per_year):
-            candidates = [
-                c for c in self.world.characters
-                if c.alive and c.active_adventure_id is None
-            ]
-            if not candidates:
-                break
             result = self.event_system.generate_random_event(
-                candidates, self.world, rng=self.rng
+                self.world.characters, self.world, rng=self.rng
             )
-            if result is not None:
-                self.history.append(result)
-                self.world.log_event(result.description)
+            if result is None:
+                break
+            self.history.append(result)
+            self.world.log_event(result.description)
 
         self.world.advance_time(1)
 
