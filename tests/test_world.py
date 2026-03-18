@@ -65,3 +65,19 @@ class TestWorld:
 
         location = world.random_location(rng=FixedRng())
         assert location == list(world.grid.values())[-1]
+
+    def test_log_event_uses_localized_year_prefix_english(self):
+        set_locale("en")
+        world = World(year=1042)
+        world.log_event("Something happened.")
+        assert world.event_log[-1] == "[Year 1042] Something happened."
+
+    def test_log_event_uses_localized_year_prefix_japanese(self):
+        set_locale("ja")
+        world = World(year=1042)
+        world.log_event("何かが起きた。")
+        entry = world.event_log[-1]
+        assert "[1042年]" in entry
+        assert "何かが起きた。" in entry
+        assert "[Year" not in entry
+        set_locale("en")

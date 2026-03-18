@@ -9,7 +9,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from i18n import tr
+from i18n import tr, tr_term
 
 
 ADVENTURE_DISCOVERIES = [
@@ -173,7 +173,7 @@ class AdventureRun:
             discovery = rng.choice(ADVENTURE_DISCOVERIES)
             self.loot_summary.append(discovery)
             summary = tr("summary_adventure_discovery", name=self.character_name, destination=self.destination)
-            detail = tr("detail_adventure_discovery", name=self.character_name, discovery=discovery, destination=self.destination)
+            detail = tr("detail_adventure_discovery", name=self.character_name, discovery=tr_term(discovery), destination=self.destination)
             self._record(summary, detail)
 
             if self.pending_choice is None and rng.random() < 0.40:
@@ -201,8 +201,8 @@ class AdventureRun:
                     detail = tr("detail_returned_injured", name=self.character_name, origin=self.origin)
                 elif self.loot_summary:
                     self.outcome = "safe_return"
-                    summary = tr("summary_returned_safely", name=self.character_name, destination=self.destination, loot=self.loot_summary[-1])
-                    detail = tr("detail_returned_safely", name=self.character_name, origin=self.origin, items=", ".join(self.loot_summary))
+                    summary = tr("summary_returned_safely", name=self.character_name, destination=self.destination, loot=tr_term(self.loot_summary[-1]))
+                    detail = tr("detail_returned_safely", name=self.character_name, origin=self.origin, items=", ".join(tr_term(item) for item in self.loot_summary))
                 else:
                     self.outcome = "retreat"
                     summary = tr("summary_retreated_safely", name=self.character_name, destination=self.destination)

@@ -299,15 +299,24 @@ class EventSystem:
             year=world.year,
         )
 
-    def event_death(self, char: Any, world: Any, rng: Any = random) -> EventResult:
-        char.alive = False
-        char.active_adventure_id = None
+    def handle_death_side_effects(self, char: Any, world: Any) -> None:
+        """Apply post-death side effects such as notifying the surviving spouse.
+
+        This is safe to call on any dead character; it is idempotent with
+        respect to spouse cleanup because it checks ``char.spouse_id`` and
+        ``spouse.spouse_id`` before mutating anything.
+        """
         if char.spouse_id:
             spouse = world.get_character_by_id(char.spouse_id)
-            if spouse and spouse.alive:
+            if spouse and spouse.alive and spouse.spouse_id == char.char_id:
                 spouse.update_relationship(char.char_id, -50)
                 spouse.add_history(tr("history_lost_spouse", year=world.year, name=char.name))
                 spouse.spouse_id = None
+
+    def event_death(self, char: Any, world: Any, rng: Any = random) -> EventResult:
+        char.alive = False
+        char.active_adventure_id = None
+        self.handle_death_side_effects(char, world)
 
         cause_options = [
             tr("death_cause_old_age"),

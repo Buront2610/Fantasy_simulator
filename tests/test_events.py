@@ -355,6 +355,29 @@ class TestEventDeath:
         # Spouse loses positive relationship
         assert char_b.relationships.get(char_a.char_id, 0) < 0
 
+    def test_handle_death_side_effects_clears_spouse_id(self, es, char_a, char_b, world):
+        """handle_death_side_effects clears spouse_id on the surviving partner."""
+        char_a.spouse_id = char_b.char_id
+        char_b.spouse_id = char_a.char_id
+        char_a.alive = False
+
+        es.handle_death_side_effects(char_a, world)
+
+        assert char_b.spouse_id is None
+        assert any("Lost" in h or "失った" in h for h in char_b.history)
+
+    def test_handle_death_side_effects_is_idempotent(self, es, char_a, char_b, world):
+        """Calling handle_death_side_effects twice must not crash or double-add history."""
+        char_a.spouse_id = char_b.char_id
+        char_b.spouse_id = char_a.char_id
+        char_a.alive = False
+
+        es.handle_death_side_effects(char_a, world)
+        history_len = len(char_b.history)
+
+        es.handle_death_side_effects(char_a, world)
+        assert len(char_b.history) == history_len
+
 
 # ---------------------------------------------------------------------------
 # event_marriage

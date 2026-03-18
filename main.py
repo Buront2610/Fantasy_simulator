@@ -135,7 +135,7 @@ def _advance_simulation(sim: Simulator, years: int) -> None:
         pending = len(sim.get_pending_adventure_choices())
         alive = sum(1 for c in sim.world.characters if c.alive)
         print(
-            f"  Year {sim.world.year}  |  {green(str(alive))} {tr('alive')}  |  "
+            f"  {tr('year_label')} {sim.world.year}  |  {green(str(alive))} {tr('alive')}  |  "
             f"{yellow(str(pending))} {tr('pending_choices')}",
             end="\r",
         )
@@ -265,8 +265,8 @@ def _show_adventure_summaries(sim: Simulator) -> None:
     print(_hr())
     for i, run in enumerate(runs, 1):
         status = tr(f"outcome_{run.outcome}") if run.outcome else tr(f"state_{run.state}")
-        loot = f" | {tr('loot_label')}: {', '.join(run.loot_summary)}" if run.loot_summary else ""
-        injury = f" | {tr('injury_label')}: {run.injury_status}" if run.injury_status != "none" else ""
+        loot = f" | {tr('loot_label')}: {', '.join(tr_term(item) for item in run.loot_summary)}" if run.loot_summary else ""
+        injury = f" | {tr('injury_label')}: {tr(f'injury_status_{run.injury_status}')}" if run.injury_status != "none" else ""
         print(
             f"  {i:>2}. {run.character_name} | {run.origin} -> {run.destination} "
             f"| {status}{injury}{loot}"
@@ -304,10 +304,10 @@ def _show_adventure_details(sim: Simulator) -> None:
     print(f"  {tr('route'):<11}: {run.origin} -> {run.destination}")
     print(f"  {tr('state'):<11}: {tr(f'state_{run.state}')}")
     print(f"  {tr('outcome'):<11}: {tr(f'outcome_{run.outcome}') if run.outcome else tr('unresolved')}")
-    print(f"  {tr('injury'):<11}: {run.injury_status}")
+    print(f"  {tr('injury'):<11}: {tr(f'injury_status_{run.injury_status}')}")
     print(f"  {tr('steps'):<11}: {run.steps_taken}")
     if run.loot_summary:
-        print(f"  {tr('discoveries'):<11}: {', '.join(run.loot_summary)}")
+        print(f"  {tr('discoveries'):<11}: {', '.join(tr_term(item) for item in run.loot_summary)}")
     print()
     for entry in sim.get_adventure_details(run.adventure_id):
         print(f"  - {entry}")
@@ -456,7 +456,7 @@ def screen_custom_simulation() -> None:
             char = creator.create_random()
             world.add_character(char)
             custom_chars.append(char)
-            print(f"\n  {green('*')}  {tr('random_character_added', name=char.name, race=char.race, job=char.job)}")
+            print(f"\n  {green('*')}  {tr('random_character_added', name=char.name, race=tr_term(char.race), job=tr_term(char.job))}")
         elif action == tr("create_from_template"):
             templates = CharacterCreator.list_templates()
             print(f"\n  {tr('available_templates')}: " + ", ".join(templates))
@@ -468,7 +468,7 @@ def screen_custom_simulation() -> None:
                 custom_chars.append(char)
                 print(
                     f"\n  {green('*')}  "
-                    f"{tr('template_character_added', name=char.name, race=char.race, job=char.job)}"
+                    f"{tr('template_character_added', name=char.name, race=tr_term(char.race), job=tr_term(char.job))}"
                 )
             except ValueError as exc:
                 print(red(f"  {tr('error_prefix')}: {exc}"))

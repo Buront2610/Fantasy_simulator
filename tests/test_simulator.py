@@ -486,3 +486,35 @@ class TestAdventureSafety:
 
         assert "[waiting_for_choice]" not in summaries[0]
         assert "[waiting for choice]" in summaries[0]
+
+
+class TestJapaneseLocaleSummary:
+    @pytest.fixture(autouse=True)
+    def _locale(self):
+        prev = get_locale()
+        set_locale("ja")
+        yield
+        set_locale(prev)
+
+    def test_summary_event_types_in_japanese(self):
+        world = _make_world(n_chars=4)
+        sim = Simulator(world, events_per_year=4, seed=42)
+        sim.run(years=5)
+        summary = sim.get_summary()
+
+        # Event type names should be in Japanese, not raw English identifiers
+        assert "回" in summary
+        # At least one localized event type should appear
+        ja_types = ["出会い", "旅", "技能訓練", "発見", "戦闘", "加齢", "結婚", "死亡"]
+        assert any(t in summary for t in ja_types)
+
+    def test_character_story_race_job_in_japanese(self):
+        world = World()
+        char = Character("Aldric", 25, "Male", "Human", "Warrior", location="Aethoria Capital")
+        world.add_character(char)
+        sim = Simulator(world, events_per_year=0, seed=1)
+
+        story = sim.get_character_story(char.char_id)
+
+        assert "人間" in story
+        assert "戦士" in story
