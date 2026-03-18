@@ -206,3 +206,75 @@ def test_choice_resolution_survives_locale_change():
     assert summaries
     assert run.state == "returning"
     assert run.pending_choice is None
+
+
+def test_adventure_death_clears_spouse_on_survivor():
+    """When a character dies during an adventure, the surviving spouse's
+    spouse_id must be cleared and the spouse must receive a history entry."""
+    world = World()
+    hero = _make_character("Hero")
+    spouse = _make_character("Spouse")
+    world.add_character(hero)
+    world.add_character(spouse)
+
+    hero.spouse_id = spouse.char_id
+    spouse.spouse_id = hero.char_id
+
+    sim = Simulator(world, events_per_year=0, adventure_steps_per_year=4, seed=1)
+
+    run = AdventureRun(
+        character_id=hero.char_id,
+        character_name=hero.name,
+        origin=hero.location,
+        destination="Whispering Woods",
+        year_started=world.year,
+        state="exploring",
+    )
+    hero.active_adventure_id = run.adventure_id
+    world.add_adventure(run)
+
+    # Roll that triggers death in exploring state (0.18 <= roll < 0.24)
+    run.step(hero, world, rng=FakeRng([0.20]))
+
+    assert not hero.alive
+    assert run.outcome == "death"
+
+    # Simulate what the simulator does after a step kills the character
+    sim.event_system.handle_death_side_effects(hero, world)
+
+    assert spouse.spouse_id is None
+    assert any("Hero" in h for h in spouse.history)
+
+
+def test_adventure_death_clears_spouse_via_simulator_integration():
+    """Full integration: simulator's _advance_adventures handles spouse
+    cleanup when adventure step kills a character."""
+    world = World()
+    hero = _make_character("Hero")
+    spouse = _make_character("Spouse")
+    world.add_character(hero)
+    world.add_character(spouse)
+
+    hero.spouse_id = spouse.char_id
+    spouse.spouse_id = hero.char_id
+
+    sim = Simulator(world, events_per_year=0, adventure_steps_per_year=1, seed=1)
+
+    run = AdventureRun(
+        character_id=hero.char_id,
+        character_name=hero.name,
+        origin=hero.location,
+        destination="Whispering Woods",
+        year_started=world.year,
+        state="exploring",
+    )
+    hero.active_adventure_id = run.adventure_id
+    world.add_adventure(run)
+
+    # Use an rng that causes death (roll = 0.20, in 0.18..0.24 range)
+    sim.rng = FakeRng([0.20])
+    sim._advance_adventures()
+
+    assert not hero.alive
+    assert spouse.spouse_id is None
+    assert any("Hero" in h for h in spouse.history)
