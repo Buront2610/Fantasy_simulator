@@ -66,3 +66,19 @@ class TestI18n:
     def test_adventure_discovery_terms_passthrough_in_english(self):
         set_locale("en")
         assert tr_term("an ancient relic") == "an ancient relic"
+
+    def test_event_log_prefix_translations(self):
+        set_locale("ja")
+        assert "[1000年]" == tr("event_log_prefix", year=1000)
+        set_locale("en")
+        assert "[Year 1000]" == tr("event_log_prefix", year=1000)
+
+    def test_injury_status_translations_in_japanese(self):
+        set_locale("ja")
+        assert tr("injury_status_none") == "なし"
+        assert tr("injury_status_injured") == "負傷中"
+
+    def test_injury_status_translations_in_english(self):
+        set_locale("en")
+        assert tr("injury_status_none") == "none"
+        assert tr("injury_status_injured") == "injured"

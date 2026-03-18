@@ -266,7 +266,7 @@ def _show_adventure_summaries(sim: Simulator) -> None:
     for i, run in enumerate(runs, 1):
         status = tr(f"outcome_{run.outcome}") if run.outcome else tr(f"state_{run.state}")
         loot = f" | {tr('loot_label')}: {', '.join(tr_term(item) for item in run.loot_summary)}" if run.loot_summary else ""
-        injury = f" | {tr('injury_label')}: {run.injury_status}" if run.injury_status != "none" else ""
+        injury = f" | {tr('injury_label')}: {tr(f'injury_status_{run.injury_status}')}" if run.injury_status != "none" else ""
         print(
             f"  {i:>2}. {run.character_name} | {run.origin} -> {run.destination} "
             f"| {status}{injury}{loot}"
@@ -304,7 +304,7 @@ def _show_adventure_details(sim: Simulator) -> None:
     print(f"  {tr('route'):<11}: {run.origin} -> {run.destination}")
     print(f"  {tr('state'):<11}: {tr(f'state_{run.state}')}")
     print(f"  {tr('outcome'):<11}: {tr(f'outcome_{run.outcome}') if run.outcome else tr('unresolved')}")
-    print(f"  {tr('injury'):<11}: {run.injury_status}")
+    print(f"  {tr('injury'):<11}: {tr(f'injury_status_{run.injury_status}')}")
     print(f"  {tr('steps'):<11}: {run.steps_taken}")
     if run.loot_summary:
         print(f"  {tr('discoveries'):<11}: {', '.join(tr_term(item) for item in run.loot_summary)}")

@@ -180,7 +180,7 @@ class Character:
             lines.append(f"  {tr('top_skills_label')}")
             lines.append(f"  {skill_str}")
         if self.injury_status != "none":
-            lines.append(f"  {tr('injury_label'):<10}: {self.injury_status}")
+            lines.append(f"  {tr('injury_label'):<10}: {tr(f'injury_status_{self.injury_status}')}")
         return "\n".join(lines)
 
 

@@ -151,7 +151,8 @@ class World:
         self.year += years
 
     def log_event(self, event_text: str) -> None:
-        self.event_log.append(f"[Year {self.year}] {event_text}")
+        prefix = tr("event_log_prefix", year=self.year)
+        self.event_log.append(f"{prefix} {event_text}")
 
     def render_map(self, highlight_location: Optional[str] = None) -> str:
         """Return a stable ASCII grid of the world map."""
