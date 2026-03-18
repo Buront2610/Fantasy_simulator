@@ -4,7 +4,7 @@ screens.py - Screen / menu functions and simulation helpers for the CLI.
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from character import Character
 from character_creator import CharacterCreator
@@ -37,7 +37,7 @@ def _build_default_world(num_characters: int = 12, seed: int | None = None) -> W
     locations = [loc.name for loc in world.grid.values() if loc.region_type != "dungeon"]
 
     import random as _random
-    rng = _random.Random(seed)
+    rng: Any = _random.Random(seed) if seed is not None else _random
     for _ in range(num_characters):
         char = creator.create_random(rng=rng)
         char.location = rng.choice(locations)

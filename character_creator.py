@@ -145,7 +145,8 @@ class CharacterCreator:
             if s not in skills:
                 skills[s] = 1
 
-        char = Character(name=char_name, age=age, gender=gender, race=race, job=job, skills=skills, **stats)
+        char_rng = rng if isinstance(rng, random.Random) else None
+        char = Character(name=char_name, age=age, gender=gender, race=race, job=job, skills=skills, rng=char_rng, **stats)
         char.add_history(f"Born into the world as a {race} {job}.")
         return char
 
@@ -165,7 +166,8 @@ class CharacterCreator:
         stats = {k: max(1, min(100, v + rng.randint(-5, 5))) for k, v in tmpl["base_stats"].items()}
         skills = dict(tmpl["skills"])
 
-        char = Character(name=char_name, age=age, gender=gender, race=race, job=job, skills=skills, **stats)
+        char_rng = rng if isinstance(rng, random.Random) else None
+        char = Character(name=char_name, age=age, gender=gender, race=race, job=job, skills=skills, rng=char_rng, **stats)
         char.add_history(f"Born into the world as a {race} {job}.")
         return char
 

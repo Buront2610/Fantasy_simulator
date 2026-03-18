@@ -30,6 +30,7 @@ class TestCreateRandomReproducibility:
         rng2 = random.Random(42)
         c1 = creator.create_random(rng=rng1)
         c2 = creator.create_random(rng=rng2)
+        assert c1.char_id == c2.char_id
         assert c1.name == c2.name
         assert c1.gender == c2.gender
         assert c1.race == c2.race
@@ -62,6 +63,7 @@ class TestCreateFromTemplateReproducibility:
         rng2 = random.Random(77)
         c1 = creator.create_from_template("warrior", rng=rng1)
         c2 = creator.create_from_template("warrior", rng=rng2)
+        assert c1.char_id == c2.char_id
         assert c1.name == c2.name
         assert c1.gender == c2.gender
         assert c1.age == c2.age

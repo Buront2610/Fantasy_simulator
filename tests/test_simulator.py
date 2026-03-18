@@ -110,12 +110,10 @@ class TestSimulatorConstruction:
 
         w1 = _make_seeded_world(seed=555)
         w2 = _make_seeded_world(seed=555)
-        # Sync char_ids (UUIDs are generated outside the RNG)
-        for c1, c2 in zip(w1.characters, w2.characters):
-            c2.char_id = c1.char_id
 
         assert len(w1.characters) == len(w2.characters)
         for c1, c2 in zip(w1.characters, w2.characters):
+            assert c1.char_id == c2.char_id
             assert c1.name == c2.name
             assert c1.race == c2.race
             assert c1.job == c2.job

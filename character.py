@@ -37,8 +37,14 @@ class Character:
         spouse_id: Optional[str] = None,
         injury_status: str = "none",
         active_adventure_id: Optional[str] = None,
+        rng: Any = None,
     ) -> None:
-        self.char_id: str = char_id or uuid.uuid4().hex[:8]
+        if char_id:
+            self.char_id: str = char_id
+        elif rng is not None:
+            self.char_id = format(rng.getrandbits(32), "08x")
+        else:
+            self.char_id = uuid.uuid4().hex[:8]
         self.name: str = name
         self.age: int = age
         self.gender: str = gender
