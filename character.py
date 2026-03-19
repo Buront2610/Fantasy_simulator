@@ -107,6 +107,14 @@ class Character:
         current = self.relationships.get(other_id, 0)
         self.relationships[other_id] = max(-100, min(100, current + delta))
 
+    def update_mutual_relationship(self, other: "Character", delta: int, delta_other: Optional[int] = None) -> None:
+        """Update relationships symmetrically between two characters.
+
+        If *delta_other* is None, both sides receive *delta*.
+        """
+        self.update_relationship(other.char_id, delta)
+        other.update_relationship(self.char_id, delta_other if delta_other is not None else delta)
+
     def add_history(self, event: str) -> None:
         self.history.append(event)
 
@@ -139,6 +147,11 @@ class Character:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Character":
+        # Clamp skill levels to [0, 10] and relationships to [-100, 100]
+        raw_skills = data.get("skills", {})
+        skills = {k: max(0, min(10, v)) for k, v in raw_skills.items()}
+        raw_rels = data.get("relationships", {})
+        relationships = {k: max(-100, min(100, v)) for k, v in raw_rels.items()}
         return cls(
             name=data["name"],
             age=data["age"],
@@ -151,8 +164,8 @@ class Character:
             wisdom=data.get("wisdom", 10),
             charisma=data.get("charisma", 10),
             constitution=data.get("constitution", 10),
-            skills=data.get("skills", {}),
-            relationships=data.get("relationships", {}),
+            skills=skills,
+            relationships=relationships,
             alive=data.get("alive", True),
             location=data.get("location", "Aethoria Capital"),
             history=data.get("history", []),

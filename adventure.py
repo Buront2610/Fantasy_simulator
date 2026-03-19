@@ -273,6 +273,8 @@ def create_adventure_run(character: Character, world: World, rng: Any = random) 
             loc for loc in world.grid.values()
             if loc.region_type in ("forest", "mountain", "dungeon")
         ]
+    if not risky and not world.grid:
+        raise ValueError("Cannot create adventure: world has no locations")
     destination = rng.choice(risky) if risky else world.random_location(rng=rng)
 
     run = AdventureRun(

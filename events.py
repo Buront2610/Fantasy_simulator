@@ -35,6 +35,25 @@ class EventResult:
     event_type: str = "generic"
     year: int = 0
 
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "description": self.description,
+            "affected_characters": list(self.affected_characters),
+            "stat_changes": self.stat_changes,
+            "event_type": self.event_type,
+            "year": self.year,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "EventResult":
+        return cls(
+            description=data["description"],
+            affected_characters=list(data.get("affected_characters", [])),
+            stat_changes=data.get("stat_changes", {}),
+            event_type=data.get("event_type", "generic"),
+            year=data.get("year", 0),
+        )
+
 
 class EventSystem:
     """Generates and resolves world events."""
@@ -67,8 +86,7 @@ class EventSystem:
             )
 
         if char1.spouse_id not in (None, char2.char_id) or char2.spouse_id not in (None, char1.char_id):
-            char1.update_relationship(char2.char_id, 3)
-            char2.update_relationship(char1.char_id, 3)
+            char1.update_mutual_relationship(char2, 3)
             desc = tr(
                 "romance_commitments_blocked",
                 name1=char1.name,
@@ -84,8 +102,7 @@ class EventSystem:
             )
 
         if char1.age < 18 or char2.age < 18 or rel1 < 60 or rel2 < 60 or avg_rel < 70:
-            char1.update_relationship(char2.char_id, 10)
-            char2.update_relationship(char1.char_id, 10)
+            char1.update_mutual_relationship(char2, 10)
             desc = tr(
                 "romance_growing_closer",
                 name1=char1.name,
@@ -102,8 +119,7 @@ class EventSystem:
 
         char1.spouse_id = char2.char_id
         char2.spouse_id = char1.char_id
-        char1.update_relationship(char2.char_id, 20)
-        char2.update_relationship(char1.char_id, 20)
+        char1.update_mutual_relationship(char2, 20)
         stat_changes = {
             char1.char_id: {"wisdom": 2, "charisma": 1},
             char2.char_id: {"wisdom": 2, "charisma": 1},
@@ -144,8 +160,7 @@ class EventSystem:
         loser_losses = {"constitution": -rng.randint(2, 8), "strength": -rng.randint(0, 3)}
         winner.apply_stat_delta(winner_gains)
         loser.apply_stat_delta(loser_losses)
-        winner.update_relationship(loser.char_id, -20)
-        loser.update_relationship(winner.char_id, -30)
+        winner.update_mutual_relationship(loser, -20, delta_other=-30)
 
         loser_died = loser.constitution <= 5 and rng.random() < 0.4
         if loser_died:
@@ -397,6 +412,13 @@ class EventSystem:
         neighbours = world.get_neighboring_locations(char.location)
         if not neighbours:
             neighbours = list(world.grid.values())
+        if not neighbours:
+            return EventResult(
+                description=tr("journey_no_destination", name=char.name),
+                affected_characters=[char.char_id],
+                event_type="journey",
+                year=world.year,
+            )
 
         destination = rng.choice(neighbours)
         old_location = char.location
@@ -472,12 +494,13 @@ class EventSystem:
 
     @staticmethod
     def _find_collocated_pair(alive: List[Character], rng: Any = random) -> Optional[Tuple[Character, Character]]:
-        by_loc: Dict[str, List[Any]] = {}
+        by_loc: Dict[str, List[Character]] = {}
         for c in alive:
-            by_loc.setdefault(c.location, []).append(c)
+            group = by_loc.setdefault(c.location, [])
+            group.append(c)
         valid = [chars for chars in by_loc.values() if len(chars) >= 2]
         if not valid:
             return None
         group = rng.choice(valid)
-        pair = rng.sample(group, 2)
-        return pair[0], pair[1]
+        c1, c2 = rng.sample(group, 2)
+        return c1, c2

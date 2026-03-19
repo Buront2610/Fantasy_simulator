@@ -159,6 +159,14 @@ class Simulator:
         run.outcome = "death"
         run.resolution_year = self.world.year
         char.active_adventure_id = None
+        char.add_history(
+            tr(
+                "history_adventure_detail",
+                year=self.world.year,
+                detail=tr("summary_adventure_died", name=char.name, destination=run.destination),
+            )
+        )
+        self.event_system.handle_death_side_effects(char, self.world)
         self.world.complete_adventure(run.adventure_id)
 
     # ------------------------------------------------------------------
@@ -264,16 +272,7 @@ class Simulator:
             "adventure_steps_per_year": self.adventure_steps_per_year,
             "locale": get_locale(),
             "rng_state": repr(self.rng.getstate()),
-            "history": [
-                {
-                    "description": ev.description,
-                    "affected_characters": list(ev.affected_characters),
-                    "stat_changes": ev.stat_changes,
-                    "event_type": ev.event_type,
-                    "year": ev.year,
-                }
-                for ev in self.history
-            ],
+            "history": [ev.to_dict() for ev in self.history],
         }
 
     @classmethod
@@ -309,14 +308,7 @@ class Simulator:
             except (ValueError, SyntaxError, TypeError):
                 pass  # Ignore corrupted RNG state; start with fresh RNG
         sim.history = [
-            EventResult(
-                description=ev["description"],
-                affected_characters=list(ev.get("affected_characters", [])),
-                stat_changes=ev.get("stat_changes", {}),
-                event_type=ev.get("event_type", "generic"),
-                year=ev.get("year", 0),
-            )
-            for ev in data.get("history", [])
+            EventResult.from_dict(ev) for ev in data.get("history", [])
         ]
         return sim
 

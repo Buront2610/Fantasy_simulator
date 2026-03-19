@@ -159,7 +159,7 @@ SKILLS: Dict[str, List[str]] = {
     "Magic": [
         "Fireball", "Arcane Shield", "Mana Control", "Spellcraft",
         "Holy Light", "Regeneration", "Nature's Wrath", "Illusion",
-        "Necromancy", "Elemental Magic",
+        "Necromancy", "Elemental Magic", "Entangle",
     ],
     "Stealth": [
         "Stealth", "Backstab", "Lockpicking", "Pickpocket", "Camouflage",

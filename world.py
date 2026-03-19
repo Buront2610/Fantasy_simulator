@@ -162,9 +162,13 @@ class World:
     def advance_time(self, years: int = 1) -> None:
         self.year += years
 
+    MAX_EVENT_LOG = 2000
+
     def log_event(self, event_text: str) -> None:
         prefix = tr("event_log_prefix", year=self.year)
         self.event_log.append(f"{prefix} {event_text}")
+        if len(self.event_log) > self.MAX_EVENT_LOG:
+            self.event_log = self.event_log[-self.MAX_EVENT_LOG:]
 
     def render_map(self, highlight_location: Optional[str] = None) -> str:
         """Return a stable ASCII grid of the world map."""
