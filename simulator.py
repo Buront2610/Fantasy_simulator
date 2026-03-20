@@ -177,7 +177,7 @@ class Simulator:
         """Return a human-readable summary of the entire simulation."""
         total = len(self.history)
         alive = sum(1 for c in self.world.characters if c.alive)
-        dead  = sum(1 for c in self.world.characters if not c.alive)
+        dead = sum(1 for c in self.world.characters if not c.alive)
 
         type_counts: Dict[str, int] = {}
         for ev in self.history:

@@ -190,8 +190,16 @@ class Character:
             f"  {tr('location_label'):<10}: {self.location}",
             f"  {tr('status_label'):<10}: {tr('status_alive') if self.alive else tr('status_dead')}",
             f"  {tr('stats_label')}",
-            f"  {tr('stat_str')} {self.strength:>3}  |  {tr('stat_int')} {self.intelligence:>3}  |  {tr('stat_dex')} {self.dexterity:>3}",
-            f"  {tr('stat_wis')} {self.wisdom:>3}  |  {tr('stat_cha')} {self.charisma:>3}  |  {tr('stat_con')} {self.constitution:>3}",
+            (
+                f"  {tr('stat_str')} {self.strength:>3}  |  "
+                f"{tr('stat_int')} {self.intelligence:>3}  |  "
+                f"{tr('stat_dex')} {self.dexterity:>3}"
+            ),
+            (
+                f"  {tr('stat_wis')} {self.wisdom:>3}  |  "
+                f"{tr('stat_cha')} {self.charisma:>3}  |  "
+                f"{tr('stat_con')} {self.constitution:>3}"
+            ),
         ]
         if self.skills:
             top_skills = sorted(self.skills.items(), key=lambda x: -x[1])[:5]

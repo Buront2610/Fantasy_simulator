@@ -219,7 +219,7 @@ DEFAULT_LOCATIONS = [
 
     # Row 3
     ("Dragonbone Ridge",  "A ridge littered with the bones of ancient dragons.",          "mountain", 0, 3),
-    ("Dusty Crossroads",  "A well-worn junction where merchants rest and rumours spread.","plains",   1, 3),
+    ("Dusty Crossroads",  "A well-worn junction where merchants rest and rumours spread.", "plains",   1, 3),
     ("Hearthglow Town",   "A warm, welcoming town renowned for its healers' guild.",      "city",     2, 3),
     ("Mirefen Swamp",     "A murky swamp hiding both treasure and terrible dangers.",     "dungeon",  3, 3),
     ("Dawnport",          "A busy harbour city that never truly sleeps.",                 "city",     4, 3),

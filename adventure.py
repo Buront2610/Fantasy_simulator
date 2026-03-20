@@ -136,7 +136,10 @@ class AdventureRun:
         if self.state == "traveling":
             self.steps_taken += 1
             summary = tr("summary_adventure_arrived", name=self.character_name, destination=self.destination)
-            detail = tr("detail_adventure_arrived", name=self.character_name, origin=self.origin, destination=self.destination)
+            detail = tr(
+                "detail_adventure_arrived",
+                name=self.character_name, origin=self.origin, destination=self.destination,
+            )
             self._record(summary, detail)
             if rng.random() < 0.35:
                 self.pending_choice = AdventureChoice(
@@ -177,7 +180,10 @@ class AdventureRun:
             discovery = rng.choice(ADVENTURE_DISCOVERIES)
             self.loot_summary.append(discovery)
             summary = tr("summary_adventure_discovery", name=self.character_name, destination=self.destination)
-            detail = tr("detail_adventure_discovery", name=self.character_name, discovery=tr_term(discovery), destination=self.destination)
+            detail = tr(
+                "detail_adventure_discovery",
+                name=self.character_name, discovery=tr_term(discovery), destination=self.destination,
+            )
             self._record(summary, detail)
 
             if self.pending_choice is None and rng.random() < 0.40:
@@ -205,8 +211,16 @@ class AdventureRun:
                     detail = tr("detail_returned_injured", name=self.character_name, origin=self.origin)
                 elif self.loot_summary:
                     self.outcome = "safe_return"
-                    summary = tr("summary_returned_safely", name=self.character_name, destination=self.destination, loot=tr_term(self.loot_summary[-1]))
-                    detail = tr("detail_returned_safely", name=self.character_name, origin=self.origin, items=", ".join(tr_term(item) for item in self.loot_summary))
+                    summary = tr(
+                        "summary_returned_safely",
+                        name=self.character_name, destination=self.destination,
+                        loot=tr_term(self.loot_summary[-1]),
+                    )
+                    detail = tr(
+                        "detail_returned_safely",
+                        name=self.character_name, origin=self.origin,
+                        items=", ".join(tr_term(item) for item in self.loot_summary),
+                    )
                 else:
                     self.outcome = "retreat"
                     summary = tr("summary_retreated_safely", name=self.character_name, destination=self.destination)

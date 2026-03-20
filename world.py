@@ -162,7 +162,7 @@ class World:
     def random_location(self, exclude_dungeon: bool = False, rng: Any = random) -> Location:
         options = list(self.grid.values())
         if exclude_dungeon:
-            options = [l for l in options if l.region_type != "dungeon"]
+            options = [loc for loc in options if loc.region_type != "dungeon"]
         return rng.choice(options)
 
     def advance_time(self, years: int = 1) -> None:

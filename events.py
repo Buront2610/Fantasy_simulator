@@ -153,9 +153,6 @@ class EventSystem:
         power2 = char2.combat_power + rng.randint(0, 30)
         winner, loser = (char1, char2) if power1 >= power2 else (char2, char1)
 
-        win_desc = rng.choice(BATTLE_OUTCOMES_WIN)
-        lose_desc = rng.choice(BATTLE_OUTCOMES_LOSE)
-
         winner_gains = {"strength": rng.randint(1, 3), "constitution": rng.randint(0, 2)}
         loser_losses = {"constitution": -rng.randint(2, 8), "strength": -rng.randint(0, 3)}
         winner.apply_stat_delta(winner_gains)
@@ -433,7 +430,10 @@ class EventSystem:
             region_type=destination.region_type,
             road_event=road_event,
         )
-        char.add_history(tr("history_travelled", year=world.year, old_location=old_location, destination=destination.name))
+        char.add_history(tr(
+            "history_travelled",
+            year=world.year, old_location=old_location, destination=destination.name,
+        ))
 
         extra_changes: Dict[str, int] = {}
         if destination.region_type == "dungeon":
@@ -460,7 +460,9 @@ class EventSystem:
             return self.event_death(char, world, rng=rng)
         return None
 
-    def generate_random_event(self, characters: List[Character], world: World, rng: Any = random) -> Optional[EventResult]:
+    def generate_random_event(
+        self, characters: List[Character], world: World, rng: Any = random
+    ) -> Optional[EventResult]:
         eligible = [c for c in characters if c.alive and c.active_adventure_id is None]
         if not eligible:
             return None

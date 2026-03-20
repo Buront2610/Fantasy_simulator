@@ -174,10 +174,10 @@ _TEXT: Dict[str, Dict[str, str]] = {
         "training_effort_tireless": "手が痛むまでたゆまず鍛え続け",
         "training_effort_scrolls": "古代の巻物を読み込み",
         "training_effort_limits": "限界を越えるまで己を追い込み",
-        "meeting_positive": "{name1} と {name2} は {location} で出会い、素晴らしい相性を見せた。（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）",
-        "meeting_pleasant": "{name1} と {name2} は {location} で気持ちの良い交流をした。（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）",
-        "meeting_neutral": "{name1} と {name2} は {location} で軽く会釈を交わした。（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）",
-        "meeting_negative": "{name1} と {name2} は {location} でぎこちない出会いをした。（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）",
+        "meeting_positive": "{name1} と {name2} は {location} で出会い、素晴らしい相性を見せた。（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）",  # noqa: E501
+        "meeting_pleasant": "{name1} と {name2} は {location} で気持ちの良い交流をした。（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）",  # noqa: E501
+        "meeting_neutral": "{name1} と {name2} は {location} で軽く会釈を交わした。（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）",  # noqa: E501
+        "meeting_negative": "{name1} と {name2} は {location} でぎこちない出会いをした。（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）",  # noqa: E501
         "history_met": "Year {year}: {name} と {location} で出会った。",
         "romance_growing_closer": "{name1} と {name2} は {location} で時を過ごし、関係を深めた。",
         "romance_commitments_blocked": "{name1} と {name2} は {location} で特別な時間を過ごしたが、既存の関係がそれ以上の進展を妨げた。",
@@ -436,16 +436,16 @@ _TEXT: Dict[str, Dict[str, str]] = {
         "training_effort_tireless": "practised tirelessly until their hands bled",
         "training_effort_scrolls": "studied ancient scrolls",
         "training_effort_limits": "pushed themselves beyond their limits",
-        "meeting_positive": "{name1} and {name2} met in {location} and hit it off splendidly. ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})",
-        "meeting_pleasant": "{name1} and {name2} met in {location} and had a pleasant exchange. ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})",
-        "meeting_neutral": "{name1} and {name2} met in {location} and exchanged a polite nod. ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})",
-        "meeting_negative": "{name1} and {name2} met in {location} and had a tense, uncomfortable encounter. ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})",
+        "meeting_positive": "{name1} and {name2} met in {location} and hit it off splendidly. ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})",  # noqa: E501
+        "meeting_pleasant": "{name1} and {name2} met in {location} and had a pleasant exchange. ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})",  # noqa: E501
+        "meeting_neutral": "{name1} and {name2} met in {location} and exchanged a polite nod. ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})",  # noqa: E501
+        "meeting_negative": "{name1} and {name2} met in {location} and had a tense, uncomfortable encounter. ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})",  # noqa: E501
         "history_met": "Year {year}: Met {name} in {location}.",
         "romance_growing_closer": "{name1} and {name2} spent time together at {location}, growing closer.",
-        "romance_commitments_blocked": "{name1} and {name2} shared a meaningful moment at {location}, but existing commitments kept the relationship from deepening.",
+        "romance_commitments_blocked": "{name1} and {name2} shared a meaningful moment at {location}, but existing commitments kept the relationship from deepening.",  # noqa: E501
         "marriage_anniversary": "{name1} and {name2} celebrated another year of their marriage.",
         "history_anniversary": "Year {year}: Celebrated marriage anniversary with {name}.",
-        "marriage_happened": "{name1} ({race1} {job1}) and {name2} ({race2} {job2}) were married in {location} amid great celebration!",
+        "marriage_happened": "{name1} ({race1} {job1}) and {name2} ({race2} {job2}) were married in {location} amid great celebration!",  # noqa: E501
         "history_married": "Year {year}: Married {name} in {location}.",
         "battle_fatal": "{winner} defeated {loser}, who did not survive the encounter.",
         "battle_normal": "{winner} defeated {loser}.",

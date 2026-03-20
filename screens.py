@@ -176,7 +176,8 @@ def _show_roster(world: World) -> None:
     print(_hr())
     header = (
         f"  {tr('roster_header_name'):<22} {tr('roster_header_race_job'):<22} {tr('roster_header_age'):>4}  "
-        f"{tr('stat_str'):>4}{tr('stat_int'):>4}{tr('stat_dex'):>4}  {tr('roster_header_status'):<10}  {tr('roster_header_location')}"
+        f"{tr('stat_str'):>4}{tr('stat_int'):>4}{tr('stat_dex'):>4}  "
+        f"{tr('roster_header_status'):<10}  {tr('roster_header_location')}"
     )
     print(bold(header))
     print(_hr())
@@ -223,8 +224,14 @@ def _show_adventure_summaries(sim: Simulator) -> None:
     print(_hr())
     for i, run in enumerate(runs, 1):
         status = tr(f"outcome_{run.outcome}") if run.outcome else tr(f"state_{run.state}")
-        loot = f" | {tr('loot_label')}: {', '.join(tr_term(item) for item in run.loot_summary)}" if run.loot_summary else ""
-        injury = f" | {tr('injury_label')}: {tr(f'injury_status_{run.injury_status}')}" if run.injury_status != "none" else ""
+        loot = (
+            f" | {tr('loot_label')}: {', '.join(tr_term(item) for item in run.loot_summary)}"
+            if run.loot_summary else ""
+        )
+        injury = (
+            f" | {tr('injury_label')}: {tr(f'injury_status_{run.injury_status}')}"
+            if run.injury_status != "none" else ""
+        )
         print(
             f"  {i:>2}. {run.character_name} | {run.origin} -> {run.destination} "
             f"| {status}{injury}{loot}"
@@ -407,7 +414,8 @@ def screen_custom_simulation() -> None:
             char = creator.create_random()
             world.add_character(char)
             custom_chars.append(char)
-            print(f"\n  {green('*')}  {tr('random_character_added', name=char.name, race=tr_term(char.race), job=tr_term(char.job))}")
+            msg = tr('random_character_added', name=char.name, race=tr_term(char.race), job=tr_term(char.job))
+            print(f"\n  {green('*')}  {msg}")
         elif action == tr("create_from_template"):
             templates = CharacterCreator.list_templates()
             print(f"\n  {tr('available_templates')}: " + ", ".join(templates))
@@ -462,7 +470,8 @@ def screen_world_lore() -> None:
     print(bold(f"  {tr('jobs_classes')}"))
     print(_hr())
     for jname, jdesc, jskills in JOBS:
-        print(f"  {cyan(tr_term(jname))}  |  {tr('primary_skills_label')}: {', '.join(tr_term(skill) for skill in jskills)}")
+        skills_str = ', '.join(tr_term(skill) for skill in jskills)
+        print(f"  {cyan(tr_term(jname))}  |  {tr('primary_skills_label')}: {skills_str}")
         _print_wrapped(jdesc)
         print()
     _pause()
