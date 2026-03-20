@@ -34,7 +34,9 @@ from world_data import JOBS, RACES, WORLD_LORE
 def _get_numeric_choice(prompt: str, count: int) -> Optional[int]:
     """Prompt the user for a 1-based index and return 0-based index, or None."""
     raw = input(prompt).strip()
-    if not raw or not raw.isdigit():
+    if not raw:
+        return None
+    if not raw.isdigit():
         print(yellow(f"  {tr('invalid_input')}"))
         return None
     idx = int(raw) - 1

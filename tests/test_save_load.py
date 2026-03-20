@@ -8,9 +8,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 import json
 
-import pytest
-
-from character import Character
 from character_creator import CharacterCreator
 from save_load import load_simulation, save_simulation
 from simulator import Simulator

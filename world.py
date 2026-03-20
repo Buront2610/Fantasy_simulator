@@ -95,7 +95,13 @@ class World:
     def add_character(self, character: Character, rng: Any = random) -> None:
         if character.location not in self._location_name_index:
             options = [loc.name for loc in self.grid.values() if loc.region_type != "dungeon"]
-            character.location = rng.choice(options) if options else self.location_names[0]
+            fallback = list(self._location_name_index.keys())
+            if options:
+                character.location = rng.choice(options)
+            elif fallback:
+                character.location = fallback[0]
+            else:
+                raise ValueError("Cannot add character: world has no locations.")
         if character.char_id in self._char_index:
             raise ValueError(
                 f"Duplicate character ID: {character.char_id!r} "

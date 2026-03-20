@@ -36,6 +36,6 @@ def load_simulation(path: str) -> Optional[Simulator]:
         with open(path, "r", encoding="utf-8") as handle:
             data: Any = json.load(handle)
         return Simulator.from_dict(data)
-    except (OSError, json.JSONDecodeError, KeyError, ValueError) as exc:
+    except (OSError, json.JSONDecodeError, KeyError, ValueError, TypeError, AttributeError) as exc:
         logger.error("Failed to load simulation from %s: %s", path, exc)
         return None
