@@ -93,6 +93,47 @@ class TestLoadSimulation:
         assert restored is not None
         assert restored.world.event_log == sim.world.event_log
 
+    def test_load_old_save_without_schema_version_migrates_to_v3(self, tmp_path):
+        path = tmp_path / "old_save.json"
+        old_save = {
+            "characters": [
+                {
+                    "name": "Aldric",
+                    "age": 25,
+                    "gender": "Male",
+                    "race": "Human",
+                    "job": "Warrior",
+                    "location": "Aethoria Capital",
+                },
+            ],
+            "world": {
+                "name": "Aethoria",
+                "year": 1000,
+                "grid": [
+                    {
+                        "name": "Aethoria Capital",
+                        "description": "The capital.",
+                        "region_type": "city",
+                        "x": 2,
+                        "y": 2,
+                    },
+                ],
+                "event_records": [],
+            },
+            "history": [],
+        }
+        path.write_text(json.dumps(old_save), encoding="utf-8")
+
+        restored = load_simulation(str(path))
+
+        assert restored is not None
+        assert restored.world.characters[0].location_id == "loc_aethoria_capital"
+        assert restored.world.characters[0].favorite is False
+        capital = restored.world.get_location_by_id("loc_aethoria_capital")
+        assert capital is not None
+        assert capital.safety == 80
+        assert capital.danger == 15
+
     def test_corrupted_rng_state_does_not_crash(self, tmp_path):
         """If rng_state is tampered with, loading should still succeed."""
         path = tmp_path / "tampered.json"

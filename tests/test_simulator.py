@@ -126,6 +126,25 @@ class TestSimulatorConstruction:
         s2.run(years=3)
         assert [ev.description for ev in s1.history] == [ev.description for ev in s2.history]
 
+    def test_seed_fixed_world_generation_is_deterministic(self):
+        import random as _random
+
+        def _build_seeded_world(seed):
+            rng = _random.Random(seed)
+            world = World()
+            creator = CharacterCreator()
+            locs = [loc.id for loc in world.grid.values() if loc.region_type != "dungeon"]
+            for _ in range(6):
+                char = creator.create_random(rng=rng)
+                char.location_id = rng.choice(locs)
+                world.add_character(char)
+            return world
+
+        world1 = _build_seeded_world(42)
+        world2 = _build_seeded_world(42)
+
+        assert world1.to_dict() == world2.to_dict()
+
 
 # ---------------------------------------------------------------------------
 # run()
@@ -427,6 +446,29 @@ class TestSimulatorSerialization:
         pending = restored.get_pending_adventure_choices()
         assert pending
         assert pending[0]["default_option"] == "proceed_cautiously"
+
+    def test_seed_fixed_12_years_snapshot_is_deterministic(self):
+        import random as _random
+
+        def _build_seeded_world(seed):
+            rng = _random.Random(seed)
+            world = World()
+            creator = CharacterCreator()
+            locs = [loc.id for loc in world.grid.values() if loc.region_type != "dungeon"]
+            for _ in range(6):
+                char = creator.create_random(rng=rng)
+                char.location_id = rng.choice(locs)
+                world.add_character(char)
+            return world
+
+        sim1 = Simulator(_build_seeded_world(42), events_per_year=4, adventure_steps_per_year=2, seed=99)
+        sim2 = Simulator(_build_seeded_world(42), events_per_year=4, adventure_steps_per_year=2, seed=99)
+
+        for _ in range(12):
+            sim1.advance_years(1)
+            sim2.advance_years(1)
+
+        assert sim1.to_dict() == sim2.to_dict()
 
 
 class TestInjuryRecovery:

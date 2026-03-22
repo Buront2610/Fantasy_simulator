@@ -9,6 +9,7 @@ import uuid
 from typing import Any, Dict, List, Optional
 
 from i18n import tr, tr_term
+from world_data import NAME_TO_LOCATION_ID, fallback_location_id
 
 
 class Character:
@@ -32,6 +33,9 @@ class Character:
         relationships: Optional[Dict[str, int]] = None,
         alive: bool = True,
         location_id: str = "loc_aethoria_capital",
+        favorite: bool = False,
+        spotlighted: bool = False,
+        playable: bool = False,
         history: Optional[List[str]] = None,
         char_id: Optional[str] = None,
         spouse_id: Optional[str] = None,
@@ -62,6 +66,9 @@ class Character:
         self.relationships: Dict[str, int] = relationships if relationships is not None else {}
         self.alive: bool = alive
         self.location_id: str = location_id
+        self.favorite: bool = favorite
+        self.spotlighted: bool = spotlighted
+        self.playable: bool = playable
         self.history: List[str] = history if history is not None else []
         self.spouse_id: Optional[str] = spouse_id
         self.injury_status: str = injury_status
@@ -151,6 +158,9 @@ class Character:
             "relationships": self.relationships,
             "alive": self.alive,
             "location_id": self.location_id,
+            "favorite": self.favorite,
+            "spotlighted": self.spotlighted,
+            "playable": self.playable,
             "history": self.history,
             "spouse_id": self.spouse_id,
             "injury_status": self.injury_status,
@@ -159,7 +169,6 @@ class Character:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Character":
-        from world_data import NAME_TO_LOCATION_ID
         # Clamp skill levels to [0, 10] and relationships to [-100, 100]
         raw_skills = data.get("skills", {})
         skills = {k: max(0, min(10, v)) for k, v in raw_skills.items()}
@@ -169,7 +178,7 @@ class Character:
         location_id = data.get("location_id")
         if location_id is None:
             old_name = data.get("location", "Aethoria Capital")
-            location_id = NAME_TO_LOCATION_ID.get(old_name, "loc_aethoria_capital")
+            location_id = NAME_TO_LOCATION_ID.get(old_name, fallback_location_id(old_name))
         return cls(
             name=data["name"],
             age=data["age"],
@@ -186,6 +195,9 @@ class Character:
             relationships=relationships,
             alive=data.get("alive", True),
             location_id=location_id,
+            favorite=data.get("favorite", False),
+            spotlighted=data.get("spotlighted", False),
+            playable=data.get("playable", False),
             history=data.get("history", []),
             char_id=data.get("char_id"),
             spouse_id=data.get("spouse_id"),
