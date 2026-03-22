@@ -80,9 +80,9 @@ class Character:
     def location(self) -> str:
         """The canonical name of the character's current location.
 
-        .. deprecated::
-            Use ``location_id`` for new code.  This property is maintained
-            for one PR cycle and will be removed in a subsequent PR.
+        .. deprecated:: PR-3a
+            Use ``location_id`` for new code.  This backward-compatible
+            property is maintained for one PR cycle and will be removed in PR-4.
         """
         return self._location
 

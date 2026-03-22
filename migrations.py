@@ -51,7 +51,7 @@ def migrate_v1_to_v2(data: Dict[str, Any]) -> Dict[str, Any]:
             "id": loc_id,
             "canonical_name": canonical_name,
             "visited": loc_data.get("visited", False),
-            "controlling_faction_id": loc_data.get("controlling_faction_id"),
+            "controlling_faction_id": loc_data.get("controlling_faction_id", None),
             "aliases": loc_data.get("aliases", []),
             "memorial_ids": loc_data.get("memorial_ids", []),
             "recent_event_ids": loc_data.get("recent_event_ids", []),
