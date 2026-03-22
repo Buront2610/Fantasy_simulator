@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh pr:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(git:*)",
+      "Bash(python:*)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(pip install:*)",
+      "Bash(wc:*)",
+      "Bash(curl -sL https://x.com/taishiyade/status/2034389599909216389)",
+      "Bash(curl -sL https://zenn.dev/karamage/articles/a0b7111698ecb2)",
+      "Bash(curl -sL https://qiita.com/akira_papa_AI/items/0385b6d1468e6d564b50)",
+      "WebFetch(domain:x.com)",
+      "WebFetch(domain:zenn.dev)",
+      "WebFetch(domain:qiita.com)"
+    ]
+  }
+}
