@@ -19,6 +19,7 @@ from ui_helpers import (
     bold,
     cyan,
     dim,
+    fit_display_width,
     green,
     red,
     yellow,
@@ -175,19 +176,34 @@ def _show_roster(world: World) -> None:
     print()
     print(_hr())
     header = (
-        f"  {tr('roster_header_name'):<22} {tr('roster_header_race_job'):<22} {tr('roster_header_age'):>4}  "
-        f"{tr('stat_str'):>4}{tr('stat_int'):>4}{tr('stat_dex'):>4}  "
-        f"{tr('roster_header_status'):<10}  {tr('roster_header_location')}"
+        "  "
+        + fit_display_width(tr("roster_header_name"), 22)
+        + " "
+        + fit_display_width(tr("roster_header_race_job"), 22)
+        + " "
+        + fit_display_width(tr("roster_header_age"), 4)
+        + "  "
+        + fit_display_width(tr("stat_str"), 4)
+        + fit_display_width(tr("stat_int"), 4)
+        + fit_display_width(tr("stat_dex"), 4)
+        + "  "
+        + fit_display_width(tr("roster_header_status"), 10)
+        + "  "
+        + fit_display_width(tr("roster_header_location"), 20)
     )
     print(bold(header))
     print(_hr())
     for c in world.characters:
-        status = green(tr("status_alive")) if c.alive else red(tr("status_dead"))
-        name_trunc = c.name[:21]
-        racejob = f"{tr_term(c.race)} {tr_term(c.job)}"[:21]
-        loc_trunc = world.location_name(c.location_id)[:20]
+        status_text = fit_display_width(
+            tr("status_alive") if c.alive else tr("status_dead"),
+            10,
+        )
+        status = green(status_text) if c.alive else red(status_text)
+        name_trunc = fit_display_width(c.name, 22)
+        racejob = fit_display_width(f"{tr_term(c.race)} {tr_term(c.job)}", 22)
+        loc_trunc = fit_display_width(world.location_name(c.location_id), 20)
         print(
-            f"  {name_trunc:<22} {racejob:<22} {c.age:>4}  "
+            f"  {name_trunc} {racejob} {c.age:>4}  "
             f"{c.strength:>4}{c.intelligence:>4}{c.dexterity:>4}  "
             f"{status}  {loc_trunc}"
         )
