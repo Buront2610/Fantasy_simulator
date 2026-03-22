@@ -494,3 +494,65 @@ class TestGenerateRandomEvent:
 
     def test_random_event_table_excludes_direct_death(self, es):
         assert "death" not in es._EVENT_WEIGHTS
+
+
+# ---------------------------------------------------------------------------
+# WorldEventRecord
+# ---------------------------------------------------------------------------
+
+class TestWorldEventRecord:
+    def test_to_dict_round_trip(self):
+        from events import WorldEventRecord
+        record = WorldEventRecord(
+            kind="battle",
+            year=1005,
+            location_id="loc_aethoria_capital",
+            primary_actor_id="abc123",
+            secondary_actor_ids=["def456"],
+            description="A battle occurred.",
+            severity=3,
+            visibility="public",
+        )
+        d = record.to_dict()
+        restored = WorldEventRecord.from_dict(d)
+        assert restored.kind == "battle"
+        assert restored.year == 1005
+        assert restored.location_id == "loc_aethoria_capital"
+        assert restored.primary_actor_id == "abc123"
+        assert restored.secondary_actor_ids == ["def456"]
+        assert restored.severity == 3
+
+    def test_from_event_result(self):
+        from events import WorldEventRecord
+        result = EventResult(
+            description="A battle occurred.",
+            affected_characters=["abc123", "def456"],
+            stat_changes={},
+            event_type="battle",
+            year=1005,
+        )
+        record = WorldEventRecord.from_event_result(result, location_id="loc_thornwood", severity=3)
+        assert record.kind == "battle"
+        assert record.year == 1005
+        assert record.location_id == "loc_thornwood"
+        assert record.primary_actor_id == "abc123"
+        assert record.secondary_actor_ids == ["def456"]
+        assert record.severity == 3
+        assert record.description == "A battle occurred."
+
+    def test_from_event_result_no_actors(self):
+        from events import WorldEventRecord
+        result = EventResult(description="Nothing happened.", year=1000)
+        record = WorldEventRecord.from_event_result(result)
+        assert record.primary_actor_id is None
+        assert record.secondary_actor_ids == []
+
+    def test_default_values(self):
+        from events import WorldEventRecord
+        record = WorldEventRecord()
+        assert record.kind == "generic"
+        assert record.year == 0
+        assert record.location_id is None
+        assert record.severity == 1
+        assert record.visibility == "public"
+        assert len(record.record_id) == 12

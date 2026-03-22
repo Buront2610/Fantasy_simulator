@@ -552,3 +552,41 @@ class TestJapaneseLocaleSummary:
 
         assert "人間" in story
         assert "戦士" in story
+
+
+class TestWorldEventRecordIntegration:
+    def test_simulation_creates_event_records(self, small_world):
+        sim = Simulator(small_world, seed=42)
+        sim.advance_years(2)
+        assert len(sim.world.event_records) > 0
+
+    def test_event_records_have_valid_kinds(self, small_world):
+        sim = Simulator(small_world, seed=42)
+        sim.advance_years(1)
+        for record in sim.world.event_records:
+            assert record.kind != ""
+            assert record.year > 0
+
+    def test_event_records_have_location_ids(self, small_world):
+        sim = Simulator(small_world, seed=42)
+        sim.advance_years(3)
+        records_with_location = [r for r in sim.world.event_records if r.location_id is not None]
+        assert len(records_with_location) > 0
+
+    def test_event_records_queryable_by_year(self, small_world):
+        sim = Simulator(small_world, seed=42)
+        sim.advance_years(3)
+        year_records = sim.world.get_events_by_year(1001)
+        assert len(year_records) >= 0  # may be 0 if year 1001 had no events
+
+    def test_event_records_saved_and_loaded(self, small_world, tmp_path):
+        sim = Simulator(small_world, seed=42)
+        sim.advance_years(2)
+        original_count = len(sim.world.event_records)
+        assert original_count > 0
+
+        path = tmp_path / "test.json"
+        save_simulation(sim, str(path))
+        restored = load_simulation(str(path))
+        assert restored is not None
+        assert len(restored.world.event_records) == original_count

@@ -78,3 +78,52 @@ class TestWorld:
         assert "何かが起きた。" in entry
         assert "[Year" not in entry
         set_locale("en")
+
+    def test_record_event_stores_structured_record(self):
+        from events import WorldEventRecord
+        world = World()
+        record = WorldEventRecord(kind="battle", year=1001, location_id="loc_aethoria_capital")
+        world.record_event(record)
+        assert len(world.event_records) == 1
+        assert world.event_records[0].kind == "battle"
+
+    def test_get_events_by_location(self):
+        from events import WorldEventRecord
+        world = World()
+        world.record_event(WorldEventRecord(kind="battle", year=1001, location_id="loc_thornwood"))
+        world.record_event(WorldEventRecord(kind="meeting", year=1001, location_id="loc_aethoria_capital"))
+        world.record_event(WorldEventRecord(kind="discovery", year=1002, location_id="loc_thornwood"))
+        results = world.get_events_by_location("loc_thornwood")
+        assert len(results) == 2
+        assert all(r.location_id == "loc_thornwood" for r in results)
+
+    def test_get_events_by_actor(self):
+        from events import WorldEventRecord
+        world = World()
+        world.record_event(WorldEventRecord(
+            kind="battle", year=1001, primary_actor_id="a1", secondary_actor_ids=["a2"],
+        ))
+        world.record_event(WorldEventRecord(kind="journey", year=1001, primary_actor_id="a3"))
+        assert len(world.get_events_by_actor("a1")) == 1
+        assert len(world.get_events_by_actor("a2")) == 1
+        assert len(world.get_events_by_actor("a3")) == 1
+        assert len(world.get_events_by_actor("unknown")) == 0
+
+    def test_get_events_by_year(self):
+        from events import WorldEventRecord
+        world = World()
+        world.record_event(WorldEventRecord(kind="battle", year=1001))
+        world.record_event(WorldEventRecord(kind="meeting", year=1002))
+        world.record_event(WorldEventRecord(kind="journey", year=1001))
+        assert len(world.get_events_by_year(1001)) == 2
+        assert len(world.get_events_by_year(1002)) == 1
+
+    def test_event_records_in_to_dict_round_trip(self):
+        from events import WorldEventRecord
+        world = World()
+        world.record_event(WorldEventRecord(kind="battle", year=1001, location_id="loc_thornwood"))
+        payload = world.to_dict()
+        restored = World.from_dict(payload)
+        assert len(restored.event_records) == 1
+        assert restored.event_records[0].kind == "battle"
+        assert restored.event_records[0].location_id == "loc_thornwood"

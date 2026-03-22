@@ -9,6 +9,7 @@ simulation tick to drive the narrative.
 from __future__ import annotations
 
 import random
+import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
@@ -50,6 +51,72 @@ class EventResult:
             stat_changes=data.get("stat_changes", {}),
             event_type=data.get("event_type", "generic"),
             year=data.get("year", 0),
+        )
+
+
+@dataclass
+class WorldEventRecord:
+    """A structured record of a world event for history and analysis.
+
+    Unlike EventResult (which is consumed immediately by the simulation loop),
+    WorldEventRecord is designed for long-term storage and querying.
+    """
+
+    record_id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
+    kind: str = "generic"
+    year: int = 0
+    location_id: Optional[str] = None
+    primary_actor_id: Optional[str] = None
+    secondary_actor_ids: List[str] = field(default_factory=list)
+    description: str = ""
+    severity: int = 1
+    visibility: str = "public"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "record_id": self.record_id,
+            "kind": self.kind,
+            "year": self.year,
+            "location_id": self.location_id,
+            "primary_actor_id": self.primary_actor_id,
+            "secondary_actor_ids": list(self.secondary_actor_ids),
+            "description": self.description,
+            "severity": self.severity,
+            "visibility": self.visibility,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "WorldEventRecord":
+        return cls(
+            record_id=data.get("record_id", uuid.uuid4().hex[:12]),
+            kind=data.get("kind", "generic"),
+            year=data.get("year", 0),
+            location_id=data.get("location_id"),
+            primary_actor_id=data.get("primary_actor_id"),
+            secondary_actor_ids=list(data.get("secondary_actor_ids", [])),
+            description=data.get("description", ""),
+            severity=data.get("severity", 1),
+            visibility=data.get("visibility", "public"),
+        )
+
+    @classmethod
+    def from_event_result(
+        cls,
+        result: EventResult,
+        location_id: Optional[str] = None,
+        severity: int = 1,
+    ) -> "WorldEventRecord":
+        """Create a WorldEventRecord from an EventResult."""
+        primary = result.affected_characters[0] if result.affected_characters else None
+        secondary = result.affected_characters[1:] if len(result.affected_characters) > 1 else []
+        return cls(
+            kind=result.event_type,
+            year=result.year,
+            location_id=location_id,
+            primary_actor_id=primary,
+            secondary_actor_ids=secondary,
+            description=result.description,
+            severity=severity,
         )
 
 

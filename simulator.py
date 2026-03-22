@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 import random
 
 from adventure import AdventureRun, create_adventure_run
-from events import EventResult, EventSystem
+from events import EventResult, EventSystem, WorldEventRecord
 from i18n import get_locale, set_locale, tr, tr_term
 
 if TYPE_CHECKING:
@@ -44,6 +44,21 @@ class Simulator:
         self.history: List[EventResult] = []  # all events across all years
         self.rng = random.Random(seed)
 
+    _SEVERITY_MAP: Dict[str, int] = {
+        "death": 5, "battle_fatal": 5, "marriage": 4,
+        "discovery": 3, "battle": 3, "journey": 2,
+        "meeting": 1, "aging": 1, "skill_training": 1,
+        "romance": 2, "anniversary": 2,
+    }
+
+    def _record_event(self, result: EventResult, location_id: Optional[str] = None) -> None:
+        """Log an event as both a string and a structured WorldEventRecord."""
+        self.history.append(result)
+        self.world.log_event(result.description)
+        severity = self._SEVERITY_MAP.get(result.event_type, 1)
+        record = WorldEventRecord.from_event_result(result, location_id=location_id, severity=severity)
+        self.world.record_event(record)
+
     # ------------------------------------------------------------------
     # Main simulation loop
     # ------------------------------------------------------------------
@@ -69,8 +84,7 @@ class Simulator:
         for char in list(self.world.characters):
             result = self.event_system.check_natural_death(char, self.world, rng=self.rng)
             if result is not None:
-                self.history.append(result)
-                self.world.log_event(result.description)
+                self._record_event(result, location_id=char.location_id)
 
         # --- Injury recovery ---
         self._recover_injuries()
@@ -86,8 +100,10 @@ class Simulator:
             )
             if result is None:
                 break
-            self.history.append(result)
-            self.world.log_event(result.description)
+            primary_id = result.affected_characters[0] if result.affected_characters else None
+            primary_char = self.world.get_character_by_id(primary_id) if primary_id else None
+            loc_id = primary_char.location_id if primary_char else None
+            self._record_event(result, location_id=loc_id)
 
         self.world.advance_time(1)
 

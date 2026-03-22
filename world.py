@@ -14,6 +14,7 @@ from world_data import DEFAULT_LOCATIONS, WORLD_LORE
 if TYPE_CHECKING:
     from adventure import AdventureRun
     from character import Character
+    from events import WorldEventRecord
 
 
 @dataclass
@@ -90,6 +91,7 @@ class World:
         self._location_name_index: Dict[str, Location] = {}
         self._location_id_index: Dict[str, Location] = {}
         self.event_log: List[str] = []
+        self.event_records: List[WorldEventRecord] = []
         self.active_adventures: List[AdventureRun] = []
         self.completed_adventures: List[AdventureRun] = []
         self._build_default_map()
@@ -208,6 +210,29 @@ class World:
         if len(self.event_log) > self.MAX_EVENT_LOG:
             self.event_log = self.event_log[-self.MAX_EVENT_LOG:]
 
+    MAX_EVENT_RECORDS = 5000
+
+    def record_event(self, record: WorldEventRecord) -> None:
+        """Store a structured event record."""
+        self.event_records.append(record)
+        if len(self.event_records) > self.MAX_EVENT_RECORDS:
+            self.event_records = self.event_records[-self.MAX_EVENT_RECORDS:]
+
+    def get_events_by_location(self, location_id: str) -> List[WorldEventRecord]:
+        """Return all event records for a specific location."""
+        return [r for r in self.event_records if r.location_id == location_id]
+
+    def get_events_by_actor(self, char_id: str) -> List[WorldEventRecord]:
+        """Return all event records involving a specific character."""
+        return [
+            r for r in self.event_records
+            if r.primary_actor_id == char_id or char_id in r.secondary_actor_ids
+        ]
+
+    def get_events_by_year(self, year: int) -> List[WorldEventRecord]:
+        """Return all event records for a specific year."""
+        return [r for r in self.event_records if r.year == year]
+
     def render_map(self, highlight_location: Optional[str] = None) -> str:
         """Return a stable ASCII grid of the world map."""
         cell_width = 16
@@ -257,6 +282,7 @@ class World:
             "year": self.year,
             "grid": [loc.to_dict() for loc in self.grid.values()],
             "event_log": self.event_log,
+            "event_records": [r.to_dict() for r in self.event_records],
             "active_adventures": [run.to_dict() for run in self.active_adventures],
             "completed_adventures": [run.to_dict() for run in self.completed_adventures],
         }
@@ -281,6 +307,10 @@ class World:
             world._location_name_index[loc.name] = loc
             world._location_id_index[loc.id] = loc
         world.event_log = data.get("event_log", [])
+        from events import WorldEventRecord as WER
+        world.event_records = [
+            WER.from_dict(r) for r in data.get("event_records", [])
+        ]
         world.active_adventures = [
             AdventureRun.from_dict(run) for run in data.get("active_adventures", [])
         ]
