@@ -261,10 +261,95 @@ DEFAULT_LOCATIONS = [
 NAME_TO_LOCATION_ID: Dict[str, str] = {entry[1]: entry[0] for entry in DEFAULT_LOCATIONS}
 
 
+LOCATION_STATE_DEFAULTS: Dict[str, Dict[str, int]] = {
+    "capital": {
+        "prosperity": 85,
+        "safety": 80,
+        "mood": 65,
+        "danger": 15,
+        "traffic": 90,
+        "rumor_heat": 60,
+        "road_condition": 85,
+    },
+    "city": {
+        "prosperity": 70,
+        "safety": 65,
+        "mood": 55,
+        "danger": 25,
+        "traffic": 70,
+        "rumor_heat": 45,
+        "road_condition": 75,
+    },
+    "village": {
+        "prosperity": 50,
+        "safety": 55,
+        "mood": 55,
+        "danger": 30,
+        "traffic": 35,
+        "rumor_heat": 20,
+        "road_condition": 55,
+    },
+    "forest": {
+        "prosperity": 10,
+        "safety": 30,
+        "mood": 40,
+        "danger": 55,
+        "traffic": 15,
+        "rumor_heat": 10,
+        "road_condition": 35,
+    },
+    "mountain": {
+        "prosperity": 5,
+        "safety": 25,
+        "mood": 35,
+        "danger": 65,
+        "traffic": 10,
+        "rumor_heat": 10,
+        "road_condition": 30,
+    },
+    "dungeon": {
+        "prosperity": 0,
+        "safety": 10,
+        "mood": 20,
+        "danger": 80,
+        "traffic": 5,
+        "rumor_heat": 35,
+        "road_condition": 20,
+    },
+    "plains": {
+        "prosperity": 35,
+        "safety": 45,
+        "mood": 50,
+        "danger": 35,
+        "traffic": 30,
+        "rumor_heat": 15,
+        "road_condition": 60,
+    },
+    "sea": {
+        "prosperity": 0,
+        "safety": 20,
+        "mood": 40,
+        "danger": 60,
+        "traffic": 25,
+        "rumor_heat": 20,
+        "road_condition": 0,
+    },
+}
+
+CAPITAL_LOCATION_IDS = {"loc_aethoria_capital"}
+
+
 def fallback_location_id(name: str) -> str:
     """Generate a location ID from a name when no canonical mapping exists."""
     slug = name.lower().replace(' ', '_').replace('-', '_').replace("'", '')
     return f"loc_{slug}"
+
+
+def get_location_state_defaults(loc_id: str, region_type: str) -> Dict[str, int]:
+    """Return initial state values for a location."""
+    profile = "capital" if loc_id in CAPITAL_LOCATION_IDS else region_type
+    defaults = LOCATION_STATE_DEFAULTS.get(profile, LOCATION_STATE_DEFAULTS["city"])
+    return dict(defaults)
 
 
 # ---------------------------------------------------------------------------

@@ -57,7 +57,12 @@ class Simulator:
         self.history.append(result)
         self.world.log_event(result.description)
         severity = self._SEVERITY_MAP.get(result.event_type, 1)
-        record = WorldEventRecord.from_event_result(result, location_id=location_id, severity=severity)
+        record = WorldEventRecord.from_event_result(
+            result,
+            location_id=location_id,
+            severity=severity,
+            rng=self.rng,
+        )
         self.world.record_event(record)
 
     # ------------------------------------------------------------------
@@ -307,6 +312,7 @@ class Simulator:
         ]
         world.characters = characters
         world._char_index = {c.char_id: c for c in characters}
+        world.ensure_valid_character_locations()
         sim = cls(
             world,
             events_per_year=data.get("events_per_year", 8),

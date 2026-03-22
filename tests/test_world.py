@@ -20,6 +20,8 @@ class TestWorld:
         rendered = world.render_map()
         assert "WORLD MAP" in rendered
         assert "Aethoria" in rendered
+        assert "Safety" in rendered
+        assert "Danger" in rendered
 
     def test_render_map_uses_highlight_marker(self):
         world = World()
@@ -30,7 +32,24 @@ class TestWorld:
         world = World()
         neighbors = world.get_neighboring_locations("loc_aethoria_capital")
         assert neighbors
-        assert all(hasattr(loc, "name") for loc in neighbors)
+        assert all(hasattr(loc, "canonical_name") for loc in neighbors)
+
+    def test_locations_have_state_defaults(self):
+        world = World()
+        capital = world.get_location_by_id("loc_aethoria_capital")
+        assert capital is not None
+        assert capital.canonical_name == "Aethoria Capital"
+        assert capital.prosperity == 85
+        assert capital.safety == 80
+        assert capital.danger == 15
+
+    def test_location_labels_derive_from_state(self):
+        set_locale("en")
+        world = World()
+        thornwood = world.get_location_by_id("loc_thornwood")
+        assert thornwood is not None
+        assert thornwood.safety_label == "dangerous"
+        assert thornwood.mood_label == "anxious"
 
     def test_to_dict_round_trip_preserves_adventure_lists(self):
         world = World()
@@ -127,3 +146,15 @@ class TestWorld:
         assert len(restored.event_records) == 1
         assert restored.event_records[0].kind == "battle"
         assert restored.event_records[0].location_id == "loc_thornwood"
+
+    def test_world_round_trip_preserves_location_state(self):
+        world = World()
+        capital = world.get_location_by_id("loc_aethoria_capital")
+        assert capital is not None
+        capital.danger = 42
+        capital.visited = True
+        restored = World.from_dict(world.to_dict())
+        restored_capital = restored.get_location_by_id("loc_aethoria_capital")
+        assert restored_capital is not None
+        assert restored_capital.danger == 42
+        assert restored_capital.visited is True

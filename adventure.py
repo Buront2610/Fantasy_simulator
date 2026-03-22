@@ -23,6 +23,13 @@ ADVENTURE_DISCOVERIES = [
     "a cache of monster trophies",
 ]
 
+
+def _generate_adventure_id(rng: Any = random) -> str:
+    if hasattr(rng, "getrandbits"):
+        return format(rng.getrandbits(40), "010x")
+    return uuid.uuid4().hex[:10]
+
+
 CHOICE_PRESS_ON = "press_on"
 CHOICE_PROCEED_CAUTIOUSLY = "proceed_cautiously"
 CHOICE_RETREAT = "retreat"
@@ -304,6 +311,7 @@ def create_adventure_run(character: Character, world: World, rng: Any = random) 
         origin=character.location_id,
         destination=destination.id,
         year_started=world.year,
+        adventure_id=_generate_adventure_id(rng),
     )
     run._record(
         tr("summary_adventure_set_out", name=character.name, origin=origin_name, destination=dest_name),
