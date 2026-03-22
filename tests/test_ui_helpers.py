@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import unittest
 
+from unittest.mock import patch
+
 from ui_helpers import (
     HEADER,
     _c,
+    _choose_key,
     _hr,
     bold,
     cyan,
@@ -57,6 +60,35 @@ class TestLayoutHelpers(unittest.TestCase):
 
     def test_header_contains_title(self) -> None:
         self.assertIn("FANTASY SIMULATOR", HEADER)
+
+
+class TestChooseKey(unittest.TestCase):
+    """_choose_key returns the key, not the display label."""
+
+    @patch("builtins.input", return_value="2")
+    def test_returns_key_not_label(self, _mock_input: object) -> None:
+        result = _choose_key(
+            "Pick one",
+            [("alpha", "Alpha Label"), ("beta", "Beta Label")],
+        )
+        self.assertEqual(result, "beta")
+
+    @patch("builtins.input", return_value="1")
+    def test_returns_first_key(self, _mock_input: object) -> None:
+        result = _choose_key(
+            "Pick one",
+            [("first", "First"), ("second", "Second")],
+        )
+        self.assertEqual(result, "first")
+
+    @patch("builtins.input", return_value="")
+    def test_default_selection(self, _mock_input: object) -> None:
+        result = _choose_key(
+            "Pick one",
+            [("a", "A"), ("b", "B")],
+            default="2",
+        )
+        self.assertEqual(result, "b")
 
 
 if __name__ == "__main__":

@@ -6,7 +6,8 @@ import unicodedata
 
 from character import Character
 from i18n import set_locale
-from world import Location, World
+from world import LocationState, World
+from world_data import get_location_state_defaults
 
 
 def _make_char(name="Aldric", location_id="loc_aethoria_capital"):
@@ -83,14 +84,16 @@ class TestWorld:
         assert capital.safety == 80
         assert capital.danger == 15
 
-    def test_location_backward_compatible_constructor_accepts_name(self):
-        location = Location(
+    def test_location_state_constructor_sets_fields(self):
+        defaults = get_location_state_defaults("loc_custom_city", "city")
+        location = LocationState(
             id="loc_custom_city",
-            name="Custom City",
+            canonical_name="Custom City",
             description="A custom settlement.",
             region_type="city",
             x=1,
             y=1,
+            **defaults,
         )
         assert location.canonical_name == "Custom City"
         assert location.name == "Custom City"

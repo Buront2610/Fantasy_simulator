@@ -245,57 +245,6 @@ class LocationState:
         )
 
 
-class Location(LocationState):
-    """Backward-compatible constructor for older callers."""
-
-    def __init__(
-        self,
-        *,
-        id: Optional[str] = None,
-        name: str = "",
-        description: str,
-        region_type: str,
-        x: int,
-        y: int,
-        canonical_name: Optional[str] = None,
-        prosperity: Optional[int] = None,
-        safety: Optional[int] = None,
-        mood: Optional[int] = None,
-        danger: Optional[int] = None,
-        traffic: Optional[int] = None,
-        rumor_heat: Optional[int] = None,
-        road_condition: Optional[int] = None,
-        visited: bool = False,
-        controlling_faction_id: Optional[str] = None,
-        recent_event_ids: Optional[List[str]] = None,
-        aliases: Optional[List[str]] = None,
-        memorial_ids: Optional[List[str]] = None,
-    ) -> None:
-        canonical_name = canonical_name or name
-        loc_id = id or NAME_TO_LOCATION_ID.get(canonical_name, fallback_location_id(canonical_name))
-        defaults = get_location_state_defaults(loc_id, region_type)
-        super().__init__(
-            id=loc_id,
-            canonical_name=canonical_name,
-            description=description,
-            region_type=region_type,
-            x=x,
-            y=y,
-            prosperity=defaults["prosperity"] if prosperity is None else prosperity,
-            safety=defaults["safety"] if safety is None else safety,
-            mood=defaults["mood"] if mood is None else mood,
-            danger=defaults["danger"] if danger is None else danger,
-            traffic=defaults["traffic"] if traffic is None else traffic,
-            rumor_heat=defaults["rumor_heat"] if rumor_heat is None else rumor_heat,
-            road_condition=defaults["road_condition"] if road_condition is None else road_condition,
-            visited=visited,
-            controlling_faction_id=controlling_faction_id,
-            recent_event_ids=[] if recent_event_ids is None else list(recent_event_ids),
-            aliases=[] if aliases is None else list(aliases),
-            memorial_ids=[] if memorial_ids is None else list(memorial_ids),
-        )
-
-
 class World:
     """Represents the entire game world."""
 
@@ -318,6 +267,9 @@ class World:
         self._adventure_index: Dict[str, AdventureRun] = {}
         self._location_name_index: Dict[str, LocationState] = {}
         self._location_id_index: Dict[str, LocationState] = {}
+        # Transitional event storage during the Phase 1 -> Phase 2 migration:
+        # - event_records is the canonical structured history for new features.
+        # - event_log is a CLI-facing formatted buffer kept for compatibility.
         self.event_log: List[str] = []
         self.event_records: List[WorldEventRecord] = []
         self.active_adventures: List[AdventureRun] = []
@@ -492,6 +444,13 @@ class World:
     MAX_EVENT_LOG = 2000
 
     def log_event(self, event_text: str) -> None:
+        """Append a formatted compatibility log entry for legacy CLI consumers.
+
+        This buffer is intentionally separate from ``event_records`` during the
+        Phase 1 -> Phase 2 migration. New gameplay/report features should treat
+        ``event_records`` as the canonical history and view this method as a
+        presentation-layer compatibility path.
+        """
         prefix = tr("event_log_prefix", year=self.year)
         self.event_log.append(f"{prefix} {event_text}")
         if len(self.event_log) > self.MAX_EVENT_LOG:
@@ -500,7 +459,7 @@ class World:
     MAX_EVENT_RECORDS = 5000
 
     def record_event(self, record: WorldEventRecord) -> None:
-        """Store a structured event record."""
+        """Store a structured event record in the canonical world history."""
         if record.location_id not in self._location_id_index:
             record.location_id = None
         self.event_records.append(record)

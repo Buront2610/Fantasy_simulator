@@ -110,6 +110,11 @@ def fit_display_width(text: str, width: int, suffix: str = "...") -> str:
 
 
 def _choose(prompt: str, options: List[str], default: Optional[str] = None) -> str:
+    """Display numbered menu and return the selected display string.
+
+    Kept for backward compatibility.  New code should prefer
+    ``_choose_key`` which decouples the return value from the locale.
+    """
     print()
     for i, opt in enumerate(options, 1):
         marker = green(">") if str(i) == default else " "
@@ -122,4 +127,30 @@ def _choose(prompt: str, options: List[str], default: Optional[str] = None) -> s
             raw = default
         if raw.isdigit() and 1 <= int(raw) <= len(options):
             return options[int(raw) - 1]
+        print(red(f"  {tr('invalid_choice')}"))
+
+
+def _choose_key(
+    prompt: str,
+    key_label_pairs: List[tuple[str, str]],
+    default: Optional[str] = None,
+) -> str:
+    """Display a numbered menu and return the **key** of the selected item.
+
+    *key_label_pairs* is a list of ``(key, display_label)`` tuples.
+    *default* is a 1-based index string (e.g. ``"1"``).
+    This avoids locale-dependent control flow.
+    """
+    print()
+    for i, (_key, label) in enumerate(key_label_pairs, 1):
+        marker = green(">") if str(i) == default else " "
+        print(f"  {marker} {cyan(str(i))}.  {label}")
+    print()
+    while True:
+        hint = f" (default {default})" if default else ""
+        raw = input(f"  {bold(tr('your_choice'))}{hint}: ").strip()
+        if not raw and default:
+            raw = default
+        if raw.isdigit() and 1 <= int(raw) <= len(key_label_pairs):
+            return key_label_pairs[int(raw) - 1][0]
         print(red(f"  {tr('invalid_choice')}"))

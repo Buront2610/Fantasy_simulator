@@ -460,7 +460,7 @@ NOTIFICATION_THRESHOLDS = {
 
 | PR | 内容 | 依存 |
 |---|---|---|
-| PR-4 | 月報 / 年報 / 復帰サマリー + UI report adapter | PR-2.5, PR-3 |
+| PR-4 | 月報 / 年報 / 復帰サマリー + UI report adapter + イベントストア統合 | PR-2.5, PR-3 |
 | PR-5 | Rumor / reliability / 通知密度分離 | PR-4 |
 | PR-6 | 条件付き自動進行（AUTO_PAUSE_PRIORITIES） | PR-4 |
 | PR-7 | Relationship 構造化 + ReputationEntry | PR-3 |
@@ -468,6 +468,14 @@ NOTIFICATION_THRESHOLDS = {
 | PR-9 | AdventureRun パーティ化 + 能力値依存 outcome | PR-8 |
 | PR-10 | live trace + memorial + alias | PR-9 |
 | PR-11 | map renderer 初期 AA 版 | PR-10 |
+
+#### PR-4 におけるイベントストア統合の完了条件
+
+- `World.event_records` を世界イベントの唯一の正規ストアとする。
+- `World.event_log` は保存互換を維持しつつも、CLI / report renderer 用の派生テキストバッファとして扱う。
+- `Simulator.history` は旧 `EventResult` ベース API と save 互換のための adapter に限定し、新規の集計・UI・レポートコードからは参照しない。
+- `get_summary()` / event list / report 生成 / UI adapter は、順次 `WorldEventRecord` を読取元に置き換える。
+- PR-4 レビューでは「新規追加コードが `history` または `event_log` を正規データ源として読んでいない」ことを確認する。
 
 ---
 

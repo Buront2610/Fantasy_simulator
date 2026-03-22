@@ -12,7 +12,7 @@ from i18n import set_locale, tr, tr_term
 from save_load import load_simulation, save_simulation
 from simulator import Simulator
 from ui_helpers import (
-    _choose,
+    _choose_key,
     _hr,
     _pause,
     _print_wrapped,
@@ -110,61 +110,61 @@ def _show_results(sim: Simulator) -> None:
         print("\n" + _hr("="))
         print(bold(f"  {tr('post_results')}"))
         print(_hr("="))
-        action = _choose(
+        action = _choose_key(
             tr("what_to_view"),
             [
-                tr("advance_1_year"),
-                tr("advance_5_years"),
-                tr("world_map"),
-                tr("character_roster"),
-                tr("event_log_last_30"),
-                tr("full_event_log"),
-                tr("adventure_summaries"),
-                tr("adventure_details"),
-                tr("resolve_pending_choice"),
-                tr("save_snapshot"),
-                tr("character_story"),
-                tr("all_character_stories"),
-                tr("simulation_summary"),
-                tr("back_to_main"),
+                ("advance_1_year", tr("advance_1_year")),
+                ("advance_5_years", tr("advance_5_years")),
+                ("world_map", tr("world_map")),
+                ("character_roster", tr("character_roster")),
+                ("event_log_last_30", tr("event_log_last_30")),
+                ("full_event_log", tr("full_event_log")),
+                ("adventure_summaries", tr("adventure_summaries")),
+                ("adventure_details", tr("adventure_details")),
+                ("resolve_pending_choice", tr("resolve_pending_choice")),
+                ("save_snapshot", tr("save_snapshot")),
+                ("character_story", tr("character_story")),
+                ("all_character_stories", tr("all_character_stories")),
+                ("simulation_summary", tr("simulation_summary")),
+                ("back_to_main", tr("back_to_main")),
             ],
         )
 
-        if action == tr("advance_1_year"):
+        if action == "advance_1_year":
             _advance_simulation(sim, 1)
-        elif action == tr("advance_5_years"):
+        elif action == "advance_5_years":
             _advance_simulation(sim, 5)
-        elif action == tr("world_map"):
+        elif action == "world_map":
             print()
             print(world.render_map())
             _pause()
-        elif action == tr("character_roster"):
+        elif action == "character_roster":
             _show_roster(world)
-        elif action == tr("event_log_last_30"):
+        elif action == "event_log_last_30":
             print()
             for entry in sim.get_event_log(last_n=30):
                 print(f"  - {entry}")
             _pause()
-        elif action == tr("full_event_log"):
+        elif action == "full_event_log":
             print()
             for entry in sim.get_event_log():
                 print(f"  - {entry}")
             _pause()
-        elif action == tr("adventure_summaries"):
+        elif action == "adventure_summaries":
             _show_adventure_summaries(sim)
-        elif action == tr("adventure_details"):
+        elif action == "adventure_details":
             _show_adventure_details(sim)
-        elif action == tr("resolve_pending_choice"):
+        elif action == "resolve_pending_choice":
             _resolve_pending_adventure_choice(sim)
-        elif action == tr("save_snapshot"):
+        elif action == "save_snapshot":
             _save_simulation_snapshot(sim)
-        elif action == tr("character_story"):
+        elif action == "character_story":
             _show_single_story(sim)
-        elif action == tr("all_character_stories"):
+        elif action == "all_character_stories":
             print()
             print(sim.get_all_stories())
             _pause()
-        elif action == tr("simulation_summary"):
+        elif action == "simulation_summary":
             print()
             print(sim.get_summary())
             _pause()
@@ -369,12 +369,15 @@ def _load_simulation_snapshot() -> Optional[Simulator]:
 # ---------------------------------------------------------------------------
 
 def _select_language() -> None:
-    action = _choose(
+    action = _choose_key(
         tr("load_language_prompt"),
-        [tr("language_option_ja"), tr("language_option_en")],
+        [
+            ("ja", tr("language_option_ja")),
+            ("en", tr("language_option_en")),
+        ],
         default="1",
     )
-    if action == tr("language_option_ja"):
+    if action == "ja":
         set_locale("ja")
         print(green(f"  {tr('language_set_ja')}"))
     else:
@@ -414,28 +417,28 @@ def screen_custom_simulation() -> None:
     custom_chars: List[Character] = []
 
     while True:
-        action = _choose(
+        action = _choose_key(
             tr("add_character_or_start"),
             [
-                tr("create_character_interactively"),
-                tr("create_random_character"),
-                tr("create_from_template"),
-                tr("start_simulation_with_roster", count=len(custom_chars)),
+                ("create_interactive", tr("create_character_interactively")),
+                ("create_random", tr("create_random_character")),
+                ("create_template", tr("create_from_template")),
+                ("start_simulation", tr("start_simulation_with_roster", count=len(custom_chars))),
             ],
         )
 
-        if action == tr("create_character_interactively"):
+        if action == "create_interactive":
             char = creator.create_interactive()
             world.add_character(char)
             custom_chars.append(char)
             print(f"\n  {green('*')}  {tr('character_added', name=char.name)}")
-        elif action == tr("create_random_character"):
+        elif action == "create_random":
             char = creator.create_random()
             world.add_character(char)
             custom_chars.append(char)
             msg = tr('random_character_added', name=char.name, race=tr_term(char.race), job=tr_term(char.job))
             print(f"\n  {green('*')}  {msg}")
-        elif action == tr("create_from_template"):
+        elif action == "create_template":
             templates = CharacterCreator.list_templates()
             print(f"\n  {tr('available_templates')}: " + ", ".join(templates))
             tmpl_name = input(f"  > {tr('template_name')}: ").strip()

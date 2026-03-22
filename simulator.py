@@ -41,7 +41,10 @@ class Simulator:
         self.events_per_year = events_per_year
         self.adventure_steps_per_year = adventure_steps_per_year
         self.event_system = EventSystem()
-        self.history: List[EventResult] = []  # all events across all years
+        # Compatibility cache of EventResult objects for legacy summaries,
+        # filters, and save/load paths. The canonical structured history lives
+        # in world.event_records.
+        self.history: List[EventResult] = []
         self.rng = random.Random(seed)
 
     # Severity scale: 1=minor, 2=notable, 3=significant, 4=major, 5=critical
@@ -53,7 +56,13 @@ class Simulator:
     }
 
     def _record_event(self, result: EventResult, location_id: Optional[str] = None) -> None:
-        """Log an event as both a string and a structured WorldEventRecord."""
+        """Mirror an EventResult into all transitional event stores.
+
+        During the Phase 1 -> Phase 2 migration:
+        - history keeps the legacy EventResult view alive
+        - world.event_log keeps CLI-facing formatted strings alive
+        - world.event_records is the canonical structured event history
+        """
         self.history.append(result)
         self.world.log_event(result.description)
         severity = self._SEVERITY_MAP.get(result.event_type, 1)
@@ -278,18 +287,18 @@ class Simulator:
     # ------------------------------------------------------------------
 
     def get_event_log(self, last_n: Optional[int] = None) -> List[str]:
-        """Return world event log entries, optionally only the last *n*."""
+        """Return the compatibility text log, optionally only the last *n*."""
         log = self.world.event_log
         if last_n is not None:
             return log[-last_n:]
         return log
 
     def events_by_type(self, event_type: str) -> List[EventResult]:
-        """Return all EventResults of the given type."""
+        """Return legacy EventResult entries of the given type."""
         return [ev for ev in self.history if ev.event_type == event_type]
 
     def to_dict(self) -> Dict[str, Any]:
-        """Serialise simulator state, including world and history."""
+        """Serialise simulator state, including compatibility history."""
         return {
             "world": self.world.to_dict(),
             "characters": [char.to_dict() for char in self.world.characters],

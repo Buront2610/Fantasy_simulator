@@ -602,6 +602,21 @@ class TestWorldEventRecordIntegration:
         sim.advance_years(2)
         assert len(sim.world.event_records) > 0
 
+    def test_legacy_history_entries_are_mirrored_into_event_records(self, small_world):
+        sim = Simulator(small_world, seed=42)
+        sim.advance_years(2)
+
+        structured_keys = {
+            (record.year, record.kind, record.description)
+            for record in sim.world.event_records
+        }
+        legacy_keys = {
+            (event.year, event.event_type, event.description)
+            for event in sim.history
+        }
+
+        assert legacy_keys <= structured_keys
+
     def test_event_records_have_valid_kinds(self, small_world):
         sim = Simulator(small_world, seed=42)
         sim.advance_years(1)
