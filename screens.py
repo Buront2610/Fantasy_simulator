@@ -115,6 +115,8 @@ def _show_results(sim: Simulator) -> None:
             [
                 ("advance_1_year", tr("advance_1_year")),
                 ("advance_5_years", tr("advance_5_years")),
+                ("yearly_report", tr("yearly_report")),
+                ("monthly_report", tr("monthly_report")),
                 ("world_map", tr("world_map")),
                 ("character_roster", tr("character_roster")),
                 ("event_log_last_30", tr("event_log_last_30")),
@@ -134,6 +136,12 @@ def _show_results(sim: Simulator) -> None:
             _advance_simulation(sim, 1)
         elif action == "advance_5_years":
             _advance_simulation(sim, 5)
+        elif action == "yearly_report":
+            print()
+            print(sim.get_latest_yearly_report())
+            _pause()
+        elif action == "monthly_report":
+            _show_monthly_report(sim)
         elif action == "world_map":
             print()
             print(world.render_map())
@@ -170,6 +178,24 @@ def _show_results(sim: Simulator) -> None:
             _pause()
         else:
             break
+
+
+def _show_monthly_report(sim: Simulator) -> None:
+    """Let the user pick a month and display the monthly report."""
+    year = sim.world.year - 1
+    if year < 1000:
+        year = sim.world.year
+    print()
+    print(f"  {tr('year_label')}: {year}")
+    month_idx = _get_numeric_choice(
+        f"  {tr('monthly_report')} (1-12): ", 12,
+    )
+    if month_idx is None:
+        return
+    month = month_idx + 1
+    print()
+    print(sim.get_monthly_report(year, month))
+    _pause()
 
 
 def _show_roster(world: World) -> None:
