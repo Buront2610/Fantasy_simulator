@@ -5,12 +5,16 @@ simulator.py - Orchestrates the world simulation loop.
 from __future__ import annotations
 
 import ast
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 import random
 
-from adventure import create_adventure_run
+from adventure import AdventureRun, create_adventure_run
 from events import EventResult, EventSystem
 from i18n import get_locale, set_locale, tr, tr_term
+
+if TYPE_CHECKING:
+    from character import Character
+    from world import World
 
 
 class Simulator:
@@ -28,7 +32,7 @@ class Simulator:
 
     def __init__(
         self,
-        world: Any,
+        world: World,
         events_per_year: int = 8,
         adventure_steps_per_year: int = 3,
         seed: Optional[int] = None,
@@ -149,12 +153,20 @@ class Simulator:
                 elif not had_pending_choice and run.pending_choice is not None:
                     paused_until_next_year.add(run.adventure_id)
 
-    def _resolve_dead_character_adventure(self, run: Any, char: Any) -> None:
+    def _resolve_dead_character_adventure(self, run: AdventureRun, char: Character) -> None:
         run.pending_choice = None
         run.state = "resolved"
         run.outcome = "death"
         run.resolution_year = self.world.year
         char.active_adventure_id = None
+        char.add_history(
+            tr(
+                "history_adventure_detail",
+                year=self.world.year,
+                detail=tr("detail_adventure_died", name=char.name, destination=run.destination),
+            )
+        )
+        self.event_system.handle_death_side_effects(char, self.world)
         self.world.complete_adventure(run.adventure_id)
 
     # ------------------------------------------------------------------
@@ -165,7 +177,7 @@ class Simulator:
         """Return a human-readable summary of the entire simulation."""
         total = len(self.history)
         alive = sum(1 for c in self.world.characters if c.alive)
-        dead  = sum(1 for c in self.world.characters if not c.alive)
+        dead = sum(1 for c in self.world.characters if not c.alive)
 
         type_counts: Dict[str, int] = {}
         for ev in self.history:
@@ -260,16 +272,7 @@ class Simulator:
             "adventure_steps_per_year": self.adventure_steps_per_year,
             "locale": get_locale(),
             "rng_state": repr(self.rng.getstate()),
-            "history": [
-                {
-                    "description": ev.description,
-                    "affected_characters": list(ev.affected_characters),
-                    "stat_changes": ev.stat_changes,
-                    "event_type": ev.event_type,
-                    "year": ev.year,
-                }
-                for ev in self.history
-            ],
+            "history": [ev.to_dict() for ev in self.history],
         }
 
     @classmethod
@@ -279,9 +282,11 @@ class Simulator:
         from world import World
 
         world = World.from_dict(data["world"])
-        world.characters = [
+        characters = [
             Character.from_dict(char_data) for char_data in data.get("characters", [])
         ]
+        world.characters = characters
+        world._char_index = {c.char_id: c for c in characters}
         sim = cls(
             world,
             events_per_year=data.get("events_per_year", 8),
@@ -290,16 +295,20 @@ class Simulator:
         set_locale(data.get("locale", get_locale()))
         rng_state = data.get("rng_state")
         if rng_state is not None:
-            sim.rng.setstate(ast.literal_eval(rng_state))
+            try:
+                parsed = ast.literal_eval(rng_state)
+                # Validate Mersenne Twister state structure: (version, internalstate, gauss_next)
+                if (
+                    isinstance(parsed, tuple)
+                    and len(parsed) == 3
+                    and isinstance(parsed[0], int)
+                    and isinstance(parsed[1], tuple)
+                ):
+                    sim.rng.setstate(parsed)
+            except (ValueError, SyntaxError, TypeError):
+                pass  # Ignore corrupted RNG state; start with fresh RNG
         sim.history = [
-            EventResult(
-                description=ev["description"],
-                affected_characters=list(ev.get("affected_characters", [])),
-                stat_changes=ev.get("stat_changes", {}),
-                event_type=ev.get("event_type", "generic"),
-                year=ev.get("year", 0),
-            )
-            for ev in data.get("history", [])
+            EventResult.from_dict(ev) for ev in data.get("history", [])
         ]
         return sim
 

@@ -2,11 +2,6 @@
 tests/test_world.py - Unit tests for the World class.
 """
 
-import os
-import sys
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-
 from character import Character
 from i18n import set_locale
 from world import World

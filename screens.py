@@ -28,6 +28,25 @@ from world_data import JOBS, RACES, WORLD_LORE
 
 
 # ---------------------------------------------------------------------------
+# Input helpers
+# ---------------------------------------------------------------------------
+
+def _get_numeric_choice(prompt: str, count: int) -> Optional[int]:
+    """Prompt the user for a 1-based index and return 0-based index, or None."""
+    raw = input(prompt).strip()
+    if not raw:
+        return None
+    if not raw.isdigit():
+        print(yellow(f"  {tr('invalid_input')}"))
+        return None
+    idx = int(raw) - 1
+    if not (0 <= idx < count):
+        print(yellow(f"  {tr('invalid_input')}"))
+        return None
+    return idx
+
+
+# ---------------------------------------------------------------------------
 # Simulation helpers
 # ---------------------------------------------------------------------------
 
@@ -157,7 +176,8 @@ def _show_roster(world: World) -> None:
     print(_hr())
     header = (
         f"  {tr('roster_header_name'):<22} {tr('roster_header_race_job'):<22} {tr('roster_header_age'):>4}  "
-        f"{tr('stat_str'):>4}{tr('stat_int'):>4}{tr('stat_dex'):>4}  {tr('roster_header_status'):<10}  {tr('roster_header_location')}"
+        f"{tr('stat_str'):>4}{tr('stat_int'):>4}{tr('stat_dex'):>4}  "
+        f"{tr('roster_header_status'):<10}  {tr('roster_header_location')}"
     )
     print(bold(header))
     print(_hr())
@@ -182,15 +202,13 @@ def _show_single_story(sim: Simulator) -> None:
         status = green(tr("status_alive")) if c.alive else red(tr("status_dead"))
         print(f"  {i:>2}. [{status}] {c.name} ({tr_term(c.race)} {tr_term(c.job)}, {tr('age_short_label')} {c.age})")
     print()
-    raw = input(f"  {tr('enter_character_number')}").strip()
-    if not raw or not raw.isdigit():
+    idx = _get_numeric_choice(f"  {tr('enter_character_number')}", len(world.characters))
+    if idx is None:
         return
-    idx = int(raw) - 1
-    if 0 <= idx < len(world.characters):
-        char = world.characters[idx]
-        print()
-        print(sim.get_character_story(char.char_id))
-        _pause()
+    char = world.characters[idx]
+    print()
+    print(sim.get_character_story(char.char_id))
+    _pause()
 
 
 def _show_adventure_summaries(sim: Simulator) -> None:
@@ -206,8 +224,14 @@ def _show_adventure_summaries(sim: Simulator) -> None:
     print(_hr())
     for i, run in enumerate(runs, 1):
         status = tr(f"outcome_{run.outcome}") if run.outcome else tr(f"state_{run.state}")
-        loot = f" | {tr('loot_label')}: {', '.join(tr_term(item) for item in run.loot_summary)}" if run.loot_summary else ""
-        injury = f" | {tr('injury_label')}: {tr(f'injury_status_{run.injury_status}')}" if run.injury_status != "none" else ""
+        loot = (
+            f" | {tr('loot_label')}: {', '.join(tr_term(item) for item in run.loot_summary)}"
+            if run.loot_summary else ""
+        )
+        injury = (
+            f" | {tr('injury_label')}: {tr(f'injury_status_{run.injury_status}')}"
+            if run.injury_status != "none" else ""
+        )
         print(
             f"  {i:>2}. {run.character_name} | {run.origin} -> {run.destination} "
             f"| {status}{injury}{loot}"
@@ -228,12 +252,8 @@ def _show_adventure_details(sim: Simulator) -> None:
         status = tr(f"outcome_{run.outcome}") if run.outcome else tr(f"state_{run.state}")
         print(f"  {i:>2}. {run.character_name} {tr('at_label')} {run.destination} [{status}]")
     print()
-    raw = input(f"  {tr('enter_adventure_number')}").strip()
-    if not raw or not raw.isdigit():
-        return
-
-    idx = int(raw) - 1
-    if not (0 <= idx < len(runs)):
+    idx = _get_numeric_choice(f"  {tr('enter_adventure_number')}", len(runs))
+    if idx is None:
         return
 
     run = runs[idx]
@@ -272,12 +292,8 @@ def _resolve_pending_adventure_choice(sim: Simulator) -> None:
         )
     print()
 
-    raw = input(f"  {tr('enter_pending_choice_number')}").strip()
-    if not raw or not raw.isdigit():
-        return
-
-    idx = int(raw) - 1
-    if not (0 <= idx < len(pending)):
+    idx = _get_numeric_choice(f"  {tr('enter_pending_choice_number')}", len(pending))
+    if idx is None:
         return
 
     item = pending[idx]
@@ -286,12 +302,8 @@ def _resolve_pending_adventure_choice(sim: Simulator) -> None:
     for i, option in enumerate(options, 1):
         default_marker = f" {tr('default_marker')}" if option == item["default_option"] else ""
         print(f"  {i:>2}. {tr(f'choice_{option}')}{default_marker}")
-    raw_option = input(f"  {tr('enter_option_number')}").strip()
-    chosen_option = None
-    if raw_option.isdigit():
-        option_idx = int(raw_option) - 1
-        if 0 <= option_idx < len(options):
-            chosen_option = options[option_idx]
+    option_idx = _get_numeric_choice(f"  {tr('enter_option_number')}", len(options))
+    chosen_option = options[option_idx] if option_idx is not None else None
 
     resolved = sim.resolve_adventure_choice(item["adventure_id"], option=chosen_option)
     print()
@@ -310,12 +322,10 @@ def _save_simulation_snapshot(sim: Simulator) -> None:
     print()
     default_name = "simulation_snapshot.json"
     path = input(f"  {tr('save_path_prompt', default_name=default_name)}").strip() or default_name
-    try:
-        save_simulation(sim, path)
-    except OSError as exc:
-        print(red(f"  {tr('save_failed', error=exc)}"))
-    else:
+    if save_simulation(sim, path):
         print(green(f"  {tr('save_succeeded', path=path)}"))
+    else:
+        print(red(f"  {tr('save_failed', error=tr('save_error_io'))}"))
     _pause()
 
 
@@ -325,14 +335,9 @@ def _load_simulation_snapshot() -> Optional[Simulator]:
     print(_hr("="))
     default_name = "simulation_snapshot.json"
     path = input(f"  {tr('load_path_prompt', default_name=default_name)}").strip() or default_name
-    try:
-        sim = load_simulation(path)
-    except FileNotFoundError:
-        print(red(f"  {tr('load_not_found', path=path)}"))
-        _pause()
-        return None
-    except (OSError, ValueError, KeyError) as exc:
-        print(red(f"  {tr('load_failed', error=exc)}"))
+    sim = load_simulation(path)
+    if sim is None:
+        print(red(f"  {tr('load_failed', error=tr('load_error_corrupted'))}"))
         _pause()
         return None
 
@@ -409,7 +414,8 @@ def screen_custom_simulation() -> None:
             char = creator.create_random()
             world.add_character(char)
             custom_chars.append(char)
-            print(f"\n  {green('*')}  {tr('random_character_added', name=char.name, race=tr_term(char.race), job=tr_term(char.job))}")
+            msg = tr('random_character_added', name=char.name, race=tr_term(char.race), job=tr_term(char.job))
+            print(f"\n  {green('*')}  {msg}")
         elif action == tr("create_from_template"):
             templates = CharacterCreator.list_templates()
             print(f"\n  {tr('available_templates')}: " + ", ".join(templates))
@@ -464,7 +470,8 @@ def screen_world_lore() -> None:
     print(bold(f"  {tr('jobs_classes')}"))
     print(_hr())
     for jname, jdesc, jskills in JOBS:
-        print(f"  {cyan(tr_term(jname))}  |  {tr('primary_skills_label')}: {', '.join(tr_term(skill) for skill in jskills)}")
+        skills_str = ', '.join(tr_term(skill) for skill in jskills)
+        print(f"  {cyan(tr_term(jname))}  |  {tr('primary_skills_label')}: {skills_str}")
         _print_wrapped(jdesc)
         print()
     _pause()

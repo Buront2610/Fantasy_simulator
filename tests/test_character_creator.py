@@ -2,11 +2,7 @@
 tests/test_character_creator.py - Unit tests for CharacterCreator.
 """
 
-import os
 import random
-import sys
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from character_creator import CharacterCreator
 

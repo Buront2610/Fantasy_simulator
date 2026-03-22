@@ -2,10 +2,6 @@
 tests/test_simulator.py - Unit tests for the Simulator class.
 """
 
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-
 import pytest
 
 from adventure import AdventureChoice, AdventureRun
@@ -85,6 +81,7 @@ class TestSimulatorConstruction:
         # Ensure same starting state by syncing char IDs
         for c1, c2 in zip(w1.characters, w2.characters):
             c2.char_id = c1.char_id
+        w2.rebuild_char_index()
 
         s1 = Simulator(w1, events_per_year=4, seed=99)
         s2 = Simulator(w2, events_per_year=4, seed=99)
@@ -368,6 +365,7 @@ class TestSimulatorSerialization:
         world_b = _make_world(n_chars=5)
         for c1, c2 in zip(world_a.characters, world_b.characters):
             c2.char_id = c1.char_id
+        world_b.rebuild_char_index()
 
         sim_a = Simulator(world_a, events_per_year=3, adventure_steps_per_year=2, seed=17)
         sim_b = Simulator(world_b, events_per_year=3, adventure_steps_per_year=2, seed=17)

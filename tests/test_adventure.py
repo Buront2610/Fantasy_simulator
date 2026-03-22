@@ -2,11 +2,6 @@
 tests/test_adventure.py - Unit tests for adventure progression.
 """
 
-import os
-import sys
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-
 from adventure import (
     AdventureChoice,
     AdventureRun,

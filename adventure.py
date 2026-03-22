@@ -7,9 +7,13 @@ from __future__ import annotations
 import random
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from i18n import tr, tr_term
+
+if TYPE_CHECKING:
+    from character import Character
+    from world import World
 
 
 ADVENTURE_DISCOVERIES = [
@@ -121,7 +125,7 @@ class AdventureRun:
             resolution_year=data.get("resolution_year"),
         )
 
-    def step(self, character: Any, world: Any, rng: Any = random) -> List[str]:
+    def step(self, character: Character, world: World, rng: Any = random) -> List[str]:
         """Advance the adventure by one internal step."""
         if self.is_resolved:
             return []
@@ -132,7 +136,10 @@ class AdventureRun:
         if self.state == "traveling":
             self.steps_taken += 1
             summary = tr("summary_adventure_arrived", name=self.character_name, destination=self.destination)
-            detail = tr("detail_adventure_arrived", name=self.character_name, origin=self.origin, destination=self.destination)
+            detail = tr(
+                "detail_adventure_arrived",
+                name=self.character_name, origin=self.origin, destination=self.destination,
+            )
             self._record(summary, detail)
             if rng.random() < 0.35:
                 self.pending_choice = AdventureChoice(
@@ -173,7 +180,10 @@ class AdventureRun:
             discovery = rng.choice(ADVENTURE_DISCOVERIES)
             self.loot_summary.append(discovery)
             summary = tr("summary_adventure_discovery", name=self.character_name, destination=self.destination)
-            detail = tr("detail_adventure_discovery", name=self.character_name, discovery=tr_term(discovery), destination=self.destination)
+            detail = tr(
+                "detail_adventure_discovery",
+                name=self.character_name, discovery=tr_term(discovery), destination=self.destination,
+            )
             self._record(summary, detail)
 
             if self.pending_choice is None and rng.random() < 0.40:
@@ -201,8 +211,16 @@ class AdventureRun:
                     detail = tr("detail_returned_injured", name=self.character_name, origin=self.origin)
                 elif self.loot_summary:
                     self.outcome = "safe_return"
-                    summary = tr("summary_returned_safely", name=self.character_name, destination=self.destination, loot=tr_term(self.loot_summary[-1]))
-                    detail = tr("detail_returned_safely", name=self.character_name, origin=self.origin, items=", ".join(tr_term(item) for item in self.loot_summary))
+                    summary = tr(
+                        "summary_returned_safely",
+                        name=self.character_name, destination=self.destination,
+                        loot=tr_term(self.loot_summary[-1]),
+                    )
+                    detail = tr(
+                        "detail_returned_safely",
+                        name=self.character_name, origin=self.origin,
+                        items=", ".join(tr_term(item) for item in self.loot_summary),
+                    )
                 else:
                     self.outcome = "retreat"
                     summary = tr("summary_retreated_safely", name=self.character_name, destination=self.destination)
@@ -216,8 +234,8 @@ class AdventureRun:
 
     def resolve_choice(
         self,
-        world: Any,
-        character: Any,
+        world: World,
+        character: Character,
         option: Optional[str] = None,
     ) -> List[str]:
         """Resolve the current pending choice or apply its default option."""
@@ -260,7 +278,7 @@ class AdventureRun:
         self.detail_log.append(detail)
 
 
-def create_adventure_run(character: Any, world: Any, rng: Any = random) -> AdventureRun:
+def create_adventure_run(character: Character, world: World, rng: Any = random) -> AdventureRun:
     """Create a new adventure for a character using nearby risky terrain when possible."""
     neighbors = world.get_neighboring_locations(character.location)
     risky = [loc for loc in neighbors if loc.region_type in ("forest", "mountain", "dungeon")]
@@ -269,6 +287,8 @@ def create_adventure_run(character: Any, world: Any, rng: Any = random) -> Adven
             loc for loc in world.grid.values()
             if loc.region_type in ("forest", "mountain", "dungeon")
         ]
+    if not risky and not world.grid:
+        raise ValueError("Cannot create adventure: world has no locations")
     destination = rng.choice(risky) if risky else world.random_location(rng=rng)
 
     run = AdventureRun(
