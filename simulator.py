@@ -206,9 +206,9 @@ class Simulator:
         self._maybe_start_adventure()
         self._advance_adventures()
 
-        # --- Random events (distributed across 12 months) ---
-        for i in range(self.events_per_year):
-            self.current_month = (i % 12) + 1
+        # --- Random events (randomly assigned to months 1-12) ---
+        for _ in range(self.events_per_year):
+            self.current_month = self.rng.randint(1, 12)
             result = self.event_system.generate_random_event(
                 self.world.characters, self.world, rng=self.rng
             )
