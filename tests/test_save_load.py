@@ -133,6 +133,7 @@ class TestLoadSimulation:
         assert capital is not None
         assert capital.safety == 80
         assert capital.danger == 15
+        assert restored.world.get_location_by_id("loc_thornwood") is not None
 
     def test_corrupted_rng_state_does_not_crash(self, tmp_path):
         """If rng_state is tampered with, loading should still succeed."""

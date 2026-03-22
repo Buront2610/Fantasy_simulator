@@ -4,12 +4,12 @@ simulator.py - Orchestrates the world simulation loop.
 
 from __future__ import annotations
 
+import random
 import ast
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
-import random
 
 from adventure import AdventureRun, create_adventure_run
-from events import EventResult, EventSystem, WorldEventRecord
+from events import EventResult, EventSystem, WorldEventRecord, generate_record_id
 from i18n import get_locale, set_locale, tr, tr_term
 
 if TYPE_CHECKING:
@@ -46,6 +46,7 @@ class Simulator:
         # in world.event_records.
         self.history: List[EventResult] = []
         self.rng = random.Random(seed)
+        self.id_rng = random.Random(self._id_seed_from_seed(seed))
 
     # Severity scale: 1=minor, 2=notable, 3=significant, 4=major, 5=critical
     _SEVERITY_MAP: Dict[str, int] = {
@@ -54,6 +55,91 @@ class Simulator:
         "meeting": 1, "aging": 1, "skill_training": 1,
         "romance": 2, "anniversary": 2,
     }
+
+    @staticmethod
+    def _id_seed_from_seed(seed: Optional[int]) -> int:
+        base_seed = 0 if seed is None else seed
+        return base_seed ^ 0x5EED5EED
+
+    @staticmethod
+    def _legacy_id_seed(data: Dict[str, Any]) -> int:
+        world_data = data.get("world", {})
+        seed = world_data.get("year", 0)
+        for count in (
+            len(data.get("history", [])),
+            len(world_data.get("event_records", [])),
+            len(world_data.get("active_adventures", [])),
+            len(world_data.get("completed_adventures", [])),
+        ):
+            seed = (seed * 1_000_003 + count) & ((1 << 64) - 1)
+        return seed ^ 0x5EED5EED
+
+    @staticmethod
+    def _restore_rng_state(rng: random.Random, state_repr: Optional[str]) -> bool:
+        if state_repr is None:
+            return False
+        try:
+            parsed = ast.literal_eval(state_repr)
+            if (
+                isinstance(parsed, tuple)
+                and len(parsed) == 3
+                and isinstance(parsed[0], int)
+                and isinstance(parsed[1], tuple)
+            ):
+                rng.setstate(parsed)
+                return True
+        except (ValueError, SyntaxError, TypeError):
+            return False
+        return False
+
+    def _record_world_event(
+        self,
+        description: str,
+        *,
+        kind: str,
+        year: Optional[int] = None,
+        location_id: Optional[str] = None,
+        primary_actor_id: Optional[str] = None,
+        secondary_actor_ids: Optional[List[str]] = None,
+        severity: int = 1,
+        visibility: str = "public",
+    ) -> None:
+        """Record a structured world event and mirror it to the legacy text log."""
+        self.world.log_event(description)
+        self.world.record_event(
+            WorldEventRecord(
+                record_id=generate_record_id(self.id_rng),
+                kind=kind,
+                year=self.world.year if year is None else year,
+                location_id=location_id,
+                primary_actor_id=primary_actor_id,
+                secondary_actor_ids=[] if secondary_actor_ids is None else list(secondary_actor_ids),
+                description=description,
+                severity=severity,
+                visibility=visibility,
+            )
+        )
+
+    @staticmethod
+    def _classify_adventure_summary(previous_state: str, run: AdventureRun) -> tuple[str, str, int]:
+        if previous_state == "traveling":
+            return "adventure_arrived", run.destination, 2
+        if previous_state == "waiting_for_choice":
+            return "adventure_choice", run.destination, 1
+        if previous_state == "exploring":
+            if run.outcome == "death":
+                return "adventure_death", run.destination, 5
+            if run.state == "returning" and run.injury_status != "none":
+                return "adventure_injured", run.destination, 3
+            return "adventure_discovery", run.destination, 2
+        if previous_state == "returning":
+            if run.outcome == "injury":
+                return "adventure_returned_injured", run.origin, 3
+            if run.outcome == "safe_return":
+                return "adventure_returned", run.origin, 2
+            if run.outcome == "retreat":
+                return "adventure_retreated", run.origin, 1
+        return "adventure_update", run.destination, 1
 
     def _record_event(self, result: EventResult, location_id: Optional[str] = None) -> None:
         """Mirror an EventResult into all transitional event stores.
@@ -64,15 +150,16 @@ class Simulator:
         - world.event_records is the canonical structured event history
         """
         self.history.append(result)
-        self.world.log_event(result.description)
         severity = self._SEVERITY_MAP.get(result.event_type, 1)
-        record = WorldEventRecord.from_event_result(
-            result,
+        self._record_world_event(
+            result.description,
+            kind=result.event_type,
+            year=result.year,
             location_id=location_id,
+            primary_actor_id=result.affected_characters[0] if result.affected_characters else None,
+            secondary_actor_ids=result.affected_characters[1:],
             severity=severity,
-            rng=self.rng,
         )
-        self.world.record_event(record)
 
     # ------------------------------------------------------------------
     # Main simulation loop
@@ -131,7 +218,12 @@ class Simulator:
                 char.injury_status = "none"
                 message = tr("recovered_from_injuries", name=char.name)
                 char.add_history(tr("history_recovered_from_injuries", year=self.world.year))
-                self.world.log_event(message)
+                self._record_world_event(
+                    message,
+                    kind="injury_recovery",
+                    location_id=char.location_id,
+                    primary_actor_id=char.char_id,
+                )
 
     def _maybe_start_adventure(self) -> None:
         """Start at most one new adventure in the current year."""
@@ -143,7 +235,7 @@ class Simulator:
             return
 
         char = self.rng.choice(candidates)
-        run = create_adventure_run(char, self.world, rng=self.rng)
+        run = create_adventure_run(char, self.world, rng=self.rng, id_rng=self.id_rng)
         char.active_adventure_id = run.adventure_id
         char.add_history(
             tr(
@@ -154,7 +246,13 @@ class Simulator:
             )
         )
         self.world.add_adventure(run)
-        self.world.log_event(run.summary_log[-1])
+        self._record_world_event(
+            run.summary_log[-1],
+            kind="adventure_started",
+            location_id=run.origin,
+            primary_actor_id=char.char_id,
+            severity=2,
+        )
 
     def _advance_adventures(self) -> None:
         """Advance active adventures by multiple internal steps per year."""
@@ -174,9 +272,17 @@ class Simulator:
                     self._resolve_dead_character_adventure(run, char)
                     continue
                 had_pending_choice = run.pending_choice is not None
+                previous_state = run.state
                 summaries = run.step(char, self.world, rng=self.rng)
                 for entry in summaries:
-                    self.world.log_event(entry)
+                    kind, location_id, severity = self._classify_adventure_summary(previous_state, run)
+                    self._record_world_event(
+                        entry,
+                        kind=kind,
+                        location_id=location_id,
+                        primary_actor_id=run.character_id,
+                        severity=severity,
+                    )
                 if not char.alive:
                     self.event_system.handle_death_side_effects(char, self.world)
                 if run.is_resolved:
@@ -306,6 +412,7 @@ class Simulator:
             "adventure_steps_per_year": self.adventure_steps_per_year,
             "locale": get_locale(),
             "rng_state": repr(self.rng.getstate()),
+            "id_rng_state": repr(self.id_rng.getstate()),
             "history": [ev.to_dict() for ev in self.history],
         }
 
@@ -327,20 +434,9 @@ class Simulator:
             adventure_steps_per_year=data.get("adventure_steps_per_year", 3),
         )
         set_locale(data.get("locale", get_locale()))
-        rng_state = data.get("rng_state")
-        if rng_state is not None:
-            try:
-                parsed = ast.literal_eval(rng_state)
-                # Validate Mersenne Twister state structure: (version, internalstate, gauss_next)
-                if (
-                    isinstance(parsed, tuple)
-                    and len(parsed) == 3
-                    and isinstance(parsed[0], int)
-                    and isinstance(parsed[1], tuple)
-                ):
-                    sim.rng.setstate(parsed)
-            except (ValueError, SyntaxError, TypeError):
-                pass  # Ignore corrupted RNG state; start with fresh RNG
+        sim._restore_rng_state(sim.rng, data.get("rng_state"))
+        if not sim._restore_rng_state(sim.id_rng, data.get("id_rng_state")):
+            sim.id_rng.seed(sim._legacy_id_seed(data))
         sim.history = [
             EventResult.from_dict(ev) for ev in data.get("history", [])
         ]
@@ -400,5 +496,10 @@ class Simulator:
             return False
         summaries = run.resolve_choice(self.world, char, option=option)
         for entry in summaries:
-            self.world.log_event(entry)
+            self._record_world_event(
+                entry,
+                kind="adventure_choice",
+                location_id=run.destination,
+                primary_actor_id=run.character_id,
+            )
         return True

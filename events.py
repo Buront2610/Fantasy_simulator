@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from world import World
 
 
-def _generate_record_id(rng: Optional[Any] = None) -> str:
+def generate_record_id(rng: Optional[Any] = None) -> str:
     if rng is not None and hasattr(rng, "getrandbits"):
         return format(rng.getrandbits(128), "032x")
     return uuid.uuid4().hex
@@ -120,7 +120,7 @@ class WorldEventRecord:
         primary = result.affected_characters[0] if result.affected_characters else None
         secondary = result.affected_characters[1:] if len(result.affected_characters) > 1 else []
         return cls(
-            record_id=_generate_record_id(rng),
+            record_id=generate_record_id(rng),
             kind=result.event_type,
             year=result.year,
             location_id=location_id,

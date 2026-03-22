@@ -2,8 +2,11 @@
 tests/test_simulator.py - Unit tests for the Simulator class.
 """
 
+from collections import Counter
+
 import pytest
 
+from events import EventResult
 from adventure import AdventureChoice, AdventureRun
 from character import Character
 from character_creator import CharacterCreator
@@ -144,6 +147,19 @@ class TestSimulatorConstruction:
         world2 = _build_seeded_world(42)
 
         assert world1.to_dict() == world2.to_dict()
+
+    def test_record_event_ids_do_not_consume_main_rng(self, small_world):
+        sim = Simulator(small_world, events_per_year=0, seed=123)
+        result = EventResult(
+            description="A structured event.",
+            event_type="meeting",
+            year=small_world.year,
+        )
+
+        before = sim.rng.getstate()
+        sim._record_event(result, location_id="loc_aethoria_capital")
+
+        assert sim.rng.getstate() == before
 
 
 # ---------------------------------------------------------------------------
@@ -616,6 +632,34 @@ class TestWorldEventRecordIntegration:
         }
 
         assert legacy_keys <= structured_keys
+
+    def test_simulator_log_entries_are_mirrored_into_event_records(self):
+        world = _make_world(n_chars=1)
+        char = world.characters[0]
+        char.injury_status = "injured"
+        sim = Simulator(world, events_per_year=0, adventure_steps_per_year=4, seed=1)
+
+        sim.rng = type(
+            "FixedRng",
+            (),
+            {
+                "random": lambda self: next(self.values),
+                "choice": lambda self, options: options[0],
+                "values": iter([0.9, 0.1, 0.0, 0.9, 0.3, 0.9]),
+            },
+        )()
+
+        sim._run_year()
+
+        log_counter = Counter(
+            entry.split("] ", 1)[1] if "] " in entry else entry
+            for entry in world.event_log
+        )
+        record_counter = Counter(record.description for record in world.event_records)
+
+        assert log_counter <= record_counter
+        assert any(record.kind == "injury_recovery" for record in world.event_records)
+        assert any(record.kind == "adventure_started" for record in world.event_records)
 
     def test_event_records_have_valid_kinds(self, small_world):
         sim = Simulator(small_world, seed=42)

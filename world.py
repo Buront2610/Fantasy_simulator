@@ -277,6 +277,16 @@ class World:
         self._build_default_map()
 
     def _register_location(self, loc: LocationState) -> None:
+        existing_at_coord = self.grid.get((loc.x, loc.y))
+        if existing_at_coord is not None and existing_at_coord is not loc:
+            self._location_name_index.pop(existing_at_coord.canonical_name, None)
+            self._location_id_index.pop(existing_at_coord.id, None)
+
+        existing_by_id = self._location_id_index.get(loc.id)
+        if existing_by_id is not None and existing_by_id is not loc:
+            self.grid.pop((existing_by_id.x, existing_by_id.y), None)
+            self._location_name_index.pop(existing_by_id.canonical_name, None)
+
         self.grid[(loc.x, loc.y)] = loc
         self._location_name_index[loc.canonical_name] = loc
         self._location_id_index[loc.id] = loc
@@ -573,9 +583,6 @@ class World:
             height=data.get("height", 5),
             year=data.get("year", 1000),
         )
-        world.grid = {}
-        world._location_name_index = {}
-        world._location_id_index = {}
         for loc_data in data.get("grid", []):
             world._register_location(LocationState.from_dict(loc_data))
         world.event_log = data.get("event_log", [])

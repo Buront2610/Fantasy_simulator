@@ -24,7 +24,7 @@ ADVENTURE_DISCOVERIES = [
 ]
 
 
-def _generate_adventure_id(rng: Any = random) -> str:
+def generate_adventure_id(rng: Any = random) -> str:
     if hasattr(rng, "getrandbits"):
         return format(rng.getrandbits(40), "010x")
     return uuid.uuid4().hex[:10]
@@ -290,7 +290,12 @@ class AdventureRun:
         self.detail_log.append(detail)
 
 
-def create_adventure_run(character: Character, world: World, rng: Any = random) -> AdventureRun:
+def create_adventure_run(
+    character: Character,
+    world: World,
+    rng: Any = random,
+    id_rng: Any = random,
+) -> AdventureRun:
     """Create a new adventure for a character using nearby risky terrain when possible."""
     neighbors = world.get_neighboring_locations(character.location_id)
     risky = [loc for loc in neighbors if loc.region_type in ("forest", "mountain", "dungeon")]
@@ -311,7 +316,7 @@ def create_adventure_run(character: Character, world: World, rng: Any = random) 
         origin=character.location_id,
         destination=destination.id,
         year_started=world.year,
-        adventure_id=_generate_adventure_id(rng),
+        adventure_id=generate_adventure_id(id_rng),
     )
     run._record(
         tr("summary_adventure_set_out", name=character.name, origin=origin_name, destination=dest_name),
