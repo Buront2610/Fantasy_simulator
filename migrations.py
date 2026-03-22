@@ -13,6 +13,11 @@ CURRENT_VERSION = 2
 def migrate(data: Dict[str, Any]) -> Dict[str, Any]:
     """Apply all necessary migrations to bring data to CURRENT_VERSION."""
     version = data.get("schema_version", 1)
+    if version > CURRENT_VERSION:
+        raise ValueError(
+            f"Save data has schema_version {version}, but this build only supports up to {CURRENT_VERSION}. "
+            "Please upgrade the application."
+        )
     if version < 2:
         data = _migrate_v1_to_v2(data)
     data["schema_version"] = CURRENT_VERSION
@@ -42,5 +47,4 @@ def _migrate_v1_to_v2(data: Dict[str, Any]) -> Dict[str, Any]:
         if "destination" in adv:
             adv["destination"] = NAME_TO_LOCATION_ID.get(adv["destination"], adv["destination"])
 
-    data["schema_version"] = 2
     return data

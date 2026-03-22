@@ -130,11 +130,11 @@ class AdventureRun:
         if self.is_resolved:
             return []
 
-        dest_name = world.location_name(self.destination)
-        origin_name = world.location_name(self.origin)
-
         if self.state == "waiting_for_choice":
             return self.resolve_choice(world, character, option=None)
+
+        dest_name = world.location_name(self.destination)
+        origin_name = world.location_name(self.origin)
 
         if self.state == "traveling":
             self.steps_taken += 1
@@ -297,6 +297,7 @@ def create_adventure_run(character: Character, world: World, rng: Any = random) 
     destination = rng.choice(risky) if risky else world.random_location(rng=rng)
 
     origin_name = world.location_name(character.location_id)
+    dest_name = world.location_name(destination.id)
     run = AdventureRun(
         character_id=character.char_id,
         character_name=character.name,
@@ -305,7 +306,7 @@ def create_adventure_run(character: Character, world: World, rng: Any = random) 
         year_started=world.year,
     )
     run._record(
-        tr("summary_adventure_set_out", name=character.name, origin=origin_name, destination=destination.name),
-        tr("detail_adventure_set_out", name=character.name, origin=origin_name, destination=destination.name),
+        tr("summary_adventure_set_out", name=character.name, origin=origin_name, destination=dest_name),
+        tr("detail_adventure_set_out", name=character.name, origin=origin_name, destination=dest_name),
     )
     return run

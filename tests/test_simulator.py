@@ -577,7 +577,7 @@ class TestWorldEventRecordIntegration:
         sim = Simulator(small_world, seed=42)
         sim.advance_years(3)
         year_records = sim.world.get_events_by_year(1001)
-        assert len(year_records) >= 0  # may be 0 if year 1001 had no events
+        assert isinstance(year_records, list)
 
     def test_event_records_saved_and_loaded(self, small_world, tmp_path):
         sim = Simulator(small_world, seed=42)

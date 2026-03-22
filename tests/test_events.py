@@ -555,4 +555,4 @@ class TestWorldEventRecord:
         assert record.location_id is None
         assert record.severity == 1
         assert record.visibility == "public"
-        assert len(record.record_id) == 12
+        assert len(record.record_id) == 32

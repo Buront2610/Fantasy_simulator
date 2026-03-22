@@ -2,6 +2,7 @@
 tests/test_migrations.py - Unit tests for schema migration.
 """
 
+# _migrate_v1_to_v2 is private but tested directly to verify per-step migration logic
 from migrations import CURRENT_VERSION, migrate, _migrate_v1_to_v2
 from world_data import NAME_TO_LOCATION_ID
 
@@ -117,3 +118,13 @@ class TestMigrateV1ToV2:
 
     def test_current_version_constant(self):
         assert CURRENT_VERSION == 2
+
+    def test_future_version_raises_error(self):
+        import pytest
+        data = {
+            "schema_version": 999,
+            "characters": [],
+            "world": {"grid": []},
+        }
+        with pytest.raises(ValueError, match="schema_version 999"):
+            migrate(data)
