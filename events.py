@@ -13,8 +13,6 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from world_data import (
-    BATTLE_OUTCOMES_LOSE,
-    BATTLE_OUTCOMES_WIN,
     DISCOVERY_ITEMS,
     JOURNEY_EVENTS,
 )
