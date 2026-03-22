@@ -2,10 +2,6 @@
 tests/test_character.py - Unit tests for the Character class.
 """
 
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-
 import pytest
 from character import Character, random_stats
 from i18n import get_locale, set_locale
@@ -306,7 +302,7 @@ class TestRandomStats:
     def test_race_bonuses_applied(self):
         import random as _random
         _random.seed(42)
-        stats_no_bonus  = random_stats(base=50, spread=0)
+        stats_no_bonus = random_stats(base=50, spread=0)
         _random.seed(42)
         stats_with_bonus = random_stats(base=50, spread=0, race_bonuses={"strength": 10})
         assert stats_with_bonus["strength"] == stats_no_bonus["strength"] + 10

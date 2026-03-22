@@ -2,10 +2,6 @@
 tests/test_save_load.py - Unit tests for save/load helpers.
 """
 
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-
 import json
 
 from character_creator import CharacterCreator

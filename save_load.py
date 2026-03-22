@@ -22,7 +22,7 @@ def save_simulation(simulator: Simulator, path: str) -> bool:
         with open(path, "w", encoding="utf-8") as handle:
             json.dump(simulator.to_dict(), handle, indent=2)
         return True
-    except (OSError, TypeError) as exc:
+    except (OSError, TypeError, ValueError) as exc:
         logger.error("Failed to save simulation to %s: %s", path, exc)
         return False
 

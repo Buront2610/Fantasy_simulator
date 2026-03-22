@@ -113,7 +113,16 @@ class World:
 
     def rebuild_char_index(self) -> None:
         """Rebuild the character ID index after external mutations."""
-        self._char_index = {c.char_id: c for c in self.characters}
+        index: Dict[str, Character] = {}
+        for c in self.characters:
+            if c.char_id in index:
+                raise ValueError(
+                    f"Duplicate character ID during rebuild: {c.char_id!r} "
+                    f"(existing: {index[c.char_id].name!r}, "
+                    f"duplicate: {c.name!r})"
+                )
+            index[c.char_id] = c
+        self._char_index = index
 
     def remove_character(self, char_id: str) -> None:
         self.characters = [c for c in self.characters if c.char_id != char_id]

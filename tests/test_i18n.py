@@ -2,11 +2,6 @@
 tests/test_i18n.py - Unit tests for CLI localization helpers.
 """
 
-import os
-import sys
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-
 from i18n import get_locale, set_locale, tr, tr_term
 
 

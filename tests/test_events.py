@@ -2,10 +2,7 @@
 tests/test_events.py - Unit tests for the EventSystem.
 """
 
-import sys
-import os
 import random
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 import pytest
 from character import Character
@@ -182,11 +179,10 @@ class TestEventBattle:
         import random
         random.seed(99)  # seed that triggers death
         attacker = _make_char("Brute", strength=90, constitution=90)
-        victim   = _make_char("Victim", strength=5, constitution=4)
+        victim = _make_char("Victim", strength=5, constitution=4)
         world.add_character(attacker)
         world.add_character(victim)
         # Run up to 20 battles to see if death can occur
-        died = False
         for _ in range(20):
             if not victim.alive:
                 break
@@ -194,7 +190,6 @@ class TestEventBattle:
             victim.constitution = 4
             result = es.event_battle(attacker, victim, world)
             if not victim.alive:
-                died = True
                 assert "battle_fatal" in result.event_type
                 break
         # We can't guarantee death in exactly these attempts, but the
@@ -294,7 +289,6 @@ class TestEventJourney:
         assert isinstance(result, EventResult)
 
     def test_location_changes(self, es, char_a, world):
-        old_loc = char_a.location
         es.event_journey(char_a, world)
         # May or may not change (neighbours possible), but no crash
         assert isinstance(char_a.location, str)

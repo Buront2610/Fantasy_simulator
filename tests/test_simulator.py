@@ -2,10 +2,6 @@
 tests/test_simulator.py - Unit tests for the Simulator class.
 """
 
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-
 import pytest
 
 from adventure import AdventureChoice, AdventureRun
