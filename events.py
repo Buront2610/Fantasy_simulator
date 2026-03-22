@@ -62,7 +62,7 @@ class WorldEventRecord:
     WorldEventRecord is designed for long-term storage and querying.
     """
 
-    record_id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
+    record_id: str = field(default_factory=lambda: uuid.uuid4().hex)
     kind: str = "generic"
     year: int = 0
     location_id: Optional[str] = None
@@ -71,6 +71,9 @@ class WorldEventRecord:
     description: str = ""
     severity: int = 1
     visibility: str = "public"
+
+    def __post_init__(self) -> None:
+        self.severity = max(1, min(5, self.severity))
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -88,7 +91,7 @@ class WorldEventRecord:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "WorldEventRecord":
         return cls(
-            record_id=data.get("record_id", uuid.uuid4().hex[:12]),
+            record_id=data.get("record_id", uuid.uuid4().hex),
             kind=data.get("kind", "generic"),
             year=data.get("year", 0),
             location_id=data.get("location_id"),

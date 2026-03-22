@@ -177,7 +177,11 @@ class World:
         loc = self._location_id_index.get(location_id)
         if loc is not None:
             return loc.name
-        return location_id
+        # Fallback: derive a human-readable name from the ID
+        lid = location_id
+        if lid.startswith("loc_"):
+            lid = lid[4:]
+        return lid.replace("_", " ").title()
 
     def get_characters_at_location(self, location_id: str) -> List[Character]:
         return [c for c in self.characters if c.location_id == location_id and c.alive]
