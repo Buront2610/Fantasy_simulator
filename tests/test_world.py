@@ -158,3 +158,17 @@ class TestWorld:
         assert restored_capital is not None
         assert restored_capital.danger == 42
         assert restored_capital.visited is True
+
+    def test_trimming_event_records_removes_dangling_recent_event_ids(self):
+        from events import WorldEventRecord
+
+        world = World()
+        world.MAX_EVENT_RECORDS = 2
+        world.record_event(WorldEventRecord(record_id="r1", kind="battle", year=1001, location_id="loc_thornwood"))
+        world.record_event(WorldEventRecord(record_id="r2", kind="battle", year=1001, location_id="loc_thornwood"))
+        world.record_event(WorldEventRecord(record_id="r3", kind="battle", year=1001, location_id="loc_thornwood"))
+
+        thornwood = world.get_location_by_id("loc_thornwood")
+        assert thornwood is not None
+        assert [record.record_id for record in world.event_records] == ["r2", "r3"]
+        assert thornwood.recent_event_ids == ["r2", "r3"]

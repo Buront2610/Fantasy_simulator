@@ -386,6 +386,13 @@ class World:
             location.recent_event_ids = location.recent_event_ids[-12:]
         if len(self.event_records) > self.MAX_EVENT_RECORDS:
             self.event_records = self.event_records[-self.MAX_EVENT_RECORDS:]
+            surviving_ids = {item.record_id for item in self.event_records}
+            for location in self.grid.values():
+                if location.recent_event_ids:
+                    location.recent_event_ids = [
+                        record_id for record_id in location.recent_event_ids
+                        if record_id in surviving_ids
+                    ]
 
     def get_events_by_location(self, location_id: str) -> List[WorldEventRecord]:
         """Return all event records for a specific location."""

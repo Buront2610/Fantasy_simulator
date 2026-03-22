@@ -54,17 +54,18 @@ def test_si10_location_state_values_stay_in_bounds(world_fixture: World):
 
 
 def test_phase1_no_legacy_character_location_references():
+    project_root = Path(__file__).resolve().parents[1]
     source_files = [
-        Path("adventure.py"),
-        Path("character.py"),
-        Path("events.py"),
-        Path("main.py"),
-        Path("save_load.py"),
-        Path("screens.py"),
-        Path("simulator.py"),
-        Path("world.py"),
+        project_root / "adventure.py",
+        project_root / "character.py",
+        project_root / "events.py",
+        project_root / "main.py",
+        project_root / "save_load.py",
+        project_root / "screens.py",
+        project_root / "simulator.py",
+        project_root / "world.py",
     ]
-    pattern = re.compile(r"character\.location\b")
+    pattern = re.compile(r"\.location\b")
     for path in source_files:
         text = path.read_text(encoding="utf-8")
         assert pattern.search(text) is None, f"Legacy location reference found in {path}"
