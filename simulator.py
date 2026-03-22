@@ -44,6 +44,7 @@ class Simulator:
         self.history: List[EventResult] = []  # all events across all years
         self.rng = random.Random(seed)
 
+    # Severity scale: 1=minor, 2=notable, 3=significant, 4=major, 5=critical
     _SEVERITY_MAP: Dict[str, int] = {
         "death": 5, "battle_fatal": 5, "marriage": 4,
         "discovery": 3, "battle": 3, "journey": 2,

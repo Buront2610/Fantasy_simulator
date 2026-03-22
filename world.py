@@ -307,9 +307,9 @@ class World:
             world._location_name_index[loc.name] = loc
             world._location_id_index[loc.id] = loc
         world.event_log = data.get("event_log", [])
-        from events import WorldEventRecord as WER
+        from events import WorldEventRecord
         world.event_records = [
-            WER.from_dict(r) for r in data.get("event_records", [])
+            WorldEventRecord.from_dict(r) for r in data.get("event_records", [])
         ]
         world.active_adventures = [
             AdventureRun.from_dict(run) for run in data.get("active_adventures", [])

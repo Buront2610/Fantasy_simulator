@@ -123,6 +123,11 @@ class Character:
 
     @property
     def location_display_name(self) -> str:
+        """Derive a human-readable name from location_id.
+
+        This is a fallback for contexts where World is not available.
+        Prefer ``world.location_name(char.location_id)`` when possible.
+        """
         lid = self.location_id
         if lid.startswith("loc_"):
             lid = lid[4:]

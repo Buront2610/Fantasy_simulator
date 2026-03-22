@@ -263,7 +263,8 @@ NAME_TO_LOCATION_ID: Dict[str, str] = {entry[1]: entry[0] for entry in DEFAULT_L
 
 def fallback_location_id(name: str) -> str:
     """Generate a location ID from a name when no canonical mapping exists."""
-    return f"loc_{name.lower().replace(' ', '_').replace('-', '_').replace(chr(39), '')}"
+    slug = name.lower().replace(' ', '_').replace('-', '_').replace("'", '')
+    return f"loc_{slug}"
 
 
 # ---------------------------------------------------------------------------
