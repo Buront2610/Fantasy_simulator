@@ -75,7 +75,7 @@ class LocationState:
     visited: bool = False
     controlling_faction_id: str | None = None
     recent_event_ids: list[str] = field(default_factory=list)
-    aliases: list[LocationAlias] = field(default_factory=list)
+    aliases: list[str] = field(default_factory=list)      # TODO: 将来 LocationAlias 型（設計書 §6.1）を導入する場合はここを置き換える
     memorial_ids: list[str] = field(default_factory=list)
 ```
 
@@ -375,7 +375,7 @@ NOTIFICATION_THRESHOLDS = {
 
 ### PR-0（推奨・任意）: 設計書但し書き追加
 
-- `docs/next_version_plan.md` §15 に「正式な migration chain・location 参照修正方針は `docs/implementation_plan.md` に従う」旨の but し書きを追加
+- `docs/next_version_plan.md` §15 に「正式な migration chain・location 参照修正方針は `docs/implementation_plan.md` に従う」旨の但し書きを追加
 - コード変更なし
 
 ### PR-1: パッケージ構造化
@@ -508,7 +508,8 @@ def test_migrate_v0_adds_schema_version():
 
 def test_migrate_v1_to_v2_converts_all_builtin_locations():
     """全 built-in 地点名が正しく id に変換される。"""
-    char_data = [{"location": name, ...} for name in LOCATION_NAME_TO_ID.keys()]
+    # 各 built-in 地点名だけを持つ最小キャラクターデータを生成
+    char_data = [{"name": "char", "location": name} for name in LOCATION_NAME_TO_ID.keys()]
     data = {"schema_version": 1, "characters": char_data}
     result = migrate_v1_to_v2(data)
     for char, (name, expected_id) in zip(result["characters"], LOCATION_NAME_TO_ID.items()):
@@ -519,8 +520,9 @@ def test_migrate_v1_to_v2_converts_all_builtin_locations():
 
 def test_old_save_roundtrip(tmp_path):
     """旧セーブ（schema_version なし）が正常に読み込める。"""
+    # 旧セーブ形式: location フィールドに場所名文字列
     old_save = {
-        "characters": [{"name": "Aldric", "location": "Aethoria Capital", ...}],
+        "characters": [{"name": "Aldric", "location": "Aethoria Capital"}],
         "world": {"year": 1000},
     }
     path = tmp_path / "old_save.json"
@@ -537,7 +539,11 @@ def test_old_save_roundtrip(tmp_path):
 # tests/test_character.py への追記
 
 def test_favorite_flag_serialization():
-    char = Character(name="Aldric", ..., favorite=True)
+    # 最小限の必須フィールドでキャラクターを生成
+    char = Character(
+        name="Aldric", age=25, gender="male", race="Human", job="Warrior",
+        favorite=True,
+    )
     d = char.to_dict()
     assert d["favorite"] is True
     char2 = Character.from_dict(d)
@@ -546,8 +552,12 @@ def test_favorite_flag_serialization():
 
 def test_flags_default_false_on_old_save():
     """旧セーブに favorite/spotlighted/playable がなくてもデフォルト False で読み込める。"""
-    data = {"name": "Aldric", "location": "Aethoria Capital", ...}
-    # favorite キーが存在しないデータ
+    # favorite/spotlighted/playable キーが存在しない旧形式データ
+    data = {
+        "name": "Aldric", "age": 25, "gender": "male",
+        "race": "Human", "job": "Warrior",
+        "location": "Aethoria Capital",  # 旧形式: location フィールド
+    }
     char = Character.from_dict(data)
     assert char.favorite is False
     assert char.spotlighted is False
