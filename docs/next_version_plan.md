@@ -6,6 +6,8 @@
 **最終更新**: 2026-03-22
 **位置づけ**: 詳細レビューの P0 / P1 指摘を反映し、実装移行・UIモック・具体例まで含めて再構成した vNext 基礎設計書
 
+> **注意**: 正式な migration chain・ID 規則・location 参照修正方針は `docs/implementation_plan.md` に従ってください。本書の §15 migration 例は設計上の参考例であり、実装計画書と齟齬がある場合は実装計画書を優先します。
+
 ---
 
 ## 0. 本文書の目的
@@ -346,13 +348,13 @@ class WorldEventRecord:
     summary_key: str
 ```
 
-`event_log: List[str]` は人間向け派生物として残すが、ゲーム内部の因果は `WorldEventRecord` を参照する。
+`event_log: List[str]` は人間向け派生物として残すが、ゲーム内部の因果は `WorldEventRecord` を参照する。現行実装では互換のため `Simulator.history: List[EventResult]` も残っているため、Phase 2 までは「`WorldEventRecord` が正規ストア、`history` / `event_log` は adapter / 派生物」という扱いに統一する。
 
 ### 5.9.1 UI 連携規約
 
 - `WorldEventRecord` は保存・通知判定・因果追跡に用いる正規イベント表現とする。
 - UI / report 層が `EventRecord` などの表示用レコードを持つ場合、それは `WorldEventRecord` から導出する非永続の view model に限る。
-- Phase 1〜2 の互換期間は、現行 `EventResult` と `event_log: List[str]` を adapter 経由で橋渡しし、正規データ源を増やさない。
+- Phase 1〜2 の互換期間は、`Simulator.history` と `event_log: List[str]` を adapter / 派生物として扱い、正規データ源は `WorldEventRecord` に一本化する。
 
 ---
 

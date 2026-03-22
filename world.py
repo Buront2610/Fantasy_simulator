@@ -1,15 +1,22 @@
 """
-world.py - World map, Location dataclass, and the World class.
+world.py - World map, LocationState dataclass, and the World class.
 """
 
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass
+import unicodedata
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
-from i18n import tr
-from world_data import DEFAULT_LOCATIONS, WORLD_LORE
+from i18n import tr, tr_term
+from world_data import (
+    DEFAULT_LOCATIONS,
+    NAME_TO_LOCATION_ID,
+    WORLD_LORE,
+    fallback_location_id,
+    get_location_state_defaults,
+)
 
 if TYPE_CHECKING:
     from adventure import AdventureRun
@@ -17,16 +24,126 @@ if TYPE_CHECKING:
     from events import WorldEventRecord
 
 
+def _clamp_state(value: int) -> int:
+    return max(0, min(100, int(value)))
+
+
+PROSPERITY_LABELS = [
+    (0, 20, "ruined"),
+    (20, 45, "declining"),
+    (45, 75, "stable"),
+    (75, 101, "thriving"),
+]
+
+SAFETY_LABELS = [
+    (0, 20, "lawless"),
+    (20, 45, "dangerous"),
+    (45, 75, "tense"),
+    (75, 101, "peaceful"),
+]
+
+MOOD_LABELS = [
+    (0, 20, "grieving"),
+    (20, 45, "anxious"),
+    (45, 75, "calm"),
+    (75, 101, "festive"),
+]
+
+
+def _band_name(value: int, bands: List[Tuple[int, int, str]]) -> str:
+    for lo, hi, name in bands:
+        if lo <= value < hi:
+            return name
+    return bands[-1][2]
+
+
+def _traffic_indicator(value: int) -> str:
+    if value >= 70:
+        return "+++"
+    if value >= 40:
+        return "++"
+    if value > 0:
+        return "+"
+    return "-"
+
+
+def _char_display_width(char: str) -> int:
+    if unicodedata.combining(char):
+        return 0
+    if unicodedata.east_asian_width(char) in ("F", "W"):
+        return 2
+    return 1
+
+
+def _display_width(text: str) -> int:
+    return sum(_char_display_width(char) for char in text)
+
+
+def _fit_display_width(text: str, width: int, suffix: str = "...") -> str:
+    """Pad or truncate text to a terminal display width."""
+    if width <= 0:
+        return ""
+    if _display_width(text) <= width:
+        return text + " " * (width - _display_width(text))
+
+    suffix_width = _display_width(suffix)
+    if suffix_width >= width:
+        suffix = ""
+        suffix_width = 0
+
+    kept: List[str] = []
+    used_width = 0
+    max_text_width = width - suffix_width
+    for char in text:
+        char_width = _char_display_width(char)
+        if used_width + char_width > max_text_width:
+            break
+        kept.append(char)
+        used_width += char_width
+
+    clipped = "".join(kept) + suffix
+    return clipped + " " * (width - _display_width(clipped))
+
+
 @dataclass
-class Location:
-    """A single cell on the world grid."""
+class LocationState:
+    """A single cell on the world grid with persistent state."""
 
     id: str
-    name: str
+    canonical_name: str
     description: str
     region_type: str
     x: int
     y: int
+    prosperity: int
+    safety: int
+    mood: int
+    danger: int
+    traffic: int
+    rumor_heat: int
+    road_condition: int
+    visited: bool = False
+    controlling_faction_id: Optional[str] = None
+    recent_event_ids: List[str] = field(default_factory=list)
+    aliases: List[str] = field(default_factory=list)
+    memorial_ids: List[str] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        for field_name in (
+            "prosperity",
+            "safety",
+            "mood",
+            "danger",
+            "traffic",
+            "rumor_heat",
+            "road_condition",
+        ):
+            setattr(self, field_name, _clamp_state(getattr(self, field_name)))
+
+    @property
+    def name(self) -> str:
+        """Compatibility alias for older callers."""
+        return self.canonical_name
 
     @property
     def icon(self) -> str:
@@ -41,30 +158,90 @@ class Location:
         }
         return icons_ascii.get(self.region_type, "?")
 
+    @property
+    def prosperity_label(self) -> str:
+        band = _band_name(self.prosperity, PROSPERITY_LABELS)
+        return tr(f"location_prosperity_{band}")
+
+    @property
+    def safety_label(self) -> str:
+        band = _band_name(self.safety, SAFETY_LABELS)
+        return tr(f"location_safety_{band}")
+
+    @property
+    def mood_label(self) -> str:
+        band = _band_name(self.mood, MOOD_LABELS)
+        return tr(f"location_mood_{band}")
+
+    @property
+    def traffic_indicator(self) -> str:
+        return _traffic_indicator(self.traffic)
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "id": self.id,
-            "name": self.name,
+            "canonical_name": self.canonical_name,
+            "name": self.canonical_name,
             "description": self.description,
             "region_type": self.region_type,
             "x": self.x,
             "y": self.y,
+            "prosperity": self.prosperity,
+            "safety": self.safety,
+            "mood": self.mood,
+            "danger": self.danger,
+            "traffic": self.traffic,
+            "rumor_heat": self.rumor_heat,
+            "road_condition": self.road_condition,
+            "visited": self.visited,
+            "controlling_faction_id": self.controlling_faction_id,
+            "recent_event_ids": list(self.recent_event_ids),
+            "aliases": list(self.aliases),
+            "memorial_ids": list(self.memorial_ids),
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Location":
-        from world_data import NAME_TO_LOCATION_ID, fallback_location_id
-        loc_id = data.get("id")
-        if not loc_id:
-            name = data.get("name", "")
-            loc_id = NAME_TO_LOCATION_ID.get(name, fallback_location_id(name))
+    def from_default_entry(cls, entry: Tuple[str, str, str, str, int, int]) -> "LocationState":
+        loc_id, canonical_name, description, region_type, x, y = entry
+        defaults = get_location_state_defaults(loc_id, region_type)
         return cls(
             id=loc_id,
-            name=data["name"],
+            canonical_name=canonical_name,
+            description=description,
+            region_type=region_type,
+            x=x,
+            y=y,
+            **defaults,
+        )
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "LocationState":
+        loc_id = data.get("id")
+        if not loc_id:
+            name = data.get("canonical_name") or data.get("name", "")
+            loc_id = NAME_TO_LOCATION_ID.get(name, fallback_location_id(name))
+        canonical_name = data.get("canonical_name") or data.get("name", "")
+        region_type = data["region_type"]
+        defaults = get_location_state_defaults(loc_id, region_type)
+        return cls(
+            id=loc_id,
+            canonical_name=canonical_name,
             description=data["description"],
-            region_type=data["region_type"],
+            region_type=region_type,
             x=data["x"],
             y=data["y"],
+            prosperity=data.get("prosperity", defaults["prosperity"]),
+            safety=data.get("safety", defaults["safety"]),
+            mood=data.get("mood", defaults["mood"]),
+            danger=data.get("danger", defaults["danger"]),
+            traffic=data.get("traffic", defaults["traffic"]),
+            rumor_heat=data.get("rumor_heat", defaults["rumor_heat"]),
+            road_condition=data.get("road_condition", defaults["road_condition"]),
+            visited=data.get("visited", False),
+            controlling_faction_id=data.get("controlling_faction_id"),
+            recent_event_ids=list(data.get("recent_event_ids", [])),
+            aliases=list(data.get("aliases", [])),
+            memorial_ids=list(data.get("memorial_ids", [])),
         )
 
 
@@ -84,36 +261,74 @@ class World:
         self.width: int = width
         self.height: int = height
         self.year: int = year
-        self.grid: Dict[Tuple[int, int], Location] = {}
+        self.grid: Dict[Tuple[int, int], LocationState] = {}
         self.characters: List[Character] = []
         self._char_index: Dict[str, Character] = {}
         self._adventure_index: Dict[str, AdventureRun] = {}
-        self._location_name_index: Dict[str, Location] = {}
-        self._location_id_index: Dict[str, Location] = {}
+        self._location_name_index: Dict[str, LocationState] = {}
+        self._location_id_index: Dict[str, LocationState] = {}
+        # Transitional event storage during the Phase 1 -> Phase 2 migration:
+        # - event_records is the canonical structured history for new features.
+        # - event_log is a CLI-facing formatted buffer kept for compatibility.
         self.event_log: List[str] = []
         self.event_records: List[WorldEventRecord] = []
         self.active_adventures: List[AdventureRun] = []
         self.completed_adventures: List[AdventureRun] = []
         self._build_default_map()
 
+    def _register_location(self, loc: LocationState) -> None:
+        existing_at_coord = self.grid.get((loc.x, loc.y))
+        if existing_at_coord is not None and existing_at_coord is not loc:
+            self._location_name_index.pop(existing_at_coord.canonical_name, None)
+            self._location_id_index.pop(existing_at_coord.id, None)
+
+        existing_by_id = self._location_id_index.get(loc.id)
+        if existing_by_id is not None and existing_by_id is not loc:
+            self.grid.pop((existing_by_id.x, existing_by_id.y), None)
+            self._location_name_index.pop(existing_by_id.canonical_name, None)
+
+        self.grid[(loc.x, loc.y)] = loc
+        self._location_name_index[loc.canonical_name] = loc
+        self._location_id_index[loc.id] = loc
+
     def _build_default_map(self) -> None:
         for entry in DEFAULT_LOCATIONS:
-            loc_id, name, desc, rtype, gx, gy = entry
-            loc = Location(id=loc_id, name=name, description=desc, region_type=rtype, x=gx, y=gy)
-            self.grid[(gx, gy)] = loc
-            self._location_name_index[name] = loc
-            self._location_id_index[loc_id] = loc
+            self._register_location(LocationState.from_default_entry(entry))
+
+    def _default_resident_location_id(self) -> str:
+        if "loc_aethoria_capital" in self._location_id_index:
+            return "loc_aethoria_capital"
+        non_dungeons = sorted(
+            loc.id for loc in self.grid.values() if loc.region_type != "dungeon"
+        )
+        if non_dungeons:
+            return non_dungeons[0]
+        all_locations = sorted(self._location_id_index)
+        if all_locations:
+            return all_locations[0]
+        raise ValueError("World has no locations.")
+
+    def mark_location_visited(self, location_id: str) -> None:
+        """Mark a location as visited when it is meaningfully occupied or reached."""
+        location = self._location_id_index.get(location_id)
+        if location is not None:
+            location.visited = True
+
+    def ensure_valid_character_locations(self) -> None:
+        """Repair invalid location references after loading legacy data."""
+        fallback = self._default_resident_location_id()
+        for character in self.characters:
+            if character.location_id not in self._location_id_index:
+                character.location_id = fallback
+            self.mark_location_visited(character.location_id)
 
     def add_character(self, character: Character, rng: Any = random) -> None:
         if character.location_id not in self._location_id_index:
             options = [loc.id for loc in self.grid.values() if loc.region_type != "dungeon"]
-            fallback = list(self._location_id_index.keys())
             if options:
                 character.location_id = rng.choice(options)
-            elif fallback:
-                character.location_id = fallback[0]
             else:
-                raise ValueError("Cannot add character: world has no locations.")
+                character.location_id = self._default_resident_location_id()
         if character.char_id in self._char_index:
             raise ValueError(
                 f"Duplicate character ID: {character.char_id!r} "
@@ -122,6 +337,7 @@ class World:
             )
         self.characters.append(character)
         self._char_index[character.char_id] = character
+        self.mark_location_visited(character.location_id)
 
     def rebuild_char_index(self) -> None:
         """Rebuild the character ID index after external mutations."""
@@ -146,6 +362,36 @@ class World:
     def get_adventure_by_id(self, adventure_id: str) -> Optional[AdventureRun]:
         return self._adventure_index.get(adventure_id)
 
+    def rebuild_adventure_index(self) -> None:
+        """Rebuild the adventure ID index after loading or external mutations."""
+        index: Dict[str, AdventureRun] = {}
+        for run in self.active_adventures + self.completed_adventures:
+            if run.adventure_id in index:
+                raise ValueError(f"Duplicate adventure ID during rebuild: {run.adventure_id!r}")
+            index[run.adventure_id] = run
+        self._adventure_index = index
+
+    def rebuild_recent_event_ids(self) -> None:
+        """Rebuild derived per-location recent_event_ids from structured event records."""
+        for location in self.grid.values():
+            location.recent_event_ids = []
+
+        for record in self.event_records:
+            if record.location_id not in self._location_id_index:
+                record.location_id = None
+                continue
+            self._location_id_index[record.location_id].recent_event_ids.append(record.record_id)
+
+        for location in self.grid.values():
+            location.recent_event_ids = location.recent_event_ids[-12:]
+
+    def normalize_after_load(self) -> None:
+        """Rebuild derived indexes and repair invariants after deserialization."""
+        self.rebuild_char_index()
+        self.ensure_valid_character_locations()
+        self.rebuild_adventure_index()
+        self.rebuild_recent_event_ids()
+
     def add_adventure(self, run: AdventureRun) -> None:
         self.active_adventures.append(run)
         self._adventure_index[run.adventure_id] = run
@@ -161,23 +407,22 @@ class World:
 
     @property
     def location_names(self) -> List[str]:
-        return sorted(loc.name for loc in self.grid.values())
+        return sorted(loc.canonical_name for loc in self.grid.values())
 
     @property
     def location_ids(self) -> List[str]:
         return sorted(loc.id for loc in self.grid.values())
 
-    def get_location_by_name(self, name: str) -> Optional[Location]:
+    def get_location_by_name(self, name: str) -> Optional[LocationState]:
         return self._location_name_index.get(name)
 
-    def get_location_by_id(self, location_id: str) -> Optional[Location]:
+    def get_location_by_id(self, location_id: str) -> Optional[LocationState]:
         return self._location_id_index.get(location_id)
 
     def location_name(self, location_id: str) -> str:
         loc = self._location_id_index.get(location_id)
         if loc is not None:
-            return loc.name
-        # Fallback: derive a human-readable name from the ID
+            return loc.canonical_name
         lid = location_id
         if lid.startswith("loc_"):
             lid = lid[4:]
@@ -186,18 +431,18 @@ class World:
     def get_characters_at_location(self, location_id: str) -> List[Character]:
         return [c for c in self.characters if c.location_id == location_id and c.alive]
 
-    def get_neighboring_locations(self, location_id: str) -> List[Location]:
+    def get_neighboring_locations(self, location_id: str) -> List[LocationState]:
         source = self._location_id_index.get(location_id)
         if source is None:
             return []
-        neighbours: List[Location] = []
+        neighbours: List[LocationState] = []
         for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
             coord = (source.x + dx, source.y + dy)
             if coord in self.grid:
                 neighbours.append(self.grid[coord])
         return neighbours
 
-    def random_location(self, exclude_dungeon: bool = False, rng: Any = random) -> Location:
+    def random_location(self, exclude_dungeon: bool = False, rng: Any = random) -> LocationState:
         options = list(self.grid.values())
         if exclude_dungeon:
             options = [loc for loc in options if loc.region_type != "dungeon"]
@@ -209,6 +454,13 @@ class World:
     MAX_EVENT_LOG = 2000
 
     def log_event(self, event_text: str) -> None:
+        """Append a formatted compatibility log entry for legacy CLI consumers.
+
+        This buffer is intentionally separate from ``event_records`` during the
+        Phase 1 -> Phase 2 migration. New gameplay/report features should treat
+        ``event_records`` as the canonical history and view this method as a
+        presentation-layer compatibility path.
+        """
         prefix = tr("event_log_prefix", year=self.year)
         self.event_log.append(f"{prefix} {event_text}")
         if len(self.event_log) > self.MAX_EVENT_LOG:
@@ -217,10 +469,23 @@ class World:
     MAX_EVENT_RECORDS = 5000
 
     def record_event(self, record: WorldEventRecord) -> None:
-        """Store a structured event record."""
+        """Store a structured event record in the canonical world history."""
+        if record.location_id not in self._location_id_index:
+            record.location_id = None
         self.event_records.append(record)
+        if record.location_id is not None:
+            location = self._location_id_index[record.location_id]
+            location.recent_event_ids.append(record.record_id)
+            location.recent_event_ids = location.recent_event_ids[-12:]
         if len(self.event_records) > self.MAX_EVENT_RECORDS:
             self.event_records = self.event_records[-self.MAX_EVENT_RECORDS:]
+            surviving_ids = {item.record_id for item in self.event_records}
+            for location in self.grid.values():
+                if location.recent_event_ids:
+                    location.recent_event_ids = [
+                        record_id for record_id in location.recent_event_ids
+                        if record_id in surviving_ids
+                    ]
 
     def get_events_by_location(self, location_id: str) -> List[WorldEventRecord]:
         """Return all event records for a specific location."""
@@ -239,39 +504,54 @@ class World:
 
     def render_map(self, highlight_location: Optional[str] = None) -> str:
         """Return a stable ASCII grid of the world map."""
-        cell_width = 16
-        total_width = self.width * (cell_width + 1) + 1
-        border = "  +" + "-" * (total_width - 2) + "+"
+        cell_width = 20
+        inner_width = self.width * cell_width + (self.width - 1)
+        border = "  +" + "-" * inner_width + "+"
+        header = f" {tr('map_title')}: {self.name} | {tr('map_year')}: {self.year}"
         lines: List[str] = [
             border,
-            f"  | {tr('map_title')}: {self.name} | {tr('map_year')}: {self.year}".ljust(total_width) + "|",
+            f"  |{_fit_display_width(header, inner_width)}|",
             border,
         ]
 
         for y in range(self.height):
             row_names: List[str] = []
             row_types: List[str] = []
+            row_safety: List[str] = []
+            row_danger: List[str] = []
+            row_traffic: List[str] = []
             row_pops: List[str] = []
             for x in range(self.width):
                 loc = self.grid.get((x, y))
                 if loc is None:
-                    row_names.append(" ? ???".ljust(cell_width))
-                    row_types.append("".ljust(cell_width))
-                    row_pops.append("".ljust(cell_width))
+                    blank = " " * cell_width
+                    row_names.append(_fit_display_width(" ? ???", cell_width))
+                    row_types.append(blank)
+                    row_safety.append(blank)
+                    row_danger.append(blank)
+                    row_traffic.append(blank)
+                    row_pops.append(blank)
                     continue
 
                 is_highlight = (
                     highlight_location is not None
-                    and (loc.id == highlight_location or loc.name == highlight_location)
+                    and (loc.id == highlight_location or loc.canonical_name == highlight_location)
                 )
                 icon = "*" if is_highlight else loc.icon
                 population = len(self.get_characters_at_location(loc.id))
-                row_names.append(f" {icon} {loc.name[:cell_width - 4]}".ljust(cell_width))
-                row_types.append(f" {tr('map_type')}: {loc.region_type[:cell_width - 8]}".ljust(cell_width))
-                row_pops.append(f" {tr('map_population')}: {population}".ljust(cell_width))
+                region_name = tr_term(loc.region_type)
+                row_names.append(_fit_display_width(f" {icon} {loc.canonical_name}", cell_width))
+                row_types.append(_fit_display_width(f" {tr('map_type')}: {region_name}", cell_width))
+                row_safety.append(_fit_display_width(f" {tr('map_safety')}: {loc.safety_label}", cell_width))
+                row_danger.append(_fit_display_width(f" {tr('map_danger')}: {loc.danger:>3}", cell_width))
+                row_traffic.append(_fit_display_width(f" {tr('map_traffic')}: {loc.traffic_indicator}", cell_width))
+                row_pops.append(_fit_display_width(f" {tr('map_population')}: {population}", cell_width))
 
             lines.append("  |" + "|".join(row_names) + "|")
             lines.append("  |" + "|".join(row_types) + "|")
+            lines.append("  |" + "|".join(row_safety) + "|")
+            lines.append("  |" + "|".join(row_danger) + "|")
+            lines.append("  |" + "|".join(row_traffic) + "|")
             lines.append("  |" + "|".join(row_pops) + "|")
             lines.append(border)
 
@@ -294,6 +574,7 @@ class World:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "World":
         from adventure import AdventureRun
+        from events import WorldEventRecord
 
         world = cls(
             name=data["name"],
@@ -302,16 +583,9 @@ class World:
             height=data.get("height", 5),
             year=data.get("year", 1000),
         )
-        world.grid = {}
-        world._location_name_index = {}
-        world._location_id_index = {}
         for loc_data in data.get("grid", []):
-            loc = Location.from_dict(loc_data)
-            world.grid[(loc.x, loc.y)] = loc
-            world._location_name_index[loc.name] = loc
-            world._location_id_index[loc.id] = loc
+            world._register_location(LocationState.from_dict(loc_data))
         world.event_log = data.get("event_log", [])
-        from events import WorldEventRecord
         world.event_records = [
             WorldEventRecord.from_dict(r) for r in data.get("event_records", [])
         ]
@@ -321,10 +595,7 @@ class World:
         world.completed_adventures = [
             AdventureRun.from_dict(run) for run in data.get("completed_adventures", [])
         ]
-        world._adventure_index = {
-            run.adventure_id: run
-            for run in world.active_adventures + world.completed_adventures
-        }
+        world.normalize_after_load()
         return world
 
     def __repr__(self) -> str:  # pragma: no cover

@@ -23,8 +23,12 @@
 
 - `WorldEventRecord` は世界側の正規イベント表現であり、保存・因果追跡・通知密度判定の基準とする。
 - `EventRecord` は UI 表示・絞り込み・グルーピングに使う表示用レコードとして扱う。実装時は `WorldEventRecord` から導出する view model に限定するか、単一イベント型へ統一する。
-- PR-3 完了までは現行の `EventResult` / `event_log: List[str]` を互換層として残し、UI では adapter 経由で新旧データを吸収する。
-- **現行の二重イベントストアの統合**: 現在 `Simulator.history: List[EventResult]`（構造化）と `World.event_log: List[str]`（フォーマット済み文字列）の2系統が併存している。`WorldEventRecord` 導入時にこれらを単一の構造化ストアに統合し、`World.log_event(event_text: str)` を構造化レコードを受け取る API に置き換える。フォーマット済み文字列の生成は renderer / presenter 層の責務とする。
+- PR-3 完了後の暫定状態では、`World.event_records: List[WorldEventRecord]` を正規ストアとしつつ、`Simulator.history: List[EventResult]` と `World.event_log: List[str]` を互換層として残す。UI は adapter 経由でこの差を吸収し、新規の集計・表示ロジックは `WorldEventRecord` を参照する。
+- **現行の3重イベントストアと統合方針**: 現在は `World.event_records`（正規の構造化履歴）、`Simulator.history`（旧 API / save 互換の `EventResult` キャッシュ）、`World.event_log`（CLI 向けフォーマット済み文字列バッファ）の3系統が存在する。これは Phase 1 完了直後の移行状態として許容するが、Phase 2 の PR-4 で次の順に整理する。
+  1. `WorldEventRecord` を report / summary / event list / filter の唯一の入力源にする。
+  2. `World.event_log` は renderer / presenter が `WorldEventRecord` から生成する表示用派生物へ縮退させる。
+  3. `Simulator.history` は旧 save 互換と既存テスト移行のための adapter に限定し、新規機能からの参照を禁止する。
+  4. PR-4 完了条件として、「新規の読取側が `history` / `event_log` を直接参照しない」ことを確認する。
 
 ## 専門家別提案
 

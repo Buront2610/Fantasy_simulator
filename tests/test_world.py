@@ -2,15 +2,27 @@
 tests/test_world.py - Unit tests for the World class.
 """
 
+import unicodedata
+
 from character import Character
 from i18n import set_locale
-from world import World
+from world import LocationState, World
+from world_data import get_location_state_defaults
 
 
 def _make_char(name="Aldric", location_id="loc_aethoria_capital"):
     return Character(
         name=name, age=25, gender="Male", race="Human", job="Warrior", location_id=location_id,
     )
+
+
+def _display_width(text: str) -> int:
+    width = 0
+    for char in text:
+        if unicodedata.combining(char):
+            continue
+        width += 2 if unicodedata.east_asian_width(char) in ("F", "W") else 1
+    return width
 
 
 class TestWorld:
@@ -20,17 +32,80 @@ class TestWorld:
         rendered = world.render_map()
         assert "WORLD MAP" in rendered
         assert "Aethoria" in rendered
+        assert "Safety" in rendered
+        assert "Danger" in rendered
+        assert "Traffic" in rendered
 
     def test_render_map_uses_highlight_marker(self):
         world = World()
         rendered = world.render_map(highlight_location="loc_aethoria_capital")
         assert "*" in rendered
 
+    def test_render_map_lines_have_stable_ascii_width_in_english(self):
+        set_locale("en")
+        world = World()
+        lines = world.render_map().splitlines()
+        lengths = {len(line) for line in lines}
+        assert len(lengths) == 1
+
+    def test_render_map_lines_have_stable_display_width_in_japanese(self):
+        set_locale("ja")
+        world = World()
+        lines = world.render_map().splitlines()
+        widths = {_display_width(line) for line in lines}
+        assert len(widths) == 1
+
+    def test_render_map_localizes_region_type_in_japanese(self):
+        set_locale("ja")
+        rendered = World().render_map()
+        assert "地形: 都市" in rendered
+        assert "地形: city" not in rendered
+
     def test_get_neighboring_locations_returns_adjacent_cells(self):
         world = World()
         neighbors = world.get_neighboring_locations("loc_aethoria_capital")
         assert neighbors
-        assert all(hasattr(loc, "name") for loc in neighbors)
+        assert all(hasattr(loc, "canonical_name") for loc in neighbors)
+
+    def test_add_character_marks_location_visited(self):
+        world = World()
+        capital = world.get_location_by_id("loc_aethoria_capital")
+        assert capital is not None
+        assert capital.visited is False
+        world.add_character(_make_char())
+        assert capital.visited is True
+
+    def test_locations_have_state_defaults(self):
+        world = World()
+        capital = world.get_location_by_id("loc_aethoria_capital")
+        assert capital is not None
+        assert capital.canonical_name == "Aethoria Capital"
+        assert capital.prosperity == 85
+        assert capital.safety == 80
+        assert capital.danger == 15
+
+    def test_location_state_constructor_sets_fields(self):
+        defaults = get_location_state_defaults("loc_custom_city", "city")
+        location = LocationState(
+            id="loc_custom_city",
+            canonical_name="Custom City",
+            description="A custom settlement.",
+            region_type="city",
+            x=1,
+            y=1,
+            **defaults,
+        )
+        assert location.canonical_name == "Custom City"
+        assert location.name == "Custom City"
+        assert location.prosperity == 70
+
+    def test_location_labels_derive_from_state(self):
+        set_locale("en")
+        world = World()
+        thornwood = world.get_location_by_id("loc_thornwood")
+        assert thornwood is not None
+        assert thornwood.safety_label == "dangerous"
+        assert thornwood.mood_label == "anxious"
 
     def test_to_dict_round_trip_preserves_adventure_lists(self):
         world = World()
@@ -127,3 +202,47 @@ class TestWorld:
         assert len(restored.event_records) == 1
         assert restored.event_records[0].kind == "battle"
         assert restored.event_records[0].location_id == "loc_thornwood"
+
+    def test_world_round_trip_preserves_location_state(self):
+        world = World()
+        capital = world.get_location_by_id("loc_aethoria_capital")
+        assert capital is not None
+        capital.danger = 42
+        capital.visited = True
+        restored = World.from_dict(world.to_dict())
+        restored_capital = restored.get_location_by_id("loc_aethoria_capital")
+        assert restored_capital is not None
+        assert restored_capital.danger == 42
+        assert restored_capital.visited is True
+
+    def test_from_dict_rebuilds_recent_event_ids_from_event_records(self):
+        from events import WorldEventRecord
+
+        world = World()
+        payload = world.to_dict()
+        payload["event_records"] = [
+            WorldEventRecord(record_id="r1", kind="battle", year=1001, location_id="loc_thornwood").to_dict(),
+            WorldEventRecord(record_id="r2", kind="journey", year=1002, location_id="loc_thornwood").to_dict(),
+        ]
+        payload["grid"][0]["recent_event_ids"] = ["stale"]
+        payload["grid"][5]["recent_event_ids"] = ["stale", "wrong"]
+
+        restored = World.from_dict(payload)
+
+        thornwood = restored.get_location_by_id("loc_thornwood")
+        assert thornwood is not None
+        assert thornwood.recent_event_ids == ["r1", "r2"]
+
+    def test_trimming_event_records_removes_dangling_recent_event_ids(self):
+        from events import WorldEventRecord
+
+        world = World()
+        world.MAX_EVENT_RECORDS = 2
+        world.record_event(WorldEventRecord(record_id="r1", kind="battle", year=1001, location_id="loc_thornwood"))
+        world.record_event(WorldEventRecord(record_id="r2", kind="battle", year=1001, location_id="loc_thornwood"))
+        world.record_event(WorldEventRecord(record_id="r3", kind="battle", year=1001, location_id="loc_thornwood"))
+
+        thornwood = world.get_location_by_id("loc_thornwood")
+        assert thornwood is not None
+        assert [record.record_id for record in world.event_records] == ["r2", "r3"]
+        assert thornwood.recent_event_ids == ["r2", "r3"]

@@ -20,7 +20,7 @@ from screens import (
     screen_new_simulation,
     screen_world_lore,
 )
-from ui_helpers import HEADER, _choose, _hr, bold, yellow
+from ui_helpers import HEADER, _choose_key, _hr, bold, yellow
 
 
 def main() -> None:
@@ -31,30 +31,30 @@ def main() -> None:
         print("\n" + _hr("="))
         print(bold(f"  {tr('main_menu')}"))
         print(_hr("="))
-        choice = _choose(
+        choice = _choose_key(
             tr("main_menu_prompt"),
             [
-                tr("start_new_sim"),
-                tr("create_custom_sim"),
-                tr("load_saved_sim"),
-                tr("read_world_lore"),
-                tr("language_menu"),
-                tr("exit"),
+                ("start_new_sim", tr("start_new_sim")),
+                ("create_custom_sim", tr("create_custom_sim")),
+                ("load_saved_sim", tr("load_saved_sim")),
+                ("read_world_lore", tr("read_world_lore")),
+                ("language_menu", tr("language_menu")),
+                ("exit", tr("exit")),
             ],
             default="1",
         )
 
-        if choice == tr("start_new_sim"):
+        if choice == "start_new_sim":
             screen_new_simulation()
-        elif choice == tr("create_custom_sim"):
+        elif choice == "create_custom_sim":
             screen_custom_simulation()
-        elif choice == tr("load_saved_sim"):
+        elif choice == "load_saved_sim":
             sim = _load_simulation_snapshot()
             if sim is not None:
                 _show_results(sim)
-        elif choice == tr("read_world_lore"):
+        elif choice == "read_world_lore":
             screen_world_lore()
-        elif choice == tr("language_menu"):
+        elif choice == "language_menu":
             _select_language()
         else:
             print(f"\n  {bold(yellow(tr('farewell')))}\n")

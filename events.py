@@ -24,6 +24,12 @@ if TYPE_CHECKING:
     from world import World
 
 
+def generate_record_id(rng: Optional[Any] = None) -> str:
+    if rng is not None and hasattr(rng, "getrandbits"):
+        return format(rng.getrandbits(128), "032x")
+    return uuid.uuid4().hex
+
+
 @dataclass
 class EventResult:
     """The outcome of a single in-world event."""
@@ -108,11 +114,13 @@ class WorldEventRecord:
         result: EventResult,
         location_id: Optional[str] = None,
         severity: int = 1,
+        rng: Optional[Any] = None,
     ) -> "WorldEventRecord":
         """Create a WorldEventRecord from an EventResult."""
         primary = result.affected_characters[0] if result.affected_characters else None
         secondary = result.affected_characters[1:] if len(result.affected_characters) > 1 else []
         return cls(
+            record_id=generate_record_id(rng),
             kind=result.event_type,
             year=result.year,
             location_id=location_id,
@@ -510,6 +518,7 @@ class EventSystem:
         destination = rng.choice(neighbours)
         old_location_id = char.location_id
         char.location_id = destination.id
+        world.mark_location_visited(destination.id)
 
         road_event = rng.choice(JOURNEY_EVENTS)
         desc = tr(
@@ -517,7 +526,7 @@ class EventSystem:
             name=char.name,
             old_location=world.location_name(old_location_id),
             destination=destination.name,
-            region_type=destination.region_type,
+            region_type=tr_term(destination.region_type),
             road_event=road_event,
         )
         char.add_history(tr(

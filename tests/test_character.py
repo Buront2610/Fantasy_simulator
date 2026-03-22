@@ -244,7 +244,8 @@ class TestSerialization:
             "char_id", "name", "age", "gender", "race", "job",
             "strength", "intelligence", "dexterity", "wisdom",
             "charisma", "constitution", "skills", "relationships",
-            "alive", "location_id", "history", "spouse_id",
+            "alive", "location_id", "favorite", "spotlighted", "playable",
+            "history", "spouse_id",
             "injury_status", "active_adventure_id",
         }
         assert expected_keys.issubset(set(d.keys()))
@@ -279,6 +280,27 @@ class TestSerialization:
         hero.spouse_id = mage.char_id
         d = hero.to_dict()
         assert d["spouse_id"] == mage.char_id
+
+    def test_favorite_flag_round_trip(self):
+        char = Character("Test", 20, "Male", "Human", "Warrior", favorite=True)
+        restored = Character.from_dict(char.to_dict())
+        assert restored.favorite is True
+        assert restored.spotlighted is False
+        assert restored.playable is False
+
+    def test_flags_default_false_on_old_save(self):
+        data = {
+            "name": "Legacy",
+            "age": 30,
+            "gender": "Male",
+            "race": "Human",
+            "job": "Warrior",
+            "location": "Aethoria Capital",
+        }
+        restored = Character.from_dict(data)
+        assert restored.favorite is False
+        assert restored.spotlighted is False
+        assert restored.playable is False
 
 
 # ---------------------------------------------------------------------------

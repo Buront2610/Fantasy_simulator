@@ -2,6 +2,8 @@
 tests/test_adventure.py - Unit tests for adventure progression.
 """
 
+import random
+
 from adventure import (
     AdventureChoice,
     AdventureRun,
@@ -201,6 +203,30 @@ def test_choice_resolution_survives_locale_change():
     assert summaries
     assert run.state == "returning"
     assert run.pending_choice is None
+
+
+def test_adventure_id_generation_uses_separate_rng():
+    world = World()
+    char = _make_character()
+    world.add_character(char)
+
+    gameplay_rng = random.Random(123)
+    gameplay_clone = random.Random()
+    gameplay_clone.setstate(gameplay_rng.getstate())
+    id_rng = random.Random(999)
+
+    neighbors = world.get_neighboring_locations(char.location_id)
+    risky = [loc for loc in neighbors if loc.region_type in ("forest", "mountain", "dungeon")]
+    if not risky:
+        risky = [
+            loc for loc in world.grid.values()
+            if loc.region_type in ("forest", "mountain", "dungeon")
+        ]
+    _ = gameplay_clone.choice(risky)
+
+    create_adventure_run(char, world, rng=gameplay_rng, id_rng=id_rng)
+
+    assert gameplay_rng.getstate() == gameplay_clone.getstate()
 
 
 def test_adventure_death_clears_spouse_on_survivor():

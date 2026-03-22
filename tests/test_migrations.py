@@ -2,13 +2,17 @@
 tests/test_migrations.py - Unit tests for schema migration.
 """
 
-# _migrate_v1_to_v2 is private but tested directly to verify per-step migration logic
-from migrations import CURRENT_VERSION, migrate, _migrate_v1_to_v2
+from migrations import (
+    CURRENT_VERSION,
+    _migrate_v1_to_v2,
+    _migrate_v2_to_v3,
+    migrate,
+)
 from world_data import NAME_TO_LOCATION_ID
 
 
-class TestMigrateV1ToV2:
-    def test_no_schema_version_treated_as_v1(self):
+class TestMigrations:
+    def test_no_schema_version_treated_as_v0(self):
         data = {"characters": [], "world": {"grid": []}}
         result = migrate(data)
         assert result["schema_version"] == CURRENT_VERSION
@@ -16,8 +20,14 @@ class TestMigrateV1ToV2:
     def test_character_location_migrated(self):
         data = {
             "characters": [
-                {"name": "Hero", "age": 25, "gender": "Male", "race": "Human", "job": "Warrior",
-                 "location": "Aethoria Capital"},
+                {
+                    "name": "Hero",
+                    "age": 25,
+                    "gender": "Male",
+                    "race": "Human",
+                    "job": "Warrior",
+                    "location": "Aethoria Capital",
+                },
             ],
             "world": {"grid": []},
         }
@@ -26,33 +36,31 @@ class TestMigrateV1ToV2:
         assert "location" not in char
         assert char["location_id"] == "loc_aethoria_capital"
 
-    def test_character_with_location_id_unchanged(self):
-        data = {
-            "schema_version": 2,
-            "characters": [
-                {"name": "Hero", "age": 25, "gender": "Male", "race": "Human", "job": "Warrior",
-                 "location_id": "loc_aethoria_capital"},
-            ],
-            "world": {"grid": []},
-        }
-        result = migrate(data)
-        assert result["characters"][0]["location_id"] == "loc_aethoria_capital"
-
     def test_grid_locations_get_ids(self):
         data = {
+            "schema_version": 1,
             "characters": [],
             "world": {
                 "grid": [
-                    {"name": "Aethoria Capital", "description": "The capital.", "region_type": "city", "x": 2, "y": 2},
+                    {
+                        "name": "Aethoria Capital",
+                        "description": "The capital.",
+                        "region_type": "city",
+                        "x": 2,
+                        "y": 2,
+                    },
                 ],
             },
         }
         result = migrate(data)
         loc = result["world"]["grid"][0]
         assert loc["id"] == "loc_aethoria_capital"
+        assert loc["canonical_name"] == "Aethoria Capital"
+        assert loc["prosperity"] == 85
 
     def test_adventure_origin_destination_migrated(self):
         data = {
+            "schema_version": 1,
             "characters": [],
             "world": {
                 "grid": [],
@@ -72,55 +80,174 @@ class TestMigrateV1ToV2:
         assert completed["origin"] == "loc_millhaven"
         assert completed["destination"] == "loc_sunken_ruins"
 
-    def test_already_v2_data_unchanged(self):
+    def test_unknown_location_uses_slug_fallback(self):
         data = {
-            "schema_version": 2,
+            "schema_version": 1,
             "characters": [
-                {"name": "Hero", "age": 25, "gender": "Male", "race": "Human", "job": "Warrior",
-                 "location_id": "loc_aethoria_capital"},
-            ],
-            "world": {
-                "grid": [
-                    {"id": "loc_aethoria_capital", "name": "Aethoria Capital",
-                     "description": "The capital.", "region_type": "city", "x": 2, "y": 2},
-                ],
-                "active_adventures": [],
-                "completed_adventures": [],
-            },
-        }
-        result = migrate(data)
-        assert result["schema_version"] == 2
-        assert result["characters"][0]["location_id"] == "loc_aethoria_capital"
-        assert result["world"]["grid"][0]["id"] == "loc_aethoria_capital"
-
-    def test_unknown_location_uses_default_capital(self):
-        data = {
-            "characters": [
-                {"name": "Hero", "age": 25, "gender": "Male", "race": "Human", "job": "Warrior",
-                 "location": "Unknown Place"},
+                {
+                    "name": "Hero",
+                    "age": 25,
+                    "gender": "Male",
+                    "race": "Human",
+                    "job": "Warrior",
+                    "location": "Unknown Place",
+                },
             ],
             "world": {"grid": []},
         }
         result = migrate(data)
-        assert result["characters"][0]["location_id"] == "loc_aethoria_capital"
+        assert result["characters"][0]["location_id"] == "loc_unknown_place"
 
     def test_all_known_locations_mapped(self):
         for name, loc_id in NAME_TO_LOCATION_ID.items():
             data = {
                 "characters": [
-                    {"name": "X", "age": 20, "gender": "Male", "race": "Human", "job": "Warrior",
-                     "location": name},
+                    {
+                        "name": "X",
+                        "age": 20,
+                        "gender": "Male",
+                        "race": "Human",
+                        "job": "Warrior",
+                        "location": name,
+                    },
                 ],
                 "world": {"grid": []},
             }
             result = _migrate_v1_to_v2(data)
             assert result["characters"][0]["location_id"] == loc_id
 
+    def test_v3_adds_character_flags_and_location_state(self):
+        data = {
+            "schema_version": 2,
+            "characters": [
+                {
+                    "name": "Hero",
+                    "age": 25,
+                    "gender": "Male",
+                    "race": "Human",
+                    "job": "Warrior",
+                    "location_id": "loc_aethoria_capital",
+                },
+            ],
+            "world": {
+                "grid": [
+                    {
+                        "id": "loc_aethoria_capital",
+                        "name": "Aethoria Capital",
+                        "description": "The capital.",
+                        "region_type": "city",
+                        "x": 2,
+                        "y": 2,
+                    },
+                ],
+                "event_records": [{"kind": "battle", "year": 1001, "location_id": "invalid"}],
+            },
+        }
+        result = _migrate_v2_to_v3(data)
+        char = result["characters"][0]
+        loc = result["world"]["grid"][0]
+        assert char["favorite"] is False
+        assert char["spotlighted"] is False
+        assert char["playable"] is False
+        assert loc["canonical_name"] == "Aethoria Capital"
+        assert loc["safety"] == 80
+        assert loc["danger"] == 15
+        assert result["world"]["event_records"][0]["location_id"] is None
+
+    def test_v3_rebuilds_recent_event_ids_from_existing_event_records(self):
+        data = {
+            "schema_version": 2,
+            "characters": [],
+            "world": {
+                "grid": [
+                    {
+                        "id": "loc_aethoria_capital",
+                        "name": "Aethoria Capital",
+                        "description": "The capital.",
+                        "region_type": "city",
+                        "x": 2,
+                        "y": 2,
+                    },
+                    {
+                        "id": "loc_thornwood",
+                        "name": "Thornwood",
+                        "description": "Forest.",
+                        "region_type": "forest",
+                        "x": 0,
+                        "y": 1,
+                    },
+                ],
+                "event_records": [
+                    {"record_id": "r1", "kind": "battle", "year": 1001, "location_id": "loc_aethoria_capital"},
+                    {"record_id": "r2", "kind": "meeting", "year": 1002, "location_id": "loc_thornwood"},
+                    {"record_id": "r3", "kind": "journey", "year": 1003, "location_id": "loc_aethoria_capital"},
+                    {"record_id": "r4", "kind": "battle", "year": 1004, "location_id": "invalid"},
+                ],
+            },
+        }
+
+        result = _migrate_v2_to_v3(data)
+
+        capital = result["world"]["grid"][0]
+        thornwood = result["world"]["grid"][1]
+        assert capital["recent_event_ids"] == ["r1", "r3"]
+        assert thornwood["recent_event_ids"] == ["r2"]
+        assert result["world"]["event_records"][3]["location_id"] is None
+
+    def test_already_v3_data_unchanged(self):
+        data = {
+            "schema_version": 3,
+            "characters": [
+                {
+                    "name": "Hero",
+                    "age": 25,
+                    "gender": "Male",
+                    "race": "Human",
+                    "job": "Warrior",
+                    "location_id": "loc_aethoria_capital",
+                    "favorite": True,
+                },
+            ],
+            "world": {
+                "grid": [
+                    {
+                        "id": "loc_aethoria_capital",
+                        "canonical_name": "Aethoria Capital",
+                        "name": "Aethoria Capital",
+                        "description": "The capital.",
+                        "region_type": "city",
+                        "x": 2,
+                        "y": 2,
+                        "prosperity": 85,
+                        "safety": 80,
+                        "mood": 65,
+                        "danger": 15,
+                        "traffic": 90,
+                        "rumor_heat": 60,
+                        "road_condition": 85,
+                        "visited": False,
+                        "controlling_faction_id": None,
+                        "recent_event_ids": [],
+                        "aliases": [],
+                        "memorial_ids": [],
+                    },
+                ],
+                "active_adventures": [],
+                "completed_adventures": [],
+                "event_records": [],
+            },
+        }
+        result = migrate(data)
+        assert result["schema_version"] == 3
+        assert result["characters"][0]["favorite"] is True
+        assert result["world"]["grid"][0]["canonical_name"] == "Aethoria Capital"
+
     def test_current_version_constant(self):
-        assert CURRENT_VERSION == 2
+        assert CURRENT_VERSION == 3
 
     def test_future_version_raises_error(self):
         import pytest
+
         data = {
             "schema_version": 999,
             "characters": [],

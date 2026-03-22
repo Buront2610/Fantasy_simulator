@@ -2,8 +2,11 @@
 tests/test_simulator.py - Unit tests for the Simulator class.
 """
 
+from collections import Counter
+
 import pytest
 
+from events import EventResult
 from adventure import AdventureChoice, AdventureRun
 from character import Character
 from character_creator import CharacterCreator
@@ -125,6 +128,38 @@ class TestSimulatorConstruction:
         s1.run(years=3)
         s2.run(years=3)
         assert [ev.description for ev in s1.history] == [ev.description for ev in s2.history]
+
+    def test_seed_fixed_world_generation_is_deterministic(self):
+        import random as _random
+
+        def _build_seeded_world(seed):
+            rng = _random.Random(seed)
+            world = World()
+            creator = CharacterCreator()
+            locs = [loc.id for loc in world.grid.values() if loc.region_type != "dungeon"]
+            for _ in range(6):
+                char = creator.create_random(rng=rng)
+                char.location_id = rng.choice(locs)
+                world.add_character(char)
+            return world
+
+        world1 = _build_seeded_world(42)
+        world2 = _build_seeded_world(42)
+
+        assert world1.to_dict() == world2.to_dict()
+
+    def test_record_event_ids_do_not_consume_main_rng(self, small_world):
+        sim = Simulator(small_world, events_per_year=0, seed=123)
+        result = EventResult(
+            description="A structured event.",
+            event_type="meeting",
+            year=small_world.year,
+        )
+
+        before = sim.rng.getstate()
+        sim._record_event(result, location_id="loc_aethoria_capital")
+
+        assert sim.rng.getstate() == before
 
 
 # ---------------------------------------------------------------------------
@@ -428,6 +463,29 @@ class TestSimulatorSerialization:
         assert pending
         assert pending[0]["default_option"] == "proceed_cautiously"
 
+    def test_seed_fixed_12_years_snapshot_is_deterministic(self):
+        import random as _random
+
+        def _build_seeded_world(seed):
+            rng = _random.Random(seed)
+            world = World()
+            creator = CharacterCreator()
+            locs = [loc.id for loc in world.grid.values() if loc.region_type != "dungeon"]
+            for _ in range(6):
+                char = creator.create_random(rng=rng)
+                char.location_id = rng.choice(locs)
+                world.add_character(char)
+            return world
+
+        sim1 = Simulator(_build_seeded_world(42), events_per_year=4, adventure_steps_per_year=2, seed=99)
+        sim2 = Simulator(_build_seeded_world(42), events_per_year=4, adventure_steps_per_year=2, seed=99)
+
+        for _ in range(12):
+            sim1.advance_years(1)
+            sim2.advance_years(1)
+
+        assert sim1.to_dict() == sim2.to_dict()
+
 
 class TestInjuryRecovery:
     def test_injured_character_can_recover_during_year(self):
@@ -559,6 +617,49 @@ class TestWorldEventRecordIntegration:
         sim = Simulator(small_world, seed=42)
         sim.advance_years(2)
         assert len(sim.world.event_records) > 0
+
+    def test_legacy_history_entries_are_mirrored_into_event_records(self, small_world):
+        sim = Simulator(small_world, seed=42)
+        sim.advance_years(2)
+
+        structured_keys = {
+            (record.year, record.kind, record.description)
+            for record in sim.world.event_records
+        }
+        legacy_keys = {
+            (event.year, event.event_type, event.description)
+            for event in sim.history
+        }
+
+        assert legacy_keys <= structured_keys
+
+    def test_simulator_log_entries_are_mirrored_into_event_records(self):
+        world = _make_world(n_chars=1)
+        char = world.characters[0]
+        char.injury_status = "injured"
+        sim = Simulator(world, events_per_year=0, adventure_steps_per_year=4, seed=1)
+
+        sim.rng = type(
+            "FixedRng",
+            (),
+            {
+                "random": lambda self: next(self.values),
+                "choice": lambda self, options: options[0],
+                "values": iter([0.9, 0.1, 0.0, 0.9, 0.3, 0.9]),
+            },
+        )()
+
+        sim._run_year()
+
+        log_counter = Counter(
+            entry.split("] ", 1)[1] if "] " in entry else entry
+            for entry in world.event_log
+        )
+        record_counter = Counter(record.description for record in world.event_records)
+
+        assert log_counter <= record_counter
+        assert any(record.kind == "injury_recovery" for record in world.event_records)
+        assert any(record.kind == "adventure_started" for record in world.event_records)
 
     def test_event_records_have_valid_kinds(self, small_world):
         sim = Simulator(small_world, seed=42)

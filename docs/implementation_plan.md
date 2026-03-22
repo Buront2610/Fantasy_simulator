@@ -413,30 +413,30 @@ NOTIFICATION_THRESHOLDS = {
 
 ---
 
-### PR-2.5: Favorite / Spotlight / Playable フラグ追加
+### PR-2.5: Favorite / Spotlight / Playable フラグ追加 ✅ 完了
 
 **ゴール**: 月報実装前に注目フラグを安定させる  
 **作業**:
-- `character.py` に `favorite`, `spotlighted`, `playable` フラグ追加
-- `to_dict()` / `from_dict()` に対応追加（デフォルト False）
-- テスト: `test_character.py` にフラグの serialize/deserialize テスト追加
+- [x] `character.py` に `favorite`, `spotlighted`, `playable` フラグ追加
+- [x] `to_dict()` / `from_dict()` に対応追加（デフォルト False）
+- [x] テスト: `test_character.py` にフラグの serialize/deserialize テスト追加
 
 **マージ条件**: 全テスト通過、旧セーブ互換確認（デフォルト False）
 
 ---
 
-### PR-3: LocationState 導入 + location 参照一括修正 — 部分完了（PR #11 にて Stage 1-3 実装）
+### PR-3: LocationState 導入 + location 参照一括修正 ✅ 完了
 
 **ゴール**: SI-1 〜 SI-3 を確立する。これが Phase 1 の最重要 PR。
 **作業**:
 
 1. [x] `world_data.py`: `DEFAULT_LOCATIONS` を `(id, canonical_name, description, region_type, x, y)` 形式に更新（`loc_` プレフィックス付き id）
 2. `world.py`:
-   - [ ] `Location` dataclass → `LocationState` dataclass（§3.1 の定義：prosperity, safety, mood 等の状態量追加）
+   - [x] `Location` dataclass → `LocationState` dataclass（§3.1 の定義：prosperity, safety, mood 等の状態量追加）
    - [x] `_location_id_index: Dict[str, Location]` 追加
    - [x] `get_location_by_id(id: str)` 追加
    - [x] `location_name(location_id)` 追加（フォールバック付き）
-   - [ ] `render_map()` に danger/safety_label/traffic 簡易表示追加（設計書 §18.2）
+   - [x] `render_map()` に danger/safety_label/traffic 簡易表示追加（設計書 §18.2）
 3. [x] `character.py`:
    - `location: str` → `location_id: str`（互換プロパティは追加しない）
 4. [ ] `character_creator.py`: `location="Aethoria Capital"` → `location_id="loc_aethoria_capital"`（変更不要だった — character_creator.py に location 参照なし）
@@ -446,13 +446,13 @@ NOTIFICATION_THRESHOLDS = {
 **テスト要件**:
 - [x] migration v1→v2 のテスト（全 built-in 地点名が正しく `loc_` 付き id に変換される）
 - [x] 旧セーブ（`location: "Aethoria Capital"` 形式）の読み込みテスト
-- [ ] SI-1 〜 SI-3 の不変条件テスト（全キャラの `location_id` が有効 id を参照する）— `LocationState` 完全導入後に追加
+- [x] SI-1 〜 SI-3 の不変条件テスト（全キャラの `location_id` が有効 id を参照する）
 
 **マージ条件**:
 - 全テスト通過、SI-1 〜 SI-3 のテストが存在、flake8 通過
 - `character\.location\b`（`location_id` を除く）の grep 結果がゼロ（旧参照ゼロ）
 
-**残作業**: `Location` → `LocationState` への完全移行（状態量フィールド追加）、render_map 拡張
+**残作業**: Phase 1 としては完了。以後は Phase 2 以降の report / rumor / UI adapter へ進む。
 
 ---
 
@@ -460,7 +460,7 @@ NOTIFICATION_THRESHOLDS = {
 
 | PR | 内容 | 依存 |
 |---|---|---|
-| PR-4 | 月報 / 年報 / 復帰サマリー + UI report adapter | PR-2.5, PR-3 |
+| PR-4 | 月報 / 年報 / 復帰サマリー + UI report adapter + イベントストア統合 | PR-2.5, PR-3 |
 | PR-5 | Rumor / reliability / 通知密度分離 | PR-4 |
 | PR-6 | 条件付き自動進行（AUTO_PAUSE_PRIORITIES） | PR-4 |
 | PR-7 | Relationship 構造化 + ReputationEntry | PR-3 |
@@ -468,6 +468,14 @@ NOTIFICATION_THRESHOLDS = {
 | PR-9 | AdventureRun パーティ化 + 能力値依存 outcome | PR-8 |
 | PR-10 | live trace + memorial + alias | PR-9 |
 | PR-11 | map renderer 初期 AA 版 | PR-10 |
+
+#### PR-4 におけるイベントストア統合の完了条件
+
+- `World.event_records` を世界イベントの唯一の正規ストアとする。
+- `World.event_log` は保存互換を維持しつつも、CLI / report renderer 用の派生テキストバッファとして扱う。
+- `Simulator.history` は旧 `EventResult` ベース API と save 互換のための adapter に限定し、新規の集計・UI・レポートコードからは参照しない。
+- `get_summary()` / event list / report 生成 / UI adapter は、順次 `WorldEventRecord` を読取元に置き換える。
+- PR-4 レビューでは「新規追加コードが `history` または `event_log` を正規データ源として読んでいない」ことを確認する。
 
 ---
 
@@ -616,9 +624,9 @@ def test_seed_fixed_12_months_is_deterministic():
 | Phase | PR | 主な成果物 | Safety Invariant | 状態 |
 |---|---|---|---|---|
 | Phase 0 | PR-0 | 設計書但し書き | — | 未着手 |
-| Phase 1a | PR-1, PR-2 | パッケージ整備・migration 基盤 | 未確立（旧コード） | ✅ PR-2 完了（PR #11） |
-| Phase 1b | PR-2.5 | Favorite/Spotlight/Playable | 未確立 | 未着手 |
-| Phase 1c | PR-3 | LocationState・location_id 一括移行（旧参照ゼロ） | **SI-1〜SI-3 確立** | 🔶 部分完了（PR #11） |
+| Phase 1a | PR-1, PR-2 | パッケージ整備・migration 基盤 | 未確立（旧コード） | ✅ 完了 |
+| Phase 1b | PR-2.5 | Favorite/Spotlight/Playable | 未確立 | ✅ 完了 |
+| Phase 1c | PR-3 | LocationState・location_id 一括移行（旧参照ゼロ） | **SI-1〜SI-3 確立** | ✅ 完了 |
 | Phase 2 | PR-4〜6 | 月報・Rumor・自動進行 | SI 維持 |
 | Phase 3 | PR-7〜8 | Relationship・dying | SI 維持 |
 | Phase 4 | PR-9〜11 | パーティ冒険・AA マップ | SI 維持 |
@@ -632,8 +640,8 @@ def test_seed_fixed_12_months_is_deterministic():
 
 | ID | 不変条件 | 確立 PR | 状態 |
 |---|---|---|---|
-| SI-1 | `character.location_id` は有効な `LocationState.id` を参照する | PR-3 | 🔶 location_id 導入済、LocationState 未完 |
-| SI-2 | `world.get_location_by_id(character.location_id)` は None を返さない | PR-3 | 🔶 location_id 導入済、LocationState 未完 |
+| SI-1 | `character.location_id` は有効な `LocationState.id` を参照する | PR-3 | ✅ 完了 |
+| SI-2 | `world.get_location_by_id(character.location_id)` は None を返さない | PR-3 | ✅ 完了 |
 | SI-3 | `WorldEventRecord.location_id` は有効 id または None | PR-3 | ✅ WorldEventRecord 導入済（PR #11） |
 | SI-4 | `schema_version` はすべての save データに存在する | PR-2 | ✅ 完了（PR #11） |
 | SI-5 | `dead` キャラは active adventure の member でない | PR-8 |
@@ -641,7 +649,7 @@ def test_seed_fixed_12_months_is_deterministic():
 | SI-7 | `rumor.reliability` は `{"certain","plausible","doubtful","false"}` の値のみ | PR-5 |
 | SI-8 | `memorial.subject_ids` の全 id は存在するキャラを参照する | PR-10 |
 | SI-9 | `month` は 1 以上の正整数 | PR-3 |
-| SI-10 | 状態量（prosperity 等）は 0〜100 の範囲 | PR-3 |
+| SI-10 | 状態量（prosperity 等）は 0〜100 の範囲 | PR-3 | ✅ 完了 |
 | SI-11 | `dying` キャラは `alive=True` を維持する | PR-8 |
 | SI-12 | active adventure の `member_ids` は全員 `alive=True` | PR-8 |
 
@@ -656,7 +664,7 @@ def test_seed_fixed_12_months_is_deterministic():
 - [x] 本計画書（`docs/implementation_plan.md`）が main ブランチにマージされている
 - [x] `docs/next_version_plan.md` が参照可能である
 - [ ] PR-0（設計書但し書き）をマージするか、スキップの合意がある
-- [ ] `requirements-dev.txt` の内容（pytest, hypothesis のバージョン）の合意がある
+- [x] `requirements-dev.txt` の内容（pytest, hypothesis のバージョン）の合意がある
 
 ### 13.2 最初に着手すべき PR
 
