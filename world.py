@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 class Location:
     """A single cell on the world grid."""
 
+    id: str
     name: str
     description: str
     region_type: str
@@ -41,6 +42,7 @@ class Location:
 
     def to_dict(self) -> Dict[str, Any]:
         return {
+            "id": self.id,
             "name": self.name,
             "description": self.description,
             "region_type": self.region_type,
@@ -50,7 +52,13 @@ class Location:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Location":
+        from world_data import NAME_TO_LOCATION_ID
+        loc_id = data.get("id")
+        if not loc_id:
+            name = data.get("name", "")
+            loc_id = NAME_TO_LOCATION_ID.get(name, f"loc_{name.lower().replace(' ', '_')}")
         return cls(
+            id=loc_id,
             name=data["name"],
             description=data["description"],
             region_type=data["region_type"],
@@ -80,6 +88,7 @@ class World:
         self._char_index: Dict[str, Character] = {}
         self._adventure_index: Dict[str, AdventureRun] = {}
         self._location_name_index: Dict[str, Location] = {}
+        self._location_id_index: Dict[str, Location] = {}
         self.event_log: List[str] = []
         self.active_adventures: List[AdventureRun] = []
         self.completed_adventures: List[AdventureRun] = []
@@ -87,19 +96,20 @@ class World:
 
     def _build_default_map(self) -> None:
         for entry in DEFAULT_LOCATIONS:
-            name, desc, rtype, gx, gy = entry
-            loc = Location(name=name, description=desc, region_type=rtype, x=gx, y=gy)
+            loc_id, name, desc, rtype, gx, gy = entry
+            loc = Location(id=loc_id, name=name, description=desc, region_type=rtype, x=gx, y=gy)
             self.grid[(gx, gy)] = loc
             self._location_name_index[name] = loc
+            self._location_id_index[loc_id] = loc
 
     def add_character(self, character: Character, rng: Any = random) -> None:
-        if character.location not in self._location_name_index:
-            options = [loc.name for loc in self.grid.values() if loc.region_type != "dungeon"]
-            fallback = list(self._location_name_index.keys())
+        if character.location_id not in self._location_id_index:
+            options = [loc.id for loc in self.grid.values() if loc.region_type != "dungeon"]
+            fallback = list(self._location_id_index.keys())
             if options:
-                character.location = rng.choice(options)
+                character.location_id = rng.choice(options)
             elif fallback:
-                character.location = fallback[0]
+                character.location_id = fallback[0]
             else:
                 raise ValueError("Cannot add character: world has no locations.")
         if character.char_id in self._char_index:
@@ -151,14 +161,29 @@ class World:
     def location_names(self) -> List[str]:
         return sorted(loc.name for loc in self.grid.values())
 
+    @property
+    def location_ids(self) -> List[str]:
+        return sorted(loc.id for loc in self.grid.values())
+
     def get_location_by_name(self, name: str) -> Optional[Location]:
         return self._location_name_index.get(name)
 
-    def get_characters_at_location(self, location_name: str) -> List[Character]:
-        return [c for c in self.characters if c.location == location_name and c.alive]
+    def get_location_by_id(self, location_id: str) -> Optional[Location]:
+        return self._location_id_index.get(location_id)
 
-    def get_neighboring_locations(self, location_name: str) -> List[Location]:
-        source = self.get_location_by_name(location_name)
+    def location_name(self, location_id: str) -> str:
+        loc = self._location_id_index.get(location_id)
+        if loc is not None:
+            return loc.name
+        return location_id
+
+    def get_characters_at_location(self, location_id: str) -> List[Character]:
+        return [c for c in self.characters if c.location_id == location_id and c.alive]
+
+    def get_neighboring_locations(self, location_id: str) -> List[Location]:
+        source = self._location_id_index.get(location_id)
+        if source is None:
+            source = self._location_name_index.get(location_id)
         if source is None:
             return []
         neighbours: List[Location] = []
@@ -208,8 +233,12 @@ class World:
                     row_pops.append("".ljust(cell_width))
                     continue
 
-                icon = "*" if loc.name == highlight_location else loc.icon
-                population = len(self.get_characters_at_location(loc.name))
+                is_highlight = (
+                    highlight_location is not None
+                    and (loc.id == highlight_location or loc.name == highlight_location)
+                )
+                icon = "*" if is_highlight else loc.icon
+                population = len(self.get_characters_at_location(loc.id))
                 row_names.append(f" {icon} {loc.name[:cell_width - 4]}".ljust(cell_width))
                 row_types.append(f" {tr('map_type')}: {loc.region_type[:cell_width - 8]}".ljust(cell_width))
                 row_pops.append(f" {tr('map_population')}: {population}".ljust(cell_width))
@@ -247,10 +276,12 @@ class World:
         )
         world.grid = {}
         world._location_name_index = {}
+        world._location_id_index = {}
         for loc_data in data.get("grid", []):
             loc = Location.from_dict(loc_data)
             world.grid[(loc.x, loc.y)] = loc
             world._location_name_index[loc.name] = loc
+            world._location_id_index[loc.id] = loc
         world.event_log = data.get("event_log", [])
         world.active_adventures = [
             AdventureRun.from_dict(run) for run in data.get("active_adventures", [])

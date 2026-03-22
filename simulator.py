@@ -118,8 +118,8 @@ class Simulator:
             tr(
                 "set_out_for_adventure",
                 year=self.world.year,
-                origin=run.origin,
-                destination=run.destination,
+                origin=self.world.location_name(run.origin),
+                destination=self.world.location_name(run.destination),
             )
         )
         self.world.add_adventure(run)
@@ -163,7 +163,10 @@ class Simulator:
             tr(
                 "history_adventure_detail",
                 year=self.world.year,
-                detail=tr("detail_adventure_died", name=char.name, destination=run.destination),
+                detail=tr(
+                    "detail_adventure_died", name=char.name,
+                    destination=self.world.location_name(run.destination),
+                ),
             )
         )
         self.event_system.handle_death_side_effects(char, self.world)
@@ -321,8 +324,10 @@ class Simulator:
         for run in runs:
             status_key = f"outcome_{run.outcome}" if run.outcome else f"state_{run.state}"
             status = tr(status_key)
+            origin_name = self.world.location_name(run.origin)
+            dest_name = self.world.location_name(run.destination)
             summaries.append(
-                f"{run.character_name}: {run.origin} -> {run.destination} [{status}]"
+                f"{run.character_name}: {origin_name} -> {dest_name} [{status}]"
             )
         return summaries
 

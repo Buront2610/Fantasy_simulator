@@ -53,13 +53,13 @@ def _get_numeric_choice(prompt: str, count: int) -> Optional[int]:
 def _build_default_world(num_characters: int = 12, seed: int | None = None) -> World:
     world = World()
     creator = CharacterCreator()
-    locations = [loc.name for loc in world.grid.values() if loc.region_type != "dungeon"]
+    location_ids = [loc.id for loc in world.grid.values() if loc.region_type != "dungeon"]
 
     import random as _random
     rng: Any = _random.Random(seed) if seed is not None else _random
     for _ in range(num_characters):
         char = creator.create_random(rng=rng)
-        char.location = rng.choice(locations)
+        char.location_id = rng.choice(location_ids)
         world.add_character(char)
     return world
 
@@ -185,7 +185,7 @@ def _show_roster(world: World) -> None:
         status = green(tr("status_alive")) if c.alive else red(tr("status_dead"))
         name_trunc = c.name[:21]
         racejob = f"{tr_term(c.race)} {tr_term(c.job)}"[:21]
-        loc_trunc = c.location[:20]
+        loc_trunc = world.location_name(c.location_id)[:20]
         print(
             f"  {name_trunc:<22} {racejob:<22} {c.age:>4}  "
             f"{c.strength:>4}{c.intelligence:>4}{c.dexterity:>4}  "
@@ -232,8 +232,10 @@ def _show_adventure_summaries(sim: Simulator) -> None:
             f" | {tr('injury_label')}: {tr(f'injury_status_{run.injury_status}')}"
             if run.injury_status != "none" else ""
         )
+        origin_name = sim.world.location_name(run.origin)
+        dest_name = sim.world.location_name(run.destination)
         print(
-            f"  {i:>2}. {run.character_name} | {run.origin} -> {run.destination} "
+            f"  {i:>2}. {run.character_name} | {origin_name} -> {dest_name} "
             f"| {status}{injury}{loot}"
         )
     print(_hr())
@@ -250,7 +252,8 @@ def _show_adventure_details(sim: Simulator) -> None:
 
     for i, run in enumerate(runs, 1):
         status = tr(f"outcome_{run.outcome}") if run.outcome else tr(f"state_{run.state}")
-        print(f"  {i:>2}. {run.character_name} {tr('at_label')} {run.destination} [{status}]")
+        dest_name = sim.world.location_name(run.destination)
+        print(f"  {i:>2}. {run.character_name} {tr('at_label')} {dest_name} [{status}]")
     print()
     idx = _get_numeric_choice(f"  {tr('enter_adventure_number')}", len(runs))
     if idx is None:
@@ -262,7 +265,7 @@ def _show_adventure_details(sim: Simulator) -> None:
     print(bold(f"  {tr('adventure_detail_header', name=run.character_name)}"))
     print(_hr())
     print(f"  {tr('id_label'):<11}: {run.adventure_id}")
-    print(f"  {tr('route'):<11}: {run.origin} -> {run.destination}")
+    print(f"  {tr('route'):<11}: {sim.world.location_name(run.origin)} -> {sim.world.location_name(run.destination)}")
     print(f"  {tr('state'):<11}: {tr(f'state_{run.state}')}")
     print(f"  {tr('outcome'):<11}: {tr(f'outcome_{run.outcome}') if run.outcome else tr('unresolved')}")
     print(f"  {tr('injury'):<11}: {tr(f'injury_status_{run.injury_status}')}")

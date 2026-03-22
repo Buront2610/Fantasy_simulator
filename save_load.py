@@ -19,8 +19,11 @@ def save_simulation(simulator: Simulator, path: str) -> bool:
     Returns True on success, False on failure.
     """
     try:
+        from migrations import CURRENT_VERSION
+        payload = simulator.to_dict()
+        payload["schema_version"] = CURRENT_VERSION
         with open(path, "w", encoding="utf-8") as handle:
-            json.dump(simulator.to_dict(), handle, indent=2)
+            json.dump(payload, handle, indent=2)
         return True
     except (OSError, TypeError, ValueError) as exc:
         logger.error("Failed to save simulation to %s: %s", path, exc)
@@ -35,6 +38,8 @@ def load_simulation(path: str) -> Optional[Simulator]:
     try:
         with open(path, "r", encoding="utf-8") as handle:
             data: Any = json.load(handle)
+        from migrations import migrate
+        data = migrate(data)
         return Simulator.from_dict(data)
     except (OSError, json.JSONDecodeError, KeyError, ValueError, TypeError, AttributeError) as exc:
         logger.error("Failed to load simulation from %s: %s", path, exc)

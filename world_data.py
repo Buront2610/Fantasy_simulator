@@ -4,6 +4,12 @@ world_data.py - Predefined lore, races, jobs, locations, and skills for the fant
 
 from typing import Dict, List, Tuple
 
+
+def _name_to_id(name: str) -> str:
+    """Convert a location name to a location ID."""
+    return "loc_" + name.lower().replace(" ", "_").replace("-", "_").replace("'", "")
+
+
 # ---------------------------------------------------------------------------
 # World lore
 # ---------------------------------------------------------------------------
@@ -191,46 +197,73 @@ ALL_SKILLS: List[str] = [s for skills in SKILLS.values() for s in skills]
 
 # ---------------------------------------------------------------------------
 # Locations for the default 5×5 world map
-# Each entry: (name, description, region_type, grid_x, grid_y)
+# Each entry: (id, name, description, region_type, grid_x, grid_y)
 # region_type: city | village | forest | dungeon | mountain | plains | sea
 # ---------------------------------------------------------------------------
 
 DEFAULT_LOCATIONS = [
     # Row 0 (north)
-    ("Frostpeak Summit",  "A jagged mountain crowned with eternal ice.",                  "mountain", 0, 0),
-    ("The Grey Pass",     "A treacherous alpine pass haunted by wind spirits.",           "mountain", 1, 0),
-    ("Skyveil Monastery", "A cliffside monastery where monks study the ley-lines.",       "village",  2, 0),
-    ("Ironvein Mine",     "A deep mine rich in enchanted ore — and old curses.",          "dungeon",  3, 0),
-    ("Stormwatch Keep",   "A fortress overlooking the northern sea.",                     "mountain", 4, 0),
+    ("loc_frostpeak_summit", "Frostpeak Summit",
+     "A jagged mountain crowned with eternal ice.", "mountain", 0, 0),
+    ("loc_the_grey_pass", "The Grey Pass",
+     "A treacherous alpine pass haunted by wind spirits.", "mountain", 1, 0),
+    ("loc_skyveil_monastery", "Skyveil Monastery",
+     "A cliffside monastery where monks study the ley-lines.", "village", 2, 0),
+    ("loc_ironvein_mine", "Ironvein Mine",
+     "A deep mine rich in enchanted ore — and old curses.", "dungeon", 3, 0),
+    ("loc_stormwatch_keep", "Stormwatch Keep",
+     "A fortress overlooking the northern sea.", "mountain", 4, 0),
 
     # Row 1
-    ("Thornwood",         "A dense forest that hums with restless magic.",                "forest",   0, 1),
-    ("Ashenvale",         "Charred woodland recovering from a decade-old wildfire.",      "forest",   1, 1),
-    ("Silverbrook",       "A prosperous trading town built on a swift silver river.",     "city",     2, 1),
-    ("Goblin Warrens",    "A network of tunnels teeming with mischievous creatures.",     "dungeon",  3, 1),
-    ("Eastwatch Tower",   "A lone watchtower staffed by a rotating ranger garrison.",     "village",  4, 1),
+    ("loc_thornwood", "Thornwood",
+     "A dense forest that hums with restless magic.", "forest", 0, 1),
+    ("loc_ashenvale", "Ashenvale",
+     "Charred woodland recovering from a decade-old wildfire.", "forest", 1, 1),
+    ("loc_silverbrook", "Silverbrook",
+     "A prosperous trading town built on a swift silver river.", "city", 2, 1),
+    ("loc_goblin_warrens", "Goblin Warrens",
+     "A network of tunnels teeming with mischievous creatures.", "dungeon", 3, 1),
+    ("loc_eastwatch_tower", "Eastwatch Tower",
+     "A lone watchtower staffed by a rotating ranger garrison.", "village", 4, 1),
 
     # Row 2 (middle)
-    ("Elderroot Forest",  "An ancient forest whose trees remember the Cataclysm.",        "forest",   0, 2),
-    ("Millhaven",         "A quiet farming village known for its legendary apple wine.",  "village",  1, 2),
-    ("Aethoria Capital",  "The grand capital — heart of trade, politics, and intrigue.",  "city",     2, 2),
-    ("Sunken Ruins",      "Ruins of a pre-Cataclysm city, half-swallowed by the earth.", "dungeon",  3, 2),
-    ("Saltmarsh",         "A fishing village where sailors whisper of sea monsters.",     "village",  4, 2),
+    ("loc_elderroot_forest", "Elderroot Forest",
+     "An ancient forest whose trees remember the Cataclysm.", "forest", 0, 2),
+    ("loc_millhaven", "Millhaven",
+     "A quiet farming village known for its legendary apple wine.", "village", 1, 2),
+    ("loc_aethoria_capital", "Aethoria Capital",
+     "The grand capital — heart of trade, politics, and intrigue.", "city", 2, 2),
+    ("loc_sunken_ruins", "Sunken Ruins",
+     "Ruins of a pre-Cataclysm city, half-swallowed by the earth.", "dungeon", 3, 2),
+    ("loc_saltmarsh", "Saltmarsh",
+     "A fishing village where sailors whisper of sea monsters.", "village", 4, 2),
 
     # Row 3
-    ("Dragonbone Ridge",  "A ridge littered with the bones of ancient dragons.",          "mountain", 0, 3),
-    ("Dusty Crossroads",  "A well-worn junction where merchants rest and rumours spread.", "plains",   1, 3),
-    ("Hearthglow Town",   "A warm, welcoming town renowned for its healers' guild.",      "city",     2, 3),
-    ("Mirefen Swamp",     "A murky swamp hiding both treasure and terrible dangers.",     "dungeon",  3, 3),
-    ("Dawnport",          "A busy harbour city that never truly sleeps.",                 "city",     4, 3),
+    ("loc_dragonbone_ridge", "Dragonbone Ridge",
+     "A ridge littered with the bones of ancient dragons.", "mountain", 0, 3),
+    ("loc_dusty_crossroads", "Dusty Crossroads",
+     "A well-worn junction where merchants rest and rumours spread.", "plains", 1, 3),
+    ("loc_hearthglow_town", "Hearthglow Town",
+     "A warm, welcoming town renowned for its healers' guild.", "city", 2, 3),
+    ("loc_mirefen_swamp", "Mirefen Swamp",
+     "A murky swamp hiding both treasure and terrible dangers.", "dungeon", 3, 3),
+    ("loc_dawnport", "Dawnport",
+     "A busy harbour city that never truly sleeps.", "city", 4, 3),
 
     # Row 4 (south)
-    ("Sunbaked Plains",   "Vast golden plains scorched by an unrelenting sun.",           "plains",   0, 4),
-    ("Sandstone Outpost", "A small desert outpost at the edge of the known world.",       "village",  1, 4),
-    ("The Verdant Vale",  "A lush valley sheltered from harsh winds — a true paradise.", "village",  2, 4),
-    ("Obsidian Crater",   "A massive crater from the Cataclysm, still faintly glowing.", "dungeon",  3, 4),
-    ("Coral Cove",        "A hidden cove home to a secretive community of sea-mages.",    "city",     4, 4),
+    ("loc_sunbaked_plains", "Sunbaked Plains",
+     "Vast golden plains scorched by an unrelenting sun.", "plains", 0, 4),
+    ("loc_sandstone_outpost", "Sandstone Outpost",
+     "A small desert outpost at the edge of the known world.", "village", 1, 4),
+    ("loc_the_verdant_vale", "The Verdant Vale",
+     "A lush valley sheltered from harsh winds — a true paradise.", "village", 2, 4),
+    ("loc_obsidian_crater", "Obsidian Crater",
+     "A massive crater from the Cataclysm, still faintly glowing.", "dungeon", 3, 4),
+    ("loc_coral_cove", "Coral Cove",
+     "A hidden cove home to a secretive community of sea-mages.", "city", 4, 4),
 ]
+
+NAME_TO_LOCATION_ID: Dict[str, str] = {entry[1]: entry[0] for entry in DEFAULT_LOCATIONS}
 
 # ---------------------------------------------------------------------------
 # Event flavour fragments used by events.py

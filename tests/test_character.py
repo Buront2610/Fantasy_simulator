@@ -27,7 +27,7 @@ def hero() -> Character:
         charisma=40,
         constitution=65,
         skills={"Swordsmanship": 2, "Shield Block": 1},
-        location="Aethoria Capital",
+        location_id="loc_aethoria_capital",
     )
 
 
@@ -81,7 +81,7 @@ class TestCharacterConstruction:
 
     def test_default_location(self):
         c = Character("Test", 20, "Male", "Human", "Warrior")
-        assert c.location == "Aethoria Capital"
+        assert c.location_id == "loc_aethoria_capital"
 
     def test_auto_generated_id(self, hero):
         assert hero.char_id is not None
@@ -244,7 +244,7 @@ class TestSerialization:
             "char_id", "name", "age", "gender", "race", "job",
             "strength", "intelligence", "dexterity", "wisdom",
             "charisma", "constitution", "skills", "relationships",
-            "alive", "location", "history", "spouse_id",
+            "alive", "location_id", "history", "spouse_id",
             "injury_status", "active_adventure_id",
         }
         assert expected_keys.issubset(set(d.keys()))

@@ -130,20 +130,23 @@ class AdventureRun:
         if self.is_resolved:
             return []
 
+        dest_name = world.location_name(self.destination)
+        origin_name = world.location_name(self.origin)
+
         if self.state == "waiting_for_choice":
             return self.resolve_choice(world, character, option=None)
 
         if self.state == "traveling":
             self.steps_taken += 1
-            summary = tr("summary_adventure_arrived", name=self.character_name, destination=self.destination)
+            summary = tr("summary_adventure_arrived", name=self.character_name, destination=dest_name)
             detail = tr(
                 "detail_adventure_arrived",
-                name=self.character_name, origin=self.origin, destination=self.destination,
+                name=self.character_name, origin=origin_name, destination=dest_name,
             )
             self._record(summary, detail)
             if rng.random() < 0.35:
                 self.pending_choice = AdventureChoice(
-                    prompt=tr("choice_dangerous_approach", name=self.character_name, destination=self.destination),
+                    prompt=tr("choice_dangerous_approach", name=self.character_name, destination=dest_name),
                     options=[CHOICE_PRESS_ON, CHOICE_PROCEED_CAUTIOUSLY, CHOICE_RETREAT],
                     default_option=CHOICE_PROCEED_CAUTIOUSLY,
                     context="approach",
@@ -160,7 +163,7 @@ class AdventureRun:
             if roll < 0.18:
                 self.injury_status = "injured"
                 summary = tr("summary_adventure_injured", name=self.character_name)
-                detail = tr("detail_adventure_injured", name=self.character_name, destination=self.destination)
+                detail = tr("detail_adventure_injured", name=self.character_name, destination=dest_name)
                 self._record(summary, detail)
                 self.state = "returning"
                 return [summary]
@@ -171,24 +174,24 @@ class AdventureRun:
                 self.resolution_year = world.year
                 character.alive = False
                 character.active_adventure_id = None
-                summary = tr("summary_adventure_died", name=self.character_name, destination=self.destination)
-                detail = tr("detail_adventure_died", name=self.character_name, destination=self.destination)
+                summary = tr("summary_adventure_died", name=self.character_name, destination=dest_name)
+                detail = tr("detail_adventure_died", name=self.character_name, destination=dest_name)
                 self._record(summary, detail)
                 character.add_history(tr("history_adventure_detail", year=world.year, detail=detail))
                 return [summary]
 
             discovery = rng.choice(ADVENTURE_DISCOVERIES)
             self.loot_summary.append(discovery)
-            summary = tr("summary_adventure_discovery", name=self.character_name, destination=self.destination)
+            summary = tr("summary_adventure_discovery", name=self.character_name, destination=dest_name)
             detail = tr(
                 "detail_adventure_discovery",
-                name=self.character_name, discovery=tr_term(discovery), destination=self.destination,
+                name=self.character_name, discovery=tr_term(discovery), destination=dest_name,
             )
             self._record(summary, detail)
 
             if self.pending_choice is None and rng.random() < 0.40:
                 self.pending_choice = AdventureChoice(
-                    prompt=tr("choice_press_deeper", name=self.character_name, destination=self.destination),
+                    prompt=tr("choice_press_deeper", name=self.character_name, destination=dest_name),
                     options=[CHOICE_PRESS_ON, CHOICE_WITHDRAW],
                     default_option=CHOICE_WITHDRAW,
                     context="depth",
@@ -207,24 +210,24 @@ class AdventureRun:
                 if self.injury_status != "none":
                     self.outcome = "injury"
                     character.injury_status = self.injury_status
-                    summary = tr("summary_returned_injured", name=self.character_name, destination=self.destination)
-                    detail = tr("detail_returned_injured", name=self.character_name, origin=self.origin)
+                    summary = tr("summary_returned_injured", name=self.character_name, destination=dest_name)
+                    detail = tr("detail_returned_injured", name=self.character_name, origin=origin_name)
                 elif self.loot_summary:
                     self.outcome = "safe_return"
                     summary = tr(
                         "summary_returned_safely",
-                        name=self.character_name, destination=self.destination,
+                        name=self.character_name, destination=dest_name,
                         loot=tr_term(self.loot_summary[-1]),
                     )
                     detail = tr(
                         "detail_returned_safely",
-                        name=self.character_name, origin=self.origin,
+                        name=self.character_name, origin=origin_name,
                         items=", ".join(tr_term(item) for item in self.loot_summary),
                     )
                 else:
                     self.outcome = "retreat"
-                    summary = tr("summary_retreated_safely", name=self.character_name, destination=self.destination)
-                    detail = tr("detail_retreated_safely", name=self.character_name, origin=self.origin)
+                    summary = tr("summary_retreated_safely", name=self.character_name, destination=dest_name)
+                    detail = tr("detail_retreated_safely", name=self.character_name, origin=origin_name)
                 self._record(summary, detail)
             character.active_adventure_id = None
             character.add_history(tr("history_adventure_detail", year=world.year, detail=self.detail_log[-1]))
@@ -262,12 +265,14 @@ class AdventureRun:
 
         if context == "approach" and chosen == CHOICE_PROCEED_CAUTIOUSLY:
             self.state = "exploring"
-            self.detail_log.append(tr("detail_choice_cautious", name=self.character_name, destination=self.destination))
+            dest_name = world.location_name(self.destination)
+            self.detail_log.append(tr("detail_choice_cautious", name=self.character_name, destination=dest_name))
             return []
 
         if context in ("approach", "depth") and chosen == CHOICE_PRESS_ON:
             self.state = "exploring"
-            self.detail_log.append(tr("detail_choice_press_on", name=self.character_name, destination=self.destination))
+            dest_name = world.location_name(self.destination)
+            self.detail_log.append(tr("detail_choice_press_on", name=self.character_name, destination=dest_name))
             return []
 
         self.state = "exploring"
@@ -280,7 +285,7 @@ class AdventureRun:
 
 def create_adventure_run(character: Character, world: World, rng: Any = random) -> AdventureRun:
     """Create a new adventure for a character using nearby risky terrain when possible."""
-    neighbors = world.get_neighboring_locations(character.location)
+    neighbors = world.get_neighboring_locations(character.location_id)
     risky = [loc for loc in neighbors if loc.region_type in ("forest", "mountain", "dungeon")]
     if not risky:
         risky = [
@@ -291,15 +296,16 @@ def create_adventure_run(character: Character, world: World, rng: Any = random) 
         raise ValueError("Cannot create adventure: world has no locations")
     destination = rng.choice(risky) if risky else world.random_location(rng=rng)
 
+    origin_name = world.location_name(character.location_id)
     run = AdventureRun(
         character_id=character.char_id,
         character_name=character.name,
-        origin=character.location,
-        destination=destination.name,
+        origin=character.location_id,
+        destination=destination.id,
         year_started=world.year,
     )
     run._record(
-        tr("summary_adventure_set_out", name=character.name, origin=character.location, destination=destination.name),
-        tr("detail_adventure_set_out", name=character.name, origin=character.location, destination=destination.name),
+        tr("summary_adventure_set_out", name=character.name, origin=origin_name, destination=destination.name),
+        tr("detail_adventure_set_out", name=character.name, origin=origin_name, destination=destination.name),
     )
     return run

@@ -52,7 +52,7 @@ def _make_character(name="Aldric") -> Character:
         strength=60,
         dexterity=50,
         constitution=55,
-        location="Aethoria Capital",
+        location_id="loc_aethoria_capital",
     )
 
 
@@ -60,8 +60,8 @@ def test_adventure_run_round_trip_serialization():
     run = AdventureRun(
         character_id="hero1",
         character_name="Aldric",
-        origin="Aethoria Capital",
-        destination="Whispering Woods",
+        origin="loc_aethoria_capital",
+        destination="loc_thornwood",
         year_started=1000,
         state="waiting_for_choice",
         injury_status="injured",
@@ -128,8 +128,8 @@ def test_injury_outcome_uses_injury_field_without_mutating_constitution():
     run = AdventureRun(
         character_id=char.char_id,
         character_name=char.name,
-        origin=char.location,
-        destination="Whispering Woods",
+        origin=char.location_id,
+        destination="loc_thornwood",
         year_started=world.year,
         state="exploring",
     )
@@ -220,8 +220,8 @@ def test_adventure_death_clears_spouse_on_survivor():
     run = AdventureRun(
         character_id=hero.char_id,
         character_name=hero.name,
-        origin=hero.location,
-        destination="Whispering Woods",
+        origin=hero.location_id,
+        destination="loc_thornwood",
         year_started=world.year,
         state="exploring",
     )
@@ -258,8 +258,8 @@ def test_adventure_death_clears_spouse_via_simulator_integration():
     run = AdventureRun(
         character_id=hero.char_id,
         character_name=hero.name,
-        origin=hero.location,
-        destination="Whispering Woods",
+        origin=hero.location_id,
+        destination="loc_thornwood",
         year_started=world.year,
         state="exploring",
     )

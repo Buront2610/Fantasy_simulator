@@ -7,8 +7,10 @@ from i18n import set_locale
 from world import World
 
 
-def _make_char(name="Aldric", location="Aethoria Capital"):
-    return Character(name=name, age=25, gender="Male", race="Human", job="Warrior", location=location)
+def _make_char(name="Aldric", location_id="loc_aethoria_capital"):
+    return Character(
+        name=name, age=25, gender="Male", race="Human", job="Warrior", location_id=location_id,
+    )
 
 
 class TestWorld:
@@ -21,12 +23,12 @@ class TestWorld:
 
     def test_render_map_uses_highlight_marker(self):
         world = World()
-        rendered = world.render_map(highlight_location="Aethoria Capital")
+        rendered = world.render_map(highlight_location="loc_aethoria_capital")
         assert "*" in rendered
 
     def test_get_neighboring_locations_returns_adjacent_cells(self):
         world = World()
-        neighbors = world.get_neighboring_locations("Aethoria Capital")
+        neighbors = world.get_neighboring_locations("loc_aethoria_capital")
         assert neighbors
         assert all(hasattr(loc, "name") for loc in neighbors)
 
@@ -48,7 +50,7 @@ class TestWorld:
         dead.alive = False
         world.add_character(alive)
         world.add_character(dead)
-        chars = world.get_characters_at_location("Aethoria Capital")
+        chars = world.get_characters_at_location("loc_aethoria_capital")
         assert [c.name for c in chars] == ["Alive"]
 
     def test_random_location_uses_injected_rng(self):

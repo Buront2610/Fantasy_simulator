@@ -8,6 +8,7 @@ from world_data import (
     DISCOVERY_ITEMS,
     JOBS,
     JOURNEY_EVENTS,
+    NAME_TO_LOCATION_ID,
     RACES,
     SKILLS,
 )
@@ -58,24 +59,38 @@ class TestLocations:
     VALID_REGION_TYPES = {"city", "village", "forest", "dungeon", "mountain", "plains", "sea"}
 
     def test_location_names_unique(self):
-        names = [entry[0] for entry in DEFAULT_LOCATIONS]
+        names = [entry[1] for entry in DEFAULT_LOCATIONS]
         assert len(names) == len(set(names))
 
+    def test_location_ids_unique(self):
+        ids = [entry[0] for entry in DEFAULT_LOCATIONS]
+        assert len(ids) == len(set(ids))
+
     def test_coordinates_unique(self):
-        coords = [(entry[3], entry[4]) for entry in DEFAULT_LOCATIONS]
+        coords = [(entry[4], entry[5]) for entry in DEFAULT_LOCATIONS]
         assert len(coords) == len(set(coords))
 
     def test_valid_region_types(self):
-        for name, _desc, rtype, _x, _y in DEFAULT_LOCATIONS:
+        for loc_id, name, _desc, rtype, _x, _y in DEFAULT_LOCATIONS:
             assert rtype in self.VALID_REGION_TYPES, f"{name} has invalid region_type {rtype!r}"
 
     def test_coordinates_within_5x5_grid(self):
-        for name, _desc, _rtype, x, y in DEFAULT_LOCATIONS:
+        for loc_id, name, _desc, _rtype, x, y in DEFAULT_LOCATIONS:
             assert 0 <= x < 5, f"{name} x={x} out of range"
             assert 0 <= y < 5, f"{name} y={y} out of range"
 
     def test_25_locations_for_5x5_grid(self):
         assert len(DEFAULT_LOCATIONS) == 25
+
+    def test_name_to_location_id_mapping(self):
+        assert len(NAME_TO_LOCATION_ID) == 25
+        for entry in DEFAULT_LOCATIONS:
+            loc_id, name = entry[0], entry[1]
+            assert NAME_TO_LOCATION_ID[name] == loc_id
+
+    def test_location_ids_follow_naming_convention(self):
+        for loc_id, name, *_ in DEFAULT_LOCATIONS:
+            assert loc_id.startswith("loc_"), f"{loc_id} doesn't start with 'loc_'"
 
 
 class TestFlavorData:

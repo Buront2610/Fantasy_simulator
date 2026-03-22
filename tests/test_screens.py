@@ -62,7 +62,7 @@ class TestBuildDefaultWorld(unittest.TestCase):
         from screens import _build_default_world
         world = _build_default_world(num_characters=4)
         for char in world.characters:
-            self.assertTrue(len(char.location) > 0)
+            self.assertTrue(len(char.location_id) > 0)
 
 
 class TestMainEntryPoint(unittest.TestCase):
