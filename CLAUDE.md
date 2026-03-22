@@ -73,10 +73,12 @@ main.py              → CLIエントリーポイント・メニューループ
 
 ## Localization Rules
 
-- ユーザーに表示されるすべての文字列は `i18n.py` の `_TEXT` 辞書に登録する（用語は `_TERMS`）
+- `_TEXT` / `_TERMS` はlocale-first構造: `{"ja": {"key": "値"}, "en": {"key": "value"}}`
+- 新しい文字列は各locale辞書にキーを追加する
 - 翻訳キーはドット区切りの階層構造（例: `"events.battle.victory"`）
 - 英語と日本語の両方を必ず追加する
-- `tr("key")` で取得し、フォールバックは英語。用語は `tr_term("term")`
+- `tr("key", **kwargs)` で取得（内部で `format(**kwargs)` 済み、`.format()` 連鎖は不要）。フォールバックは英語
+- 用語は `tr_term("term")`
 
 ## Design Principles
 

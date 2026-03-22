@@ -109,15 +109,24 @@ result = es.event_battle(char1, char2, world)
 
 ### 翻訳文字列の追加
 ```python
-# i18n.py の _TEXT 辞書に追加
-"events.new_event": {
-    "en": "A new event occurred: {description}",
-    "ja": "新しいイベントが発生しました: {description}"
+# i18n.py の _TEXT はlocale-first構造: _TEXT = {"ja": {...}, "en": {...}}
+# 各locale辞書にキーを追加する
+_TEXT = {
+    "ja": {
+        ...
+        "events.new_event": "新しいイベントが発生しました: {description}",
+    },
+    "en": {
+        ...
+        "events.new_event": "A new event occurred: {description}",
+    },
 }
-# 使用時
+
+# 使用時 — tr() が内部で format(**kwargs) するので .format() は不要
 from i18n import tr
-message = tr("events.new_event").format(description="...")
-# 用語は _TERMS 辞書 + tr_term()
+message = tr("events.new_event", description="...")
+
+# 用語は _TERMS 辞書（同じくlocale-first）+ tr_term()
 from i18n import tr_term
 race_name = tr_term("Human")
 ```
