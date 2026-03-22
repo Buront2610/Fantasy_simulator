@@ -2,6 +2,8 @@
 tests/test_world.py - Unit tests for the World class.
 """
 
+import unicodedata
+
 from character import Character
 from i18n import set_locale
 from world import Location, World
@@ -13,6 +15,15 @@ def _make_char(name="Aldric", location_id="loc_aethoria_capital"):
     )
 
 
+def _display_width(text: str) -> int:
+    width = 0
+    for char in text:
+        if unicodedata.combining(char):
+            continue
+        width += 2 if unicodedata.east_asian_width(char) in ("F", "W") else 1
+    return width
+
+
 class TestWorld:
     def test_render_map_contains_header(self):
         set_locale("en")
@@ -22,11 +33,32 @@ class TestWorld:
         assert "Aethoria" in rendered
         assert "Safety" in rendered
         assert "Danger" in rendered
+        assert "Traffic" in rendered
 
     def test_render_map_uses_highlight_marker(self):
         world = World()
         rendered = world.render_map(highlight_location="loc_aethoria_capital")
         assert "*" in rendered
+
+    def test_render_map_lines_have_stable_ascii_width_in_english(self):
+        set_locale("en")
+        world = World()
+        lines = world.render_map().splitlines()
+        lengths = {len(line) for line in lines}
+        assert len(lengths) == 1
+
+    def test_render_map_lines_have_stable_display_width_in_japanese(self):
+        set_locale("ja")
+        world = World()
+        lines = world.render_map().splitlines()
+        widths = {_display_width(line) for line in lines}
+        assert len(widths) == 1
+
+    def test_render_map_localizes_region_type_in_japanese(self):
+        set_locale("ja")
+        rendered = World().render_map()
+        assert "地形: 都市" in rendered
+        assert "地形: city" not in rendered
 
     def test_get_neighboring_locations_returns_adjacent_cells(self):
         world = World()

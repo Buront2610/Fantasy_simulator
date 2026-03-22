@@ -5,10 +5,11 @@ world.py - World map, LocationState dataclass, and the World class.
 from __future__ import annotations
 
 import random
+import unicodedata
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
-from i18n import tr
+from i18n import tr, tr_term
 from world_data import (
     DEFAULT_LOCATIONS,
     NAME_TO_LOCATION_ID,
@@ -64,6 +65,44 @@ def _traffic_indicator(value: int) -> str:
     if value > 0:
         return "+"
     return "-"
+
+
+def _char_display_width(char: str) -> int:
+    if unicodedata.combining(char):
+        return 0
+    if unicodedata.east_asian_width(char) in ("F", "W"):
+        return 2
+    return 1
+
+
+def _display_width(text: str) -> int:
+    return sum(_char_display_width(char) for char in text)
+
+
+def _fit_display_width(text: str, width: int, suffix: str = "...") -> str:
+    """Pad or truncate text to a terminal display width."""
+    if width <= 0:
+        return ""
+    if _display_width(text) <= width:
+        return text + " " * (width - _display_width(text))
+
+    suffix_width = _display_width(suffix)
+    if suffix_width >= width:
+        suffix = ""
+        suffix_width = 0
+
+    kept: List[str] = []
+    used_width = 0
+    max_text_width = width - suffix_width
+    for char in text:
+        char_width = _char_display_width(char)
+        if used_width + char_width > max_text_width:
+            break
+        kept.append(char)
+        used_width += char_width
+
+    clipped = "".join(kept) + suffix
+    return clipped + " " * (width - _display_width(clipped))
 
 
 @dataclass
@@ -459,11 +498,12 @@ class World:
     def render_map(self, highlight_location: Optional[str] = None) -> str:
         """Return a stable ASCII grid of the world map."""
         cell_width = 20
-        total_width = self.width * (cell_width + 1) + 1
-        border = "  +" + "-" * (total_width - 2) + "+"
+        inner_width = self.width * cell_width + (self.width - 1)
+        border = "  +" + "-" * inner_width + "+"
+        header = f" {tr('map_title')}: {self.name} | {tr('map_year')}: {self.year}"
         lines: List[str] = [
             border,
-            f"  | {tr('map_title')}: {self.name} | {tr('map_year')}: {self.year}".ljust(total_width) + "|",
+            f"  |{_fit_display_width(header, inner_width)}|",
             border,
         ]
 
@@ -471,16 +511,18 @@ class World:
             row_names: List[str] = []
             row_types: List[str] = []
             row_safety: List[str] = []
-            row_state: List[str] = []
+            row_danger: List[str] = []
+            row_traffic: List[str] = []
             row_pops: List[str] = []
             for x in range(self.width):
                 loc = self.grid.get((x, y))
                 if loc is None:
-                    blank = "".ljust(cell_width)
-                    row_names.append(f" ? {'???':<{cell_width - 3}}")
+                    blank = " " * cell_width
+                    row_names.append(_fit_display_width(" ? ???", cell_width))
                     row_types.append(blank)
                     row_safety.append(blank)
-                    row_state.append(blank)
+                    row_danger.append(blank)
+                    row_traffic.append(blank)
                     row_pops.append(blank)
                     continue
 
@@ -490,20 +532,19 @@ class World:
                 )
                 icon = "*" if is_highlight else loc.icon
                 population = len(self.get_characters_at_location(loc.id))
-                row_names.append(f" {icon} {loc.canonical_name[:cell_width - 4]}".ljust(cell_width))
-                row_types.append(f" {tr('map_type')}: {loc.region_type}".ljust(cell_width))
-                row_safety.append(f" {tr('map_safety')}: {loc.safety_label}".ljust(cell_width))
-                row_state.append(
-                    f" {tr('map_danger')}: {loc.danger:>3} {tr('map_traffic')}: {loc.traffic_indicator}".ljust(
-                        cell_width
-                    )
-                )
-                row_pops.append(f" {tr('map_population')}: {population}".ljust(cell_width))
+                region_name = tr_term(loc.region_type)
+                row_names.append(_fit_display_width(f" {icon} {loc.canonical_name}", cell_width))
+                row_types.append(_fit_display_width(f" {tr('map_type')}: {region_name}", cell_width))
+                row_safety.append(_fit_display_width(f" {tr('map_safety')}: {loc.safety_label}", cell_width))
+                row_danger.append(_fit_display_width(f" {tr('map_danger')}: {loc.danger:>3}", cell_width))
+                row_traffic.append(_fit_display_width(f" {tr('map_traffic')}: {loc.traffic_indicator}", cell_width))
+                row_pops.append(_fit_display_width(f" {tr('map_population')}: {population}", cell_width))
 
             lines.append("  |" + "|".join(row_names) + "|")
             lines.append("  |" + "|".join(row_types) + "|")
             lines.append("  |" + "|".join(row_safety) + "|")
-            lines.append("  |" + "|".join(row_state) + "|")
+            lines.append("  |" + "|".join(row_danger) + "|")
+            lines.append("  |" + "|".join(row_traffic) + "|")
             lines.append("  |" + "|".join(row_pops) + "|")
             lines.append(border)
 
