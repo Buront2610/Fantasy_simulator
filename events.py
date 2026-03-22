@@ -9,6 +9,7 @@ simulation tick to drive the narrative.
 from __future__ import annotations
 
 import random
+import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
@@ -53,6 +54,75 @@ class EventResult:
         )
 
 
+@dataclass
+class WorldEventRecord:
+    """A structured record of a world event for history and analysis.
+
+    Unlike EventResult (which is consumed immediately by the simulation loop),
+    WorldEventRecord is designed for long-term storage and querying.
+    """
+
+    record_id: str = field(default_factory=lambda: uuid.uuid4().hex)
+    kind: str = "generic"
+    year: int = 0
+    location_id: Optional[str] = None
+    primary_actor_id: Optional[str] = None
+    secondary_actor_ids: List[str] = field(default_factory=list)
+    description: str = ""
+    severity: int = 1
+    visibility: str = "public"
+
+    def __post_init__(self) -> None:
+        self.severity = max(1, min(5, self.severity))
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "record_id": self.record_id,
+            "kind": self.kind,
+            "year": self.year,
+            "location_id": self.location_id,
+            "primary_actor_id": self.primary_actor_id,
+            "secondary_actor_ids": list(self.secondary_actor_ids),
+            "description": self.description,
+            "severity": self.severity,
+            "visibility": self.visibility,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "WorldEventRecord":
+        return cls(
+            record_id=data.get("record_id", uuid.uuid4().hex),
+            kind=data.get("kind", "generic"),
+            year=data.get("year", 0),
+            location_id=data.get("location_id"),
+            primary_actor_id=data.get("primary_actor_id"),
+            secondary_actor_ids=list(data.get("secondary_actor_ids", [])),
+            description=data.get("description", ""),
+            severity=data.get("severity", 1),
+            visibility=data.get("visibility", "public"),
+        )
+
+    @classmethod
+    def from_event_result(
+        cls,
+        result: EventResult,
+        location_id: Optional[str] = None,
+        severity: int = 1,
+    ) -> "WorldEventRecord":
+        """Create a WorldEventRecord from an EventResult."""
+        primary = result.affected_characters[0] if result.affected_characters else None
+        secondary = result.affected_characters[1:] if len(result.affected_characters) > 1 else []
+        return cls(
+            kind=result.event_type,
+            year=result.year,
+            location_id=location_id,
+            primary_actor_id=primary,
+            secondary_actor_ids=secondary,
+            description=result.description,
+            severity=severity,
+        )
+
+
 class EventSystem:
     """Generates and resolves world events."""
 
@@ -89,7 +159,7 @@ class EventSystem:
                 "romance_commitments_blocked",
                 name1=char1.name,
                 name2=char2.name,
-                location=char1.location,
+                location=world.location_name(char1.location_id),
             )
             return EventResult(
                 description=desc,
@@ -105,7 +175,7 @@ class EventSystem:
                 "romance_growing_closer",
                 name1=char1.name,
                 name2=char2.name,
-                location=char1.location,
+                location=world.location_name(char1.location_id),
             )
             return EventResult(
                 description=desc,
@@ -133,10 +203,16 @@ class EventSystem:
             name2=char2.name,
             race2=char2.race,
             job2=char2.job,
-            location=char1.location,
+            location=world.location_name(char1.location_id),
         )
-        char1.add_history(tr("history_married", year=world.year, name=char2.name, location=char1.location))
-        char2.add_history(tr("history_married", year=world.year, name=char1.name, location=char2.location))
+        char1.add_history(tr(
+            "history_married", year=world.year, name=char2.name,
+            location=world.location_name(char1.location_id),
+        ))
+        char2.add_history(tr(
+            "history_married", year=world.year, name=char1.name,
+            location=world.location_name(char2.location_id),
+        ))
         return EventResult(
             description=desc,
             affected_characters=[char1.char_id, char2.char_id],
@@ -161,7 +237,10 @@ class EventSystem:
         if loser_died:
             self.event_death(loser, world, rng=rng)
             desc = tr("battle_fatal", winner=winner.name, loser=loser.name)
-            winner.add_history(tr("history_battle_fatal", year=world.year, name=loser.name, location=winner.location))
+            winner.add_history(tr(
+                "history_battle_fatal", year=world.year, name=loser.name,
+                location=world.location_name(winner.location_id),
+            ))
             return EventResult(
                 description=desc,
                 affected_characters=[winner.char_id, loser.char_id],
@@ -171,8 +250,14 @@ class EventSystem:
             )
 
         desc = tr("battle_normal", winner=winner.name, loser=loser.name)
-        winner.add_history(tr("history_battle_win", year=world.year, name=loser.name, location=winner.location))
-        loser.add_history(tr("history_battle_loss", year=world.year, name=winner.name, location=loser.location))
+        winner.add_history(tr(
+            "history_battle_win", year=world.year, name=loser.name,
+            location=world.location_name(winner.location_id),
+        ))
+        loser.add_history(tr(
+            "history_battle_loss", year=world.year, name=winner.name,
+            location=world.location_name(loser.location_id),
+        ))
         return EventResult(
             description=desc,
             affected_characters=[winner.char_id, loser.char_id],
@@ -201,8 +286,9 @@ class EventSystem:
         char.level_up_skill(trained_skill)
 
         localized_item = tr_term(item)
-        desc = tr("discovery_narrative", name=char.name, item=localized_item, location=char.location, extra=extra)
-        char.add_history(tr("history_discovery", year=world.year, item=localized_item, location=char.location))
+        loc_name = world.location_name(char.location_id)
+        desc = tr("discovery_narrative", name=char.name, item=localized_item, location=loc_name, extra=extra)
+        char.add_history(tr("history_discovery", year=world.year, item=localized_item, location=loc_name))
         return EventResult(
             description=desc,
             affected_characters=[char.char_id],
@@ -225,7 +311,7 @@ class EventSystem:
                 "meeting_positive",
                 name1=char1.name,
                 name2=char2.name,
-                location=char1.location,
+                location=world.location_name(char1.location_id),
                 relationship_a=rel1_after,
                 relationship_b=rel2_after,
                 relationship_avg=avg_after,
@@ -235,7 +321,7 @@ class EventSystem:
                 "meeting_pleasant",
                 name1=char1.name,
                 name2=char2.name,
-                location=char1.location,
+                location=world.location_name(char1.location_id),
                 relationship_a=rel1_after,
                 relationship_b=rel2_after,
                 relationship_avg=avg_after,
@@ -245,7 +331,7 @@ class EventSystem:
                 "meeting_neutral",
                 name1=char1.name,
                 name2=char2.name,
-                location=char1.location,
+                location=world.location_name(char1.location_id),
                 relationship_a=rel1_after,
                 relationship_b=rel2_after,
                 relationship_avg=avg_after,
@@ -255,13 +341,19 @@ class EventSystem:
                 "meeting_negative",
                 name1=char1.name,
                 name2=char2.name,
-                location=char1.location,
+                location=world.location_name(char1.location_id),
                 relationship_a=rel1_after,
                 relationship_b=rel2_after,
                 relationship_avg=avg_after,
             )
-        char1.add_history(tr("history_met", year=world.year, name=char2.name, location=char1.location))
-        char2.add_history(tr("history_met", year=world.year, name=char1.name, location=char2.location))
+        char1.add_history(tr(
+            "history_met", year=world.year, name=char2.name,
+            location=world.location_name(char1.location_id),
+        ))
+        char2.add_history(tr(
+            "history_met", year=world.year, name=char1.name,
+            location=world.location_name(char2.location_id),
+        ))
         return EventResult(
             description=desc,
             affected_characters=[char1.char_id, char2.char_id],
@@ -334,7 +426,7 @@ class EventSystem:
 
         cause_options = [
             tr("death_cause_old_age"),
-            tr("death_cause_monster", location=char.location),
+            tr("death_cause_monster", location=world.location_name(char.location_id)),
             tr("death_cause_illness"),
             tr("death_cause_protecting"),
             tr("death_cause_dungeon"),
@@ -404,7 +496,7 @@ class EventSystem:
         )
 
     def event_journey(self, char: Character, world: World, rng: Any = random) -> EventResult:
-        neighbours = world.get_neighboring_locations(char.location)
+        neighbours = world.get_neighboring_locations(char.location_id)
         if not neighbours:
             neighbours = list(world.grid.values())
         if not neighbours:
@@ -416,21 +508,23 @@ class EventSystem:
             )
 
         destination = rng.choice(neighbours)
-        old_location = char.location
-        char.location = destination.name
+        old_location_id = char.location_id
+        char.location_id = destination.id
 
         road_event = rng.choice(JOURNEY_EVENTS)
         desc = tr(
             "journey_narrative",
             name=char.name,
-            old_location=old_location,
+            old_location=world.location_name(old_location_id),
             destination=destination.name,
             region_type=destination.region_type,
             road_event=road_event,
         )
         char.add_history(tr(
             "history_travelled",
-            year=world.year, old_location=old_location, destination=destination.name,
+            year=world.year,
+            old_location=world.location_name(old_location_id),
+            destination=destination.name,
         ))
 
         extra_changes: Dict[str, int] = {}
@@ -496,7 +590,7 @@ class EventSystem:
     def _find_collocated_pair(alive: List[Character], rng: Any = random) -> Optional[Tuple[Character, Character]]:
         by_loc: Dict[str, List[Character]] = {}
         for c in alive:
-            group = by_loc.setdefault(c.location, [])
+            group = by_loc.setdefault(c.location_id, [])
             group.append(c)
         valid = [chars for chars in by_loc.values() if len(chars) >= 2]
         if not valid:

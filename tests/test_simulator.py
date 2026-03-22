@@ -23,10 +23,10 @@ def _make_world(n_chars: int = 6, seed_name_prefix: str = "Hero") -> World:
     creator = CharacterCreator()
     import random
     random.seed(42)
-    locs = [loc.name for loc in world.grid.values() if loc.region_type != "dungeon"]
+    locs = [loc.id for loc in world.grid.values() if loc.region_type != "dungeon"]
     for i in range(n_chars):
         c = creator.create_random(name=f"{seed_name_prefix}{i}")
-        c.location = locs[i % len(locs)]
+        c.location_id = locs[i % len(locs)]
         world.add_character(c)
     return world
 
@@ -98,10 +98,10 @@ class TestSimulatorConstruction:
             rng = _random.Random(seed)
             world = World()
             creator = CharacterCreator()
-            locs = [loc.name for loc in world.grid.values() if loc.region_type != "dungeon"]
+            locs = [loc.id for loc in world.grid.values() if loc.region_type != "dungeon"]
             for _ in range(4):
                 c = creator.create_random(rng=rng)
-                c.location = rng.choice(locs)
+                c.location_id = rng.choice(locs)
                 world.add_character(c)
             return world
 
@@ -117,7 +117,7 @@ class TestSimulatorConstruction:
             assert c1.age == c2.age
             assert c1.strength == c2.strength
             assert c1.intelligence == c2.intelligence
-            assert c1.location == c2.location
+            assert c1.location_id == c2.location_id
 
         # Full simulation should also match
         s1 = Simulator(w1, events_per_year=4, seed=99)
@@ -399,14 +399,14 @@ class TestSimulatorSerialization:
     def test_save_and_load_preserves_pending_choice_ids_across_locale_change(self, tmp_path):
         set_locale("ja")
         world = World()
-        char = Character("Aldric", 25, "Male", "Human", "Warrior", location="Aethoria Capital")
+        char = Character("Aldric", 25, "Male", "Human", "Warrior", location_id="loc_aethoria_capital")
         world.add_character(char)
         sim = Simulator(world, events_per_year=0, adventure_steps_per_year=1, seed=1)
         run = AdventureRun(
             character_id=char.char_id,
             character_name=char.name,
-            origin=char.location,
-            destination="Sunken Ruins",
+            origin=char.location_id,
+            destination="loc_sunken_ruins",
             year_started=world.year,
             state="waiting_for_choice",
         )
@@ -474,7 +474,7 @@ class TestInjuryRecovery:
 class TestAdventureSafety:
     def test_dead_character_adventure_is_not_advanced(self):
         world = World()
-        char = Character("Aldric", 95, "Male", "Human", "Warrior", location="Aethoria Capital")
+        char = Character("Aldric", 95, "Male", "Human", "Warrior", location_id="loc_aethoria_capital")
         world.add_character(char)
         sim = Simulator(world, events_per_year=0, adventure_steps_per_year=3, seed=1)
 
@@ -509,8 +509,8 @@ class TestAdventureSafety:
         run = AdventureRun(
             character_id="hero1",
             character_name="Aldric",
-            origin="Aethoria Capital",
-            destination="Whispering Woods",
+            origin="loc_aethoria_capital",
+            destination="loc_thornwood",
             year_started=1000,
             state="waiting_for_choice",
         )
@@ -544,7 +544,7 @@ class TestJapaneseLocaleSummary:
 
     def test_character_story_race_job_in_japanese(self):
         world = World()
-        char = Character("Aldric", 25, "Male", "Human", "Warrior", location="Aethoria Capital")
+        char = Character("Aldric", 25, "Male", "Human", "Warrior", location_id="loc_aethoria_capital")
         world.add_character(char)
         sim = Simulator(world, events_per_year=0, seed=1)
 
@@ -552,3 +552,41 @@ class TestJapaneseLocaleSummary:
 
         assert "人間" in story
         assert "戦士" in story
+
+
+class TestWorldEventRecordIntegration:
+    def test_simulation_creates_event_records(self, small_world):
+        sim = Simulator(small_world, seed=42)
+        sim.advance_years(2)
+        assert len(sim.world.event_records) > 0
+
+    def test_event_records_have_valid_kinds(self, small_world):
+        sim = Simulator(small_world, seed=42)
+        sim.advance_years(1)
+        for record in sim.world.event_records:
+            assert record.kind != ""
+            assert record.year > 0
+
+    def test_event_records_have_location_ids(self, small_world):
+        sim = Simulator(small_world, seed=42)
+        sim.advance_years(3)
+        records_with_location = [r for r in sim.world.event_records if r.location_id is not None]
+        assert len(records_with_location) > 0
+
+    def test_event_records_queryable_by_year(self, small_world):
+        sim = Simulator(small_world, seed=42)
+        sim.advance_years(3)
+        year_records = sim.world.get_events_by_year(1001)
+        assert isinstance(year_records, list)
+
+    def test_event_records_saved_and_loaded(self, small_world, tmp_path):
+        sim = Simulator(small_world, seed=42)
+        sim.advance_years(2)
+        original_count = len(sim.world.event_records)
+        assert original_count > 0
+
+        path = tmp_path / "test.json"
+        save_simulation(sim, str(path))
+        restored = load_simulation(str(path))
+        assert restored is not None
+        assert len(restored.world.event_records) == original_count

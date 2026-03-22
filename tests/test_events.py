@@ -35,7 +35,7 @@ def reset_locale():
 
 def _make_char(
     name: str,
-    location: str = "Aethoria Capital",
+    location_id: str = "loc_aethoria_capital",
     age: int = 25,
     strength: int = 50,
     constitution: int = 50,
@@ -46,21 +46,21 @@ def _make_char(
         strength=strength, constitution=constitution, intelligence=intelligence,
         dexterity=50, wisdom=40, charisma=40,
         skills={"Swordsmanship": 2},
-        location=location,
+        location_id=location_id,
     )
     return c
 
 
 @pytest.fixture
 def char_a(world) -> Character:
-    c = _make_char("Alice", location="Aethoria Capital")
+    c = _make_char("Alice", location_id="loc_aethoria_capital")
     world.add_character(c)
     return c
 
 
 @pytest.fixture
 def char_b(world) -> Character:
-    c = _make_char("Bob", location="Aethoria Capital")
+    c = _make_char("Bob", location_id="loc_aethoria_capital")
     world.add_character(c)
     return c
 
@@ -290,8 +290,7 @@ class TestEventJourney:
 
     def test_location_changes(self, es, char_a, world):
         es.event_journey(char_a, world)
-        # May or may not change (neighbours possible), but no crash
-        assert isinstance(char_a.location, str)
+        assert isinstance(char_a.location_id, str)
 
     def test_history_updated(self, es, char_a, world):
         es.event_journey(char_a, world)
@@ -403,7 +402,7 @@ class TestEventMarriage:
         assert result.event_type == "anniversary"
 
     def test_existing_spouse_blocks_new_marriage(self, es, char_a, char_b, world):
-        outsider = _make_char("Cara", location="Aethoria Capital")
+        outsider = _make_char("Cara", location_id="loc_aethoria_capital")
         world.add_character(outsider)
         char_a.spouse_id = outsider.char_id
         char_a.update_relationship(char_b.char_id, 90)
@@ -463,7 +462,7 @@ class TestNaturalDeath:
 class TestGenerateRandomEvent:
     def test_returns_event_result(self, es, world):
         for _ in range(5):
-            c = _make_char(f"Char{_}", location="Aethoria Capital")
+            c = _make_char(f"Char{_}", location_id="loc_aethoria_capital")
             world.add_character(c)
         result = es.generate_random_event(world.characters, world)
         assert result is None or isinstance(result, EventResult)
@@ -484,7 +483,7 @@ class TestGenerateRandomEvent:
 
     def test_single_char_solo_event(self, es, world):
         """With only one character, a solo event should fire (no crash)."""
-        c = _make_char("Solo", location="Aethoria Capital")
+        c = _make_char("Solo", location_id="loc_aethoria_capital")
         c.skills = {"Swordsmanship": 1}
         world.add_character(c)
         import random
@@ -495,3 +494,65 @@ class TestGenerateRandomEvent:
 
     def test_random_event_table_excludes_direct_death(self, es):
         assert "death" not in es._EVENT_WEIGHTS
+
+
+# ---------------------------------------------------------------------------
+# WorldEventRecord
+# ---------------------------------------------------------------------------
+
+class TestWorldEventRecord:
+    def test_to_dict_round_trip(self):
+        from events import WorldEventRecord
+        record = WorldEventRecord(
+            kind="battle",
+            year=1005,
+            location_id="loc_aethoria_capital",
+            primary_actor_id="abc123",
+            secondary_actor_ids=["def456"],
+            description="A battle occurred.",
+            severity=3,
+            visibility="public",
+        )
+        d = record.to_dict()
+        restored = WorldEventRecord.from_dict(d)
+        assert restored.kind == "battle"
+        assert restored.year == 1005
+        assert restored.location_id == "loc_aethoria_capital"
+        assert restored.primary_actor_id == "abc123"
+        assert restored.secondary_actor_ids == ["def456"]
+        assert restored.severity == 3
+
+    def test_from_event_result(self):
+        from events import WorldEventRecord
+        result = EventResult(
+            description="A battle occurred.",
+            affected_characters=["abc123", "def456"],
+            stat_changes={},
+            event_type="battle",
+            year=1005,
+        )
+        record = WorldEventRecord.from_event_result(result, location_id="loc_thornwood", severity=3)
+        assert record.kind == "battle"
+        assert record.year == 1005
+        assert record.location_id == "loc_thornwood"
+        assert record.primary_actor_id == "abc123"
+        assert record.secondary_actor_ids == ["def456"]
+        assert record.severity == 3
+        assert record.description == "A battle occurred."
+
+    def test_from_event_result_no_actors(self):
+        from events import WorldEventRecord
+        result = EventResult(description="Nothing happened.", year=1000)
+        record = WorldEventRecord.from_event_result(result)
+        assert record.primary_actor_id is None
+        assert record.secondary_actor_ids == []
+
+    def test_default_values(self):
+        from events import WorldEventRecord
+        record = WorldEventRecord()
+        assert record.kind == "generic"
+        assert record.year == 0
+        assert record.location_id is None
+        assert record.severity == 1
+        assert record.visibility == "public"
+        assert len(record.record_id) == 32

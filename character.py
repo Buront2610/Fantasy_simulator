@@ -31,7 +31,7 @@ class Character:
         skills: Optional[Dict[str, int]] = None,
         relationships: Optional[Dict[str, int]] = None,
         alive: bool = True,
-        location: str = "Aethoria Capital",
+        location_id: str = "loc_aethoria_capital",
         history: Optional[List[str]] = None,
         char_id: Optional[str] = None,
         spouse_id: Optional[str] = None,
@@ -61,7 +61,7 @@ class Character:
         self.skills: Dict[str, int] = skills if skills is not None else {}
         self.relationships: Dict[str, int] = relationships if relationships is not None else {}
         self.alive: bool = alive
-        self.location: str = location
+        self.location_id: str = location_id
         self.history: List[str] = history if history is not None else []
         self.spouse_id: Optional[str] = spouse_id
         self.injury_status: str = injury_status
@@ -121,6 +121,18 @@ class Character:
     def get_relationship(self, other_id: str) -> int:
         return self.relationships.get(other_id, 0)
 
+    @property
+    def location_display_name(self) -> str:
+        """Derive a human-readable name from location_id.
+
+        This is a fallback for contexts where World is not available.
+        Prefer ``world.location_name(char.location_id)`` when possible.
+        """
+        lid = self.location_id
+        if lid.startswith("loc_"):
+            lid = lid[4:]
+        return lid.replace("_", " ").title()
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "char_id": self.char_id,
@@ -138,7 +150,7 @@ class Character:
             "skills": self.skills,
             "relationships": self.relationships,
             "alive": self.alive,
-            "location": self.location,
+            "location_id": self.location_id,
             "history": self.history,
             "spouse_id": self.spouse_id,
             "injury_status": self.injury_status,
@@ -147,11 +159,17 @@ class Character:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Character":
+        from world_data import NAME_TO_LOCATION_ID
         # Clamp skill levels to [0, 10] and relationships to [-100, 100]
         raw_skills = data.get("skills", {})
         skills = {k: max(0, min(10, v)) for k, v in raw_skills.items()}
         raw_rels = data.get("relationships", {})
         relationships = {k: max(-100, min(100, v)) for k, v in raw_rels.items()}
+        # Support both old "location" and new "location_id" keys
+        location_id = data.get("location_id")
+        if location_id is None:
+            old_name = data.get("location", "Aethoria Capital")
+            location_id = NAME_TO_LOCATION_ID.get(old_name, "loc_aethoria_capital")
         return cls(
             name=data["name"],
             age=data["age"],
@@ -167,7 +185,7 @@ class Character:
             skills=skills,
             relationships=relationships,
             alive=data.get("alive", True),
-            location=data.get("location", "Aethoria Capital"),
+            location_id=location_id,
             history=data.get("history", []),
             char_id=data.get("char_id"),
             spouse_id=data.get("spouse_id"),
@@ -187,7 +205,7 @@ class Character:
             f"  {tr('name_label'):<10}: {self.name}",
             f"  {tr('race_job_label'):<10}: {tr_term(self.race)} {tr_term(self.job)}",
             f"  {tr('age_gender_label'):<10}: {self.age}  |  {tr('gender_label')}: {tr_term(self.gender)}",
-            f"  {tr('location_label'):<10}: {self.location}",
+            f"  {tr('location_label'):<10}: {self.location_display_name}",
             f"  {tr('status_label'):<10}: {tr('status_alive') if self.alive else tr('status_dead')}",
             f"  {tr('stats_label')}",
             (
