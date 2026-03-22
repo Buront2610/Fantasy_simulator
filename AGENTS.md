@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Fantasy Simulator: Python CLI世界シミュレーション（Aethoria）。純粋Python 3.10+、外部依存なし。
+Fantasy Simulator: Python CLI世界シミュレーション（Aethoria）。Python 3.10+。ランタイムは現時点で標準ライブラリのみだが、必要に応じて外部パッケージを導入してよい。
 
 ## Architecture
 
@@ -29,7 +29,6 @@ Fantasy_simulator/
 ├── save_load.py             # セーブ/ロード
 ├── i18n.py                  # 翻訳システム
 ├── tests/
-│   ├── conftest.py          # テストfixture
 │   └── test_*.py            # 各モジュールのテスト
 ├── .github/workflows/
 │   └── test.yml             # CI設定
@@ -41,7 +40,7 @@ Fantasy_simulator/
 
 - snake_case（変数・関数）、PascalCase（クラス）
 - 行の最大長: 120文字
-- ユーザー向け文字列は `t()` 経由（i18n）
+- ユーザー向け文字列は `tr()` / `tr_term()` 経由（i18n）
 - シリアライズは `to_dict()` / `from_dict()` パターン
 - テストは `tests/test_<module>.py`
 
@@ -63,12 +62,11 @@ flake8 --max-line-length=120 --exclude=node_modules,__pycache__ . && python -m p
 
 ## NEVER
 
-- 外部パッケージの依存を追加しない（純粋Python標準ライブラリのみ）
 - `node_modules/`、`__pycache__/` を編集しない
 - 既存のテストを削除しない
-- `i18n.py` の翻訳キー構造を壊さない
-- flake8 エラーを残さない
-- ハードコードされたユーザー向け文字列を追加しない（`t()` を使う）
+- `i18n.py` の翻訳キー構造（`_TEXT` / `_TERMS`）を壊さない
+- flake8 エラーを残さない（CIで強制）
+- ハードコードされたユーザー向け文字列を追加しない（`tr()` / `tr_term()` を使う）
 - `save_load.py` のシリアライゼーション互換性を壊さない
 
 ## Permissions
@@ -94,29 +92,32 @@ flake8 --max-line-length=120 --exclude=node_modules,__pycache__ . && python -m p
 ```python
 from character import Character
 char = Character(
-    name="Aldric", race="Human", job="Warrior",
-    stats={"strength": 15, "intelligence": 8, "dexterity": 12,
-           "wisdom": 10, "charisma": 11, "constitution": 14}
+    name="Aldric", age=25, gender="male", race="Human", job="Warrior",
+    strength=15, intelligence=8, dexterity=12,
+    wisdom=10, charisma=11, constitution=14,
 )
 ```
 
 ### イベント生成
 ```python
 from events import EventSystem
-es = EventSystem(world, seed=42)
-events = es.generate_events(year=5, events_per_year=3)
-for event in events:
-    es.resolve_event(event)
+es = EventSystem()
+result = es.generate_random_event(world.characters, world)
+# 個別イベント呼び出し
+result = es.event_battle(char1, char2, world)
 ```
 
 ### 翻訳文字列の追加
 ```python
-# i18n.py の TRANSLATIONS 辞書に追加
+# i18n.py の _TEXT 辞書に追加
 "events.new_event": {
     "en": "A new event occurred: {description}",
     "ja": "新しいイベントが発生しました: {description}"
 }
 # 使用時
-from i18n import t
-message = t("events.new_event").format(description="...")
+from i18n import tr
+message = tr("events.new_event").format(description="...")
+# 用語は _TERMS 辞書 + tr_term()
+from i18n import tr_term
+race_name = tr_term("Human")
 ```
