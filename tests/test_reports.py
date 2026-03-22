@@ -299,8 +299,8 @@ class TestGenerateYearlyReport:
         # The report should still contain year-1000 events
         assert report_at_1003.total_events == 1
         assert report_at_1003.character_entries[0].name == "Hero"
-        # No alive/dead counts from world state
-        assert not hasattr(report_at_1003, 'alive_count') or report_at_1003.deaths_this_year == 0
+        # deaths_this_year comes from events, not current state; no death events in year 1000
+        assert report_at_1003.deaths_this_year == 0
 
 
 # ---------------------------------------------------------------------------
@@ -509,6 +509,14 @@ class TestSimulatorReportIntegration:
 # i18n tests for report keys
 # ---------------------------------------------------------------------------
 
+_ADVENTURE_EVENT_KINDS = [
+    "injury_recovery", "adventure_started", "adventure_arrived",
+    "adventure_choice", "adventure_death", "adventure_injured",
+    "adventure_discovery", "adventure_returned_injured",
+    "adventure_returned", "adventure_retreated", "adventure_update",
+]
+
+
 class TestReportI18n:
     def test_report_keys_exist_en(self):
         set_locale("en")
@@ -534,23 +542,13 @@ class TestReportI18n:
     def test_adventure_event_type_keys_en(self):
         """All adventure/injury event kinds must have i18n keys."""
         set_locale("en")
-        for kind in [
-            "injury_recovery", "adventure_started", "adventure_arrived",
-            "adventure_choice", "adventure_death", "adventure_injured",
-            "adventure_discovery", "adventure_returned_injured",
-            "adventure_returned", "adventure_retreated", "adventure_update",
-        ]:
+        for kind in _ADVENTURE_EVENT_KINDS:
             key = f"event_type_{kind}"
             assert tr(key) != key, f"Missing i18n key: {key}"
 
     def test_adventure_event_type_keys_ja(self):
         set_locale("ja")
-        for kind in [
-            "injury_recovery", "adventure_started", "adventure_arrived",
-            "adventure_choice", "adventure_death", "adventure_injured",
-            "adventure_discovery", "adventure_returned_injured",
-            "adventure_returned", "adventure_retreated", "adventure_update",
-        ]:
+        for kind in _ADVENTURE_EVENT_KINDS:
             key = f"event_type_{kind}"
             assert tr(key) != key, f"Missing ja i18n key: {key}"
         set_locale("en")
