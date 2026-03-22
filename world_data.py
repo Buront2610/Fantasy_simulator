@@ -5,11 +5,6 @@ world_data.py - Predefined lore, races, jobs, locations, and skills for the fant
 from typing import Dict, List, Tuple
 
 
-def _name_to_id(name: str) -> str:
-    """Convert a location name to a location ID."""
-    return "loc_" + name.lower().replace(" ", "_").replace("-", "_").replace("'", "")
-
-
 # ---------------------------------------------------------------------------
 # World lore
 # ---------------------------------------------------------------------------
@@ -264,6 +259,12 @@ DEFAULT_LOCATIONS = [
 ]
 
 NAME_TO_LOCATION_ID: Dict[str, str] = {entry[1]: entry[0] for entry in DEFAULT_LOCATIONS}
+
+
+def fallback_location_id(name: str) -> str:
+    """Generate a location ID from a name when no canonical mapping exists."""
+    return f"loc_{name.lower().replace(' ', '_').replace('-', '_').replace(chr(39), '')}"
+
 
 # ---------------------------------------------------------------------------
 # Event flavour fragments used by events.py

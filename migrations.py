@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from world_data import NAME_TO_LOCATION_ID
+from world_data import NAME_TO_LOCATION_ID, fallback_location_id
 
 CURRENT_VERSION = 2
 
@@ -29,7 +29,7 @@ def _migrate_v1_to_v2(data: Dict[str, Any]) -> Dict[str, Any]:
     for loc_data in data.get("world", {}).get("grid", []):
         if "id" not in loc_data:
             name = loc_data.get("name", "")
-            loc_data["id"] = NAME_TO_LOCATION_ID.get(name, f"loc_{name.lower().replace(' ', '_')}")
+            loc_data["id"] = NAME_TO_LOCATION_ID.get(name, fallback_location_id(name))
 
     for adv in data.get("world", {}).get("active_adventures", []):
         if "origin" in adv:

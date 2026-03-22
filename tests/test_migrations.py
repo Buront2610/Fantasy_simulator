@@ -92,7 +92,7 @@ class TestMigrateV1ToV2:
         assert result["characters"][0]["location_id"] == "loc_aethoria_capital"
         assert result["world"]["grid"][0]["id"] == "loc_aethoria_capital"
 
-    def test_unknown_location_gets_fallback_id(self):
+    def test_unknown_location_uses_default_capital(self):
         data = {
             "characters": [
                 {"name": "Hero", "age": 25, "gender": "Male", "race": "Human", "job": "Warrior",

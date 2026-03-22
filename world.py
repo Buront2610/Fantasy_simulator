@@ -52,11 +52,11 @@ class Location:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Location":
-        from world_data import NAME_TO_LOCATION_ID
+        from world_data import NAME_TO_LOCATION_ID, fallback_location_id
         loc_id = data.get("id")
         if not loc_id:
             name = data.get("name", "")
-            loc_id = NAME_TO_LOCATION_ID.get(name, f"loc_{name.lower().replace(' ', '_')}")
+            loc_id = NAME_TO_LOCATION_ID.get(name, fallback_location_id(name))
         return cls(
             id=loc_id,
             name=data["name"],
@@ -182,8 +182,6 @@ class World:
 
     def get_neighboring_locations(self, location_id: str) -> List[Location]:
         source = self._location_id_index.get(location_id)
-        if source is None:
-            source = self._location_name_index.get(location_id)
         if source is None:
             return []
         neighbours: List[Location] = []
