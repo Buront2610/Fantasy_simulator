@@ -346,12 +346,19 @@ class World:
             return all_locations[0]
         raise ValueError("World has no locations.")
 
+    def mark_location_visited(self, location_id: str) -> None:
+        """Mark a location as visited when it is meaningfully occupied or reached."""
+        location = self._location_id_index.get(location_id)
+        if location is not None:
+            location.visited = True
+
     def ensure_valid_character_locations(self) -> None:
         """Repair invalid location references after loading legacy data."""
         fallback = self._default_resident_location_id()
         for character in self.characters:
             if character.location_id not in self._location_id_index:
                 character.location_id = fallback
+            self.mark_location_visited(character.location_id)
 
     def add_character(self, character: Character, rng: Any = random) -> None:
         if character.location_id not in self._location_id_index:
@@ -368,6 +375,7 @@ class World:
             )
         self.characters.append(character)
         self._char_index[character.char_id] = character
+        self.mark_location_visited(character.location_id)
 
     def rebuild_char_index(self) -> None:
         """Rebuild the character ID index after external mutations."""
@@ -391,6 +399,36 @@ class World:
 
     def get_adventure_by_id(self, adventure_id: str) -> Optional[AdventureRun]:
         return self._adventure_index.get(adventure_id)
+
+    def rebuild_adventure_index(self) -> None:
+        """Rebuild the adventure ID index after loading or external mutations."""
+        index: Dict[str, AdventureRun] = {}
+        for run in self.active_adventures + self.completed_adventures:
+            if run.adventure_id in index:
+                raise ValueError(f"Duplicate adventure ID during rebuild: {run.adventure_id!r}")
+            index[run.adventure_id] = run
+        self._adventure_index = index
+
+    def rebuild_recent_event_ids(self) -> None:
+        """Rebuild derived per-location recent_event_ids from structured event records."""
+        for location in self.grid.values():
+            location.recent_event_ids = []
+
+        for record in self.event_records:
+            if record.location_id not in self._location_id_index:
+                record.location_id = None
+                continue
+            self._location_id_index[record.location_id].recent_event_ids.append(record.record_id)
+
+        for location in self.grid.values():
+            location.recent_event_ids = location.recent_event_ids[-12:]
+
+    def normalize_after_load(self) -> None:
+        """Rebuild derived indexes and repair invariants after deserialization."""
+        self.rebuild_char_index()
+        self.ensure_valid_character_locations()
+        self.rebuild_adventure_index()
+        self.rebuild_recent_event_ids()
 
     def add_adventure(self, run: AdventureRun) -> None:
         self.active_adventures.append(run)
@@ -591,10 +629,7 @@ class World:
         world.completed_adventures = [
             AdventureRun.from_dict(run) for run in data.get("completed_adventures", [])
         ]
-        world._adventure_index = {
-            run.adventure_id: run
-            for run in world.active_adventures + world.completed_adventures
-        }
+        world.normalize_after_load()
         return world
 
     def __repr__(self) -> str:  # pragma: no cover

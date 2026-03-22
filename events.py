@@ -518,6 +518,7 @@ class EventSystem:
         destination = rng.choice(neighbours)
         old_location_id = char.location_id
         char.location_id = destination.id
+        world.mark_location_visited(destination.id)
 
         road_event = rng.choice(JOURNEY_EVENTS)
         desc = tr(
@@ -525,7 +526,7 @@ class EventSystem:
             name=char.name,
             old_location=world.location_name(old_location_id),
             destination=destination.name,
-            region_type=destination.region_type,
+            region_type=tr_term(destination.region_type),
             road_event=road_event,
         )
         char.add_history(tr(

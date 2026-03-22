@@ -66,6 +66,14 @@ class TestWorld:
         assert neighbors
         assert all(hasattr(loc, "canonical_name") for loc in neighbors)
 
+    def test_add_character_marks_location_visited(self):
+        world = World()
+        capital = world.get_location_by_id("loc_aethoria_capital")
+        assert capital is not None
+        assert capital.visited is False
+        world.add_character(_make_char())
+        assert capital.visited is True
+
     def test_locations_have_state_defaults(self):
         world = World()
         capital = world.get_location_by_id("loc_aethoria_capital")
@@ -203,6 +211,24 @@ class TestWorld:
         assert restored_capital is not None
         assert restored_capital.danger == 42
         assert restored_capital.visited is True
+
+    def test_from_dict_rebuilds_recent_event_ids_from_event_records(self):
+        from events import WorldEventRecord
+
+        world = World()
+        payload = world.to_dict()
+        payload["event_records"] = [
+            WorldEventRecord(record_id="r1", kind="battle", year=1001, location_id="loc_thornwood").to_dict(),
+            WorldEventRecord(record_id="r2", kind="journey", year=1002, location_id="loc_thornwood").to_dict(),
+        ]
+        payload["grid"][0]["recent_event_ids"] = ["stale"]
+        payload["grid"][5]["recent_event_ids"] = ["stale", "wrong"]
+
+        restored = World.from_dict(payload)
+
+        thornwood = restored.get_location_by_id("loc_thornwood")
+        assert thornwood is not None
+        assert thornwood.recent_event_ids == ["r1", "r2"]
 
     def test_trimming_event_records_removes_dangling_recent_event_ids(self):
         from events import WorldEventRecord

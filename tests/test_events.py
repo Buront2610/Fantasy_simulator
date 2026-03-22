@@ -300,6 +300,19 @@ class TestEventJourney:
         result = es.event_journey(char_a, world)
         assert result.event_type == "journey"
 
+    def test_destination_marked_visited(self, es, char_a, world):
+        result = es.event_journey(char_a, world, rng=random.Random(0))
+        destination = world.get_location_by_id(char_a.location_id)
+        assert destination is not None
+        assert destination.visited is True
+        assert result.event_type == "journey"
+
+    def test_japanese_locale_localizes_region_type(self, es, char_a, world):
+        set_locale("ja")
+        result = es.event_journey(char_a, world, rng=random.Random(0))
+        assert "（city）" not in result.description
+        assert any(region in result.description for region in ("都市", "村", "森", "山岳", "地下迷宮", "平原"))
+
 
 # ---------------------------------------------------------------------------
 # event_aging

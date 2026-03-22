@@ -146,3 +146,49 @@ class TestLoadSimulation:
             json.dump(data, f)
         restored = load_simulation(str(path))
         assert restored is not None  # Should not crash
+
+    def test_load_returns_none_for_duplicate_character_ids(self, tmp_path):
+        path = tmp_path / "duplicate_ids.json"
+        duplicate_save = {
+            "schema_version": 3,
+            "world": {
+                "name": "Aethoria",
+                "lore": "Test lore",
+                "width": 5,
+                "height": 5,
+                "year": 1000,
+                "grid": [loc.to_dict() for loc in World().grid.values()],
+                "event_log": [],
+                "event_records": [],
+                "active_adventures": [],
+                "completed_adventures": [],
+            },
+            "characters": [
+                {
+                    "char_id": "dup1",
+                    "name": "Aldric",
+                    "age": 25,
+                    "gender": "Male",
+                    "race": "Human",
+                    "job": "Warrior",
+                    "location_id": "loc_aethoria_capital",
+                },
+                {
+                    "char_id": "dup1",
+                    "name": "Lyra",
+                    "age": 22,
+                    "gender": "Female",
+                    "race": "Elf",
+                    "job": "Mage",
+                    "location_id": "loc_thornwood",
+                },
+            ],
+            "events_per_year": 8,
+            "adventure_steps_per_year": 3,
+            "history": [],
+        }
+        path.write_text(json.dumps(duplicate_save), encoding="utf-8")
+
+        restored = load_simulation(str(path))
+
+        assert restored is None

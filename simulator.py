@@ -311,8 +311,7 @@ class Simulator:
             Character.from_dict(char_data) for char_data in data.get("characters", [])
         ]
         world.characters = characters
-        world._char_index = {c.char_id: c for c in characters}
-        world.ensure_valid_character_locations()
+        world.normalize_after_load()
         sim = cls(
             world,
             events_per_year=data.get("events_per_year", 8),
