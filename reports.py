@@ -1,20 +1,22 @@
 """
 reports.py - Monthly and yearly report generation from WorldEventRecord.
 
-Reports are non-persistent view models derived from the canonical
-WorldEventRecord store.  They are generated on demand for display
-and never saved to disk.
+Reports are non-persistent view models derived exclusively from the
+canonical WorldEventRecord store.  Character status and location are
+derived from the event records of the period rather than from current
+world state, so that past reports remain stable over time.
+
+Reports are generated on demand for display and never saved to disk.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Dict, List
+from typing import TYPE_CHECKING, Dict, List, Set
 
 from i18n import tr
 
 if TYPE_CHECKING:
-    from character import Character
     from events import WorldEventRecord
     from world import World
 
@@ -29,8 +31,6 @@ class CharacterReportEntry:
 
     char_id: str
     name: str
-    status: str
-    location_name: str
     events: List[str] = field(default_factory=list)
 
 
@@ -65,8 +65,7 @@ class YearlyReport:
     notable_events: List[str] = field(default_factory=list)
     location_entries: List[LocationReportEntry] = field(default_factory=list)
     total_events: int = 0
-    alive_count: int = 0
-    dead_count: int = 0
+    deaths_this_year: int = 0
 
 
 # ------------------------------------------------------------------
@@ -88,6 +87,28 @@ def _season_for_month(month: int) -> str:
     return _SEASON_MAP.get(month, "unknown")
 
 
+def _watched_char_ids(world: World) -> Set[str]:
+    """Return char_ids for favorite / spotlighted / playable characters."""
+    return {
+        c.char_id for c in world.characters
+        if c.favorite or c.spotlighted or c.playable
+    }
+
+
+def _char_name_map(world: World) -> Dict[str, str]:
+    """Return a char_id → name lookup."""
+    return {c.char_id: c.name for c in world.characters}
+
+
+def _actors_in_record(record: WorldEventRecord) -> List[str]:
+    """Return all actor ids mentioned in a record."""
+    ids: List[str] = []
+    if record.primary_actor_id:
+        ids.append(record.primary_actor_id)
+    ids.extend(record.secondary_actor_ids)
+    return ids
+
+
 # ------------------------------------------------------------------
 # Report generation
 # ------------------------------------------------------------------
@@ -97,39 +118,36 @@ def generate_monthly_report(
     year: int,
     month: int,
 ) -> MonthlyReport:
-    """Generate a monthly report from WorldEventRecord entries.
+    """Generate a monthly report purely from WorldEventRecord entries.
 
-    Filters event_records for the given year/month and builds a
-    structured report highlighting favorite/spotlighted characters
-    and notable events.
+    Character entries are built only for watched characters that actually
+    appear in that month's event records.  No current-world character
+    state (location, alive, injury) is mixed in, so past-month reports
+    remain stable.
     """
     records = [
         r for r in world.event_records
         if r.year == year and r.month == month
     ]
 
-    # Build character entries for favorite / spotlighted / playable chars
-    watched_chars = [
-        c for c in world.characters
-        if c.favorite or c.spotlighted or c.playable
-    ]
-    char_entries: List[CharacterReportEntry] = []
-    for char in watched_chars:
-        char_records = [
-            r for r in records
-            if r.primary_actor_id == char.char_id
-            or char.char_id in r.secondary_actor_ids
-        ]
-        loc_name = world.location_name(char.location_id)
-        status = _char_status_label(char)
-        entry = CharacterReportEntry(
-            char_id=char.char_id,
-            name=char.name,
-            status=status,
-            location_name=loc_name,
-            events=[r.description for r in char_records],
+    watched = _watched_char_ids(world)
+    names = _char_name_map(world)
+
+    # Collect events per watched char that appeared in this period
+    char_event_map: Dict[str, List[str]] = {}
+    for r in records:
+        for cid in _actors_in_record(r):
+            if cid in watched:
+                char_event_map.setdefault(cid, []).append(r.description)
+
+    char_entries = [
+        CharacterReportEntry(
+            char_id=cid,
+            name=names.get(cid, cid),
+            events=evts,
         )
-        char_entries.append(entry)
+        for cid, evts in sorted(char_event_map.items())
+    ]
 
     # Notable events (severity >= threshold)
     notable = [r.description for r in records if r.severity >= _SEVERITY_THRESHOLD_MONTHLY]
@@ -165,41 +183,36 @@ def generate_yearly_report(
     world: World,
     year: int,
 ) -> YearlyReport:
-    """Generate a yearly report from WorldEventRecord entries.
+    """Generate a yearly report purely from WorldEventRecord entries.
 
-    Aggregates all event_records for the given year and builds a
-    structured report with character summaries and world highlights.
+    Character entries are built only for watched characters that actually
+    appear in that year's event records.  Death counts are derived from
+    event records with kind ``"death"``, not from current world state.
     """
     records = [r for r in world.event_records if r.year == year]
 
-    alive = sum(1 for c in world.characters if c.alive)
-    dead = sum(1 for c in world.characters if not c.alive)
+    deaths_this_year = sum(1 for r in records if r.kind == "death")
 
-    # Build character entries for favorite / spotlighted / playable chars
-    watched_chars = [
-        c for c in world.characters
-        if c.favorite or c.spotlighted or c.playable
-    ]
+    watched = _watched_char_ids(world)
+    names = _char_name_map(world)
+
+    # Collect events per watched char that appeared this year
+    char_event_map: Dict[str, List[WorldEventRecord]] = {}
+    for r in records:
+        for cid in _actors_in_record(r):
+            if cid in watched:
+                char_event_map.setdefault(cid, []).append(r)
+
     char_entries: List[CharacterReportEntry] = []
-    for char in watched_chars:
-        char_records = [
-            r for r in records
-            if r.primary_actor_id == char.char_id
-            or char.char_id in r.secondary_actor_ids
-        ]
-        loc_name = world.location_name(char.location_id)
-        status = _char_status_label(char)
+    for cid, char_records in sorted(char_event_map.items()):
         events = [r.description for r in char_records if r.severity >= _SEVERITY_THRESHOLD_YEARLY]
         if not events:
             events = [r.description for r in char_records[:3]]
-        entry = CharacterReportEntry(
-            char_id=char.char_id,
-            name=char.name,
-            status=status,
-            location_name=loc_name,
+        char_entries.append(CharacterReportEntry(
+            char_id=cid,
+            name=names.get(cid, cid),
             events=events,
-        )
-        char_entries.append(entry)
+        ))
 
     # Notable events for the year (severity >= threshold)
     notable = [r.description for r in records if r.severity >= _SEVERITY_THRESHOLD_YEARLY]
@@ -228,8 +241,7 @@ def generate_yearly_report(
         notable_events=notable,
         location_entries=loc_entries,
         total_events=len(records),
-        alive_count=alive,
-        dead_count=dead,
+        deaths_this_year=deaths_this_year,
     )
 
 
@@ -246,14 +258,12 @@ def format_monthly_report(report: MonthlyReport) -> str:
         "=" * 55,
     ]
 
-    # Watched characters section
+    # Watched characters section — only those with events this month
     if report.character_entries:
         lines.append("")
-        lines.append(f"  {tr('report_section_characters')}")
+        lines.append(f"  {tr('report_section_watched')}")
         for entry in report.character_entries:
-            lines.append(
-                f"    {entry.name} [{entry.status}]  {tr('at_label')} {entry.location_name}"
-            )
+            lines.append(f"    {entry.name}")
             for ev in entry.events:
                 lines.append(f"      - {ev}")
 
@@ -264,14 +274,16 @@ def format_monthly_report(report: MonthlyReport) -> str:
         for ev in report.notable_events:
             lines.append(f"    - {ev}")
 
-    # Location highlights
-    if report.location_entries:
+    # Location highlights — only locations with notable events
+    location_entries_with_notables = [
+        loc for loc in report.location_entries if loc.notable_events
+    ]
+    if location_entries_with_notables:
         lines.append("")
         lines.append(f"  {tr('report_section_world')}")
-        for loc in report.location_entries:
-            if loc.notable_events:
-                for ev in loc.notable_events:
-                    lines.append(f"    {loc.name}: {ev}")
+        for loc in location_entries_with_notables:
+            for ev in loc.notable_events:
+                lines.append(f"    {loc.name}: {ev}")
 
     # Footer
     lines.append("")
@@ -288,14 +300,12 @@ def format_yearly_report(report: YearlyReport) -> str:
         "=" * 55,
     ]
 
-    # World overview
+    # World overview — derived from events only
     lines.append("")
     lines.append(f"  {tr('report_section_world_overview')}")
-    lines.append(
-        f"    {tr('characters_alive')}: {report.alive_count}  "
-        f"{tr('characters_deceased')}: {report.dead_count}"
-    )
     lines.append(f"    {tr('total_events')}: {report.total_events}")
+    if report.deaths_this_year:
+        lines.append(f"    {tr('report_deaths_this_year', count=report.deaths_this_year)}")
 
     # Notable events
     if report.notable_events:
@@ -312,32 +322,17 @@ def format_yearly_report(report: YearlyReport) -> str:
             for ev in loc.notable_events:
                 lines.append(f"    {loc.name}: {ev}")
 
-    # Watched characters
+    # Watched characters — only those with events this year
     if report.character_entries:
         lines.append("")
-        lines.append(f"  {tr('report_section_your_adventurers')}")
+        lines.append(f"  {tr('report_section_watched_year')}")
         for entry in report.character_entries:
             if entry.events:
                 summary = "; ".join(entry.events[:2])
-                lines.append(f"    {entry.name} [{entry.status}]: {summary}")
+                lines.append(f"    {entry.name}: {summary}")
             else:
-                lines.append(
-                    f"    {entry.name} [{entry.status}]  {tr('at_label')} {entry.location_name}"
-                )
+                lines.append(f"    {entry.name}")
 
     # Footer
     lines.append("=" * 55)
     return "\n".join(lines)
-
-
-# ------------------------------------------------------------------
-# Helpers
-# ------------------------------------------------------------------
-
-def _char_status_label(char: Character) -> str:
-    """Return a localized status label for a character."""
-    if not char.alive:
-        return tr("status_dead")
-    if char.injury_status == "injured":
-        return tr("injury_status_injured")
-    return tr("status_alive")

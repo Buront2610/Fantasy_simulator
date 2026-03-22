@@ -181,7 +181,11 @@ def _show_results(sim: Simulator) -> None:
 
 
 def _show_monthly_report(sim: Simulator) -> None:
-    """Let the user pick a month and display the monthly report."""
+    """Show a monthly report for the latest completed year.
+
+    The user picks a month (1-12) within that year.  Reports are
+    derived solely from event records, so content stays stable.
+    """
     year = sim.world.year - 1
     if year < 1000:
         year = sim.world.year

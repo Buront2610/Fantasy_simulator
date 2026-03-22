@@ -71,7 +71,7 @@ class WorldEventRecord:
     record_id: str = field(default_factory=lambda: uuid.uuid4().hex)
     kind: str = "generic"
     year: int = 0
-    month: int = 0
+    month: int = 1
     location_id: Optional[str] = None
     primary_actor_id: Optional[str] = None
     secondary_actor_ids: List[str] = field(default_factory=list)
@@ -81,7 +81,7 @@ class WorldEventRecord:
 
     def __post_init__(self) -> None:
         self.severity = max(1, min(5, self.severity))
-        self.month = max(0, int(self.month))
+        self.month = max(1, min(12, int(self.month)))
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -103,7 +103,7 @@ class WorldEventRecord:
             record_id=data.get("record_id", uuid.uuid4().hex),
             kind=data.get("kind", "generic"),
             year=data.get("year", 0),
-            month=data.get("month", 0),
+            month=data.get("month", 1),
             location_id=data.get("location_id"),
             primary_actor_id=data.get("primary_actor_id"),
             secondary_actor_ids=list(data.get("secondary_actor_ids", [])),
@@ -119,7 +119,7 @@ class WorldEventRecord:
         location_id: Optional[str] = None,
         severity: int = 1,
         rng: Optional[Any] = None,
-        month: int = 0,
+        month: int = 1,
     ) -> "WorldEventRecord":
         """Create a WorldEventRecord from an EventResult."""
         primary = result.affected_characters[0] if result.affected_characters else None

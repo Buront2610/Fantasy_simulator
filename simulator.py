@@ -51,7 +51,7 @@ class Simulator:
         # filters, and save/load paths. The canonical structured history lives
         # in world.event_records.
         self.history: List[EventResult] = []
-        self.current_month: int = 0
+        self.current_month: int = 1
         self.rng = random.Random(seed)
         self.id_rng = random.Random(self._id_seed_from_seed(seed))
 
@@ -190,7 +190,14 @@ class Simulator:
             self._run_year()
 
     def _run_year(self) -> None:
-        """Process a single year, distributing events across 12 months."""
+        """Process a single year, stamping events with month 1..12.
+
+        NOTE: This is a month-stamped foundation, not a true month-level
+        simulation.  Events are *not* processed in chronological month
+        order — random events receive randomised month labels and the
+        simulation still mutates world state in a single pass per year.
+        Full month-ordered progression is a future milestone.
+        """
         # --- Natural death checks (once per year, month 1) ---
         self.current_month = 1
         for char in list(self.world.characters):
@@ -201,12 +208,12 @@ class Simulator:
         # --- Injury recovery (once per year, month 1) ---
         self._recover_injuries()
 
-        # --- Adventure start / progression (distributed across months) ---
+        # --- Adventure start / progression (month 2) ---
         self.current_month = 2
         self._maybe_start_adventure()
         self._advance_adventures()
 
-        # --- Random events (randomly assigned to months 1-12) ---
+        # --- Random events (randomly stamped with months 1-12) ---
         for _ in range(self.events_per_year):
             self.current_month = self.rng.randint(1, 12)
             result = self.event_system.generate_random_event(
@@ -219,7 +226,7 @@ class Simulator:
             loc_id = primary_char.location_id if primary_char else None
             self._record_event(result, location_id=loc_id)
 
-        self.current_month = 0
+        self.current_month = 12
         self.world.advance_time(1)
 
     def _recover_injuries(self) -> None:
@@ -349,7 +356,11 @@ class Simulator:
             f"  {tr('event_breakdown')}:",
         ]
         for etype, count in sorted(type_counts.items(), key=lambda x: -x[1]):
-            localized_type = tr(f"event_type_{etype}")
+            i18n_key = f"event_type_{etype}"
+            localized_type = tr(i18n_key)
+            # Fallback: if tr() returned the key unchanged, show the raw kind
+            if localized_type == i18n_key:
+                localized_type = etype.replace("_", " ").capitalize()
             lines.append(f"    {localized_type:<20} {count:>4} {tr('times_suffix')}")
 
         lines.append("")
@@ -468,7 +479,7 @@ class Simulator:
         sim._restore_rng_state(sim.rng, data.get("rng_state"))
         if not sim._restore_rng_state(sim.id_rng, data.get("id_rng_state")):
             sim.id_rng.seed(sim._legacy_id_seed(data))
-        sim.current_month = data.get("current_month", 0)
+        sim.current_month = max(1, min(12, data.get("current_month", 1)))
         sim.history = [
             EventResult.from_dict(ev) for ev in data.get("history", [])
         ]
@@ -531,6 +542,7 @@ class Simulator:
             self._record_world_event(
                 entry,
                 kind="adventure_choice",
+                month=self.current_month,
                 location_id=run.destination,
                 primary_actor_id=run.character_id,
             )
