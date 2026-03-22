@@ -1203,6 +1203,8 @@ class TemplateHistory:
 
 ## 15. 保存形式・schema・migration
 
+> **⚠️ 実装時の注意**: 本章の migration 例（§15.3）は**概念例**です。正式な migration chain・location ID 規則・location 参照修正方針は `docs/implementation_plan.md` に従ってください。特に §15.3 の v1 に記載の `job → adventure_job` は**採用しない旧案**です。実装前に必ず `docs/implementation_plan.md` を参照してください。
+
 ### 15.1 schema_version
 
 全 save データに `schema_version` を必須とする。
