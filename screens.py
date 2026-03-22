@@ -325,7 +325,7 @@ def _save_simulation_snapshot(sim: Simulator) -> None:
     if save_simulation(sim, path):
         print(green(f"  {tr('save_succeeded', path=path)}"))
     else:
-        print(red(f"  {tr('save_failed', error='I/O or serialization error')}"))
+        print(red(f"  {tr('save_failed', error=tr('save_error_io'))}"))
     _pause()
 
 
@@ -337,7 +337,7 @@ def _load_simulation_snapshot() -> Optional[Simulator]:
     path = input(f"  {tr('load_path_prompt', default_name=default_name)}").strip() or default_name
     sim = load_simulation(path)
     if sim is None:
-        print(red(f"  {tr('load_failed', error='file not found or corrupted')}"))
+        print(red(f"  {tr('load_failed', error=tr('load_error_corrupted'))}"))
         _pause()
         return None
 

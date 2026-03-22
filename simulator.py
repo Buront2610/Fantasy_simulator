@@ -163,7 +163,7 @@ class Simulator:
             tr(
                 "history_adventure_detail",
                 year=self.world.year,
-                detail=tr("summary_adventure_died", name=char.name, destination=run.destination),
+                detail=tr("detail_adventure_died", name=char.name, destination=run.destination),
             )
         )
         self.event_system.handle_death_side_effects(char, self.world)
