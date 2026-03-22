@@ -11,6 +11,7 @@ import random
 from adventure import AdventureRun, create_adventure_run
 from events import EventResult, EventSystem
 from i18n import get_locale, set_locale, tr, tr_term
+from migrations import CURRENT_VERSION, apply_migrations
 
 if TYPE_CHECKING:
     from character import Character
@@ -266,6 +267,7 @@ class Simulator:
     def to_dict(self) -> Dict[str, Any]:
         """Serialise simulator state, including world and history."""
         return {
+            "schema_version": CURRENT_VERSION,
             "world": self.world.to_dict(),
             "characters": [char.to_dict() for char in self.world.characters],
             "events_per_year": self.events_per_year,
@@ -280,6 +282,9 @@ class Simulator:
         """Rebuild a simulator from a serialised snapshot."""
         from character import Character
         from world import World
+
+        # Apply any pending migrations before deserializing.
+        data = apply_migrations(data)
 
         world = World.from_dict(data["world"])
         characters = [

@@ -9,6 +9,7 @@ import uuid
 from typing import Any, Dict, List, Optional
 
 from i18n import tr, tr_term
+from location import make_location_id
 
 
 class Character:
@@ -32,6 +33,7 @@ class Character:
         relationships: Optional[Dict[str, int]] = None,
         alive: bool = True,
         location: str = "Aethoria Capital",
+        location_id: Optional[str] = None,
         history: Optional[List[str]] = None,
         char_id: Optional[str] = None,
         spouse_id: Optional[str] = None,
@@ -61,11 +63,33 @@ class Character:
         self.skills: Dict[str, int] = skills if skills is not None else {}
         self.relationships: Dict[str, int] = relationships if relationships is not None else {}
         self.alive: bool = alive
-        self.location: str = location
+        # Initialise _location directly to avoid triggering the setter before
+        # location_id has been assigned.
+        self._location: str = location
+        self.location_id: str = location_id if location_id is not None else make_location_id(location)
         self.history: List[str] = history if history is not None else []
         self.spouse_id: Optional[str] = spouse_id
         self.injury_status: str = injury_status
         self.active_adventure_id: Optional[str] = active_adventure_id
+
+    # ------------------------------------------------------------------
+    # Backward-compatible location property
+    # ------------------------------------------------------------------
+
+    @property
+    def location(self) -> str:
+        """The canonical name of the character's current location.
+
+        .. deprecated::
+            Use ``location_id`` for new code.  This property is maintained
+            for one PR cycle and will be removed in a subsequent PR.
+        """
+        return self._location
+
+    @location.setter
+    def location(self, value: str) -> None:
+        self._location = value
+        self.location_id = make_location_id(value)
 
     @staticmethod
     def _clamp(value: int, lo: int = 1, hi: int = 100) -> int:
@@ -138,7 +162,8 @@ class Character:
             "skills": self.skills,
             "relationships": self.relationships,
             "alive": self.alive,
-            "location": self.location,
+            "location": self._location,
+            "location_id": self.location_id,
             "history": self.history,
             "spouse_id": self.spouse_id,
             "injury_status": self.injury_status,
@@ -152,6 +177,8 @@ class Character:
         skills = {k: max(0, min(10, v)) for k, v in raw_skills.items()}
         raw_rels = data.get("relationships", {})
         relationships = {k: max(-100, min(100, v)) for k, v in raw_rels.items()}
+        location_name: str = data.get("location", "Aethoria Capital")
+        location_id: Optional[str] = data.get("location_id") or make_location_id(location_name)
         return cls(
             name=data["name"],
             age=data["age"],
@@ -167,7 +194,8 @@ class Character:
             skills=skills,
             relationships=relationships,
             alive=data.get("alive", True),
-            location=data.get("location", "Aethoria Capital"),
+            location=location_name,
+            location_id=location_id,
             history=data.get("history", []),
             char_id=data.get("char_id"),
             spouse_id=data.get("spouse_id"),

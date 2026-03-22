@@ -1,62 +1,22 @@
 """
-world.py - World map, Location dataclass, and the World class.
+world.py - World map, LocationState, and the World class.
 """
 
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from i18n import tr
+from location import LOCATION_DEFAULTS, LocationState, make_location_id
 from world_data import DEFAULT_LOCATIONS, WORLD_LORE
 
 if TYPE_CHECKING:
     from adventure import AdventureRun
     from character import Character
 
-
-@dataclass
-class Location:
-    """A single cell on the world grid."""
-
-    name: str
-    description: str
-    region_type: str
-    x: int
-    y: int
-
-    @property
-    def icon(self) -> str:
-        icons_ascii = {
-            "city": "C",
-            "village": "V",
-            "forest": "F",
-            "dungeon": "D",
-            "mountain": "M",
-            "plains": "P",
-            "sea": "~",
-        }
-        return icons_ascii.get(self.region_type, "?")
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "name": self.name,
-            "description": self.description,
-            "region_type": self.region_type,
-            "x": self.x,
-            "y": self.y,
-        }
-
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Location":
-        return cls(
-            name=data["name"],
-            description=data["description"],
-            region_type=data["region_type"],
-            x=data["x"],
-            y=data["y"],
-        )
+# Backward-compatible alias: code that imported Location from world still works.
+Location = LocationState
 
 
 class World:
@@ -75,11 +35,12 @@ class World:
         self.width: int = width
         self.height: int = height
         self.year: int = year
-        self.grid: Dict[Tuple[int, int], Location] = {}
+        self.grid: Dict[Tuple[int, int], LocationState] = {}
         self.characters: List[Character] = []
         self._char_index: Dict[str, Character] = {}
         self._adventure_index: Dict[str, AdventureRun] = {}
-        self._location_name_index: Dict[str, Location] = {}
+        self._location_name_index: Dict[str, LocationState] = {}
+        self._location_id_index: Dict[str, LocationState] = {}
         self.event_log: List[str] = []
         self.active_adventures: List[AdventureRun] = []
         self.completed_adventures: List[AdventureRun] = []
@@ -88,13 +49,24 @@ class World:
     def _build_default_map(self) -> None:
         for entry in DEFAULT_LOCATIONS:
             name, desc, rtype, gx, gy = entry
-            loc = Location(name=name, description=desc, region_type=rtype, x=gx, y=gy)
+            loc_id = make_location_id(name)
+            defaults = LOCATION_DEFAULTS.get(rtype, LOCATION_DEFAULTS["plains"])
+            loc = LocationState(
+                id=loc_id,
+                canonical_name=name,
+                description=desc,
+                region_type=rtype,
+                x=gx,
+                y=gy,
+                **defaults,
+            )
             self.grid[(gx, gy)] = loc
             self._location_name_index[name] = loc
+            self._location_id_index[loc_id] = loc
 
     def add_character(self, character: Character, rng: Any = random) -> None:
         if character.location not in self._location_name_index:
-            options = [loc.name for loc in self.grid.values() if loc.region_type != "dungeon"]
+            options = [loc.canonical_name for loc in self.grid.values() if loc.region_type != "dungeon"]
             fallback = list(self._location_name_index.keys())
             if options:
                 character.location = rng.choice(options)
@@ -149,15 +121,22 @@ class World:
 
     @property
     def location_names(self) -> List[str]:
-        return sorted(loc.name for loc in self.grid.values())
+        return sorted(loc.canonical_name for loc in self.grid.values())
 
-    def get_location_by_name(self, name: str) -> Optional[Location]:
+    def get_location_by_name(self, name: str) -> Optional[LocationState]:
         return self._location_name_index.get(name)
 
-    def get_characters_at_location(self, location_name: str) -> List[Character]:
-        return [c for c in self.characters if c.location == location_name and c.alive]
+    def get_location_by_id(self, location_id: str) -> Optional[LocationState]:
+        """Look up a LocationState by its stable ID."""
+        return self._location_id_index.get(location_id)
 
-    def get_neighboring_locations(self, location_name: str) -> List[Location]:
+    def get_characters_at_location(self, location_name: str) -> List[Character]:
+        loc = self._location_name_index.get(location_name)
+        if loc is None:
+            return []
+        return [c for c in self.characters if c.location_id == loc.id and c.alive]
+
+    def get_neighboring_locations(self, location_name: str) -> List[LocationState]:
         source = self.get_location_by_name(location_name)
         if source is None:
             return []
@@ -200,23 +179,31 @@ class World:
             row_names: List[str] = []
             row_types: List[str] = []
             row_pops: List[str] = []
+            row_state: List[str] = []
             for x in range(self.width):
                 loc = self.grid.get((x, y))
                 if loc is None:
                     row_names.append(" ? ???".ljust(cell_width))
                     row_types.append("".ljust(cell_width))
                     row_pops.append("".ljust(cell_width))
+                    row_state.append("".ljust(cell_width))
                     continue
 
-                icon = "*" if loc.name == highlight_location else loc.icon
-                population = len(self.get_characters_at_location(loc.name))
-                row_names.append(f" {icon} {loc.name[:cell_width - 4]}".ljust(cell_width))
+                icon = "*" if loc.canonical_name == highlight_location else loc.icon
+                population = len(self.get_characters_at_location(loc.canonical_name))
+                row_names.append(f" {icon} {loc.canonical_name[:cell_width - 4]}".ljust(cell_width))
                 row_types.append(f" {tr('map_type')}: {loc.region_type[:cell_width - 8]}".ljust(cell_width))
                 row_pops.append(f" {tr('map_population')}: {population}".ljust(cell_width))
+                state_str = (
+                    f" {tr('map_danger')}:{loc.danger:3}"
+                    f" {tr('map_safety')}:{loc.safety_label[:4]}"
+                )
+                row_state.append(state_str[:cell_width].ljust(cell_width))
 
             lines.append("  |" + "|".join(row_names) + "|")
             lines.append("  |" + "|".join(row_types) + "|")
             lines.append("  |" + "|".join(row_pops) + "|")
+            lines.append("  |" + "|".join(row_state) + "|")
             lines.append(border)
 
         return "\n".join(lines)
@@ -247,10 +234,12 @@ class World:
         )
         world.grid = {}
         world._location_name_index = {}
+        world._location_id_index = {}
         for loc_data in data.get("grid", []):
-            loc = Location.from_dict(loc_data)
+            loc = LocationState.from_dict(loc_data)
             world.grid[(loc.x, loc.y)] = loc
-            world._location_name_index[loc.name] = loc
+            world._location_name_index[loc.canonical_name] = loc
+            world._location_id_index[loc.id] = loc
         world.event_log = data.get("event_log", [])
         world.active_adventures = [
             AdventureRun.from_dict(run) for run in data.get("active_adventures", [])
