@@ -154,6 +154,46 @@ class TestMigrations:
         assert loc["danger"] == 15
         assert result["world"]["event_records"][0]["location_id"] is None
 
+    def test_v3_rebuilds_recent_event_ids_from_existing_event_records(self):
+        data = {
+            "schema_version": 2,
+            "characters": [],
+            "world": {
+                "grid": [
+                    {
+                        "id": "loc_aethoria_capital",
+                        "name": "Aethoria Capital",
+                        "description": "The capital.",
+                        "region_type": "city",
+                        "x": 2,
+                        "y": 2,
+                    },
+                    {
+                        "id": "loc_thornwood",
+                        "name": "Thornwood",
+                        "description": "Forest.",
+                        "region_type": "forest",
+                        "x": 0,
+                        "y": 1,
+                    },
+                ],
+                "event_records": [
+                    {"record_id": "r1", "kind": "battle", "year": 1001, "location_id": "loc_aethoria_capital"},
+                    {"record_id": "r2", "kind": "meeting", "year": 1002, "location_id": "loc_thornwood"},
+                    {"record_id": "r3", "kind": "journey", "year": 1003, "location_id": "loc_aethoria_capital"},
+                    {"record_id": "r4", "kind": "battle", "year": 1004, "location_id": "invalid"},
+                ],
+            },
+        }
+
+        result = _migrate_v2_to_v3(data)
+
+        capital = result["world"]["grid"][0]
+        thornwood = result["world"]["grid"][1]
+        assert capital["recent_event_ids"] == ["r1", "r3"]
+        assert thornwood["recent_event_ids"] == ["r2"]
+        assert result["world"]["event_records"][3]["location_id"] is None
+
     def test_already_v3_data_unchanged(self):
         data = {
             "schema_version": 3,

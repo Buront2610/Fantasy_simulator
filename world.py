@@ -206,8 +206,55 @@ class LocationState:
         )
 
 
-# Backward-compatible alias for older imports.
-Location = LocationState
+class Location(LocationState):
+    """Backward-compatible constructor for older callers."""
+
+    def __init__(
+        self,
+        *,
+        id: Optional[str] = None,
+        name: str = "",
+        description: str,
+        region_type: str,
+        x: int,
+        y: int,
+        canonical_name: Optional[str] = None,
+        prosperity: Optional[int] = None,
+        safety: Optional[int] = None,
+        mood: Optional[int] = None,
+        danger: Optional[int] = None,
+        traffic: Optional[int] = None,
+        rumor_heat: Optional[int] = None,
+        road_condition: Optional[int] = None,
+        visited: bool = False,
+        controlling_faction_id: Optional[str] = None,
+        recent_event_ids: Optional[List[str]] = None,
+        aliases: Optional[List[str]] = None,
+        memorial_ids: Optional[List[str]] = None,
+    ) -> None:
+        canonical_name = canonical_name or name
+        loc_id = id or NAME_TO_LOCATION_ID.get(canonical_name, fallback_location_id(canonical_name))
+        defaults = get_location_state_defaults(loc_id, region_type)
+        super().__init__(
+            id=loc_id,
+            canonical_name=canonical_name,
+            description=description,
+            region_type=region_type,
+            x=x,
+            y=y,
+            prosperity=defaults["prosperity"] if prosperity is None else prosperity,
+            safety=defaults["safety"] if safety is None else safety,
+            mood=defaults["mood"] if mood is None else mood,
+            danger=defaults["danger"] if danger is None else danger,
+            traffic=defaults["traffic"] if traffic is None else traffic,
+            rumor_heat=defaults["rumor_heat"] if rumor_heat is None else rumor_heat,
+            road_condition=defaults["road_condition"] if road_condition is None else road_condition,
+            visited=visited,
+            controlling_faction_id=controlling_faction_id,
+            recent_event_ids=[] if recent_event_ids is None else list(recent_event_ids),
+            aliases=[] if aliases is None else list(aliases),
+            memorial_ids=[] if memorial_ids is None else list(memorial_ids),
+        )
 
 
 class World:

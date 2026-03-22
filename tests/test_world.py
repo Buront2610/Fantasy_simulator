@@ -4,7 +4,7 @@ tests/test_world.py - Unit tests for the World class.
 
 from character import Character
 from i18n import set_locale
-from world import World
+from world import Location, World
 
 
 def _make_char(name="Aldric", location_id="loc_aethoria_capital"):
@@ -42,6 +42,19 @@ class TestWorld:
         assert capital.prosperity == 85
         assert capital.safety == 80
         assert capital.danger == 15
+
+    def test_location_backward_compatible_constructor_accepts_name(self):
+        location = Location(
+            id="loc_custom_city",
+            name="Custom City",
+            description="A custom settlement.",
+            region_type="city",
+            x=1,
+            y=1,
+        )
+        assert location.canonical_name == "Custom City"
+        assert location.name == "Custom City"
+        assert location.prosperity == 70
 
     def test_location_labels_derive_from_state(self):
         set_locale("en")

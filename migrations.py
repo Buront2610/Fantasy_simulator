@@ -102,10 +102,22 @@ def _migrate_v2_to_v3(data: Dict[str, Any]) -> Dict[str, Any]:
         char_data.setdefault("spotlighted", False)
         char_data.setdefault("playable", False)
 
-    for record in world_data.get("event_records", []):
+    recent_event_ids_by_location = {loc_id: [] for loc_id in valid_location_ids}
+    for index, record in enumerate(world_data.get("event_records", []), start=1):
+        record_id = record.get("record_id")
+        if not record_id:
+            record_id = f"legacy_record_{index}"
+            record["record_id"] = record_id
         location_id = record.get("location_id")
         if location_id is not None and location_id not in valid_location_ids:
             record["location_id"] = None
+            continue
+        if location_id is not None:
+            recent_event_ids_by_location[location_id].append(record_id)
+
+    for loc_data in grid:
+        loc_id = loc_data["id"]
+        loc_data["recent_event_ids"] = recent_event_ids_by_location[loc_id][-12:]
 
     data["schema_version"] = 3
     return data
