@@ -390,16 +390,16 @@ NOTIFICATION_THRESHOLDS = {
 
 ---
 
-### PR-2: schema_version と migration 基盤
+### PR-2: schema_version と migration 基盤 ✅ 完了（PR #11 にて実装）
 
-**ゴール**: 旧セーブの schema_version 欠損を安全に扱える  
+**ゴール**: 旧セーブの schema_version 欠損を安全に扱える
 **作業**:
-- `persistence/migrations.py`（または `migrations.py`）を新規作成
-  - `CURRENT_VERSION = 1`
-  - `migrate_v0_to_v1`（schema_version 追加のみ）
-  - `apply_migrations(data)` 関数
-- `save_load.py` の `load_simulation` で `apply_migrations` を呼び出す
-- テスト: `test_migrations.py` にて v0 セーブの読み込みテスト
+- [x] `persistence/migrations.py`（または `migrations.py`）を新規作成
+  - `CURRENT_VERSION = 2`
+  - `migrate_v1_to_v2`（schema_version 追加 + location name→id 変換）
+  - `migrate(data)` 関数（未来バージョン拒否を含む）
+- [x] `save_load.py` の `load_simulation` で `migrate` を呼び出す
+- [x] テスト: `test_migrations.py` にて v1 セーブの読み込みテスト + 未来バージョン拒否テスト
 
 **マージ条件**: 全テスト通過、migration chain のテスト存在
 
@@ -417,32 +417,34 @@ NOTIFICATION_THRESHOLDS = {
 
 ---
 
-### PR-3: LocationState 導入 + location 参照一括修正
+### PR-3: LocationState 導入 + location 参照一括修正 — 部分完了（PR #11 にて Stage 1-3 実装）
 
-**ゴール**: SI-1 〜 SI-3 を確立する。これが Phase 1 の最重要 PR。  
+**ゴール**: SI-1 〜 SI-3 を確立する。これが Phase 1 の最重要 PR。
 **作業**:
 
-1. `world_data.py`: `DEFAULT_LOCATIONS` を `(id, canonical_name, description, region_type, x, y)` 形式に更新（`loc_` プレフィックス付き id）
+1. [x] `world_data.py`: `DEFAULT_LOCATIONS` を `(id, canonical_name, description, region_type, x, y)` 形式に更新（`loc_` プレフィックス付き id）
 2. `world.py`:
-   - `Location` dataclass → `LocationState` dataclass（§3.1 の定義）
-   - `_location_name_index` → `_location_id_index: Dict[str, LocationState]`
-   - `get_location_by_id(id: str)` 追加
-   - `get_location_by_name(name: str)` を deprecated として残す（旧セーブ読み込み補助用）
-   - `render_map()` に danger/safety_label/traffic 簡易表示追加（設計書 §18.2）
-3. `character.py`:
+   - [ ] `Location` dataclass → `LocationState` dataclass（§3.1 の定義：prosperity, safety, mood 等の状態量追加）
+   - [x] `_location_id_index: Dict[str, Location]` 追加
+   - [x] `get_location_by_id(id: str)` 追加
+   - [x] `location_name(location_id)` 追加（フォールバック付き）
+   - [ ] `render_map()` に danger/safety_label/traffic 簡易表示追加（設計書 §18.2）
+3. [x] `character.py`:
    - `location: str` → `location_id: str`（互換プロパティは追加しない）
-4. `character_creator.py`: `location="Aethoria Capital"` → `location_id="loc_aethoria_capital"`
-5. `events.py` / `adventure.py` / `screens.py`: `character.location` → 目的に応じて `character.location_id`（比較・インデックス）または `world.get_location_by_id(character.location_id).canonical_name`（表示）に一括置換
-6. `migrations.py`: `CURRENT_VERSION = 3`、`migrate_v1_to_v2`（location name→id）、`migrate_v2_to_v3`（LocationState 初期値補完）追加
+4. [ ] `character_creator.py`: `location="Aethoria Capital"` → `location_id="loc_aethoria_capital"`（変更不要だった — character_creator.py に location 参照なし）
+5. [x] `events.py` / `adventure.py` / `screens.py`: `character.location` → `character.location_id` に一括置換 + `WorldEventRecord` 導入
+6. [x] `migrations.py`: `CURRENT_VERSION = 2`、`migrate_v1_to_v2`（location name→id 変換）追加
 
 **テスト要件**:
-- SI-1 〜 SI-3 の不変条件テスト（全キャラの `location_id` が有効 id を参照する）
-- migration v1→v2 のテスト（全 built-in 地点名が正しく `loc_` 付き id に変換される）
-- 旧セーブ（`location: "Aethoria Capital"` 形式）の読み込みテスト
+- [x] migration v1→v2 のテスト（全 built-in 地点名が正しく `loc_` 付き id に変換される）
+- [x] 旧セーブ（`location: "Aethoria Capital"` 形式）の読み込みテスト
+- [ ] SI-1 〜 SI-3 の不変条件テスト（全キャラの `location_id` が有効 id を参照する）— `LocationState` 完全導入後に追加
 
 **マージ条件**:
 - 全テスト通過、SI-1 〜 SI-3 のテストが存在、flake8 通過
 - `character\.location\b`（`location_id` を除く）の grep 結果がゼロ（旧参照ゼロ）
+
+**残作業**: `Location` → `LocationState` への完全移行（状態量フィールド追加）、render_map 拡張
 
 ---
 
@@ -603,12 +605,12 @@ def test_seed_fixed_12_months_is_deterministic():
 
 ## 11. フェーズ要約
 
-| Phase | PR | 主な成果物 | Safety Invariant |
-|---|---|---|---|
-| Phase 0 | PR-0 | 設計書但し書き | — |
-| Phase 1a | PR-1, PR-2 | パッケージ整備・migration 基盤 | 未確立（旧コード） |
-| Phase 1b | PR-2.5 | Favorite/Spotlight/Playable | 未確立 |
-| Phase 1c | PR-3 | LocationState・location_id 一括移行（旧参照ゼロ） | **SI-1〜SI-3 確立** |
+| Phase | PR | 主な成果物 | Safety Invariant | 状態 |
+|---|---|---|---|---|
+| Phase 0 | PR-0 | 設計書但し書き | — | 未着手 |
+| Phase 1a | PR-1, PR-2 | パッケージ整備・migration 基盤 | 未確立（旧コード） | ✅ PR-2 完了（PR #11） |
+| Phase 1b | PR-2.5 | Favorite/Spotlight/Playable | 未確立 | 未着手 |
+| Phase 1c | PR-3 | LocationState・location_id 一括移行（旧参照ゼロ） | **SI-1〜SI-3 確立** | 🔶 部分完了（PR #11） |
 | Phase 2 | PR-4〜6 | 月報・Rumor・自動進行 | SI 維持 |
 | Phase 3 | PR-7〜8 | Relationship・dying | SI 維持 |
 | Phase 4 | PR-9〜11 | パーティ冒険・AA マップ | SI 維持 |
@@ -620,12 +622,12 @@ def test_seed_fixed_12_months_is_deterministic():
 
 本計画書で追加・確認した不変条件を設計書 §15.5 に加えて以下に列挙する。
 
-| ID | 不変条件 | 確立 PR |
-|---|---|---|
-| SI-1 | `character.location_id` は有効な `LocationState.id` を参照する | PR-3 |
-| SI-2 | `world.get_location_by_id(character.location_id)` は None を返さない | PR-3 |
-| SI-3 | `WorldEventRecord.location_id` は有効 id または None | PR-3 |
-| SI-4 | `schema_version` はすべての save データに存在する | PR-2 |
+| ID | 不変条件 | 確立 PR | 状態 |
+|---|---|---|---|
+| SI-1 | `character.location_id` は有効な `LocationState.id` を参照する | PR-3 | 🔶 location_id 導入済、LocationState 未完 |
+| SI-2 | `world.get_location_by_id(character.location_id)` は None を返さない | PR-3 | 🔶 location_id 導入済、LocationState 未完 |
+| SI-3 | `WorldEventRecord.location_id` は有効 id または None | PR-3 | ✅ WorldEventRecord 導入済（PR #11） |
+| SI-4 | `schema_version` はすべての save データに存在する | PR-2 | ✅ 完了（PR #11） |
 | SI-5 | `dead` キャラは active adventure の member でない | PR-8 |
 | SI-6 | `retired` キャラは frontline quest を持たない | PR-8 |
 | SI-7 | `rumor.reliability` は `{"certain","plausible","doubtful","false"}` の値のみ | PR-5 |

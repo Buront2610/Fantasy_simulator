@@ -102,7 +102,7 @@
 * 観察用月報 / 年報 / 復帰サマリー
 * 情報の確度レイヤー
 * AA風を含む文字ベースの濃い観測UI
-* schema_version と migration chain
+* ✅ schema_version と migration chain（PR #11 にて実装済）
 
 ---
 
@@ -199,7 +199,9 @@ AUTO_PAUSE_PRIORITIES = {
 
 `Location` を「名前付きセル」から、「状態と記憶を持つ場所」へ引き上げる。
 
-### 5.2 LocationState
+### 5.2 LocationState — 🔶 基盤実装済、状態量は未導入
+
+> **実装状況**: PR #11 にて `Location` に `id` フィールドを追加し、`location_id` ベースの参照に移行済。`LocationState` への完全移行（prosperity, safety, mood 等の状態量追加）は今後の PR で対応。
 
 内部状態量と表示ラベルを分離し、**内部では原則数値を持つ**。
 
@@ -328,7 +330,9 @@ SEASONAL_MODIFIERS = {
 * map renderer は可変サイズ前提
 * 近傍計算はユーティリティ関数へ集約
 
-### 5.9 構造化イベント記録
+### 5.9 構造化イベント記録 ✅ 基盤実装済（PR #11）
+
+> **実装状況**: `WorldEventRecord` の基本版が PR #11 で導入済。フィールド構成は設計書と一部異なる（`record_id`, `kind`, `year`, `severity`, `visibility` 等）。`month` への移行と `tags`/`summary_key` の追加は Phase 2 以降の対応。
 
 ```python
 @dataclass
