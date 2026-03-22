@@ -369,6 +369,14 @@ NOTIFICATION_THRESHOLDS = {
 - 内部 `WorldEventRecord` はすべて記録するが、月報への掲載は重要度フィルタを通す。
 - 詳細ログ（全イベント）はデバッグモードまたは「詳細表示」で閲覧可能とする。
 
+### 8.4 UI 連携規約
+
+- `WorldEventRecord` は世界側の正規イベント表現とし、保存・通知密度判定・月報/年報集計の基準にする。
+- UI / report 層が `EventRecord` 等の表示用レコードを用いる場合、それは `WorldEventRecord` から導出する非永続の view model とし、新たな正規スキーマは増やさない。
+- `ui/` パッケージ化、renderer / input interface 定義、`screens.py` / `ui_helpers.py` の facade 化は PR-1〜PR-3 と並行して先行着手してよい。
+- ただし `location_id` / `WorldEventRecord` を前提とする表示刷新（マップ再設計、月報/年報、イベントフィルタ UI）は PR-3 完了後に切り替える。
+- 詳細な画面刷新方針は `docs/ui_renovation_plan.md` に従う。
+
 ---
 
 ## 9. PR 分割計画（必須 PR リスト）
@@ -452,7 +460,7 @@ NOTIFICATION_THRESHOLDS = {
 
 | PR | 内容 | 依存 |
 |---|---|---|
-| PR-4 | 月報 / 年報 / 復帰サマリー | PR-2.5, PR-3 |
+| PR-4 | 月報 / 年報 / 復帰サマリー + UI report adapter | PR-2.5, PR-3 |
 | PR-5 | Rumor / reliability / 通知密度分離 | PR-4 |
 | PR-6 | 条件付き自動進行（AUTO_PAUSE_PRIORITIES） | PR-4 |
 | PR-7 | Relationship 構造化 + ReputationEntry | PR-3 |
