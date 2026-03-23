@@ -68,6 +68,8 @@ _EVENT_IMPACT: Dict[str, Dict[str, int]] = {
     "adventure_returned": {"mood": +2, "traffic": +1},
     "journey":            {"traffic": +1},
     "injury_recovery":    {"mood": +1},
+    "condition_worsened": {"mood": -2, "rumor_heat": +3},
+    "dying_rescued":      {"mood": +3, "rumor_heat": +5},
 }
 
 

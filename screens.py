@@ -114,6 +114,24 @@ def _advance_simulation(sim: Simulator, years: int) -> None:
     print(f"  {green('*')}  {tr('simulation_advanced_to_year', year=sim.world.year)}")
 
 
+def _advance_auto(sim: Simulator) -> None:
+    """Run simulation until auto-pause triggers (design doc section 4.4)."""
+    print()
+    print(f"  {bold(tr('advancing_auto'))}")
+    result = sim.advance_until_pause(max_years=12)
+    years = result["years_advanced"]
+    reason = result["pause_reason"]
+    alive = sum(1 for c in sim.world.characters if c.alive)
+    pending = len(sim.get_pending_adventure_choices())
+    print(
+        f"  {tr('year_label')} {sim.world.year}  |  {green(str(alive))} {tr('alive')}  |  "
+        f"{yellow(str(pending))} {tr('pending_choices')}"
+    )
+    reason_key = f"auto_pause_{reason}"
+    reason_text = tr(reason_key)
+    print(f"  {yellow('!')}  {tr('auto_paused_after', years=years)}: {reason_text}")
+
+
 # ---------------------------------------------------------------------------
 # Result / post-simulation viewers
 # ---------------------------------------------------------------------------
@@ -129,6 +147,7 @@ def _show_results(sim: Simulator) -> None:
             [
                 ("advance_1_year", tr("advance_1_year")),
                 ("advance_5_years", tr("advance_5_years")),
+                ("advance_auto", tr("advance_auto")),
                 ("yearly_report", tr("yearly_report")),
                 ("monthly_report", tr("monthly_report")),
                 ("world_map", tr("world_map")),
@@ -150,6 +169,8 @@ def _show_results(sim: Simulator) -> None:
             _advance_simulation(sim, 1)
         elif action == "advance_5_years":
             _advance_simulation(sim, 5)
+        elif action == "advance_auto":
+            _advance_auto(sim)
         elif action == "yearly_report":
             print()
             print(sim.get_latest_yearly_report())

@@ -71,6 +71,18 @@ class Simulator:
         "discovery": 3, "battle": 3, "journey": 2,
         "meeting": 1, "aging": 1, "skill_training": 1,
         "romance": 2, "anniversary": 2,
+        "condition_worsened": 3, "dying_rescued": 4,
+    }
+
+    # Conditional auto-advance pause priorities (design §4.5)
+    AUTO_PAUSE_PRIORITIES: Dict[str, int] = {
+        "dying_spotlighted": 100,
+        "pending_decision": 90,
+        "dying_favorite": 80,
+        "party_returned": 70,
+        "dying_any": 60,
+        "condition_worsened_favorite": 50,
+        "months_elapsed": 10,
     }
 
     # --- Notification density configuration (§8 of implementation_plan) ---
@@ -213,6 +225,63 @@ class Simulator:
         for _ in range(years):
             self._run_year()
 
+    def advance_until_pause(self, max_years: int = 12) -> Dict[str, Any]:
+        """Advance the simulation until a pause condition triggers or max_years.
+
+        Returns a dict with 'years_advanced', 'pause_reason', and 'pause_priority'.
+        This implements the conditional auto-advance system (design §4.4).
+        """
+        self.pending_notifications.clear()
+        years_advanced = 0
+        for _ in range(max_years):
+            self._run_year()
+            years_advanced += 1
+            reason = self._check_pause_conditions()
+            if reason is not None:
+                return {
+                    "years_advanced": years_advanced,
+                    "pause_reason": reason,
+                    "pause_priority": self.AUTO_PAUSE_PRIORITIES.get(reason, 0),
+                }
+        return {
+            "years_advanced": years_advanced,
+            "pause_reason": "months_elapsed",
+            "pause_priority": self.AUTO_PAUSE_PRIORITIES["months_elapsed"],
+        }
+
+    def _check_pause_conditions(self) -> Optional[str]:
+        """Check if any auto-pause condition is met. Returns highest-priority reason."""
+        reasons: List[tuple] = []
+
+        for char in self.world.characters:
+            if not char.alive:
+                continue
+            if char.is_dying:
+                if char.spotlighted:
+                    reasons.append(("dying_spotlighted",
+                                    self.AUTO_PAUSE_PRIORITIES["dying_spotlighted"]))
+                elif char.favorite:
+                    reasons.append(("dying_favorite",
+                                    self.AUTO_PAUSE_PRIORITIES["dying_favorite"]))
+                else:
+                    reasons.append(("dying_any",
+                                    self.AUTO_PAUSE_PRIORITIES["dying_any"]))
+            if char.favorite and char.injury_status == "serious":
+                reasons.append(("condition_worsened_favorite",
+                                self.AUTO_PAUSE_PRIORITIES["condition_worsened_favorite"]))
+
+        # Pending adventure choices
+        for run in self.world.active_adventures:
+            if run.pending_choice is not None:
+                reasons.append(("pending_decision",
+                                self.AUTO_PAUSE_PRIORITIES["pending_decision"]))
+                break
+
+        if not reasons:
+            return None
+        reasons.sort(key=lambda x: -x[1])
+        return reasons[0][0]
+
     def _run_year(self) -> None:
         """Process a single year, stamping events with month 1..12.
 
@@ -228,6 +297,9 @@ class Simulator:
             result = self.event_system.check_natural_death(char, self.world, rng=self.rng)
             if result is not None:
                 self._record_event(result, location_id=char.location_id)
+
+        # --- Dying resolution (design §8.3) ---
+        self._resolve_dying_characters()
 
         # --- Injury recovery (once per year, month 1) ---
         self._recover_injuries()
@@ -257,11 +329,42 @@ class Simulator:
 
         self.world.advance_time(1)
 
-    def _recover_injuries(self) -> None:
-        """Give injured characters a chance to recover during normal life."""
-        for char in self.world.characters:
-            if not char.alive or char.injury_status != "injured":
+    def _resolve_dying_characters(self) -> None:
+        """Give dying characters a chance at rescue or death (design §8.3)."""
+        for char in list(self.world.characters):
+            if not char.alive or char.injury_status != "dying":
                 continue
+            result = self.event_system.check_dying_resolution(
+                char, self.world, rng=self.rng
+            )
+            if result is not None:
+                self._record_event(result, location_id=char.location_id)
+
+    def _recover_injuries(self) -> None:
+        """Give injured/serious characters a chance to recover during normal life.
+
+        Recovery is staged (design §8): serious→injured (30%), injured→none (50%).
+        Dying characters are handled separately in _resolve_dying_characters.
+        """
+        for char in self.world.characters:
+            if not char.alive or char.injury_status not in ("injured", "serious"):
+                continue
+            # Serious: 30% chance to recover to injured
+            if char.injury_status == "serious":
+                if self.rng.random() < 0.3:
+                    char.injury_status = "injured"
+                    message = tr("condition_improved", name=char.name,
+                                 status=tr("injury_status_injured"))
+                    char.add_history(tr("history_condition_improved", year=self.world.year,
+                                        status=tr("injury_status_injured")))
+                    self._record_world_event(
+                        message,
+                        kind="injury_recovery",
+                        location_id=char.location_id,
+                        primary_actor_id=char.char_id,
+                    )
+                continue
+            # Injured: 50% chance to recover to none
             if self.rng.random() < 0.5:
                 char.injury_status = "none"
                 message = tr("recovered_from_injuries", name=char.name)
@@ -310,7 +413,8 @@ class Simulator:
         """Start at most one new adventure in the current year."""
         candidates = [
             c for c in self.world.characters
-            if c.alive and c.active_adventure_id is None and c.injury_status != "injured"
+            if c.alive and c.active_adventure_id is None
+            and c.injury_status not in ("injured", "serious", "dying")
         ]
         if not candidates or self.rng.random() >= 0.25:
             return
