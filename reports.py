@@ -45,6 +45,16 @@ class LocationReportEntry:
 
 
 @dataclass
+class RumorReportEntry:
+    """A single rumor entry within a report."""
+
+    rumor_id: str
+    description: str
+    reliability: str
+    category: str = "event"
+
+
+@dataclass
 class MonthlyReport:
     """Data model for a monthly report."""
 
@@ -53,6 +63,7 @@ class MonthlyReport:
     character_entries: List[CharacterReportEntry] = field(default_factory=list)
     notable_events: List[str] = field(default_factory=list)
     location_entries: List[LocationReportEntry] = field(default_factory=list)
+    rumor_entries: List[RumorReportEntry] = field(default_factory=list)
     total_events: int = 0
 
 
@@ -169,12 +180,25 @@ def generate_monthly_report(
             notable_events=notable_loc,
         ))
 
+    # Rumor entries (active, non-expired rumors)
+    rumor_entries = [
+        RumorReportEntry(
+            rumor_id=r.id,
+            description=r.description,
+            reliability=r.reliability,
+            category=r.category,
+        )
+        for r in world.rumors
+        if not r.is_expired
+    ]
+
     return MonthlyReport(
         year=year,
         month=month,
         character_entries=char_entries,
         notable_events=notable,
         location_entries=loc_entries,
+        rumor_entries=rumor_entries,
         total_events=len(records),
     )
 
@@ -284,6 +308,14 @@ def format_monthly_report(report: MonthlyReport) -> str:
         for loc in location_entries_with_notables:
             for ev in loc.notable_events:
                 lines.append(f"    {loc.name}: {ev}")
+
+    # Rumors
+    if report.rumor_entries:
+        lines.append("")
+        lines.append(f"  {tr('report_section_rumors')}")
+        for entry in report.rumor_entries:
+            reliability_label = tr(f"rumor_reliability_{entry.reliability}")
+            lines.append(f"    - {entry.description} ({reliability_label})")
 
     # Footer
     lines.append("")

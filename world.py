@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from adventure import AdventureRun
     from character import Character
     from events import WorldEventRecord
+    from rumor import Rumor
 
 
 def _clamp_state(value: int) -> int:
@@ -272,6 +273,7 @@ class World:
         # - event_log is a CLI-facing formatted buffer kept for compatibility.
         self.event_log: List[str] = []
         self.event_records: List[WorldEventRecord] = []
+        self.rumors: List[Rumor] = []
         self.active_adventures: List[AdventureRun] = []
         self.completed_adventures: List[AdventureRun] = []
         self._build_default_map()
@@ -567,6 +569,7 @@ class World:
             "grid": [loc.to_dict() for loc in self.grid.values()],
             "event_log": self.event_log,
             "event_records": [r.to_dict() for r in self.event_records],
+            "rumors": [r.to_dict() for r in self.rumors],
             "active_adventures": [run.to_dict() for run in self.active_adventures],
             "completed_adventures": [run.to_dict() for run in self.completed_adventures],
         }
@@ -575,6 +578,7 @@ class World:
     def from_dict(cls, data: Dict[str, Any]) -> "World":
         from adventure import AdventureRun
         from events import WorldEventRecord
+        from rumor import Rumor
 
         world = cls(
             name=data["name"],
@@ -588,6 +592,9 @@ class World:
         world.event_log = data.get("event_log", [])
         world.event_records = [
             WorldEventRecord.from_dict(r) for r in data.get("event_records", [])
+        ]
+        world.rumors = [
+            Rumor.from_dict(r) for r in data.get("rumors", [])
         ]
         world.active_adventures = [
             AdventureRun.from_dict(run) for run in data.get("active_adventures", [])

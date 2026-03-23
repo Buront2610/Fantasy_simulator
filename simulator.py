@@ -17,6 +17,7 @@ from reports import (
     generate_monthly_report,
     generate_yearly_report,
 )
+from rumor import age_rumors, generate_rumors_for_period, trim_rumors
 
 if TYPE_CHECKING:
     from character import Character
@@ -67,6 +68,17 @@ class Simulator:
         "discovery": 3, "battle": 3, "journey": 2,
         "meeting": 1, "aging": 1, "skill_training": 1,
         "romance": 2, "anniversary": 2,
+    }
+
+    # --- Notification density configuration (§8 of implementation_plan) ---
+    # These thresholds control what gets surfaced to the player vs what
+    # stays as internal simulation detail.
+    NOTIFICATION_THRESHOLDS: Dict[str, Any] = {
+        "favorite_any": True,          # any event involving a favorite is notified
+        "spotlight_serious": True,     # spotlighted char: severity >= 3
+        "auto_pause_dying": True,      # dying triggers auto-pause
+        "auto_pause_months": 6,        # force a notification at least every N months
+        "rumor_high_heat": 70,         # rumor_heat >= 70 triggers location notification
     }
 
     @staticmethod
@@ -232,7 +244,10 @@ class Simulator:
             loc_id = primary_char.location_id if primary_char else None
             self._record_event(result, location_id=loc_id)
 
+        # --- Rumor generation and aging (once per year at month 12) ---
         self.current_month = 12
+        self._generate_and_age_rumors()
+
         self.world.advance_time(1)
 
     def _recover_injuries(self) -> None:
@@ -250,6 +265,19 @@ class Simulator:
                     location_id=char.location_id,
                     primary_actor_id=char.char_id,
                 )
+
+    def _generate_and_age_rumors(self) -> None:
+        """Generate new rumors from recent events and age existing ones."""
+        new_rumors = generate_rumors_for_period(
+            self.world,
+            year=self.world.year,
+            month=self.current_month,
+            max_rumors=5,
+            rng=self.rng,
+        )
+        self.world.rumors.extend(new_rumors)
+        self.world.rumors = age_rumors(self.world.rumors, months=12)
+        self.world.rumors = trim_rumors(self.world.rumors)
 
     def _maybe_start_adventure(self) -> None:
         """Start at most one new adventure in the current year."""
@@ -410,6 +438,50 @@ class Simulator:
     def get_latest_yearly_report(self) -> str:
         """Generate and format a yearly report for the most recent completed year."""
         return self.get_yearly_report(self.get_latest_completed_report_year())
+
+    def should_notify(self, record: WorldEventRecord) -> bool:
+        """Determine if an event record should trigger a player notification.
+
+        Applies notification density thresholds (§8 of implementation plan)
+        to separate internal simulation events from player-visible alerts.
+        """
+        thresholds = self.NOTIFICATION_THRESHOLDS
+
+        # Always notify for major events (severity >= 4)
+        if record.severity >= 4:
+            return True
+
+        # Check favorite characters
+        if thresholds.get("favorite_any"):
+            for char in self.world.characters:
+                if not char.favorite:
+                    continue
+                if (record.primary_actor_id == char.char_id
+                        or char.char_id in record.secondary_actor_ids):
+                    return True
+
+        # Check spotlighted characters (severity >= 3)
+        if thresholds.get("spotlight_serious"):
+            for char in self.world.characters:
+                if not char.spotlighted:
+                    continue
+                if record.severity >= 3 and (
+                    record.primary_actor_id == char.char_id
+                    or char.char_id in record.secondary_actor_ids
+                ):
+                    return True
+
+        return False
+
+    def get_active_rumors(self) -> List[str]:
+        """Return formatted strings for currently active rumors."""
+        lines: List[str] = []
+        for rumor in self.world.rumors:
+            if rumor.is_expired:
+                continue
+            reliability_label = tr(f"rumor_reliability_{rumor.reliability}")
+            lines.append(f"{rumor.description} ({reliability_label})")
+        return lines
 
     def get_character_story(self, char_id: str) -> str:
         """Return the life story of a single character.
