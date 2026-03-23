@@ -61,6 +61,9 @@ class Simulator:
         self.start_year: int = world.year
         self.rng = random.Random(seed)
         self.id_rng = random.Random(self._id_seed_from_seed(seed))
+        # Events that passed the should_notify() threshold during the
+        # most recent advance_years() call, available for the UI layer.
+        self.pending_notifications: List[WorldEventRecord] = []
 
     # Severity scale: 1=minor, 2=notable, 3=significant, 4=major, 5=critical
     _SEVERITY_MAP: Dict[str, int] = {
@@ -130,22 +133,24 @@ class Simulator:
     ) -> None:
         """Record a structured world event and mirror it to the legacy text log."""
         self.world.log_event(description)
-        self.world.record_event(
-            WorldEventRecord(
-                record_id=generate_record_id(self.id_rng),
-                kind=kind,
-                year=self.world.year if year is None else year,
-                month=self.current_month if month is None else month,
-                location_id=location_id,
-                primary_actor_id=primary_actor_id,
-                secondary_actor_ids=[] if secondary_actor_ids is None else list(secondary_actor_ids),
-                description=description,
-                severity=severity,
-                visibility=visibility,
-            )
+        record = WorldEventRecord(
+            record_id=generate_record_id(self.id_rng),
+            kind=kind,
+            year=self.world.year if year is None else year,
+            month=self.current_month if month is None else month,
+            location_id=location_id,
+            primary_actor_id=primary_actor_id,
+            secondary_actor_ids=[] if secondary_actor_ids is None else list(secondary_actor_ids),
+            description=description,
+            severity=severity,
+            visibility=visibility,
         )
+        self.world.record_event(record)
         # Apply event impact on location state (design §5.5)
         self.world.apply_event_impact(kind, location_id)
+        # Surface notable events to the UI layer via notification thresholds
+        if self.should_notify(record):
+            self.pending_notifications.append(record)
 
     @staticmethod
     def _classify_adventure_summary(previous_state: str, run: AdventureRun) -> tuple[str, str, int]:
@@ -204,6 +209,7 @@ class Simulator:
 
     def advance_years(self, years: int = 1) -> None:
         """Advance the simulation by a public number of whole years."""
+        self.pending_notifications.clear()
         for _ in range(years):
             self._run_year()
 
