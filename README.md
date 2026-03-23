@@ -85,7 +85,7 @@ python -m pytest
 
 ## Near-Term Priorities
 
-- Establish documentation source-of-truth and keep the README aligned with it
+- Maintain documentation source-of-truth alignment as the roadmap evolves
 - Move toward package-based structure and clearer module boundaries
 - Complete true monthly progression and deterministic monthly test coverage
 - Normalize `World.event_records` as the canonical event store

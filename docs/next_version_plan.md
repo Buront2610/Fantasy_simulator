@@ -3,7 +3,7 @@
 **プロジェクト名**: Fantasy Simulator
 **世界名**: Aethoria（エイソリア）
 **版**: Review-Integrated Draft 4
-**最終更新**: 2026-03-22
+**最終更新**: 2026-03-23
 **位置づけ**: 詳細レビューの P0 / P1 指摘を反映し、実装移行・UIモック・具体例まで含めて再構成した vNext 基礎設計書
 
 > **注意**: 実装順・PR 分割・完了条件・現状認識の正本は `docs/implementation_plan.md` に従ってください。本書は中長期の設計目標を定義する文書です。正式な migration chain・ID 規則・location 参照修正方針も `docs/implementation_plan.md` を優先し、本書の §15 migration 例は設計上の参考例として扱います。
