@@ -316,6 +316,7 @@ class World:
         self.event_log: List[str] = []
         self.event_records: List[WorldEventRecord] = []
         self.rumors: List[Rumor] = []
+        self.rumor_archive: List[Rumor] = []
         self.active_adventures: List[AdventureRun] = []
         self.completed_adventures: List[AdventureRun] = []
         self._build_default_map()
@@ -544,11 +545,44 @@ class World:
             if old is not None:
                 setattr(loc, attr, _clamp_state(old + delta))
 
+    # Annual decay rate: each year, event-driven deviations from baseline
+    # decay by this fraction toward the region-type default, preventing
+    # runaway accumulation of danger/traffic/mood changes over long runs.
+    # Set high enough to counterbalance propagation from neighboring
+    # high-danger/traffic locations (e.g. dungeons, mountains).
+    _STATE_DECAY_RATE = 0.30
+
+    def _decay_toward_baseline(self) -> None:
+        """Pull volatile state fields back toward their region-type defaults.
+
+        Without this, additive event impacts and neighbor propagation cause
+        states to drift monotonically toward 0 or 100 over long simulations.
+        """
+        for loc in self.grid.values():
+            defaults = get_location_state_defaults(loc.id, loc.region_type)
+            for attr in ("danger", "traffic", "mood", "safety", "rumor_heat"):
+                current = getattr(loc, attr)
+                baseline = defaults[attr]
+                diff = baseline - current
+                if diff == 0:
+                    continue
+                # Move a fraction of the distance back toward baseline
+                adjustment = int(diff * self._STATE_DECAY_RATE)
+                if adjustment == 0:
+                    adjustment = 1 if diff > 0 else -1
+                setattr(loc, attr, _clamp_state(current + adjustment))
+
     def propagate_state(self) -> None:
         """Propagate location state to neighbors (design §5.6).
 
         Called once per simulated year after events are processed.
+        Applies natural decay toward baseline first, then propagation,
+        so that state quantities stabilise over time instead of
+        accumulating unboundedly.
         """
+        # Decay toward baseline before propagation
+        self._decay_toward_baseline()
+
         pending_changes: List[tuple] = []
 
         for loc in self.grid.values():
@@ -556,19 +590,24 @@ class World:
             if not neighbours:
                 continue
 
-            # Danger propagation
+            # Danger propagation — only to neighbors whose danger is
+            # below the source's current level (prevents runaway upward drift)
             rule = PROPAGATION_RULES["danger"]
             if loc.danger >= rule["min_source"]:
                 spread = min(int(loc.danger * rule["decay"]), rule["cap"])
                 for n in neighbours:
-                    pending_changes.append((n.id, "danger", spread))
+                    if n.danger < loc.danger:
+                        capped = min(spread, loc.danger - n.danger)
+                        pending_changes.append((n.id, "danger", capped))
 
-            # Traffic propagation
+            # Traffic propagation — same directional cap
             rule = PROPAGATION_RULES["traffic"]
             if loc.traffic >= rule["min_source"]:
                 spread = min(int(loc.traffic * rule["decay"]), rule["cap"])
                 for n in neighbours:
-                    pending_changes.append((n.id, "traffic", spread))
+                    if n.traffic < loc.traffic:
+                        capped = min(spread, loc.traffic - n.traffic)
+                        pending_changes.append((n.id, "traffic", capped))
 
             # Mood penalty from ruined neighbors
             rule = PROPAGATION_RULES["mood_from_ruin"]
@@ -668,6 +707,7 @@ class World:
             "event_log": self.event_log,
             "event_records": [r.to_dict() for r in self.event_records],
             "rumors": [r.to_dict() for r in self.rumors],
+            "rumor_archive": [r.to_dict() for r in self.rumor_archive],
             "active_adventures": [run.to_dict() for run in self.active_adventures],
             "completed_adventures": [run.to_dict() for run in self.completed_adventures],
         }
@@ -693,6 +733,9 @@ class World:
         ]
         world.rumors = [
             Rumor.from_dict(r) for r in data.get("rumors", [])
+        ]
+        world.rumor_archive = [
+            Rumor.from_dict(r) for r in data.get("rumor_archive", [])
         ]
         world.active_adventures = [
             AdventureRun.from_dict(run) for run in data.get("active_adventures", [])

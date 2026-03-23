@@ -274,22 +274,37 @@ class Simulator:
                 )
 
     def _generate_and_age_rumors(self) -> None:
-        """Generate new rumors from recent events and age existing ones.
+        """Generate rumors monthly and age existing ones.
 
-        Age existing rumors first, then append new ones so freshly
-        generated rumors start at age 0 instead of immediately gaining
-        12 months of age.
+        Instead of generating all rumors at year-end, iterate months
+        1..12 so that each month's events can spawn rumors timestamped
+        to that month.  This lets monthly reports show rumor activity
+        throughout the year rather than only at month 12.
+
+        Aging is applied once per year (1 month per simulated month
+        would require true monthly simulation; for now 1 year = 1 age
+        tick of 12 months, applied before generation to avoid
+        double-aging freshly created rumors).
         """
-        self.world.rumors = age_rumors(self.world.rumors, months=12)
-        new_rumors = generate_rumors_for_period(
-            self.world,
-            year=self.world.year,
-            month=self.current_month,
-            max_rumors=5,
-            rng=self.rng,
-        )
-        self.world.rumors.extend(new_rumors)
-        self.world.rumors = trim_rumors(self.world.rumors)
+        # Age existing rumors once at year start
+        active, expired = age_rumors(self.world.rumors, months=12)
+        self.world.rumors = active
+        self.world.rumor_archive.extend(expired)
+
+        # Generate rumors for each month of the year
+        for gen_month in range(1, 13):
+            new_rumors = generate_rumors_for_period(
+                self.world,
+                year=self.world.year,
+                month=gen_month,
+                max_rumors=3,
+                rng=self.rng,
+            )
+            self.world.rumors.extend(new_rumors)
+
+        kept, trimmed = trim_rumors(self.world.rumors)
+        self.world.rumors = kept
+        self.world.rumor_archive.extend(trimmed)
 
     def _maybe_start_adventure(self) -> None:
         """Start at most one new adventure in the current year."""

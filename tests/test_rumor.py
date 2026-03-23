@@ -208,29 +208,33 @@ def test_age_rumors_removes_expired():
         Rumor(age_in_months=RUMOR_MAX_AGE_MONTHS - 2),
         Rumor(age_in_months=RUMOR_MAX_AGE_MONTHS - 1),
     ]
-    result = age_rumors(rumors, months=1)
-    assert len(result) == 1  # Second one expires after aging
+    active, expired = age_rumors(rumors, months=1)
+    assert len(active) == 1  # Second one expires after aging
+    assert len(expired) == 1
 
 
 def test_age_rumors_increments_age():
     rumor = Rumor(age_in_months=5)
-    result = age_rumors([rumor], months=3)
-    assert len(result) == 1
-    assert result[0].age_in_months == 8
+    active, expired = age_rumors([rumor], months=3)
+    assert len(active) == 1
+    assert active[0].age_in_months == 8
+    assert len(expired) == 0
 
 
 def test_trim_rumors_respects_max():
     rumors = [Rumor(age_in_months=i) for i in range(60)]
-    result = trim_rumors(rumors, max_count=10)
-    assert len(result) == 10
+    kept, trimmed = trim_rumors(rumors, max_count=10)
+    assert len(kept) == 10
     # Should keep the newest (lowest age)
-    assert all(r.age_in_months < 10 for r in result)
+    assert all(r.age_in_months < 10 for r in kept)
+    assert len(trimmed) == 50
 
 
 def test_trim_rumors_noop_when_under_limit():
     rumors = [Rumor() for _ in range(3)]
-    result = trim_rumors(rumors, max_count=10)
-    assert len(result) == 3
+    kept, trimmed = trim_rumors(rumors, max_count=10)
+    assert len(kept) == 3
+    assert len(trimmed) == 0
 
 
 # ------------------------------------------------------------------
@@ -432,3 +436,108 @@ def test_get_active_rumors_returns_formatted_strings():
     lines = sim.get_active_rumors()
     assert len(lines) == 1
     assert "Dragon sighting" in lines[0]
+
+
+# ------------------------------------------------------------------
+# Monthly generation ensures rumors appear in months 1-11
+# ------------------------------------------------------------------
+
+def test_monthly_rumor_generation_covers_early_months():
+    """Rumors must be generated for months 1-11, not just at year-end."""
+    world = _make_world_with_events()
+    sim = Simulator(world, seed=0)
+    sim.advance_years(1)
+    created_months = {r.month_created for r in world.rumors}
+    # With monthly generation, at least some rumor should be created
+    # before month 12
+    early_months = created_months - {12}
+    assert len(early_months) > 0, (
+        f"All rumors created at month 12; created_months={created_months}"
+    )
+
+
+# ------------------------------------------------------------------
+# Rumor archive stability — past reports
+# ------------------------------------------------------------------
+
+def test_past_report_rumors_stable_after_aging():
+    """Rumors that expire should still appear in past monthly reports
+    via the rumor_archive."""
+    from reports import generate_monthly_report
+    world = World()
+    char = Character(
+        name="Aldric", age=25, gender="male", race="Human", job="Warrior",
+        location_id="loc_aethoria_capital", favorite=True,
+    )
+    world.add_character(char)
+    # Add a rumor created in year 1000, month 6
+    rumor = Rumor(
+        id="rum_stable_test",
+        category="battle",
+        source_location_id="loc_aethoria_capital",
+        reliability="plausible",
+        description="Battle at the capital",
+        year_created=1000,
+        month_created=6,
+    )
+    world.rumors.append(rumor)
+
+    # Report for month 6 should include the rumor
+    report_before = generate_monthly_report(world, 1000, 6)
+    assert any(r.rumor_id == "rum_stable_test" for r in report_before.rumor_entries)
+
+    # Expire the rumor and move to archive
+    active, expired = age_rumors(world.rumors, months=RUMOR_MAX_AGE_MONTHS)
+    world.rumors = active
+    world.rumor_archive.extend(expired)
+    assert len(world.rumors) == 0
+
+    # Past report should still include the rumor from archive
+    report_after = generate_monthly_report(world, 1000, 6)
+    assert any(r.rumor_id == "rum_stable_test" for r in report_after.rumor_entries)
+
+
+# ------------------------------------------------------------------
+# Candidate selection prioritises recent + severe events
+# ------------------------------------------------------------------
+
+def test_generate_rumors_prioritises_recent_severe_events():
+    """max_rumors should pick recent, high-severity events first."""
+    world = World()
+    char = Character(
+        name="Aldric", age=25, gender="male", race="Human", job="Warrior",
+        location_id="loc_aethoria_capital", favorite=True,
+    )
+    world.add_character(char)
+
+    # Add many low-severity early-month events
+    for i in range(10):
+        world.record_event(WorldEventRecord(
+            record_id=f"evt_early_{i}",
+            kind="meeting",
+            year=1000,
+            month=1,
+            location_id="loc_aethoria_capital",
+            primary_actor_id=char.char_id,
+            description=f"Minor event {i}",
+            severity=2,
+        ))
+    # Add one high-severity late-month event
+    world.record_event(WorldEventRecord(
+        record_id="evt_important",
+        kind="death",
+        year=1000,
+        month=11,
+        location_id="loc_aethoria_capital",
+        primary_actor_id=char.char_id,
+        description="An important death occurred",
+        severity=5,
+    ))
+
+    rng = random.Random(0)
+    rumors = generate_rumors_for_period(
+        world, year=1000, month=12, max_rumors=1, rng=rng,
+    )
+    # The important event should be picked first
+    assert len(rumors) == 1
+    assert rumors[0].source_event_id == "evt_important"

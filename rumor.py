@@ -203,6 +203,59 @@ def _generate_misinformation(
     return tr(template_key, kind=record.kind)
 
 
+def _build_rumor_description(
+    record: WorldEventRecord,
+    reliability: str,
+    rng: Any = random,
+) -> str:
+    """Build a rumor description applying per-field DISCLOSURE masking.
+
+    Instead of an all-or-nothing check on ``disclosure["what"]``, each
+    dimension (who / what / where / when) is independently rolled against
+    its disclosure probability.  This produces partially accurate rumors
+    where, for example, the actor is correct but the location is vague.
+
+    Design reference: docs/next_version_plan.md §11.3
+    """
+    disclosure = DISCLOSURE[reliability]
+
+    # "false" reliability: §11.4 — misinformation, not omission
+    if reliability == "false":
+        if rng.random() < disclosure["what"]:
+            return record.description
+        return _generate_misinformation(record, rng=rng)
+
+    # Determine which fields are revealed
+    who_known = rng.random() < disclosure["who"]
+    what_known = rng.random() < disclosure["what"]
+    where_known = rng.random() < disclosure["where"]
+    when_known = rng.random() < disclosure["when"]
+
+    # If all fields are known, return the original description
+    if who_known and what_known and where_known and when_known:
+        return record.description
+
+    # If what is unknown, the core event detail is lost
+    if not what_known:
+        return tr("rumor_vague_event")
+
+    # Build a partially masked description from the original
+    parts: List[str] = []
+    base = record.description
+
+    if not who_known and record.primary_actor_id:
+        parts.append(tr("rumor_unknown_who"))
+    if not where_known and record.location_id:
+        parts.append(tr("rumor_unknown_where"))
+    if not when_known:
+        parts.append(tr("rumor_unknown_when"))
+
+    if parts:
+        qualifier = "; ".join(parts)
+        return f"{base} ({qualifier})"
+    return base
+
+
 def generate_rumor_from_event(
     record: WorldEventRecord,
     listener_location_id: Optional[str],
@@ -235,15 +288,7 @@ def generate_rumor_from_event(
         record.severity, same_location, months_elapsed, rng=rng,
     )
 
-    disclosure = DISCLOSURE[reliability]
-
-    if rng.random() < disclosure["what"]:
-        description = record.description
-    elif reliability == "false":
-        # §11.4: "false" means misinformation, not just omission
-        description = _generate_misinformation(record, rng=rng)
-    else:
-        description = tr("rumor_vague_event")
+    description = _build_rumor_description(record, reliability, rng=rng)
 
     rumor_id = f"rum_{rng.getrandbits(48):012x}" if hasattr(rng, 'getrandbits') else f"rum_{uuid.uuid4().hex[:12]}"
     return Rumor(
@@ -285,14 +330,19 @@ def generate_rumors_for_period(
         cutoff_year -= 1
 
     candidates: List[WorldEventRecord] = []
+    cutoff_abs = cutoff_year * 12 + cutoff_month
+    current_abs = year * 12 + month
     for r in world.event_records:
         event_abs = r.year * 12 + r.month
-        cutoff_abs = cutoff_year * 12 + cutoff_month
-        current_abs = year * 12 + month
         if cutoff_abs <= event_abs <= current_abs and r.severity >= _MIN_SEVERITY_FOR_RUMOR:
             candidates.append(r)
 
+    # Prioritise recent, high-severity events so the rumor selection
+    # reflects "what the world is talking about" rather than array order.
+    candidates.sort(key=lambda r: (-r.month, -r.severity))
+
     existing_event_ids = {rum.source_event_id for rum in world.rumors}
+    existing_event_ids.update(rum.source_event_id for rum in world.rumor_archive)
 
     rumors: List[Rumor] = []
     for record in candidates:
@@ -309,18 +359,33 @@ def generate_rumors_for_period(
     return rumors
 
 
-def age_rumors(rumors: List[Rumor], months: int = 1) -> List[Rumor]:
-    """Age all rumors and remove expired ones."""
+def age_rumors(
+    rumors: List[Rumor], months: int = 1,
+) -> tuple:
+    """Age all rumors, returning (active, newly_expired).
+
+    Expired rumors are separated so they can be archived for stable
+    historical report generation.
+    """
     active: List[Rumor] = []
+    expired: List[Rumor] = []
     for rumor in rumors:
         rumor.age_in_months += months
-        if not rumor.is_expired:
+        if rumor.is_expired:
+            expired.append(rumor)
+        else:
             active.append(rumor)
-    return active
+    return active, expired
 
 
-def trim_rumors(rumors: List[Rumor], max_count: int = MAX_ACTIVE_RUMORS) -> List[Rumor]:
-    """Keep only the most recent rumors up to max_count."""
+def trim_rumors(
+    rumors: List[Rumor], max_count: int = MAX_ACTIVE_RUMORS,
+) -> tuple:
+    """Keep only the most recent rumors up to max_count.
+
+    Returns (kept, trimmed) so trimmed rumors can be archived.
+    """
     if len(rumors) <= max_count:
-        return rumors
-    return sorted(rumors, key=lambda r: r.age_in_months)[:max_count]
+        return rumors, []
+    sorted_rumors = sorted(rumors, key=lambda r: r.age_in_months)
+    return sorted_rumors[:max_count], sorted_rumors[max_count:]

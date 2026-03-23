@@ -184,10 +184,13 @@ def generate_monthly_report(
     # Rumor entries — evaluate expiration and freshness relative to the
     # report's own year/month so that historical reports stay stable even
     # after the simulation advances and ages/removes rumors.
+    # Read from both active rumors and the archive so that past reports
+    # remain reproducible after rumors expire or are trimmed.
     _RUMOR_FRESHNESS_MONTHS = 6
     report_abs_month = year * 12 + month
+    all_rumors = list(world.rumors) + list(world.rumor_archive)
     rumor_entries = []
-    for r in world.rumors:
+    for r in all_rumors:
         created_abs = r.year_created * 12 + r.month_created
         if created_abs > report_abs_month:
             continue
