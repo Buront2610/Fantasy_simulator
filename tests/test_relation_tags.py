@@ -141,6 +141,17 @@ class TestRelationTagsFromEvents:
                 break
         assert tagged, "Expected friend tag after positive meetings"
 
+    def test_event_system_does_not_write_source_ids_without_simulator(self, world, event_system):
+        """Canonical source IDs are attached by Simulator when recording world events."""
+        char1 = _make_char("Fighter1", strength=80, char_id="fight001")
+        char2 = _make_char("Fighter2", strength=20, char_id="fight002")
+        world.add_character(char1)
+        world.add_character(char2)
+        rng = random.Random(42)
+        event_system.event_battle(char1, char2, world, rng=rng)
+        assert char1.relation_tag_sources == {}
+        assert char2.relation_tag_sources == {}
+
 
 class TestRelationTagSources:
     """Design §7.4: Source event tracking for relation tags."""
