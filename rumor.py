@@ -206,14 +206,16 @@ def _generate_misinformation(
 def _build_rumor_description(
     record: WorldEventRecord,
     reliability: str,
+    world: World,
     rng: Any = random,
 ) -> str:
     """Build a rumor description applying per-field DISCLOSURE masking.
 
-    Instead of an all-or-nothing check on ``disclosure["what"]``, each
-    dimension (who / what / where / when) is independently rolled against
-    its disclosure probability.  This produces partially accurate rumors
-    where, for example, the actor is correct but the location is vague.
+    Each dimension (who / what / where / when) is independently rolled
+    against its disclosure probability.  When any field is masked, a
+    category-specific template is used that naturally omits the hidden
+    information — avoiding contradictions where the original description
+    mentions a name or place that is then annotated as "unknown".
 
     Design reference: docs/next_version_plan.md §11.3
     """
@@ -239,21 +241,24 @@ def _build_rumor_description(
     if not what_known:
         return tr("rumor_vague_event")
 
-    # Build a partially masked description from the original
-    parts: List[str] = []
-    base = record.description
+    # Resolve names: use actual values when disclosed, placeholders when masked
+    if who_known and record.primary_actor_id:
+        char = world.get_character_by_id(record.primary_actor_id)
+        who = char.name if char else tr("rumor_someone")
+    else:
+        who = tr("rumor_someone")
 
-    if not who_known and record.primary_actor_id:
-        parts.append(tr("rumor_unknown_who"))
-    if not where_known and record.location_id:
-        parts.append(tr("rumor_unknown_where"))
-    if not when_known:
-        parts.append(tr("rumor_unknown_when"))
+    if where_known and record.location_id:
+        where = world.location_name(record.location_id)
+    else:
+        where = tr("rumor_somewhere")
 
-    if parts:
-        qualifier = "; ".join(parts)
-        return f"{base} ({qualifier})"
-    return base
+    when = tr("rumor_recently") if when_known else tr("rumor_at_some_point")
+
+    # Select category-specific template
+    category = _category_from_event_kind(record.kind)
+    template_key = f"rumor_heard_{category}"
+    return tr(template_key, who=who, where=where, when=when)
 
 
 def generate_rumor_from_event(
@@ -261,6 +266,7 @@ def generate_rumor_from_event(
     listener_location_id: Optional[str],
     current_year: int,
     current_month: int,
+    world: Optional[World] = None,
     rng: Any = random,
 ) -> Optional[Rumor]:
     """Attempt to generate a rumor from a WorldEventRecord.
@@ -288,7 +294,11 @@ def generate_rumor_from_event(
         record.severity, same_location, months_elapsed, rng=rng,
     )
 
-    description = _build_rumor_description(record, reliability, rng=rng)
+    if world is not None:
+        description = _build_rumor_description(record, reliability, world, rng=rng)
+    else:
+        # Fallback for callers that don't supply world (e.g. legacy tests)
+        description = record.description
 
     rumor_id = f"rum_{rng.getrandbits(48):012x}" if hasattr(rng, 'getrandbits') else f"rum_{uuid.uuid4().hex[:12]}"
     return Rumor(
@@ -339,7 +349,9 @@ def generate_rumors_for_period(
 
     # Prioritise recent, high-severity events so the rumor selection
     # reflects "what the world is talking about" rather than array order.
-    candidates.sort(key=lambda r: (-r.month, -r.severity))
+    # Use absolute month (year*12+month) so cross-year lookback sorts
+    # correctly (e.g. prior-year Dec < current-year Jan).
+    candidates.sort(key=lambda r: (-(r.year * 12 + r.month), -r.severity))
 
     existing_event_ids = {rum.source_event_id for rum in world.rumors}
     existing_event_ids.update(rum.source_event_id for rum in world.rumor_archive)
@@ -349,7 +361,7 @@ def generate_rumors_for_period(
         if record.record_id in existing_event_ids:
             continue
         rumor = generate_rumor_from_event(
-            record, listener_location_id, year, month, rng=rng,
+            record, listener_location_id, year, month, world=world, rng=rng,
         )
         if rumor is not None:
             rumors.append(rumor)

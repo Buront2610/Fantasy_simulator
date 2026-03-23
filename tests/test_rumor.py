@@ -541,3 +541,102 @@ def test_generate_rumors_prioritises_recent_severe_events():
     # The important event should be picked first
     assert len(rumors) == 1
     assert rumors[0].source_event_id == "evt_important"
+
+
+# ------------------------------------------------------------------
+# Cross-year sort correctness
+# ------------------------------------------------------------------
+
+def test_cross_year_sort_prefers_current_year_over_prior_december():
+    """Current-year January events must rank above prior-year December."""
+    world = World()
+    char = Character(
+        name="Aldric", age=25, gender="male", race="Human", job="Warrior",
+        location_id="loc_aethoria_capital", favorite=True,
+    )
+    world.add_character(char)
+
+    # Prior-year December event (severity 5 to guarantee rumor generation)
+    world.record_event(WorldEventRecord(
+        record_id="evt_old_dec",
+        kind="death",
+        year=999,
+        month=12,
+        location_id="loc_aethoria_capital",
+        primary_actor_id=char.char_id,
+        description="Old December death",
+        severity=5,
+    ))
+    # Current-year January event, same severity
+    world.record_event(WorldEventRecord(
+        record_id="evt_new_jan",
+        kind="death",
+        year=1000,
+        month=1,
+        location_id="loc_aethoria_capital",
+        primary_actor_id=char.char_id,
+        description="New January death",
+        severity=5,
+    ))
+
+    rng = random.Random(0)
+    rumors = generate_rumors_for_period(
+        world, year=1000, month=1, max_rumors=1, rng=rng,
+    )
+    assert len(rumors) >= 1
+    # January (current year) must beat December (prior year)
+    assert rumors[0].source_event_id == "evt_new_jan"
+
+
+# ------------------------------------------------------------------
+# Kind-based rumor description builder
+# ------------------------------------------------------------------
+
+def test_partial_disclosure_does_not_contradict_description():
+    """When fields are masked, the rumor text must not contain the
+    original names/places followed by 'unknown' annotations."""
+    from rumor import _build_rumor_description
+
+    world = _make_world_with_events()
+    char = world.characters[0]
+    record = WorldEventRecord(
+        record_id="evt_disc",
+        kind="battle",
+        year=1000,
+        month=6,
+        location_id="loc_aethoria_capital",
+        primary_actor_id=char.char_id,
+        description=f"{char.name} fought bravely at Aethoria Capital",
+        severity=4,
+    )
+
+    # Force "doubtful" reliability where who/where/when may be masked
+    # Run many times; if any disclosure field is masked, the output
+    # should NOT contain the original character name (when who is masked)
+    # or location name (when where is masked).
+    found_masked_who = False
+    found_masked_where = False
+    for seed in range(200):
+        rng = random.Random(seed)
+        desc = _build_rumor_description(record, "doubtful", world, rng=rng)
+        if desc == record.description:
+            continue  # all fields disclosed
+        if desc == "Something happened...":
+            continue  # what unknown
+        # If we get a template-based description, verify no contradiction
+        if char.name not in desc:
+            found_masked_who = True
+        if "Aethoria Capital" not in desc:
+            found_masked_where = True
+        # The key assertion: never both mention and disclaim
+        assert not (char.name in desc and "unclear" in desc), (
+            f"Contradiction: name present but marked unclear: {desc}"
+        )
+        assert not ("Aethoria Capital" in desc and "uncertain" in desc), (
+            f"Contradiction: location present but marked uncertain: {desc}"
+        )
+
+    # With doubtful reliability (who=0.5, where=0.3), we should hit
+    # masked variants across 200 seeds
+    assert found_masked_who, "Never saw a who-masked rumor in 200 seeds"
+    assert found_masked_where, "Never saw a where-masked rumor in 200 seeds"
