@@ -29,6 +29,48 @@ def _clamp_state(value: int) -> int:
     return max(0, min(100, int(value)))
 
 
+# ------------------------------------------------------------------
+# Propagation rules (design doc §5.6)
+# ------------------------------------------------------------------
+
+PROPAGATION_RULES: Dict[str, Dict[str, Any]] = {
+    "danger": {
+        "decay": 0.30,
+        "cap": 15,
+        "min_source": 40,
+    },
+    "traffic": {
+        "decay": 0.20,
+        "cap": 10,
+        "min_source": 35,
+    },
+    "mood_from_ruin": {
+        "source_threshold": 20,
+        "neighbor_penalty": 5,
+        "max_neighbors": 4,
+    },
+    "road_damage_from_danger": {
+        "danger_threshold": 70,
+        "road_penalty": 8,
+    },
+}
+
+# Event kind -> location state impact (design doc §5.5)
+_EVENT_IMPACT: Dict[str, Dict[str, int]] = {
+    "death":              {"safety": -3, "mood": -5, "rumor_heat": +10},
+    "battle_fatal":       {"safety": -5, "mood": -8, "danger": +5, "rumor_heat": +15},
+    "battle":             {"safety": -2, "mood": -3, "danger": +3, "rumor_heat": +5},
+    "discovery":          {"rumor_heat": +5, "traffic": +3},
+    "marriage":           {"mood": +3},
+    "adventure_death":    {"danger": +5, "mood": -5, "rumor_heat": +10},
+    "adventure_discovery": {"rumor_heat": +5, "traffic": +2, "prosperity": +2},
+    "adventure_started":  {"traffic": +2},
+    "adventure_returned": {"mood": +2, "traffic": +1},
+    "journey":            {"traffic": +1},
+    "injury_recovery":    {"mood": +1},
+}
+
+
 PROSPERITY_LABELS = [
     (0, 20, "ruined"),
     (20, 45, "declining"),
@@ -488,6 +530,62 @@ class World:
                         record_id for record_id in location.recent_event_ids
                         if record_id in surviving_ids
                     ]
+
+    def apply_event_impact(self, kind: str, location_id: Optional[str]) -> None:
+        """Update location state quantities based on an event kind (design §5.5)."""
+        if location_id is None:
+            return
+        loc = self._location_id_index.get(location_id)
+        if loc is None:
+            return
+        deltas = _EVENT_IMPACT.get(kind, {})
+        for attr, delta in deltas.items():
+            old = getattr(loc, attr, None)
+            if old is not None:
+                setattr(loc, attr, _clamp_state(old + delta))
+
+    def propagate_state(self) -> None:
+        """Propagate location state to neighbors (design §5.6).
+
+        Called once per simulated year after events are processed.
+        """
+        pending_changes: List[tuple] = []
+
+        for loc in self.grid.values():
+            neighbours = self.get_neighboring_locations(loc.id)
+            if not neighbours:
+                continue
+
+            # Danger propagation
+            rule = PROPAGATION_RULES["danger"]
+            if loc.danger >= rule["min_source"]:
+                spread = min(int(loc.danger * rule["decay"]), rule["cap"])
+                for n in neighbours:
+                    pending_changes.append((n.id, "danger", spread))
+
+            # Traffic propagation
+            rule = PROPAGATION_RULES["traffic"]
+            if loc.traffic >= rule["min_source"]:
+                spread = min(int(loc.traffic * rule["decay"]), rule["cap"])
+                for n in neighbours:
+                    pending_changes.append((n.id, "traffic", spread))
+
+            # Mood penalty from ruined neighbors
+            rule = PROPAGATION_RULES["mood_from_ruin"]
+            if loc.prosperity < rule["source_threshold"]:
+                for n in neighbours[:rule["max_neighbors"]]:
+                    pending_changes.append((n.id, "mood", -rule["neighbor_penalty"]))
+
+            # Road damage from high danger
+            rule = PROPAGATION_RULES["road_damage_from_danger"]
+            if loc.danger >= rule["danger_threshold"]:
+                pending_changes.append((loc.id, "road_condition", -rule["road_penalty"]))
+
+        for loc_id, attr, delta in pending_changes:
+            loc = self._location_id_index.get(loc_id)
+            if loc is not None:
+                old = getattr(loc, attr)
+                setattr(loc, attr, _clamp_state(old + delta))
 
     def get_events_by_location(self, location_id: str) -> List[WorldEventRecord]:
         """Return all event records for a specific location."""

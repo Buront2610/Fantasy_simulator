@@ -146,6 +146,8 @@ class Simulator:
                 visibility=visibility,
             )
         )
+        # Apply event impact on location state (design §5.5)
+        self.world.apply_event_impact(kind, location_id)
 
     @staticmethod
     def _classify_adventure_summary(previous_state: str, run: AdventureRun) -> tuple[str, str, int]:
@@ -244,8 +246,9 @@ class Simulator:
             loc_id = primary_char.location_id if primary_char else None
             self._record_event(result, location_id=loc_id)
 
-        # --- Rumor generation and aging (once per year at month 12) ---
+        # --- State propagation and rumor generation (once per year at month 12) ---
         self.current_month = 12
+        self.world.propagate_state()
         self._generate_and_age_rumors()
 
         self.world.advance_time(1)
@@ -470,6 +473,13 @@ class Simulator:
                     or char.char_id in record.secondary_actor_ids
                 ):
                     return True
+
+        # Check location rumor_heat threshold
+        heat_threshold = thresholds.get("rumor_high_heat", 0)
+        if heat_threshold and record.location_id:
+            loc = self.world.get_location_by_id(record.location_id)
+            if loc is not None and loc.rumor_heat >= heat_threshold:
+                return True
 
         return False
 

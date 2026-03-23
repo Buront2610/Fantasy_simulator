@@ -185,6 +185,24 @@ def _content_tags_from_event(record: WorldEventRecord) -> List[str]:
     return tags
 
 
+def _generate_misinformation(
+    record: WorldEventRecord,
+    rng: Any = random,
+) -> str:
+    """Generate misleading content for a 'false' reliability rumor (§11.4).
+
+    False rumors replace the actual event with plausible but incorrect info.
+    """
+    _FALSE_TEMPLATES = [
+        "rumor_false_wrong_actor",
+        "rumor_false_wrong_location",
+        "rumor_false_wrong_outcome",
+        "rumor_false_exaggerated",
+    ]
+    template_key = rng.choice(_FALSE_TEMPLATES)
+    return tr(template_key, kind=record.kind)
+
+
 def generate_rumor_from_event(
     record: WorldEventRecord,
     listener_location_id: Optional[str],
@@ -214,14 +232,14 @@ def generate_rumor_from_event(
     )
 
     disclosure = DISCLOSURE[reliability]
-    desc_parts: List[str] = []
 
     if rng.random() < disclosure["what"]:
-        desc_parts.append(record.description)
+        description = record.description
+    elif reliability == "false":
+        # §11.4: "false" means misinformation, not just omission
+        description = _generate_misinformation(record, rng=rng)
     else:
-        desc_parts.append(tr("rumor_vague_event"))
-
-    description = " ".join(desc_parts) if desc_parts else tr("rumor_vague_event")
+        description = tr("rumor_vague_event")
 
     return Rumor(
         id=f"rum_{uuid.uuid4().hex[:12]}",
