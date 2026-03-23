@@ -178,6 +178,7 @@ def _show_results(sim: Simulator, ctx: UIContext | None = None) -> None:
                 ("character_story", tr("character_story")),
                 ("all_character_stories", tr("all_character_stories")),
                 ("simulation_summary", tr("simulation_summary")),
+                ("location_history", tr("location_history_menu")),
                 ("back_to_main", tr("back_to_main")),
             ],
         )
@@ -228,6 +229,8 @@ def _show_results(sim: Simulator, ctx: UIContext | None = None) -> None:
             out.print_line()
             out.print_line(sim.get_summary())
             inp.pause()
+        elif action == "location_history":
+            _show_location_history(world, ctx=ctx)
         else:
             break
 
@@ -451,6 +454,70 @@ def _resolve_pending_adventure_choice(sim: Simulator, ctx: UIContext | None = No
         out.print_success(f"  {tr('choice_resolved')}")
     else:
         out.print_error(f"  {tr('choice_resolve_failed')}")
+    ctx.inp.pause()
+
+
+# ---------------------------------------------------------------------------
+# Location history (PR-F: world memory)
+# ---------------------------------------------------------------------------
+
+def _show_location_history(world: World, ctx: UIContext | None = None) -> None:
+    """Show live traces, memorials, and aliases for a selected location.
+
+    PR-F (design §E-2): Surfaces world memory data — who visited, who
+    died there, and any aliases the location has gained — so the player
+    can observe how the world has been shaped over time.
+    """
+    ctx = _default_ctx(ctx)
+    out = ctx.out
+
+    locations = sorted(world.grid.values(), key=lambda loc: loc.canonical_name)
+    out.print_line()
+    for i, loc in enumerate(locations, 1):
+        tags = []
+        if loc.memorial_ids:
+            tags.append(f"{len(loc.memorial_ids)} memorial(s)")
+        if loc.aliases:
+            tags.append(f"{len(loc.aliases)} alias(es)")
+        if loc.live_traces:
+            tags.append(f"{len(loc.live_traces)} trace(s)")
+        tag_str = f"  [{', '.join(tags)}]" if tags else ""
+        out.print_line(f"  {i:>2}. {loc.canonical_name} ({loc.region_type}){tag_str}")
+    out.print_line()
+
+    idx = _get_numeric_choice(f"  {tr('enter_location_number')}", len(locations), ctx=ctx)
+    if idx is None:
+        return
+
+    loc = locations[idx]
+    out.print_line()
+    out.print_separator()
+    out.print_heading(f"  {tr('location_detail_header', name=loc.canonical_name)}")
+    out.print_separator()
+
+    # Aliases
+    if loc.aliases:
+        out.print_line(f"  {tr('location_aliases_label')}: {', '.join(loc.aliases)}")
+        out.print_line()
+
+    # Memorials
+    out.print_line(f"  {tr('location_memorials_label')}:")
+    memorials = world.get_memorials_for_location(loc.id)
+    if memorials:
+        for mem in memorials:
+            out.print_line(f"    {tr('memorial_entry', year=mem.year, epitaph=mem.epitaph)}")
+    else:
+        out.print_dim(f"    {tr('no_memorials')}")
+
+    # Live traces (most recent first, up to 5)
+    out.print_line()
+    out.print_line(f"  {tr('location_live_traces_label')}:")
+    if loc.live_traces:
+        for trace in reversed(loc.live_traces[-5:]):
+            out.print_line(f"    - {trace['text']}")
+    else:
+        out.print_dim(f"    {tr('no_live_traces')}")
+
     ctx.inp.pause()
 
 

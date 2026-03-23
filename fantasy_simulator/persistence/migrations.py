@@ -12,7 +12,7 @@ from ..content.world_data import (
     get_location_state_defaults,
 )
 
-CURRENT_VERSION = 4
+CURRENT_VERSION = 5
 
 
 def migrate(data: Dict[str, Any]) -> Dict[str, Any]:
@@ -29,6 +29,7 @@ def migrate(data: Dict[str, Any]) -> Dict[str, Any]:
         2: _migrate_v1_to_v2,
         3: _migrate_v2_to_v3,
         4: _migrate_v3_to_v4,
+        5: _migrate_v4_to_v5,
     }
     for target_version in range(version + 1, CURRENT_VERSION + 1):
         data = migrations[target_version](data)
@@ -143,4 +144,20 @@ def _migrate_v3_to_v4(data: Dict[str, Any]) -> Dict[str, Any]:
             adv.setdefault("supply_state", "full")
             adv.setdefault("danger_level", 50)
     data["schema_version"] = 4
+    return data
+
+
+def _migrate_v4_to_v5(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Add world memory fields (PR-F): live_traces to locations, memorials dict to world.
+
+    Pre-PR-F saves have no live trace history or memorial records.
+    Locations get an empty ``live_traces`` list; the world gets an empty
+    ``memorials`` dict.  Existing ``memorial_ids`` and ``aliases`` on
+    locations are left untouched (they were already empty lists from v3).
+    """
+    world_data = data.setdefault("world", {})
+    for loc_data in world_data.get("grid", []):
+        loc_data.setdefault("live_traces", [])
+    world_data.setdefault("memorials", {})
+    data["schema_version"] = 5
     return data

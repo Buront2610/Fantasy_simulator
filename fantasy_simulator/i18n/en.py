@@ -398,6 +398,34 @@ TEXT_EN: Dict[str, str] = {
     'party_members_label': 'Party',
     'party_policy_label': 'Policy',
     'party_supply_label': 'Supply',
+    # --- World memory strings (PR-F) ---
+    # Live traces
+    'live_trace_solo': '{name} passed through {destination} (Year {year}).',
+    'live_trace_party': '{party} passed through {destination} (Year {year}).',
+    # Memorial epitaphs — minimal NarrativeContext variant selection (design §E-2)
+    'memorial_epitaph_warrior': (
+        'Here fell {name}, a warrior who met their end at {location} in year {year}.'
+    ),
+    'memorial_epitaph_mage': (
+        'In memory of {name}, a seeker of knowledge lost at {location} in year {year}.'
+    ),
+    'memorial_epitaph_adventurer': (
+        'Here rests the spirit of {name}, an adventurer who perished at {location} in year {year}.'
+    ),
+    'memorial_epitaph_default': 'In memory of {name}, who fell at {location} in year {year}.',
+    # Location aliases generated from significant events
+    'alias_death_site': "Site of {name}'s Demise",
+    'alias_notable_site': "{name}'s Discovery",
+    # Location detail view UI labels
+    'location_detail_header': 'LOCATION DETAIL - {name}',
+    'location_aliases_label': 'Known as',
+    'location_live_traces_label': 'Recent visitors',
+    'location_memorials_label': 'Memorials',
+    'no_live_traces': 'No recent visitors recorded.',
+    'no_memorials': 'No memorials at this location.',
+    'memorial_entry': '[Year {year}] {epitaph}',
+    'location_history_menu': 'Location history',
+    'enter_location_number': 'Enter location number (or ENTER to cancel): ',
 }
 
 TERMS_EN: Dict[str, str] = {}

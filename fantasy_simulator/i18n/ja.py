@@ -394,6 +394,34 @@ TEXT_JA: Dict[str, str] = {
     'party_members_label': 'パーティ',
     'party_policy_label': '方針',
     'party_supply_label': '補給',
+    # --- ワールドメモリ文字列 (PR-F) ---
+    # 生きた痕跡
+    'live_trace_solo': '{name} が {destination} を訪れた（{year}年）。',
+    'live_trace_party': '{party} が {destination} を訪れた（{year}年）。',
+    # 記念碑の碑文 — 最小 NarrativeContext ― 職業カテゴリ別 (design §E-2)
+    'memorial_epitaph_warrior': (
+        'ここに {name} 眠る。{year}年、{location} にて討たれた戦士。'
+    ),
+    'memorial_epitaph_mage': (
+        '{name} を悼む。{year}年、{location} にて命を落とした知の探究者。'
+    ),
+    'memorial_epitaph_adventurer': (
+        '{name} の魂、ここに安らかなれ。{year}年、{location} にて果てた冒険者。'
+    ),
+    'memorial_epitaph_default': '{year}年、{location} に倒れた {name} を偲ぶ。',
+    # 重大イベントによって生成される地名の別名
+    'alias_death_site': '{name} 終焉の地',
+    'alias_notable_site': '{name} の発見地',
+    # 地点詳細ビューの UI ラベル
+    'location_detail_header': '地点詳細 - {name}',
+    'location_aliases_label': '別称',
+    'location_live_traces_label': '最近の訪問者',
+    'location_memorials_label': '記念碑',
+    'no_live_traces': '最近の訪問記録なし。',
+    'no_memorials': 'この地点に記念碑はない。',
+    'memorial_entry': '【{year}年】{epitaph}',
+    'location_history_menu': '地点の歴史',
+    'enter_location_number': '地点番号を入力（またはEnterでキャンセル）: ',
 }
 
 TERMS_JA: Dict[str, str] = {

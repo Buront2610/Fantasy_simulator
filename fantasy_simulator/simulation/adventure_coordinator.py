@@ -18,6 +18,7 @@ from ..adventure import (
     generate_adventure_id,
     select_party_policy,
 )
+from ..narrative.context import alias_for_event, epitaph_for_character
 from ..i18n import tr
 
 if TYPE_CHECKING:
@@ -186,6 +187,7 @@ class AdventureMixin:
                 if not char.alive:
                     self.event_system.handle_death_side_effects(char, self.world)
                 if run.is_resolved:
+                    self._apply_world_memory(run)
                     self._recently_completed_adventures.append(run)
                     self.world.complete_adventure(run.adventure_id)
                 elif not had_pending_choice and run.pending_choice is not None:
@@ -214,8 +216,70 @@ class AdventureMixin:
             )
         )
         self.event_system.handle_death_side_effects(char, self.world)
+        self._apply_world_memory(run)
         self._recently_completed_adventures.append(run)
         self.world.complete_adventure(run.adventure_id)
+
+    def _apply_world_memory(self, run: AdventureRun) -> None:
+        """Record live traces, memorials, and aliases from a resolved adventure.
+
+        PR-F (design §E-2): Called for every resolved adventure to leave
+        footprints at the destination.  Deaths additionally create a
+        permanent memorial and may generate a location alias.
+
+        Does NOT consume RNG — all IDs are generated via ``self.id_rng``.
+        """
+        dest = run.destination
+        dest_name = self.world.location_name(dest)
+
+        # -- Live trace (all outcomes) -----------------------------------
+        if run.is_party:
+            members = [self.world.get_character_by_id(mid) for mid in run.member_ids]
+            names = [m.name for m in members if m is not None]
+            if not names:
+                names = [run.character_name]
+            party_str = self._format_party_names_from_list(names)
+            trace_text = tr(
+                "live_trace_party",
+                party=party_str,
+                destination=dest_name,
+                year=self.world.year,
+            )
+        else:
+            trace_text = tr(
+                "live_trace_solo",
+                name=run.character_name,
+                destination=dest_name,
+                year=self.world.year,
+            )
+        self.world.add_live_trace(dest, self.world.year, run.character_name, trace_text)
+
+        # -- Memorial + alias (death only) --------------------------------
+        if run.outcome == "death":
+            char = self.world.get_character_by_id(run.character_id)
+            char_name = char.name if char is not None else run.character_name
+            epitaph = epitaph_for_character(
+                char_name,
+                self.world.year,
+                dest_name,
+                "adventure_death",
+                char=char,
+            )
+            memorial_id = generate_adventure_id(self.id_rng)
+            self.world.add_memorial(
+                memorial_id,
+                run.character_id,
+                char_name,
+                dest,
+                self.world.year,
+                "adventure_death",
+                epitaph,
+            )
+            # Generate a location alias (capped by World.MAX_ALIASES)
+            dest_loc = self.world.get_location_by_id(dest)
+            if dest_loc is not None:
+                alias = alias_for_event("adventure_death", char_name, dest_name)
+                self.world.add_alias(dest, alias)
 
     def get_adventure_summaries(self, include_active: bool = True) -> List[str]:
         """Return summary lines for known adventures."""
