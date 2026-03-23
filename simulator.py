@@ -182,33 +182,17 @@ class Simulator:
 
     def _link_relation_tag_source_from_record(self, result: EventResult, record_id: str) -> None:
         """Attach canonical WorldEventRecord IDs to relation tag sources."""
-        chars = [self.world.get_character_by_id(cid) for cid in result.affected_characters]
-        chars = [char for char in chars if char is not None]
-        if result.event_type in ("battle", "battle_fatal") and len(chars) >= 2:
-            chars[0].add_relation_tag(chars[1].char_id, "rival", source_event_id=record_id)
-            chars[1].add_relation_tag(chars[0].char_id, "rival", source_event_id=record_id)
-            return
-        if result.event_type == "marriage" and len(chars) >= 2:
-            chars[0].add_relation_tag(chars[1].char_id, "spouse", source_event_id=record_id)
-            chars[1].add_relation_tag(chars[0].char_id, "spouse", source_event_id=record_id)
-            return
-        if result.event_type == "meeting" and len(chars) >= 2:
-            for tag in ("friend", "rival"):
-                if chars[0].has_relation_tag(chars[1].char_id, tag):
-                    chars[0].add_relation_tag(chars[1].char_id, tag, source_event_id=record_id)
-                if chars[1].has_relation_tag(chars[0].char_id, tag):
-                    chars[1].add_relation_tag(chars[0].char_id, tag, source_event_id=record_id)
-            return
-        if result.event_type != "dying_rescued" or not chars:
-            return
-        rescued = chars[0]
-        for candidate in self.world.characters:
-            if candidate.char_id == rescued.char_id:
+        updates = result.metadata.get("relation_tag_updates", [])
+        for update in updates:
+            source_id = update.get("source")
+            target_id = update.get("target")
+            tag = update.get("tag")
+            if not source_id or not target_id or not tag:
                 continue
-            if rescued.has_relation_tag(candidate.char_id, "savior") and candidate.has_relation_tag(rescued.char_id, "rescued"):
-                rescued.add_relation_tag(candidate.char_id, "savior", source_event_id=record_id)
-                candidate.add_relation_tag(rescued.char_id, "rescued", source_event_id=record_id)
-                break
+            source_char = self.world.get_character_by_id(source_id)
+            if source_char is None or not source_char.has_relation_tag(target_id, tag):
+                continue
+            source_char.add_relation_tag(target_id, tag, source_event_id=record_id)
 
     @staticmethod
     def _classify_adventure_summary(previous_state: str, run: AdventureRun) -> tuple[str, str, int]:
@@ -279,6 +263,10 @@ class Simulator:
         This implements the conditional auto-advance system (design §4.4).
         """
         self.pending_notifications.clear()
+        # These are "recent year" markers and should not trigger
+        # repeated 0-year pauses across separate auto-advance requests.
+        self._favorites_worsened_this_year.clear()
+        self._recently_completed_adventures.clear()
         preexisting_reason = self._check_pause_conditions()
         if preexisting_reason is not None:
             return {
@@ -373,29 +361,28 @@ class Simulator:
         # --- Injury recovery (once per year, month 1) ---
         self._recover_injuries()
 
-        # --- Apply seasonal modifiers before adventures & events ---
-        self._apply_seasonal_modifiers(self.current_month)
-
         # --- Adventure start / progression (month 2) ---
         self.current_month = 2
+        self._apply_seasonal_modifiers(self.current_month)
         self._maybe_start_adventure()
         self._advance_adventures()
+        self._revert_seasonal_modifiers()
 
         # --- Random events (randomly stamped with months 1-12) ---
         for _ in range(self.events_per_year):
             self.current_month = self.rng.randint(1, 12)
+            self._apply_seasonal_modifiers(self.current_month)
             result = self.event_system.generate_random_event(
                 self.world.characters, self.world, rng=self.rng
             )
             if result is None:
+                self._revert_seasonal_modifiers()
                 break
             primary_id = result.affected_characters[0] if result.affected_characters else None
             primary_char = self.world.get_character_by_id(primary_id) if primary_id else None
             loc_id = primary_char.location_id if primary_char else None
             self._record_event(result, location_id=loc_id)
-
-        # --- Revert seasonal modifiers before propagation ---
-        self._revert_seasonal_modifiers()
+            self._revert_seasonal_modifiers()
 
         # --- State propagation and rumor generation (once per year at month 12) ---
         self.current_month = 12

@@ -177,6 +177,7 @@ class TestDyingResolution:
             if result and result.event_type == "dying_rescued":
                 assert char.has_relation_tag(ally.char_id, "savior")
                 assert ally.has_relation_tag(char.char_id, "rescued")
+                assert ally.char_id in result.affected_characters
                 return
         pytest.fail("No rescue occurred in 200 tries")
 

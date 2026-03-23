@@ -70,6 +70,14 @@ class TestAutoAdvanceBasics:
             "condition_worsened_favorite",
         )
 
+    def test_ephemeral_pause_markers_are_cleared_between_auto_advance_calls(self, sim):
+        char = sim.world.characters[0]
+        char.favorite = True
+        sim._favorites_worsened_this_year.add(char.char_id)
+        # stale yearly marker should not stop immediately.
+        result = sim.advance_until_pause(max_years=1)
+        assert result["years_advanced"] >= 1
+
 
 class TestDyingPauseConditions:
     """Soren Johnson: Dying should force a decision point."""

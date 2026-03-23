@@ -772,6 +772,23 @@ class TestSeasonalModifiers:
         assert World.get_season(10) == "autumn"
         assert World.get_season(12) == "winter"
 
+    def test_run_year_applies_seasonal_modifiers_with_event_months(self):
+        world = World(name="TestWorld", year=1000)
+        sim = Simulator(world, events_per_year=3, seed=123)
+        applied_months = []
+        original_apply = sim._apply_seasonal_modifiers
+
+        def _tracking_apply(month):
+            applied_months.append(month)
+            return original_apply(month)
+
+        sim._apply_seasonal_modifiers = _tracking_apply
+        sim._run_year()
+        # at least month 2 (adventure phase) + random event months should be observed
+        assert 2 in applied_months
+        assert len(applied_months) >= 2
+        assert any(month != 1 for month in applied_months)
+
 
 # ---------------------------------------------------------------------------
 # Recovery stages (design §8)
