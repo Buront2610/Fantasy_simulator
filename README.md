@@ -9,7 +9,7 @@ occasionally influence.
 
 ## Features
 
-- World simulation with yearly time progression
+- Yearly time progression in the CLI, with monthly reports, rumors, and event-record foundations implemented but true monthly progression not yet complete
 - Character generation with random and template-based creation
 - Event system for meetings, journeys, discoveries, training, battles, aging,
   marriage, and natural death
@@ -21,6 +21,8 @@ occasionally influence.
   - pending player choices
   - automatic default resolution when choices are left unresolved
 - Save/load support for simulation snapshots
+- Schema-versioned save migration support for older data
+- Structured world event records, rumors, and monthly/yearly reports
 - CLI localization support for Japanese and English
 
 ## Running
@@ -35,6 +37,11 @@ Start the CLI:
 python main.py
 ```
 
+The repository does not yet use the planned package entry point by default. The
+current roadmap for package migration, true monthly progression, UI separation,
+and later phase features is maintained in
+[`docs/implementation_plan.md`](docs/implementation_plan.md).
+
 Run tests:
 
 ```bash
@@ -48,9 +55,15 @@ python -m pytest
 - `world.py`: world state, locations, map, and world serialization
 - `events.py`: event generation and event resolution
 - `adventure.py`: multi-step adventure progression
-- `simulator.py`: yearly simulation orchestration
+- `simulator.py`: current simulation orchestration
+- `reports.py`: monthly and yearly report view generation
+- `rumor.py`: rumor generation and lifecycle helpers
+- `migrations.py`: schema migration helpers for save compatibility
 - `save_load.py`: snapshot save/load helpers
 - `main.py`: CLI interface
+- `docs/implementation_plan.md`: current implementation roadmap and phase order
+- `docs/next_version_plan.md`: long-range design target
+- `docs/ui_renovation_plan.md`: UI renovation strategy
 - `tests/`: automated tests
 
 ## Design Direction
@@ -72,7 +85,8 @@ python -m pytest
 
 ## Near-Term Priorities
 
-- Deepen relationship and social causality
-- Improve adventure consequence modeling
-- Expand world and creator test coverage
-- Localize more generated narrative text
+- Maintain documentation source-of-truth alignment as the roadmap evolves
+- Move toward package-based structure and clearer module boundaries
+- Complete true monthly progression and deterministic monthly test coverage
+- Normalize `World.event_records` as the canonical event store
+- Separate UI/presentation concerns before expanding party adventure and AA map features
