@@ -39,6 +39,7 @@ class EventResult:
     stat_changes: Dict[str, Dict[str, int]] = field(default_factory=dict)
     event_type: str = "generic"
     year: int = 0
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -47,6 +48,7 @@ class EventResult:
             "stat_changes": self.stat_changes,
             "event_type": self.event_type,
             "year": self.year,
+            "metadata": self.metadata,
         }
 
     @classmethod
@@ -57,6 +59,7 @@ class EventResult:
             stat_changes=data.get("stat_changes", {}),
             event_type=data.get("event_type", "generic"),
             year=data.get("year", 0),
+            metadata=data.get("metadata", {}),
         )
 
 
@@ -204,6 +207,10 @@ class EventSystem:
         char1.update_mutual_relationship(char2, 20)
         char1.add_relation_tag(char2.char_id, "spouse")
         char2.add_relation_tag(char1.char_id, "spouse")
+        relation_tag_updates = [
+            {"source": char1.char_id, "target": char2.char_id, "tag": "spouse"},
+            {"source": char2.char_id, "target": char1.char_id, "tag": "spouse"},
+        ]
         stat_changes = {
             char1.char_id: {"wisdom": 2, "charisma": 1},
             char2.char_id: {"wisdom": 2, "charisma": 1},
@@ -235,6 +242,7 @@ class EventSystem:
             stat_changes=stat_changes,
             event_type="marriage",
             year=world.year,
+            metadata={"relation_tag_updates": relation_tag_updates},
         )
 
     def event_battle(self, char1: Character, char2: Character, world: World, rng: Any = random) -> EventResult:
@@ -256,6 +264,10 @@ class EventSystem:
         # Relation tags: mark as rival
         winner.add_relation_tag(loser.char_id, "rival")
         loser.add_relation_tag(winner.char_id, "rival")
+        relation_tag_updates = [
+            {"source": winner.char_id, "target": loser.char_id, "tag": "rival"},
+            {"source": loser.char_id, "target": winner.char_id, "tag": "rival"},
+        ]
 
         # Death staging: worsen injury instead of instant death
         old_status = loser.injury_status
@@ -275,6 +287,7 @@ class EventSystem:
                 stat_changes={winner.char_id: winner_gains, loser.char_id: loser_losses},
                 event_type="battle_fatal",
                 year=world.year,
+                metadata={"relation_tag_updates": relation_tag_updates},
             )
 
         # Report injury worsening
@@ -296,6 +309,7 @@ class EventSystem:
             stat_changes={winner.char_id: winner_gains, loser.char_id: loser_losses},
             event_type="battle",
             year=world.year,
+            metadata={"relation_tag_updates": relation_tag_updates},
         )
 
     def event_discovery(self, char: Character, world: World, rng: Any = random) -> EventResult:
@@ -339,12 +353,21 @@ class EventSystem:
         avg_after = round((rel1_after + rel2_after) / 2)
 
         # Relation tags based on affinity level
+        relation_tag_updates: List[Dict[str, str]] = []
         if avg_after >= 50:
             char1.add_relation_tag(char2.char_id, "friend")
             char2.add_relation_tag(char1.char_id, "friend")
+            relation_tag_updates = [
+                {"source": char1.char_id, "target": char2.char_id, "tag": "friend"},
+                {"source": char2.char_id, "target": char1.char_id, "tag": "friend"},
+            ]
         elif avg_after <= -50:
             char1.add_relation_tag(char2.char_id, "rival")
             char2.add_relation_tag(char1.char_id, "rival")
+            relation_tag_updates = [
+                {"source": char1.char_id, "target": char2.char_id, "tag": "rival"},
+                {"source": char2.char_id, "target": char1.char_id, "tag": "rival"},
+            ]
 
         if avg_after > 10:
             desc = tr(
@@ -399,6 +422,7 @@ class EventSystem:
             affected_characters=[char1.char_id, char2.char_id],
             event_type="meeting",
             year=world.year,
+            metadata={"relation_tag_updates": relation_tag_updates},
         )
 
     def event_aging(self, char: Character, world: World, rng: Any = random) -> EventResult:
@@ -650,9 +674,16 @@ class EventSystem:
         if rng.random() < rescue_chance:
             char.injury_status = "serious"
             rescuer = allies_at_loc[0] if allies_at_loc else None
+            relation_tag_updates: List[Dict[str, str]] = []
+            affected_characters = [char.char_id]
             if rescuer:
                 char.add_relation_tag(rescuer.char_id, "savior")
                 rescuer.add_relation_tag(char.char_id, "rescued")
+                relation_tag_updates = [
+                    {"source": char.char_id, "target": rescuer.char_id, "tag": "savior"},
+                    {"source": rescuer.char_id, "target": char.char_id, "tag": "rescued"},
+                ]
+                affected_characters.append(rescuer.char_id)
                 desc = tr(
                     "dying_rescued_by",
                     name=char.name,
@@ -670,9 +701,10 @@ class EventSystem:
             )
             return EventResult(
                 description=desc,
-                affected_characters=[char.char_id],
+                affected_characters=affected_characters,
                 event_type="dying_rescued",
                 year=world.year,
+                metadata={"relation_tag_updates": relation_tag_updates},
             )
         # Death
         return self.event_death(char, world, rng=rng)

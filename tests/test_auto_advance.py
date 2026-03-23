@@ -51,15 +51,32 @@ class TestAutoAdvanceBasics:
         result = sim.advance_until_pause(max_years=2)
         assert result["years_advanced"] <= 2
 
-    def test_months_elapsed_is_default_reason(self, sim):
-        """If no specific condition triggers, default reason is months_elapsed."""
+    def test_preexisting_pause_is_checked_before_advance(self, sim):
+        char = sim.world.characters[0]
+        char.injury_status = "dying"
+        start_year = sim.world.year
+        result = sim.advance_until_pause(max_years=3)
+        assert result["years_advanced"] == 0
+        assert result["pause_reason"] == "dying_any"
+        assert sim.world.year == start_year
+
+    def test_years_elapsed_is_default_reason(self, sim):
+        """If no specific condition triggers, default reason is years_elapsed."""
         result = sim.advance_until_pause(max_years=1)
         # With only 4 chars and low events, likely no pause condition
         assert result["pause_reason"] in (
-            "months_elapsed", "dying_any", "dying_favorite",
+            "years_elapsed", "dying_any", "dying_favorite",
             "dying_spotlighted", "pending_decision",
             "condition_worsened_favorite",
         )
+
+    def test_ephemeral_pause_markers_are_cleared_between_auto_advance_calls(self, sim):
+        char = sim.world.characters[0]
+        char.favorite = True
+        sim._favorites_worsened_this_year.add(char.char_id)
+        # stale yearly marker should not stop immediately.
+        result = sim.advance_until_pause(max_years=1)
+        assert result["years_advanced"] >= 1
 
 
 class TestDyingPauseConditions:
@@ -142,11 +159,23 @@ class TestPausePriorityOrdering:
     def test_condition_worsened_favorite_lower_than_dying(self, sim):
         char = sim.world.characters[0]
         char.favorite = True
-        char.injury_status = "serious"  # condition_worsened_favorite
+        sim._favorites_worsened_this_year = {char.char_id}  # condition_worsened_favorite
         char2 = sim.world.characters[1]
         char2.injury_status = "dying"  # dying_any
         reason = sim._check_pause_conditions()
         assert reason == "dying_any"
+
+    def test_condition_worsened_favorite_is_event_based(self, sim):
+        char = sim.world.characters[0]
+        char.favorite = True
+        char.injury_status = "serious"
+        # Persistent serious state alone should not pause.
+        reason = sim._check_pause_conditions()
+        assert reason is None
+        # Marking this year's worsening should pause.
+        sim._favorites_worsened_this_year.add(char.char_id)
+        reason = sim._check_pause_conditions()
+        assert reason == "condition_worsened_favorite"
 
 
 class TestPartyReturnedPause:
