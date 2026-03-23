@@ -64,6 +64,12 @@ class Simulator:
         # Events that passed the should_notify() threshold during the
         # most recent advance_years() call, available for the UI layer.
         self.pending_notifications: List[WorldEventRecord] = []
+        # Adventures completed during the current year, used by
+        # _check_pause_conditions() for the party_returned condition.
+        self._recently_completed_adventures: List[AdventureRun] = []
+        # Favorites whose condition worsened this year, used for
+        # event-based condition_worsened_favorite pause checks.
+        self._favorites_worsened_this_year: set[str] = set()
 
     # Severity scale: 1=minor, 2=notable, 3=significant, 4=major, 5=critical
     _SEVERITY_MAP: Dict[str, int] = {
@@ -71,6 +77,40 @@ class Simulator:
         "discovery": 3, "battle": 3, "journey": 2,
         "meeting": 1, "aging": 1, "skill_training": 1,
         "romance": 2, "anniversary": 2,
+        "condition_worsened": 3, "dying_rescued": 4,
+    }
+
+    # Conditional auto-advance pause priorities (design §4.5)
+    AUTO_PAUSE_PRIORITIES: Dict[str, int] = {
+        "dying_spotlighted": 100,
+        "pending_decision": 90,
+        "dying_favorite": 80,
+        "party_returned": 70,
+        "dying_any": 60,
+        "condition_worsened_favorite": 50,
+        "years_elapsed": 10,
+    }
+
+    # Seasonal modifiers applied to locations each year (design §5.7).
+    # Mapped to actual region_types: city, village, forest, dungeon, mountain, plains, sea.
+    SEASONAL_MODIFIERS: Dict[tuple, Dict[str, int]] = {
+        # Winter: mountains & forests become treacherous, sea routes close
+        ("winter", "mountain"): {"danger": +30, "road_condition": -20},
+        ("winter", "forest"): {"danger": +15, "road_condition": -15},
+        ("winter", "sea"): {"traffic": -20},
+        ("winter", "plains"): {"road_condition": -10},
+        # Spring: settlements brighten, forests become safer
+        ("spring", "village"): {"mood": +10, "traffic": +10},
+        ("spring", "city"): {"mood": +5, "traffic": +10},
+        ("spring", "forest"): {"danger": -10},
+        # Summer: cities & sea routes thrive, plains easy to traverse
+        ("summer", "city"): {"traffic": +20},
+        ("summer", "sea"): {"traffic": +20, "danger": -10},
+        ("summer", "plains"): {"traffic": +15},
+        # Autumn: wilds grow dangerous, dungeons more active
+        ("autumn", "plains"): {"danger": +10},
+        ("autumn", "forest"): {"danger": +10},
+        ("autumn", "dungeon"): {"danger": +15},
     }
 
     # --- Notification density configuration (§8 of implementation_plan) ---
@@ -130,7 +170,7 @@ class Simulator:
         secondary_actor_ids: Optional[List[str]] = None,
         severity: int = 1,
         visibility: str = "public",
-    ) -> None:
+    ) -> WorldEventRecord:
         """Record a structured world event and mirror it to the legacy text log."""
         self.world.log_event(description)
         record = WorldEventRecord(
@@ -151,6 +191,21 @@ class Simulator:
         # Surface notable events to the UI layer via notification thresholds
         if self.should_notify(record):
             self.pending_notifications.append(record)
+        return record
+
+    def _link_relation_tag_source_from_record(self, result: EventResult, record_id: str) -> None:
+        """Attach canonical WorldEventRecord IDs to relation tag sources."""
+        updates = result.metadata.get("relation_tag_updates", [])
+        for update in updates:
+            source_id = update.get("source")
+            target_id = update.get("target")
+            tag = update.get("tag")
+            if not source_id or not target_id or not tag:
+                continue
+            source_char = self.world.get_character_by_id(source_id)
+            if source_char is None or not source_char.has_relation_tag(target_id, tag):
+                continue
+            source_char.add_relation_tag(target_id, tag, source_event_id=record_id)
 
     @staticmethod
     def _classify_adventure_summary(previous_state: str, run: AdventureRun) -> tuple[str, str, int]:
@@ -183,7 +238,7 @@ class Simulator:
         """
         self.history.append(result)
         severity = self._SEVERITY_MAP.get(result.event_type, 1)
-        self._record_world_event(
+        record = self._record_world_event(
             result.description,
             kind=result.event_type,
             year=result.year,
@@ -192,6 +247,7 @@ class Simulator:
             secondary_actor_ids=result.affected_characters[1:],
             severity=severity,
         )
+        self._link_relation_tag_source_from_record(result, record.record_id)
 
     # ------------------------------------------------------------------
     # Main simulation loop
@@ -213,6 +269,83 @@ class Simulator:
         for _ in range(years):
             self._run_year()
 
+    def advance_until_pause(self, max_years: int = 12) -> Dict[str, Any]:
+        """Advance the simulation until a pause condition triggers or max_years.
+
+        Returns a dict with 'years_advanced', 'pause_reason', and 'pause_priority'.
+        This implements the conditional auto-advance system (design §4.4).
+        """
+        self.pending_notifications.clear()
+        # These are "recent year" markers and should not trigger
+        # repeated 0-year pauses across separate auto-advance requests.
+        self._favorites_worsened_this_year.clear()
+        self._recently_completed_adventures.clear()
+        preexisting_reason = self._check_pause_conditions()
+        if preexisting_reason is not None:
+            return {
+                "years_advanced": 0,
+                "pause_reason": preexisting_reason,
+                "pause_priority": self.AUTO_PAUSE_PRIORITIES.get(preexisting_reason, 0),
+            }
+        years_advanced = 0
+        for _ in range(max_years):
+            self._run_year()
+            years_advanced += 1
+            reason = self._check_pause_conditions()
+            if reason is not None:
+                return {
+                    "years_advanced": years_advanced,
+                    "pause_reason": reason,
+                    "pause_priority": self.AUTO_PAUSE_PRIORITIES.get(reason, 0),
+                }
+        return {
+            "years_advanced": years_advanced,
+            "pause_reason": "years_elapsed",
+            "pause_priority": self.AUTO_PAUSE_PRIORITIES["years_elapsed"],
+        }
+
+    def _check_pause_conditions(self) -> Optional[str]:
+        """Check if any auto-pause condition is met. Returns highest-priority reason."""
+        reasons: List[tuple] = []
+
+        for char in self.world.characters:
+            if not char.alive:
+                continue
+            if char.is_dying:
+                if char.spotlighted:
+                    reasons.append(("dying_spotlighted",
+                                    self.AUTO_PAUSE_PRIORITIES["dying_spotlighted"]))
+                elif char.favorite:
+                    reasons.append(("dying_favorite",
+                                    self.AUTO_PAUSE_PRIORITIES["dying_favorite"]))
+                else:
+                    reasons.append(("dying_any",
+                                    self.AUTO_PAUSE_PRIORITIES["dying_any"]))
+            if char.favorite and char.char_id in self._favorites_worsened_this_year:
+                reasons.append(("condition_worsened_favorite",
+                                self.AUTO_PAUSE_PRIORITIES["condition_worsened_favorite"]))
+
+        # Pending adventure choices
+        for run in self.world.active_adventures:
+            if run.pending_choice is not None:
+                reasons.append(("pending_decision",
+                                self.AUTO_PAUSE_PRIORITIES["pending_decision"]))
+                break
+
+        # Party returned (design §4.4: check recently completed adventures)
+        if self._recently_completed_adventures:
+            for run in self._recently_completed_adventures:
+                char = self.world.get_character_by_id(run.character_id)
+                if char and (char.favorite or char.spotlighted):
+                    reasons.append(("party_returned",
+                                    self.AUTO_PAUSE_PRIORITIES["party_returned"]))
+                    break
+
+        if not reasons:
+            return None
+        reasons.sort(key=lambda x: -x[1])
+        return reasons[0][0]
+
     def _run_year(self) -> None:
         """Process a single year, stamping events with month 1..12.
 
@@ -222,11 +355,20 @@ class Simulator:
         simulation still mutates world state in a single pass per year.
         Full month-ordered progression is a future milestone.
         """
-        # --- Natural death checks (once per year, month 1) ---
+        # Reset per-year tracking for pause conditions
+        self._recently_completed_adventures.clear()
+        self._favorites_worsened_this_year.clear()
+
+        # --- Dying resolution for pre-existing dying characters (month 1) ---
         self.current_month = 1
+        self._resolve_dying_characters()
+
+        # --- Natural death checks (once per year, month 1) ---
         for char in list(self.world.characters):
             result = self.event_system.check_natural_death(char, self.world, rng=self.rng)
             if result is not None:
+                if result.event_type == "condition_worsened" and char.favorite:
+                    self._favorites_worsened_this_year.add(char.char_id)
                 self._record_event(result, location_id=char.location_id)
 
         # --- Injury recovery (once per year, month 1) ---
@@ -234,21 +376,26 @@ class Simulator:
 
         # --- Adventure start / progression (month 2) ---
         self.current_month = 2
+        self._apply_seasonal_modifiers(self.current_month)
         self._maybe_start_adventure()
         self._advance_adventures()
+        self._revert_seasonal_modifiers()
 
         # --- Random events (randomly stamped with months 1-12) ---
         for _ in range(self.events_per_year):
             self.current_month = self.rng.randint(1, 12)
+            self._apply_seasonal_modifiers(self.current_month)
             result = self.event_system.generate_random_event(
                 self.world.characters, self.world, rng=self.rng
             )
             if result is None:
+                self._revert_seasonal_modifiers()
                 break
             primary_id = result.affected_characters[0] if result.affected_characters else None
             primary_char = self.world.get_character_by_id(primary_id) if primary_id else None
             loc_id = primary_char.location_id if primary_char else None
             self._record_event(result, location_id=loc_id)
+            self._revert_seasonal_modifiers()
 
         # --- State propagation and rumor generation (once per year at month 12) ---
         self.current_month = 12
@@ -257,11 +404,42 @@ class Simulator:
 
         self.world.advance_time(1)
 
-    def _recover_injuries(self) -> None:
-        """Give injured characters a chance to recover during normal life."""
-        for char in self.world.characters:
-            if not char.alive or char.injury_status != "injured":
+    def _resolve_dying_characters(self) -> None:
+        """Give dying characters a chance at rescue or death (design §8.3)."""
+        for char in list(self.world.characters):
+            if not char.alive or char.injury_status != "dying":
                 continue
+            result = self.event_system.check_dying_resolution(
+                char, self.world, rng=self.rng
+            )
+            if result is not None:
+                self._record_event(result, location_id=char.location_id)
+
+    def _recover_injuries(self) -> None:
+        """Give injured/serious characters a chance to recover during normal life.
+
+        Recovery is staged (design §8): serious→injured (30%), injured→none (50%).
+        Dying characters are handled separately in _resolve_dying_characters.
+        """
+        for char in self.world.characters:
+            if not char.alive or char.injury_status not in ("injured", "serious"):
+                continue
+            # Serious: 30% chance to recover to injured
+            if char.injury_status == "serious":
+                if self.rng.random() < 0.3:
+                    char.injury_status = "injured"
+                    message = tr("condition_improved", name=char.name,
+                                 status=tr("injury_status_injured"))
+                    char.add_history(tr("history_condition_improved", year=self.world.year,
+                                        status=tr("injury_status_injured")))
+                    self._record_world_event(
+                        message,
+                        kind="injury_recovery",
+                        location_id=char.location_id,
+                        primary_actor_id=char.char_id,
+                    )
+                continue
+            # Injured: 50% chance to recover to none
             if self.rng.random() < 0.5:
                 char.injury_status = "none"
                 message = tr("recovered_from_injuries", name=char.name)
@@ -272,6 +450,36 @@ class Simulator:
                     location_id=char.location_id,
                     primary_actor_id=char.char_id,
                 )
+
+    def _apply_seasonal_modifiers(self, month: int) -> None:
+        """Apply seasonal modifiers to locations based on current month (design §5.7).
+
+        Modifiers are temporary adjustments applied before events/adventures
+        and reversed after, so they influence outcomes without permanently
+        drifting location stats.
+        """
+        season = self.world.get_season(month)
+        self._active_seasonal_deltas: List[tuple] = []
+        for (s, region), deltas in self.SEASONAL_MODIFIERS.items():
+            if s != season:
+                continue
+            for loc in self.world.grid.values():
+                if loc.region_type != region:
+                    continue
+                for attr, delta in deltas.items():
+                    if not hasattr(loc, attr):
+                        continue
+                    old_val = getattr(loc, attr)
+                    new_val = max(0, min(100, old_val + delta))
+                    setattr(loc, attr, new_val)
+                    self._active_seasonal_deltas.append((loc, attr, new_val - old_val))
+
+    def _revert_seasonal_modifiers(self) -> None:
+        """Revert seasonal modifiers applied by _apply_seasonal_modifiers."""
+        for loc, attr, applied_delta in self._active_seasonal_deltas:
+            old_val = getattr(loc, attr)
+            setattr(loc, attr, max(0, min(100, old_val - applied_delta)))
+        self._active_seasonal_deltas.clear()
 
     def _generate_and_age_rumors(self) -> None:
         """Generate rumors monthly and age existing ones.
@@ -310,7 +518,8 @@ class Simulator:
         """Start at most one new adventure in the current year."""
         candidates = [
             c for c in self.world.characters
-            if c.alive and c.active_adventure_id is None and c.injury_status != "injured"
+            if c.alive and c.active_adventure_id is None
+            and c.injury_status not in ("injured", "serious", "dying")
         ]
         if not candidates or self.rng.random() >= 0.25:
             return
@@ -367,6 +576,7 @@ class Simulator:
                 if not char.alive:
                     self.event_system.handle_death_side_effects(char, self.world)
                 if run.is_resolved:
+                    self._recently_completed_adventures.append(run)
                     self.world.complete_adventure(run.adventure_id)
                 elif not had_pending_choice and run.pending_choice is not None:
                     paused_until_next_year.add(run.adventure_id)
@@ -388,6 +598,7 @@ class Simulator:
             )
         )
         self.event_system.handle_death_side_effects(char, self.world)
+        self._recently_completed_adventures.append(run)
         self.world.complete_adventure(run.adventure_id)
 
     # ------------------------------------------------------------------

@@ -694,3 +694,174 @@ class TestWorldEventRecordIntegration:
         restored = load_simulation(str(path))
         assert restored is not None
         assert len(restored.world.event_records) == original_count
+
+    def test_relation_tag_sources_include_canonical_event_record_id(self, small_world):
+        sim = Simulator(small_world, events_per_year=0, seed=42)
+        char1, char2 = sim.world.characters[0], sim.world.characters[1]
+        result = sim.event_system.event_battle(char1, char2, sim.world, rng=sim.rng)
+        sim._record_event(result, location_id=char1.location_id)
+        record_id = sim.world.event_records[-1].record_id
+        key1 = f"{char2.char_id}:rival"
+        key2 = f"{char1.char_id}:rival"
+        assert record_id in char1.relation_tag_sources.get(key1, [])
+        assert record_id in char2.relation_tag_sources.get(key2, [])
+
+
+# ---------------------------------------------------------------------------
+# Seasonal Modifiers (design §5.7)
+# ---------------------------------------------------------------------------
+
+class TestSeasonalModifiers:
+    """Tarn Adams: Seasons should meaningfully affect world conditions."""
+
+    def test_winter_mountain_increases_danger(self):
+        world = World(name="TestWorld", year=1000)
+        sim = Simulator(world, events_per_year=0, seed=1)
+        mountain_locs = [loc for loc in world.grid.values() if loc.region_type == "mountain"]
+        if not mountain_locs:
+            pytest.skip("No mountain locations in default world")
+        loc = mountain_locs[0]
+        original_danger = loc.danger
+        sim._apply_seasonal_modifiers(1)  # January = winter
+        assert loc.danger > original_danger or loc.danger == 100  # clamped at 100
+        sim._revert_seasonal_modifiers()
+        assert loc.danger == original_danger
+
+    def test_non_winter_no_mountain_modifier(self):
+        world = World(name="TestWorld", year=1000)
+        sim = Simulator(world, events_per_year=0, seed=1)
+        mountain_locs = [loc for loc in world.grid.values() if loc.region_type == "mountain"]
+        if not mountain_locs:
+            pytest.skip("No mountain locations in default world")
+        loc = mountain_locs[0]
+        original_danger = loc.danger
+        sim._apply_seasonal_modifiers(7)  # July = summer
+        assert loc.danger == original_danger
+        sim._revert_seasonal_modifiers()
+
+    def test_summer_city_increases_traffic(self):
+        world = World(name="TestWorld", year=1000)
+        sim = Simulator(world, events_per_year=0, seed=1)
+        city_locs = [loc for loc in world.grid.values() if loc.region_type == "city"]
+        if not city_locs:
+            pytest.skip("No city locations in default world")
+        loc = city_locs[0]
+        original_traffic = loc.traffic
+        sim._apply_seasonal_modifiers(7)  # July = summer
+        assert loc.traffic >= original_traffic
+        sim._revert_seasonal_modifiers()
+        assert loc.traffic == original_traffic
+
+    def test_spring_village_increases_mood(self):
+        world = World(name="TestWorld", year=1000)
+        sim = Simulator(world, events_per_year=0, seed=1)
+        village_locs = [loc for loc in world.grid.values() if loc.region_type == "village"]
+        if not village_locs:
+            pytest.skip("No village locations in default world")
+        loc = village_locs[0]
+        original_mood = loc.mood
+        sim._apply_seasonal_modifiers(4)  # April = spring
+        assert loc.mood >= original_mood
+        sim._revert_seasonal_modifiers()
+        assert loc.mood == original_mood
+
+    def test_autumn_forest_increases_danger(self):
+        world = World(name="TestWorld", year=1000)
+        sim = Simulator(world, events_per_year=0, seed=1)
+        forest_locs = [loc for loc in world.grid.values() if loc.region_type == "forest"]
+        if not forest_locs:
+            pytest.skip("No forest locations in default world")
+        loc = forest_locs[0]
+        original_danger = loc.danger
+        sim._apply_seasonal_modifiers(10)  # October = autumn
+        assert loc.danger > original_danger or loc.danger == 100
+        sim._revert_seasonal_modifiers()
+        assert loc.danger == original_danger
+
+    def test_summer_sea_increases_traffic(self):
+        world = World(name="TestWorld", year=1000)
+        sim = Simulator(world, events_per_year=0, seed=1)
+        sea_locs = [loc for loc in world.grid.values() if loc.region_type == "sea"]
+        if not sea_locs:
+            pytest.skip("No sea locations in default world")
+        loc = sea_locs[0]
+        original_traffic = loc.traffic
+        sim._apply_seasonal_modifiers(7)  # July = summer
+        assert loc.traffic > original_traffic or loc.traffic == 100
+        sim._revert_seasonal_modifiers()
+        assert loc.traffic == original_traffic
+
+    def test_winter_forest_increases_danger(self):
+        world = World(name="TestWorld", year=1000)
+        sim = Simulator(world, events_per_year=0, seed=1)
+        forest_locs = [loc for loc in world.grid.values() if loc.region_type == "forest"]
+        if not forest_locs:
+            pytest.skip("No forest locations in default world")
+        loc = forest_locs[0]
+        original_danger = loc.danger
+        sim._apply_seasonal_modifiers(1)  # January = winter
+        assert loc.danger > original_danger or loc.danger == 100
+        sim._revert_seasonal_modifiers()
+        assert loc.danger == original_danger
+
+    def test_get_season_helper(self):
+        assert World.get_season(1) == "winter"
+        assert World.get_season(3) == "spring"
+        assert World.get_season(7) == "summer"
+        assert World.get_season(10) == "autumn"
+        assert World.get_season(12) == "winter"
+
+    def test_run_year_applies_seasonal_modifiers_with_event_months(self):
+        world = World(name="TestWorld", year=1000)
+        sim = Simulator(world, events_per_year=3, seed=123)
+        applied_months = []
+        original_apply = sim._apply_seasonal_modifiers
+
+        def _tracking_apply(month):
+            applied_months.append(month)
+            return original_apply(month)
+
+        sim._apply_seasonal_modifiers = _tracking_apply
+        sim._run_year()
+        # at least month 2 (adventure phase) + random event months should be observed
+        assert 2 in applied_months
+        assert len(applied_months) >= 2
+        assert any(month != 1 for month in applied_months)
+
+
+# ---------------------------------------------------------------------------
+# Recovery stages (design §8)
+# ---------------------------------------------------------------------------
+
+class TestStagedInjuryRecovery:
+    """Design §8: Staged recovery serious→injured→none."""
+
+    def test_serious_can_recover_to_injured(self):
+        world = World(name="TestWorld", year=1000)
+        char = Character(
+            name="Wounded", age=30, gender="male", race="Human", job="Warrior",
+            strength=50, dexterity=50, constitution=50,
+            injury_status="serious",
+        )
+        world.add_character(char)
+        sim = Simulator(world, events_per_year=0, seed=1)
+        # Run many years to get the 30% recovery
+        recovered = False
+        for _ in range(50):
+            sim._recover_injuries()
+            if char.injury_status == "injured":
+                recovered = True
+                break
+        assert recovered, "Expected serious→injured recovery within 50 attempts"
+
+    def test_dying_not_recovered_by_recover_injuries(self):
+        world = World(name="TestWorld", year=1000)
+        char = Character(
+            name="Dying", age=30, gender="male", race="Human", job="Warrior",
+            strength=50, dexterity=50, constitution=50,
+            injury_status="dying",
+        )
+        world.add_character(char)
+        sim = Simulator(world, events_per_year=0, seed=1)
+        sim._recover_injuries()
+        assert char.injury_status == "dying"

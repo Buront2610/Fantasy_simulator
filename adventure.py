@@ -168,7 +168,9 @@ class AdventureRun:
             self.steps_taken += 1
             roll = rng.random()
             if roll < 0.18:
-                self.injury_status = "injured"
+                # Death staging: worsen character injury instead of fixed "injured"
+                character.worsen_injury()
+                self.injury_status = character.injury_status
                 summary = tr("summary_adventure_injured", name=self.character_name)
                 detail = tr("detail_adventure_injured", name=self.character_name, destination=dest_name)
                 self._record(summary, detail)
@@ -176,15 +178,29 @@ class AdventureRun:
                 return [summary]
 
             if roll < 0.24:
-                self.outcome = "death"
-                self.state = "resolved"
-                self.resolution_year = world.year
-                character.alive = False
-                character.active_adventure_id = None
-                summary = tr("summary_adventure_died", name=self.character_name, destination=dest_name)
-                detail = tr("detail_adventure_died", name=self.character_name, destination=dest_name)
+                # Death staging: if already dying, die; otherwise worsen to dying
+                if character.injury_status == "dying":
+                    self.outcome = "death"
+                    self.state = "resolved"
+                    self.resolution_year = world.year
+                    character.alive = False
+                    character.active_adventure_id = None
+                    summary = tr("summary_adventure_died", name=self.character_name, destination=dest_name)
+                    detail = tr(
+                        "detail_adventure_died", name=self.character_name, destination=dest_name
+                    )
+                    self._record(summary, detail)
+                    character.add_history(
+                        tr("history_adventure_detail", year=world.year, detail=detail)
+                    )
+                    return [summary]
+                # Not yet dying: worsen injury and continue
+                character.worsen_injury()
+                self.injury_status = character.injury_status
+                summary = tr("summary_adventure_injured", name=self.character_name)
+                detail = tr("detail_adventure_injured", name=self.character_name, destination=dest_name)
                 self._record(summary, detail)
-                character.add_history(tr("history_adventure_detail", year=world.year, detail=detail))
+                self.state = "returning"
                 return [summary]
 
             discovery = rng.choice(ADVENTURE_DISCOVERIES)

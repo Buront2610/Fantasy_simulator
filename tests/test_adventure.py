@@ -230,8 +230,12 @@ def test_adventure_id_generation_uses_separate_rng():
 
 
 def test_adventure_death_clears_spouse_on_survivor():
-    """When a character dies during an adventure, the surviving spouse's
-    spouse_id must be cleared and the spouse must receive a history entry."""
+    """When a dying character dies during an adventure, the surviving spouse's
+    spouse_id must be cleared and the spouse must receive a history entry.
+
+    With death staging (design §8), only already-dying characters die
+    instantly in the 0.18-0.24 range; others worsen injury instead.
+    """
     world = World()
     hero = _make_character("Hero")
     spouse = _make_character("Spouse")
@@ -240,6 +244,8 @@ def test_adventure_death_clears_spouse_on_survivor():
 
     hero.spouse_id = spouse.char_id
     spouse.spouse_id = hero.char_id
+    # Hero must already be dying for instant death
+    hero.injury_status = "dying"
 
     sim = Simulator(world, events_per_year=0, adventure_steps_per_year=4, seed=1)
 
@@ -269,7 +275,11 @@ def test_adventure_death_clears_spouse_on_survivor():
 
 def test_adventure_death_clears_spouse_via_simulator_integration():
     """Full integration: simulator's _advance_adventures handles spouse
-    cleanup when adventure step kills a character."""
+    cleanup when a dying character's adventure step kills them.
+
+    With death staging (design §8), character must be dying to die in
+    the 0.18-0.24 roll range; otherwise injury worsens.
+    """
     world = World()
     hero = _make_character("Hero")
     spouse = _make_character("Spouse")
@@ -278,6 +288,8 @@ def test_adventure_death_clears_spouse_via_simulator_integration():
 
     hero.spouse_id = spouse.char_id
     spouse.spouse_id = hero.char_id
+    # Hero must already be dying for instant death
+    hero.injury_status = "dying"
 
     sim = Simulator(world, events_per_year=0, adventure_steps_per_year=1, seed=1)
 

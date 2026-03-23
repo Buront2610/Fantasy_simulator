@@ -68,6 +68,8 @@ _EVENT_IMPACT: Dict[str, Dict[str, int]] = {
     "adventure_returned": {"mood": +2, "traffic": +1},
     "journey":            {"traffic": +1},
     "injury_recovery":    {"mood": +1},
+    "condition_worsened": {"mood": -2, "rumor_heat": +3},
+    "dying_rescued":      {"mood": +3, "rumor_heat": +5},
 }
 
 
@@ -492,6 +494,17 @@ class World:
         if exclude_dungeon:
             options = [loc for loc in options if loc.region_type != "dungeon"]
         return rng.choice(options)
+
+    @staticmethod
+    def get_season(month: int) -> str:
+        """Return season name for a given month (1-12)."""
+        if month in (12, 1, 2):
+            return "winter"
+        if month in (3, 4, 5):
+            return "spring"
+        if month in (6, 7, 8):
+            return "summer"
+        return "autumn"
 
     def advance_time(self, years: int = 1) -> None:
         self.year += years

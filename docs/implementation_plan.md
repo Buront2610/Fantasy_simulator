@@ -460,11 +460,11 @@ NOTIFICATION_THRESHOLDS = {
 
 | PR | 内容 | 依存 |
 |---|---|---|
-| PR-4 | 月報 / 年報 / 復帰サマリー + UI report adapter + イベントストア統合 | PR-2.5, PR-3 |
-| PR-5 | Rumor / reliability / 通知密度分離 | PR-4 |
-| PR-6 | 条件付き自動進行（AUTO_PAUSE_PRIORITIES） | PR-4 |
-| PR-7 | Relationship 構造化 + ReputationEntry | PR-3 |
-| PR-8 | dying / rescue / 死の段階化 | PR-7 |
+| PR-4 | 月報 / 年報 / 復帰サマリー + UI report adapter + イベントストア統合 | PR-2.5, PR-3 | ✅ 完了 |
+| PR-5 | Rumor / reliability / 通知密度分離 | PR-4 | ✅ 完了 |
+| PR-6 | 条件付き自動進行（AUTO_PAUSE_PRIORITIES） | PR-4 | ✅ 完了 |
+| PR-7 | Relationship 構造化（relation_tags） | PR-3 | ✅ 完了 |
+| PR-8 | dying / rescue / 死の段階化 | PR-7 | ✅ 完了 |
 | PR-9 | AdventureRun パーティ化 + 能力値依存 outcome | PR-8 |
 | PR-10 | live trace + memorial + alias | PR-9 |
 | PR-11 | map renderer 初期 AA 版 | PR-10 |
@@ -627,8 +627,8 @@ def test_seed_fixed_12_months_is_deterministic():
 | Phase 1a | PR-1, PR-2 | パッケージ整備・migration 基盤 | 未確立（旧コード） | ✅ 完了 |
 | Phase 1b | PR-2.5 | Favorite/Spotlight/Playable | 未確立 | ✅ 完了 |
 | Phase 1c | PR-3 | LocationState・location_id 一括移行（旧参照ゼロ） | **SI-1〜SI-3 確立** | ✅ 完了 |
-| Phase 2 | PR-4〜6 | 月報・Rumor・自動進行 | SI 維持 |
-| Phase 3 | PR-7〜8 | Relationship・dying | SI 維持 |
+| Phase 2 | PR-4〜6 | 月報・Rumor・自動進行 | SI 維持 | ✅ 完了 |
+| Phase 3 | PR-7〜8 | Relationship（relation_tags）・dying / rescue | SI 維持 | ✅ 完了 |
 | Phase 4 | PR-9〜11 | パーティ冒険・AA マップ | SI 維持 |
 | Phase 5 | 未定 | Vow/secrecy 体系化 | SI 維持 |
 
@@ -650,8 +650,8 @@ def test_seed_fixed_12_months_is_deterministic():
 | SI-8 | `memorial.subject_ids` の全 id は存在するキャラを参照する | PR-10 |
 | SI-9 | `month` は 1 以上の正整数 | PR-3 |
 | SI-10 | 状態量（prosperity 等）は 0〜100 の範囲 | PR-3 | ✅ 完了 |
-| SI-11 | `dying` キャラは `alive=True` を維持する | PR-8 |
-| SI-12 | active adventure の `member_ids` は全員 `alive=True` | PR-8 |
+| SI-11 | `dying` キャラは `alive=True` を維持する | PR-8 | ✅ 完了 |
+| SI-12 | active adventure の `member_ids` は全員 `alive=True` | PR-8 | ✅ 完了 |
 
 ---
 
