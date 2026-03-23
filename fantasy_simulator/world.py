@@ -511,15 +511,21 @@ class World:
 
     MAX_EVENT_LOG = 2000
 
-    def log_event(self, event_text: str) -> None:
+    def log_event(self, event_text: str, *, month: Optional[int] = None) -> None:
         """Append a formatted compatibility log entry for legacy CLI consumers.
 
         This buffer is intentionally separate from ``event_records`` during the
         Phase 1 -> Phase 2 migration. New gameplay/report features should treat
         ``event_records`` as the canonical history and view this method as a
         presentation-layer compatibility path.
+
+        When *month* is provided, the prefix includes month information so that
+        the player-visible log reflects monthly causality introduced in PR-B.
         """
-        prefix = tr("event_log_prefix", year=self.year)
+        if month is not None:
+            prefix = tr("event_log_prefix_month", year=self.year, month=month)
+        else:
+            prefix = tr("event_log_prefix", year=self.year)
         self.event_log.append(f"{prefix} {event_text}")
         if len(self.event_log) > self.MAX_EVENT_LOG:
             self.event_log = self.event_log[-self.MAX_EVENT_LOG:]

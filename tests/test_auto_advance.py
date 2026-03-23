@@ -42,10 +42,11 @@ class TestAutoAdvanceBasics:
     def test_advance_until_pause_returns_dict(self, sim):
         result = sim.advance_until_pause(max_years=3)
         assert "years_advanced" in result
+        assert "months_advanced" in result
         assert "pause_reason" in result
         assert "pause_priority" in result
-        assert result["years_advanced"] >= 1
-        assert result["years_advanced"] <= 3
+        assert result["months_advanced"] >= 1
+        assert result["months_advanced"] <= 3 * 12
 
     def test_max_years_fallback(self, sim):
         result = sim.advance_until_pause(max_years=2)
@@ -76,7 +77,7 @@ class TestAutoAdvanceBasics:
         sim._favorites_worsened_this_year.add(char.char_id)
         # stale yearly marker should not stop immediately.
         result = sim.advance_until_pause(max_years=1)
-        assert result["years_advanced"] >= 1
+        assert result["months_advanced"] >= 1
 
 
 class TestDyingPauseConditions:

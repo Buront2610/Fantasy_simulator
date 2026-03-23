@@ -119,7 +119,7 @@ def _advance_auto(sim: Simulator) -> None:
     print()
     print(f"  {bold(tr('advancing_auto'))}")
     result = sim.advance_until_pause(max_years=12)
-    years = result["years_advanced"]
+    months = result["months_advanced"]
     reason = result["pause_reason"]
     alive = sum(1 for c in sim.world.characters if c.alive)
     pending = len(sim.get_pending_adventure_choices())
@@ -129,7 +129,13 @@ def _advance_auto(sim: Simulator) -> None:
     )
     reason_key = f"auto_pause_{reason}"
     reason_text = tr(reason_key)
-    print(f"  {yellow('!')}  {tr('auto_paused_after', years=years)}: {reason_text}")
+    years = months // 12
+    remainder_months = months % 12
+    if remainder_months == 0:
+        print(f"  {yellow('!')}  {tr('auto_paused_after', years=years)}: {reason_text}")
+    else:
+        print(f"  {yellow('!')}  {tr('auto_paused_after_months', years=years, months=remainder_months)}: "
+              f"{reason_text}")
 
 
 # ---------------------------------------------------------------------------
