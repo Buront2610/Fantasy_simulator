@@ -72,16 +72,17 @@
 
 ### Phase 0：基礎整備（PR-1〜PR-3 と並行可能。`WorldEventRecord` / `location_id` に依存する刷新は関連 PR 完了後）
 
-- [ ] `screens.py` / `ui_helpers.py` の責務を棚卸しし、`ui/` パッケージを作成する
-- [ ] `screens.py` の `_show_results()` 等で `action == tr("...")` による分岐をキーベース（例: `"advance_1_year"`）の選択に変更し、ロケール依存の制御フローを解消する
-- [ ] `InputBackend`（`input()` / prompt_toolkit の差し替えを可能にする）インターフェースを定義する
-- [ ] `RenderBackend`（Rich / 素の print の差し替えを可能にする）インターフェースを定義する
-- [ ] presenter インターフェースを定義する
-- [ ] `world.py` / `simulator.py` の文字列生成 API（`render_map()`, `get_summary()`, `get_character_story()` など）に互換ラッパーを設け、段階的に renderer / presenter 層へ寄せる
-- [ ] `EventRecord` / `WorldEventRecord` を受け取って表示する設計へ切り替える準備を行う
-- [ ] `WorldEventRecord` / `location_id` 対応後に、イベント一覧・マップ・レポート renderer を新データ契約へ接続する
-- [ ] `wcwidth` による文字幅計算ユーティリティを導入する
-- [ ] 移設後も既存テスト（`test_screens.py`, `test_ui_helpers.py`）が通ることを確認する
+- [x] `screens.py` / `ui_helpers.py` の責務を棚卸しし、`ui/` パッケージを作成する
+- [x] `screens.py` の `_show_results()` 等で `action == tr("...")` による分岐をキーベース（例: `"advance_1_year"`）の選択に変更し、ロケール依存の制御フローを解消する
+- [x] `InputBackend`（`input()` / prompt_toolkit の差し替えを可能にする）インターフェースを定義する
+- [x] `RenderBackend`（Rich / 素の print の差し替えを可能にする）インターフェースを定義する
+- [x] `screens.py` / `main.py` / `character_creator.py` の全 I/O を `InputBackend` + `RenderBackend` 経由に移行（`UIContext` 導入、直接 `print()` / `input()` 排除、統合テストで証明済み）
+- [ ] presenter インターフェースを定義する（Phase 1 で Rich 導入時に本格着手予定。現状は `MapRenderInfo` が初歩版として存在）
+- [x] `world.py` / `simulator.py` の文字列生成 API（`render_map()`, `get_summary()`, `get_character_story()` など）に互換ラッパーを設け、段階的に renderer / presenter 層へ寄せる（`render_map()` は `map_renderer.py` へ移行完了。`get_summary()` 等は文字列を返す純粋関数であり、backend 経由で表示される設計が確立済み）
+- [ ] `EventRecord` / `WorldEventRecord` を受け取って表示する設計へ切り替える準備を行う（Phase 1 で Rich 導入時に着手予定）
+- [ ] `WorldEventRecord` / `location_id` 対応後に、イベント一覧・マップ・レポート renderer を新データ契約へ接続する（Phase 2 のスコープ）
+- [ ] `wcwidth` による文字幅計算ユーティリティを導入する（Phase 1 で Rich 導入時に評価。Rich 経由出力では不要、独自レンダリング部分のみ対象）
+- [x] 移設後も既存テスト（`test_screens.py`, `test_ui_helpers.py`）が通ることを確認する
 
 ### Phase 1：見た目の刷新
 
@@ -108,7 +109,8 @@
 
 ## テスト戦略
 
-- [ ] 既存の `test_screens.py`, `test_ui_helpers.py` を移行中も維持し、旧 entry point と helper の互換性を確認する
+- [x] 既存の `test_screens.py`, `test_ui_helpers.py` を移行中も維持し、旧 entry point と helper の互換性を確認する
+- [x] `test_ui_integration.py` で `RecordingRenderBackend` / `ScriptedInputBackend` を用いた統合テストを追加し、UI 基盤が差し替え可能であることを証明する（ゼロ stdout 漏洩テスト含む）
 - [ ] 日本語英語混在時のセンタリング、表幅、AA 罫線が崩れないことを確認する幅崩れテストを追加する
 - [ ] メインメニュー、ワールドマップ、月報、キャラクター一覧など主要画面の文字出力スナップショット比較テストを追加する（Rich の `Console(file=StringIO(), width=固定値)` でターミナル幅依存を排除）
 - [ ] `WorldEventRecord` から期待するパネル・レポート・通知カードが生成されることを確認するイベント表示テストを追加する

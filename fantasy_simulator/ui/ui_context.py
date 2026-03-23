@@ -1,0 +1,71 @@
+"""
+ui_context.py - Dependency container for the UI layer.
+
+``UIContext`` bundles an ``InputBackend`` and ``RenderBackend`` together
+so that all screen functions receive a single injection point.  When no
+context is supplied, the default (``StdInputBackend`` + ``PrintRenderBackend``)
+is used — meaning existing callers see zero behaviour change.
+
+Example (production)::
+
+    ctx = UIContext()                         # uses stdin/stdout
+    screen_new_simulation(ctx=ctx)
+
+Example (testing)::
+
+    ctx = UIContext(inp=RecordingInput(...), out=BufferOutput())
+    screen_new_simulation(ctx=ctx)
+    assert "world_created" in ctx.out.lines
+"""
+
+from __future__ import annotations
+
+from typing import List, Optional, Tuple
+
+from .input_backend import InputBackend, StdInputBackend
+from .render_backend import RenderBackend, PrintRenderBackend
+
+
+class UIContext:
+    """Thin wrapper around an input backend and a render backend.
+
+    All screen / menu functions accept an optional ``ctx`` parameter.
+    If ``None`` is passed they create a default ``UIContext`` internally,
+    so the change is fully backward-compatible.
+
+    ``choose_key()`` is the orchestrating facade that separates rendering
+    (delegated to ``self.out``) from reading (delegated to ``self.inp``),
+    so swapping either backend independently works as expected.
+    """
+
+    __slots__ = ("inp", "out")
+
+    def __init__(
+        self,
+        inp: InputBackend | None = None,
+        out: RenderBackend | None = None,
+    ) -> None:
+        self.inp: InputBackend = inp or StdInputBackend()
+        self.out: RenderBackend = out or PrintRenderBackend()
+
+    def choose_key(
+        self,
+        prompt: str,
+        key_label_pairs: List[Tuple[str, str]],
+        default: Optional[str] = None,
+    ) -> str:
+        """Render a numbered menu then read and return the selected key.
+
+        Rendering goes through ``self.out.print_menu()``; reading goes through
+        ``self.inp.read_menu_key()``.  The two responsibilities are fully
+        separated so any combination of backends works correctly.
+        """
+        self.out.print_menu(prompt, key_label_pairs, default)
+        return self.inp.read_menu_key(key_label_pairs, default)
+
+
+def _default_ctx(ctx: UIContext | None) -> UIContext:
+    """Return *ctx* if provided, or a fresh default ``UIContext``."""
+    if ctx is not None:
+        return ctx
+    return UIContext()
