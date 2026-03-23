@@ -211,6 +211,8 @@ class TimelineMixin:
         drifting location stats.
         """
         season = self.world.get_season(month)
+        # Reset per-month: each invocation builds its own delta set so that
+        # _revert_seasonal_modifiers() reverses exactly this month's changes.
         self._active_seasonal_deltas: List[tuple] = []
         for (s, region), deltas in self.SEASONAL_MODIFIERS.items():
             if s != season:

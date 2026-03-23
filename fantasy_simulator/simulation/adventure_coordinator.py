@@ -6,10 +6,13 @@ resolution, and player-facing query methods.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from ..adventure import AdventureRun, create_adventure_run
 from ..i18n import tr
+
+if TYPE_CHECKING:
+    from ..character import Character
 
 
 class AdventureMixin:
@@ -91,7 +94,7 @@ class AdventureMixin:
                 elif not had_pending_choice and run.pending_choice is not None:
                     paused_until_next_year.add(run.adventure_id)
 
-    def _resolve_dead_character_adventure(self, run: AdventureRun, char) -> None:
+    def _resolve_dead_character_adventure(self, run: AdventureRun, char: "Character") -> None:
         run.pending_choice = None
         run.state = "resolved"
         run.outcome = "death"

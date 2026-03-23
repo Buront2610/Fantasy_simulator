@@ -16,6 +16,11 @@ from fantasy_simulator.character_creator import CharacterCreator
 from fantasy_simulator.world import World
 
 
+def _first_location_id(world):
+    """Return a valid location_id from the world using the public grid API."""
+    return next(iter(world.grid.values())).id
+
+
 def _make_sim(seed=42):
     """Create a Simulator with an empty seeded World for deterministic testing.
 
@@ -126,7 +131,9 @@ class TestImpactTracking:
     def test_apply_event_impact_battle_returns_nonempty(self):
         """'battle' is in _EVENT_IMPACT and must produce actual impact dicts."""
         world = World()
-        loc_id = list(world._location_id_index.keys())[0]
+        loc_id = _first_location_id(world)
+        location = world.get_location_by_id(loc_id)
+        original_danger = location.danger
         impacts = world.apply_event_impact("battle", loc_id)
         assert isinstance(impacts, list)
         assert len(impacts) > 0, "battle should produce at least one impact"
@@ -136,6 +143,11 @@ class TestImpactTracking:
         assert "old_value" in imp
         assert "new_value" in imp
         assert "delta" in imp
+        assert imp["delta"] == imp["new_value"] - imp["old_value"]
+        # Verify the danger attribute was actually changed
+        danger_impacts = [i for i in impacts if i["attribute"] == "danger"]
+        assert danger_impacts, "battle should impact the danger attribute"
+        assert danger_impacts[0]["old_value"] == original_danger
 
     def test_apply_event_impact_returns_empty_for_none_location(self):
         world = World()
@@ -149,23 +161,26 @@ class TestImpactTracking:
 
     def test_apply_event_impact_returns_empty_for_unknown_kind(self):
         world = World()
-        loc_id = list(world._location_id_index.keys())[0]
+        loc_id = _first_location_id(world)
         impacts = world.apply_event_impact("totally_unknown_kind", loc_id)
         assert impacts == []
 
     def test_record_world_event_stores_impacts_with_content(self):
         """_record_world_event with 'battle' kind must produce impact dicts."""
         sim = _make_sim()
-        loc_id = list(sim.world._location_id_index.keys())[0]
+        loc_id = _first_location_id(sim.world)
         record = sim._record_world_event(
             "A battle occurred",
             kind="battle",
             location_id=loc_id,
         )
-        assert isinstance(record.impacts, list)
-        assert len(record.impacts) > 0, "battle should record impacts"
-        assert record.impacts[0]["target_type"] == "location"
-        assert record.impacts[0]["target_id"] == loc_id
+        assert record.impacts, "Expected at least one impact for 'battle' event"
+        first_impact = record.impacts[0]
+        assert first_impact["target_type"] == "location"
+        assert first_impact["target_id"] == loc_id
+        assert "attribute" in first_impact
+        assert "delta" in first_impact
+        assert first_impact["delta"] == first_impact["new_value"] - first_impact["old_value"]
 
 
 class TestEventStoreStoreCoverage:
@@ -179,7 +194,7 @@ class TestEventStoreStoreCoverage:
     def test_record_world_event_writes_event_records_and_event_log(self):
         """_record_world_event populates event_records and event_log."""
         sim = _make_sim()
-        loc_id = list(sim.world._location_id_index.keys())[0]
+        loc_id = _first_location_id(sim.world)
         sim._record_world_event(
             "An adventure started",
             kind="adventure_started",
@@ -193,7 +208,7 @@ class TestEventStoreStoreCoverage:
     def test_record_world_event_does_NOT_write_history(self):
         """_record_world_event must NOT populate history — this is intentional."""
         sim = _make_sim()
-        loc_id = list(sim.world._location_id_index.keys())[0]
+        loc_id = _first_location_id(sim.world)
         sim._record_world_event(
             "Injury recovery happened",
             kind="injury_recovery",
@@ -221,7 +236,7 @@ class TestEventStoreStoreCoverage:
         assert sim.world.event_records[0].kind == "battle"
         assert len(sim.world.event_log) == 1
 
-    def test_events_by_type_cannot_see_record_world_event_only_events(self):
+    def test_events_by_type_excludes_record_world_event_entries(self):
         """events_by_type() only sees events that went through _record_event().
 
         Events created via _record_world_event() directly (adventure lifecycle,
@@ -229,7 +244,7 @@ class TestEventStoreStoreCoverage:
         limitation documented in the docstring.
         """
         sim = _make_sim()
-        loc_id = list(sim.world._location_id_index.keys())[0]
+        loc_id = _first_location_id(sim.world)
         # This goes through _record_world_event only -> not in history
         sim._record_world_event(
             "Adventure started",
@@ -350,7 +365,7 @@ class TestSaveLoadCompatibility:
         """Impacts recorded during simulation survive save/load."""
         from fantasy_simulator.simulation import Simulator
         sim = _make_sim()
-        loc_id = list(sim.world._location_id_index.keys())[0]
+        loc_id = _first_location_id(sim.world)
         # Create an event with known impacts (battle triggers _EVENT_IMPACT)
         sim._record_world_event(
             "A fierce battle", kind="battle", location_id=loc_id,

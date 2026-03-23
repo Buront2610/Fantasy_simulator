@@ -150,7 +150,7 @@ class QueryMixin:
         return "\n\n".join(self.get_character_story(c.char_id) for c in chars)
 
     # ------------------------------------------------------------------
-    # Event log access — reads from event_records (canonical source)
+    # Event log access and compatibility adapters
     # ------------------------------------------------------------------
 
     def get_event_log(self, last_n: Optional[int] = None) -> List[str]:
@@ -185,6 +185,7 @@ class QueryMixin:
         """Return WorldEventRecord entries matching the given kind.
 
         This is the canonical replacement for ``events_by_type()``, reading
-        from ``world.event_records`` directly.
+        from ``world.event_records`` directly.  Linear scan is acceptable
+        for typical simulation sizes (hundreds of records per run).
         """
         return [rec for rec in self.world.event_records if rec.kind == kind]
