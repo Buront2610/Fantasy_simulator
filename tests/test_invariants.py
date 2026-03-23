@@ -53,6 +53,46 @@ def test_si10_location_state_values_stay_in_bounds(world_fixture: World):
             assert 0 <= value <= 100, f"{location.id}.{attr} out of bounds: {value}"
 
 
+def test_si4_schema_version_always_present_in_save(tmp_path):
+    """SI-4: schema_version is present in all saved data."""
+    import json
+    from save_load import save_simulation
+    from simulator import Simulator
+
+    world = World()
+    world.add_character(Character("Test", 25, "Male", "Human", "Warrior"))
+    sim = Simulator(world)
+    path = str(tmp_path / "si4_test.json")
+    assert save_simulation(sim, path) is True
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    assert "schema_version" in data, "Save data must contain schema_version"
+    assert isinstance(data["schema_version"], int)
+    assert data["schema_version"] >= 1
+
+
+def test_si5_dead_chars_not_in_active_adventures(world_fixture: World):
+    """SI-5: Dead characters should not have active adventures."""
+    from adventure import create_adventure_run
+    from events import EventSystem
+    import random
+
+    rng = random.Random(42)
+    char = world_fixture.characters[0]
+    run = create_adventure_run(char, world_fixture, rng=rng, id_rng=rng)
+    char.active_adventure_id = run.adventure_id
+    world_fixture.add_adventure(run)
+
+    # Kill the character through event_death
+    es = EventSystem()
+    es.event_death(char, world_fixture, rng=rng)
+
+    # SI-5: dead char must not be in active adventures
+    assert char.active_adventure_id is None
+    active_char_ids = {r.character_id for r in world_fixture.active_adventures}
+    assert char.char_id not in active_char_ids, "Dead character still in active adventures"
+
+
 def test_phase1_no_legacy_character_location_references():
     project_root = Path(__file__).resolve().parents[1]
     source_files = [

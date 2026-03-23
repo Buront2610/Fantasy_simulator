@@ -17,6 +17,7 @@ from reports import (
     generate_monthly_report,
     generate_yearly_report,
 )
+from rumor import age_rumors, generate_rumors_for_period, trim_rumors
 
 if TYPE_CHECKING:
     from character import Character
@@ -60,6 +61,9 @@ class Simulator:
         self.start_year: int = world.year
         self.rng = random.Random(seed)
         self.id_rng = random.Random(self._id_seed_from_seed(seed))
+        # Events that passed the should_notify() threshold during the
+        # most recent advance_years() call, available for the UI layer.
+        self.pending_notifications: List[WorldEventRecord] = []
 
     # Severity scale: 1=minor, 2=notable, 3=significant, 4=major, 5=critical
     _SEVERITY_MAP: Dict[str, int] = {
@@ -67,6 +71,15 @@ class Simulator:
         "discovery": 3, "battle": 3, "journey": 2,
         "meeting": 1, "aging": 1, "skill_training": 1,
         "romance": 2, "anniversary": 2,
+    }
+
+    # --- Notification density configuration (§8 of implementation_plan) ---
+    # These thresholds control what gets surfaced to the player vs what
+    # stays as internal simulation detail.
+    NOTIFICATION_THRESHOLDS: Dict[str, Any] = {
+        "favorite_any": True,          # any event involving a favorite is notified
+        "spotlight_serious": True,     # spotlighted char: severity >= 3
+        "rumor_high_heat": 70,         # rumor_heat >= 70 triggers location notification
     }
 
     @staticmethod
@@ -120,20 +133,24 @@ class Simulator:
     ) -> None:
         """Record a structured world event and mirror it to the legacy text log."""
         self.world.log_event(description)
-        self.world.record_event(
-            WorldEventRecord(
-                record_id=generate_record_id(self.id_rng),
-                kind=kind,
-                year=self.world.year if year is None else year,
-                month=self.current_month if month is None else month,
-                location_id=location_id,
-                primary_actor_id=primary_actor_id,
-                secondary_actor_ids=[] if secondary_actor_ids is None else list(secondary_actor_ids),
-                description=description,
-                severity=severity,
-                visibility=visibility,
-            )
+        record = WorldEventRecord(
+            record_id=generate_record_id(self.id_rng),
+            kind=kind,
+            year=self.world.year if year is None else year,
+            month=self.current_month if month is None else month,
+            location_id=location_id,
+            primary_actor_id=primary_actor_id,
+            secondary_actor_ids=[] if secondary_actor_ids is None else list(secondary_actor_ids),
+            description=description,
+            severity=severity,
+            visibility=visibility,
         )
+        self.world.record_event(record)
+        # Apply event impact on location state (design §5.5)
+        self.world.apply_event_impact(kind, location_id)
+        # Surface notable events to the UI layer via notification thresholds
+        if self.should_notify(record):
+            self.pending_notifications.append(record)
 
     @staticmethod
     def _classify_adventure_summary(previous_state: str, run: AdventureRun) -> tuple[str, str, int]:
@@ -192,6 +209,7 @@ class Simulator:
 
     def advance_years(self, years: int = 1) -> None:
         """Advance the simulation by a public number of whole years."""
+        self.pending_notifications.clear()
         for _ in range(years):
             self._run_year()
 
@@ -232,7 +250,11 @@ class Simulator:
             loc_id = primary_char.location_id if primary_char else None
             self._record_event(result, location_id=loc_id)
 
+        # --- State propagation and rumor generation (once per year at month 12) ---
         self.current_month = 12
+        self.world.propagate_state()
+        self._generate_and_age_rumors()
+
         self.world.advance_time(1)
 
     def _recover_injuries(self) -> None:
@@ -250,6 +272,39 @@ class Simulator:
                     location_id=char.location_id,
                     primary_actor_id=char.char_id,
                 )
+
+    def _generate_and_age_rumors(self) -> None:
+        """Generate rumors monthly and age existing ones.
+
+        Instead of generating all rumors at year-end, iterate months
+        1..12 so that each month's events can spawn rumors timestamped
+        to that month.  This lets monthly reports show rumor activity
+        throughout the year rather than only at month 12.
+
+        Aging is applied once per year (1 month per simulated month
+        would require true monthly simulation; for now 1 year = 1 age
+        tick of 12 months, applied before generation to avoid
+        double-aging freshly created rumors).
+        """
+        # Age existing rumors once at year start
+        active, expired = age_rumors(self.world.rumors, months=12)
+        self.world.rumors = active
+        self.world.rumor_archive.extend(expired)
+
+        # Generate rumors for each month of the year
+        for gen_month in range(1, 13):
+            new_rumors = generate_rumors_for_period(
+                self.world,
+                year=self.world.year,
+                month=gen_month,
+                max_rumors=3,
+                rng=self.rng,
+            )
+            self.world.rumors.extend(new_rumors)
+
+        kept, trimmed = trim_rumors(self.world.rumors)
+        self.world.rumors = kept
+        self.world.rumor_archive.extend(trimmed)
 
     def _maybe_start_adventure(self) -> None:
         """Start at most one new adventure in the current year."""
@@ -410,6 +465,57 @@ class Simulator:
     def get_latest_yearly_report(self) -> str:
         """Generate and format a yearly report for the most recent completed year."""
         return self.get_yearly_report(self.get_latest_completed_report_year())
+
+    def should_notify(self, record: WorldEventRecord) -> bool:
+        """Determine if an event record should trigger a player notification.
+
+        Applies notification density thresholds (§8 of implementation plan)
+        to separate internal simulation events from player-visible alerts.
+        """
+        thresholds = self.NOTIFICATION_THRESHOLDS
+
+        # Always notify for major events (severity >= 4)
+        if record.severity >= 4:
+            return True
+
+        # Check favorite characters
+        if thresholds.get("favorite_any"):
+            for char in self.world.characters:
+                if not char.favorite:
+                    continue
+                if (record.primary_actor_id == char.char_id
+                        or char.char_id in record.secondary_actor_ids):
+                    return True
+
+        # Check spotlighted characters (severity >= 3)
+        if thresholds.get("spotlight_serious"):
+            for char in self.world.characters:
+                if not char.spotlighted:
+                    continue
+                if record.severity >= 3 and (
+                    record.primary_actor_id == char.char_id
+                    or char.char_id in record.secondary_actor_ids
+                ):
+                    return True
+
+        # Check location rumor_heat threshold
+        heat_threshold = thresholds.get("rumor_high_heat", 0)
+        if heat_threshold and record.location_id:
+            loc = self.world.get_location_by_id(record.location_id)
+            if loc is not None and loc.rumor_heat >= heat_threshold:
+                return True
+
+        return False
+
+    def get_active_rumors(self) -> List[str]:
+        """Return formatted strings for currently active rumors."""
+        lines: List[str] = []
+        for rumor in self.world.rumors:
+            if rumor.is_expired:
+                continue
+            reliability_label = tr(f"rumor_reliability_{rumor.reliability}")
+            lines.append(f"{rumor.description} ({reliability_label})")
+        return lines
 
     def get_character_story(self, char_id: str) -> str:
         """Return the life story of a single character.

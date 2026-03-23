@@ -435,6 +435,16 @@ class EventSystem:
 
     def event_death(self, char: Character, world: World, rng: Any = random) -> EventResult:
         char.alive = False
+        # Clean up any active adventure before clearing the ID (SI-5)
+        if char.active_adventure_id is not None:
+            adventure_id = char.active_adventure_id
+            run = world.get_adventure_by_id(adventure_id)
+            if run is not None and not run.is_resolved:
+                run.state = "resolved"
+                run.outcome = "death"
+                run.resolution_year = world.year
+                run.pending_choice = None
+                world.complete_adventure(adventure_id)
         char.active_adventure_id = None
         self.handle_death_side_effects(char, world)
 

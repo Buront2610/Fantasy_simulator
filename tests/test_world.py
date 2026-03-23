@@ -246,3 +246,47 @@ class TestWorld:
         assert thornwood is not None
         assert [record.record_id for record in world.event_records] == ["r2", "r3"]
         assert thornwood.recent_event_ids == ["r2", "r3"]
+
+
+# ---------------------------------------------------------------------------
+# State propagation decay — long-run saturation prevention
+# ---------------------------------------------------------------------------
+
+class TestStatePropagationDecay:
+    def test_decay_reduces_inflated_state_in_isolation(self):
+        """Decay alone should pull an inflated value toward baseline."""
+        world = World()
+        # Pick a location and inflate its danger well above baseline
+        loc = None
+        for candidate in world.grid.values():
+            if candidate.region_type == "village":
+                loc = candidate
+                break
+        assert loc is not None
+        baseline = get_location_state_defaults(loc.id, loc.region_type)["danger"]
+        loc.danger = 95
+        # Call _decay_toward_baseline directly (no propagation)
+        world._decay_toward_baseline()
+        assert loc.danger < 95, (
+            f"Decay did not reduce danger from 95; got {loc.danger}"
+        )
+        # Run more decay cycles
+        for _ in range(30):
+            world._decay_toward_baseline()
+        # Should converge near baseline
+        assert abs(loc.danger - baseline) <= 5, (
+            f"danger={loc.danger} did not converge to baseline={baseline}"
+        )
+
+    def test_propagation_with_decay_stabilises(self):
+        """With decay active, repeated propagation should stabilise
+        rather than pushing all values to ceiling/floor."""
+        world = World()
+        # Record all danger values, run 50 cycles, check they don't all hit 100
+        for _ in range(50):
+            world.propagate_state()
+        danger_values = [loc.danger for loc in world.grid.values()]
+        # Not all locations should be at 100
+        assert not all(d == 100 for d in danger_values), (
+            "All locations saturated to danger=100"
+        )
