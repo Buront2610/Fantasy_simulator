@@ -6,14 +6,14 @@ from collections import Counter
 
 import pytest
 
-from events import EventResult
-from adventure import AdventureChoice, AdventureRun
-from character import Character
-from character_creator import CharacterCreator
-from i18n import get_locale, set_locale
-from save_load import load_simulation, save_simulation
-from simulator import Simulator
-from world import World
+from fantasy_simulator.events import EventResult
+from fantasy_simulator.adventure import AdventureChoice, AdventureRun
+from fantasy_simulator.character import Character
+from fantasy_simulator.character_creator import CharacterCreator
+from fantasy_simulator.i18n import get_locale, set_locale
+from fantasy_simulator.persistence.save_load import load_simulation, save_simulation
+from fantasy_simulator.simulator import Simulator
+from fantasy_simulator.world import World
 
 
 # ---------------------------------------------------------------------------

@@ -6,7 +6,7 @@ import unittest
 
 from unittest.mock import patch
 
-from ui_helpers import (
+from fantasy_simulator.ui.ui_helpers import (
     HEADER,
     _c,
     _choose_key,

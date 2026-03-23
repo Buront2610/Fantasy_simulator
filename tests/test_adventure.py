@@ -4,7 +4,7 @@ tests/test_adventure.py - Unit tests for adventure progression.
 
 import random
 
-from adventure import (
+from fantasy_simulator.adventure import (
     AdventureChoice,
     AdventureRun,
     CHOICE_PROCEED_CAUTIOUSLY,
@@ -13,10 +13,10 @@ from adventure import (
     CHOICE_WITHDRAW,
     create_adventure_run,
 )
-from character import Character
-from i18n import set_locale
-from simulator import Simulator
-from world import World
+from fantasy_simulator.character import Character
+from fantasy_simulator.i18n import set_locale
+from fantasy_simulator.simulator import Simulator
+from fantasy_simulator.world import World
 
 
 class FakeRng:

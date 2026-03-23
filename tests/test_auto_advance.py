@@ -9,9 +9,9 @@ Covers:
 """
 import pytest
 
-from character import Character
-from simulator import Simulator
-from world import World
+from fantasy_simulator.character import Character
+from fantasy_simulator.simulator import Simulator
+from fantasy_simulator.world import World
 
 
 @pytest.fixture
@@ -110,7 +110,7 @@ class TestDyingPauseConditions:
 class TestPendingDecisionPause:
 
     def test_pending_choice_pauses(self, sim):
-        from adventure import AdventureRun, AdventureChoice
+        from fantasy_simulator.adventure import AdventureRun, AdventureChoice
         run = AdventureRun(
             character_id="char0000",
             character_name="Char0",
@@ -134,7 +134,7 @@ class TestPausePriorityOrdering:
     """Soren Johnson: Highest priority condition should win."""
 
     def test_dying_spotlighted_beats_pending_decision(self, sim):
-        from adventure import AdventureRun, AdventureChoice
+        from fantasy_simulator.adventure import AdventureRun, AdventureChoice
         char = sim.world.characters[0]
         char.spotlighted = True
         char.injury_status = "dying"
@@ -182,7 +182,7 @@ class TestPartyReturnedPause:
     """Design §4.4: Party returned should pause for favorite/spotlighted."""
 
     def test_party_returned_pauses_for_favorite(self, sim):
-        from adventure import AdventureRun
+        from fantasy_simulator.adventure import AdventureRun
         char = sim.world.characters[0]
         char.favorite = True
         run = AdventureRun(
@@ -199,7 +199,7 @@ class TestPartyReturnedPause:
         assert reason == "party_returned"
 
     def test_no_pause_for_non_favorite_return(self, sim):
-        from adventure import AdventureRun
+        from fantasy_simulator.adventure import AdventureRun
         char = sim.world.characters[0]
         char.favorite = False
         char.spotlighted = False
@@ -217,7 +217,7 @@ class TestPartyReturnedPause:
         assert reason is None
 
     def test_recently_completed_cleared_each_year(self, sim):
-        from adventure import AdventureRun
+        from fantasy_simulator.adventure import AdventureRun
         run = AdventureRun(
             character_id="char0000",
             character_name="Char0",

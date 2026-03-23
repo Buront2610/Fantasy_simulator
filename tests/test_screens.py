@@ -10,9 +10,9 @@ from contextlib import redirect_stdout
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from character import Character
-from i18n import set_locale
-from world import World
+from fantasy_simulator.character import Character
+from fantasy_simulator.i18n import set_locale
+from fantasy_simulator.world import World
 
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
@@ -34,7 +34,7 @@ class TestScreensImport(unittest.TestCase):
         import screens  # noqa: F401
 
     def test_public_screen_functions_exist(self) -> None:
-        from screens import (
+        from fantasy_simulator.ui.screens import (
             screen_custom_simulation,
             screen_new_simulation,
             screen_world_lore,
@@ -44,7 +44,7 @@ class TestScreensImport(unittest.TestCase):
         self.assertTrue(callable(screen_world_lore))
 
     def test_internal_helpers_exist(self) -> None:
-        from screens import (
+        from fantasy_simulator.ui.screens import (
             _advance_simulation,
             _build_default_world,
             _load_simulation_snapshot,
@@ -69,17 +69,17 @@ class TestBuildDefaultWorld(unittest.TestCase):
         set_locale("en")
 
     def test_default_character_count(self) -> None:
-        from screens import _build_default_world
+        from fantasy_simulator.ui.screens import _build_default_world
         world = _build_default_world()
         self.assertEqual(len(world.characters), 12)
 
     def test_custom_character_count(self) -> None:
-        from screens import _build_default_world
+        from fantasy_simulator.ui.screens import _build_default_world
         world = _build_default_world(num_characters=5)
         self.assertEqual(len(world.characters), 5)
 
     def test_characters_have_locations(self) -> None:
-        from screens import _build_default_world
+        from fantasy_simulator.ui.screens import _build_default_world
         world = _build_default_world(num_characters=4)
         for char in world.characters:
             self.assertTrue(len(char.location_id) > 0)
@@ -95,7 +95,7 @@ class TestMainEntryPoint(unittest.TestCase):
 
 class TestRosterRendering(unittest.TestCase):
     def test_show_roster_keeps_header_and_rows_same_display_width_in_japanese(self) -> None:
-        from screens import _show_roster
+        from fantasy_simulator.ui.screens import _show_roster
 
         set_locale("ja")
         world = World()
@@ -111,7 +111,7 @@ class TestRosterRendering(unittest.TestCase):
         )
 
         captured = io.StringIO()
-        with patch("screens._pause", return_value=None):
+        with patch("fantasy_simulator.ui.screens._pause", return_value=None):
             with redirect_stdout(captured):
                 _show_roster(world)
 
@@ -128,7 +128,7 @@ class TestMonthlyReportScreen(unittest.TestCase):
         set_locale("en")
 
     def test_month_season_hint_contains_all_months(self) -> None:
-        from screens import _month_season_hint
+        from fantasy_simulator.ui.screens import _month_season_hint
 
         hint = _month_season_hint()
         self.assertIn("1 (Winter)", hint)
@@ -136,7 +136,7 @@ class TestMonthlyReportScreen(unittest.TestCase):
         self.assertEqual(hint.count("("), 12)
 
     def test_show_monthly_report_uses_latest_completed_report_year(self) -> None:
-        from screens import _show_monthly_report
+        from fantasy_simulator.ui.screens import _show_monthly_report
 
         sim = SimpleNamespace(
             world=SimpleNamespace(year=1002),
@@ -145,8 +145,8 @@ class TestMonthlyReportScreen(unittest.TestCase):
         )
 
         captured = io.StringIO()
-        with patch("screens._pause", return_value=None):
-            with patch("screens._get_numeric_choice", return_value=0):
+        with patch("fantasy_simulator.ui.screens._pause", return_value=None):
+            with patch("fantasy_simulator.ui.screens._get_numeric_choice", return_value=0):
                 with redirect_stdout(captured):
                     _show_monthly_report(sim)
 

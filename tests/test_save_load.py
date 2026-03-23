@@ -4,10 +4,10 @@ tests/test_save_load.py - Unit tests for save/load helpers.
 
 import json
 
-from character_creator import CharacterCreator
-from save_load import load_simulation, save_simulation
-from simulator import Simulator
-from world import World
+from fantasy_simulator.character_creator import CharacterCreator
+from fantasy_simulator.persistence.save_load import load_simulation, save_simulation
+from fantasy_simulator.simulator import Simulator
+from fantasy_simulator.world import World
 
 
 def _make_world(n_chars: int = 3) -> World:

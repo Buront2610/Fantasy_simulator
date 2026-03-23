@@ -3,8 +3,8 @@ tests/test_character.py - Unit tests for the Character class.
 """
 
 import pytest
-from character import Character, random_stats
-from i18n import get_locale, set_locale
+from fantasy_simulator.character import Character, random_stats
+from fantasy_simulator.i18n import get_locale, set_locale
 
 
 # ---------------------------------------------------------------------------

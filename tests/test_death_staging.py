@@ -12,10 +12,10 @@ import random
 
 import pytest
 
-from character import Character
-from events import EventSystem
-from simulator import Simulator
-from world import World
+from fantasy_simulator.character import Character
+from fantasy_simulator.events import EventSystem
+from fantasy_simulator.simulator import Simulator
+from fantasy_simulator.world import World
 
 
 @pytest.fixture

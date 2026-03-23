@@ -11,9 +11,9 @@ import random
 
 import pytest
 
-from character import Character
-from events import EventSystem
-from world import World
+from fantasy_simulator.character import Character
+from fantasy_simulator.events import EventSystem
+from fantasy_simulator.world import World
 
 
 @pytest.fixture

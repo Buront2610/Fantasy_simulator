@@ -4,7 +4,7 @@ tests/test_character_creator.py - Unit tests for CharacterCreator.
 
 import random
 
-from character_creator import CharacterCreator
+from fantasy_simulator.character_creator import CharacterCreator
 
 
 class TestCharacterCreator:

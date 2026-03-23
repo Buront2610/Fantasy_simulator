@@ -2,7 +2,7 @@
 
 import random
 
-from rumor import (
+from fantasy_simulator.rumor import (
     DISCLOSURE,
     RELIABILITY_LEVELS,
     RUMOR_MAX_AGE_MONTHS,
@@ -15,10 +15,10 @@ from rumor import (
     _category_from_event_kind,
     _content_tags_from_event,
 )
-from events import WorldEventRecord
-from world import World
-from character import Character
-from simulator import Simulator
+from fantasy_simulator.events import WorldEventRecord
+from fantasy_simulator.world import World
+from fantasy_simulator.character import Character
+from fantasy_simulator.simulator import Simulator
 
 
 # ------------------------------------------------------------------
@@ -463,7 +463,7 @@ def test_monthly_rumor_generation_covers_early_months():
 def test_past_report_rumors_stable_after_aging():
     """Rumors that expire should still appear in past monthly reports
     via the rumor_archive."""
-    from reports import generate_monthly_report
+    from fantasy_simulator.reports import generate_monthly_report
     world = World()
     char = Character(
         name="Aldric", age=25, gender="male", race="Human", job="Warrior",
@@ -595,7 +595,7 @@ def test_cross_year_sort_prefers_current_year_over_prior_december():
 def test_partial_disclosure_does_not_contradict_description():
     """When fields are masked, the rumor text must not contain the
     original names/places followed by 'unknown' annotations."""
-    from rumor import _build_rumor_description
+    from fantasy_simulator.rumor import _build_rumor_description
 
     world = _make_world_with_events()
     char = world.characters[0]

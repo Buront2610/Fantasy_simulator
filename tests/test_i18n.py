@@ -2,7 +2,7 @@
 tests/test_i18n.py - Unit tests for CLI localization helpers.
 """
 
-from i18n import get_locale, set_locale, tr, tr_term
+from fantasy_simulator.i18n import get_locale, set_locale, tr, tr_term
 
 
 class TestI18n:

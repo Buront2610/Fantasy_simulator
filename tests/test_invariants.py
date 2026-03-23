@@ -5,9 +5,9 @@ import re
 
 import pytest
 
-from character import Character
-from events import WorldEventRecord
-from world import World
+from fantasy_simulator.character import Character
+from fantasy_simulator.events import WorldEventRecord
+from fantasy_simulator.world import World
 
 
 @pytest.fixture
@@ -56,8 +56,8 @@ def test_si10_location_state_values_stay_in_bounds(world_fixture: World):
 def test_si4_schema_version_always_present_in_save(tmp_path):
     """SI-4: schema_version is present in all saved data."""
     import json
-    from save_load import save_simulation
-    from simulator import Simulator
+    from fantasy_simulator.persistence.save_load import save_simulation
+    from fantasy_simulator.simulator import Simulator
 
     world = World()
     world.add_character(Character("Test", 25, "Male", "Human", "Warrior"))
@@ -73,8 +73,8 @@ def test_si4_schema_version_always_present_in_save(tmp_path):
 
 def test_si5_dead_chars_not_in_active_adventures(world_fixture: World):
     """SI-5: Dead characters should not have active adventures."""
-    from adventure import create_adventure_run
-    from events import EventSystem
+    from fantasy_simulator.adventure import create_adventure_run
+    from fantasy_simulator.events import EventSystem
     import random
 
     rng = random.Random(42)
@@ -96,14 +96,14 @@ def test_si5_dead_chars_not_in_active_adventures(world_fixture: World):
 def test_phase1_no_legacy_character_location_references():
     project_root = Path(__file__).resolve().parents[1]
     source_files = [
-        project_root / "adventure.py",
-        project_root / "character.py",
-        project_root / "events.py",
+        project_root / "fantasy_simulator" / "adventure.py",
+        project_root / "fantasy_simulator" / "character.py",
+        project_root / "fantasy_simulator" / "events.py",
         project_root / "main.py",
-        project_root / "save_load.py",
-        project_root / "screens.py",
-        project_root / "simulator.py",
-        project_root / "world.py",
+        project_root / "fantasy_simulator" / "persistence" / "save_load.py",
+        project_root / "fantasy_simulator" / "ui" / "screens.py",
+        project_root / "fantasy_simulator" / "simulator.py",
+        project_root / "fantasy_simulator" / "world.py",
     ]
     pattern = re.compile(r"\.location\b")
     for path in source_files:
