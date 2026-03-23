@@ -165,13 +165,17 @@ class TestAdvanceMonths:
 
     def test_pending_notifications_cleared_at_start(self):
         sim = Simulator(_build_seeded_world(5, n_chars=3), events_per_year=4, seed=5)
-        # Prime some notifications
+        # Prime some notifications by advancing 3 months
         sim.advance_months(3)
-        initial_count = len(sim.pending_notifications)
-        # Next advance should clear and repopulate
+        # Notifications list must be empty at the start of the next advance call
         sim.advance_months(3)
-        # After clearing, notifications come only from the just-run months
-        _ = initial_count  # used to confirm it was non-zero scenario may vary
+        # pending_notifications contains only notifications from the last 3 months,
+        # not the accumulated 6-month total — verify by checking subsequent clear
+        notifications_after = list(sim.pending_notifications)
+        sim.advance_months(0)
+        # A zero-month advance should clear pending_notifications
+        assert sim.pending_notifications == []
+        _ = notifications_after  # referenced to suppress unused-variable warning
 
 
 # ---------------------------------------------------------------------------
@@ -275,9 +279,13 @@ class TestSimulationDensity:
 
     def test_events_for_month_base_count_with_density_12(self):
         """With events_per_year=12 and density=1.0, base=1 per month."""
+        class _ZeroRng:
+            """Stub RNG that always returns 0.0 so the remainder check never fires."""
+            def random(self) -> float:
+                return 0.0
+
         sim = Simulator(_build_seeded_world(3, n_chars=2), events_per_year=12, seed=3)
-        # Replace rng so remainder check never fires an extra event
-        sim.rng = type("ZeroRng", (), {"random": lambda self: 0.0})()
+        sim.rng = _ZeroRng()
         for month in range(1, 13):
             # base = 12/12 = 1; remainder = 0; extra = 0
             assert sim._events_for_month(month) == 1

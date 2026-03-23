@@ -410,7 +410,10 @@ class Simulator:
         total = self.events_per_year * self.SIMULATION_DENSITY
         base = int(total / 12)
         remainder = total / 12 - base
-        extra = 1 if (remainder > 1e-9 and self.rng.random() < remainder) else 0
+        # Guard against floating-point noise (e.g. 0.9999... instead of 1.0)
+        # so that a mathematically zero remainder never triggers an extra roll.
+        _FLOAT_EPS = 1e-9
+        extra = 1 if (remainder > _FLOAT_EPS and self.rng.random() < remainder) else 0
         return base + extra
 
     def _run_month(self, month: int) -> None:
