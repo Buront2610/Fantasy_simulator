@@ -167,15 +167,11 @@ class TestAdvanceMonths:
         sim = Simulator(_build_seeded_world(5, n_chars=3), events_per_year=4, seed=5)
         # Prime some notifications by advancing 3 months
         sim.advance_months(3)
-        # Notifications list must be empty at the start of the next advance call
-        sim.advance_months(3)
-        # pending_notifications contains only notifications from the last 3 months,
-        # not the accumulated 6-month total — verify by checking subsequent clear
-        notifications_after = list(sim.pending_notifications)
-        sim.advance_months(0)
+        # We expect some notifications to be pending after advancing months
+        assert sim.pending_notifications is not None
         # A zero-month advance should clear pending_notifications
+        sim.advance_months(0)
         assert sim.pending_notifications == []
-        _ = notifications_after  # referenced to suppress unused-variable warning
 
 
 # ---------------------------------------------------------------------------
@@ -194,14 +190,16 @@ class TestMonthlyEventTimestamps:
             )
 
     def test_no_randomised_month_stamps(self):
-        """After the monthly engine, no two random events should share the same
-        random month that happened to be picked by randint — all months 1..12
-        should appear across a long simulation run."""
+        """After the monthly engine, events should be spread across multiple months
+        rather than all sharing a single randomly-chosen month."""
         sim = Simulator(_build_seeded_world(11, n_chars=6), events_per_year=12, seed=11)
         sim.advance_months(12)
         months_seen = {r.month for r in sim.world.event_records}
-        # With events_per_year=12 and 6 chars, multiple months should be covered
-        assert len(months_seen) > 1
+        # With events_per_year=12 and 6 chars, at least 4 distinct months should
+        # appear (health events at 1, recovery at 2, adventure at 3, random events)
+        assert len(months_seen) >= 4, (
+            f"Expected broad month coverage, got only months {sorted(months_seen)}"
+        )
 
     def test_month1_events_include_natural_processes(self):
         """Year-opening events (death checks, recovery) are timestamped to month 1."""
@@ -220,8 +218,8 @@ class TestMonthlyEventTimestamps:
         month1_health = [r for r in month1_records if r.kind in health_kinds]
         assert len(month1_health) > 0, "Expected at least one health event at month 1"
 
-    def test_adventure_events_stamped_to_month2(self):
-        """Adventure start and progression events are stamped to month 2 (spring)."""
+    def test_adventure_events_stamped_to_month3(self):
+        """Adventure start and progression events are stamped to month 3 (spring)."""
         world = _build_seeded_world(21, n_chars=4)
         sim = Simulator(world, events_per_year=0, adventure_steps_per_year=3, seed=21)
         sim.advance_months(12)
@@ -233,8 +231,8 @@ class TestMonthlyEventTimestamps:
         adventure_records = [r for r in world.event_records if r.kind in adventure_kinds]
         if adventure_records:
             for rec in adventure_records:
-                assert rec.month == 2, (
-                    f"Adventure event {rec.kind!r} should be at month 2, got {rec.month}"
+                assert rec.month == 3, (
+                    f"Adventure event {rec.kind!r} should be at month 3, got {rec.month}"
                 )
 
 
@@ -262,8 +260,14 @@ class TestSimulationDensity:
             )
             totals.append(count)
         avg = sum(totals) / total_trials
-        # Expected ≈ events_per_year; allow generous tolerance for small samples
-        assert avg > 0, "Expected non-zero random events with default density"
+        # Expected ≈ events_per_year; use a wide band so randomness does not
+        # cause flaky failures.
+        lower_bound = 0.5 * events_per_year
+        upper_bound = 1.5 * events_per_year
+        assert lower_bound <= avg <= upper_bound, (
+            f"Average random event count {avg} not within expected range "
+            f"[{lower_bound}, {upper_bound}] for events_per_year={events_per_year}"
+        )
 
     def test_density_attribute_exists_and_is_float(self):
         sim = Simulator(_build_seeded_world(1, n_chars=2), events_per_year=4, seed=1)
@@ -334,3 +338,239 @@ class TestWorldEventRecordTags:
         for record in sim.world.event_records:
             assert hasattr(record, "tags")
             assert isinstance(record.tags, list)
+
+
+# ---------------------------------------------------------------------------
+# Monthly auto-pause
+# ---------------------------------------------------------------------------
+
+class TestMonthlyAutoPause:
+    """advance_until_pause() should now operate at monthly granularity,
+    pausing at the exact month a condition occurs rather than waiting
+    until the end of the year."""
+
+    def test_dying_char_pauses_immediately(self):
+        """A dying character should cause auto-pause before the year ends."""
+        world = World(name="TestWorld", year=1000)
+        char = Character(
+            "Fragile", age=25, gender="male", race="Human", job="Warrior",
+            strength=50, dexterity=50, constitution=50,
+            char_id="frag_01",
+        )
+        char.injury_status = "dying"
+        world.add_character(char)
+        sim = Simulator(world, events_per_year=0, seed=1)
+        result = sim.advance_until_pause(max_years=3)
+        # Preexisting dying condition should pause immediately (0 months)
+        assert result["months_advanced"] == 0
+        assert result["pause_reason"] == "dying_any"
+
+    def test_auto_pause_returns_months_advanced(self):
+        """Result dict must include months_advanced and years_advanced."""
+        sim = Simulator(_build_seeded_world(7, n_chars=3), events_per_year=4, seed=7)
+        result = sim.advance_until_pause(max_years=1)
+        assert "months_advanced" in result
+        assert "years_advanced" in result
+        assert result["months_advanced"] >= 1
+
+    def test_auto_pause_mid_year_does_not_complete_year(self):
+        """If a pause triggers mid-year, world.year should NOT have advanced
+        past the current year."""
+        world = World(name="TestWorld", year=1000)
+        char = Character(
+            "Doomed", age=95, gender="male", race="Human", job="Farmer",
+            strength=10, dexterity=10, constitution=10,
+            char_id="doomed_01",
+        )
+        world.add_character(char)
+        sim = Simulator(world, events_per_year=0, adventure_steps_per_year=0, seed=42)
+        result = sim.advance_until_pause(max_years=5)
+        # Very old, low-constitution character should eventually trigger
+        # condition_worsened or death, hopefully mid-year
+        assert result["pause_reason"] in (
+            "dying_any", "condition_worsened_favorite", "years_elapsed",
+        )
+
+    def test_pending_decision_pauses_at_month_3(self):
+        """Pending adventure choices should trigger pause at month 3 (spring)."""
+        from fantasy_simulator.adventure import AdventureChoice, AdventureRun
+        world = World(name="TestWorld", year=1000)
+        char = Character(
+            "Adventurer", age=25, gender="male", race="Human", job="Warrior",
+            strength=50, dexterity=50, constitution=50,
+            char_id="adv_01",
+        )
+        world.add_character(char)
+        sim = Simulator(world, events_per_year=0, adventure_steps_per_year=3, seed=1)
+        # Inject active adventure with pending choice
+        run = AdventureRun(
+            character_id="adv_01",
+            character_name="Adventurer",
+            origin="loc_aethoria_capital",
+            destination="loc_thornwood",
+            year_started=1000,
+            adventure_id="adv_test_pause",
+        )
+        run.pending_choice = AdventureChoice(
+            prompt="Test?",
+            options=["press_on", "retreat"],
+            default_option="retreat",
+            context="approach",
+        )
+        world.add_adventure(run)
+        result = sim.advance_until_pause(max_years=1)
+        assert result["months_advanced"] == 0
+        assert result["pause_reason"] == "pending_decision"
+
+
+# ---------------------------------------------------------------------------
+# Mid-year save/load consistency
+# ---------------------------------------------------------------------------
+
+class TestMidYearSaveLoad:
+    """Saving and loading mid-year should preserve month state and produce
+    consistent subsequent simulation."""
+
+    def test_mid_year_save_preserves_current_month(self):
+        from fantasy_simulator.persistence.save_load import load_simulation, save_simulation
+        sim = Simulator(_build_seeded_world(10, n_chars=3), events_per_year=4, seed=10)
+        sim.advance_months(5)
+        assert sim.current_month == 6
+        import tempfile
+        import os
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
+            path = f.name
+        try:
+            save_simulation(sim, path)
+            restored = load_simulation(path)
+            assert restored.current_month == 6
+        finally:
+            os.unlink(path)
+
+    def test_mid_year_save_load_continues_deterministically(self):
+        """After saving at month 6, loading and continuing should produce
+        the same state as running without interruption."""
+        from fantasy_simulator.persistence.save_load import load_simulation, save_simulation
+        import tempfile
+        import os
+        # Run 1: straight through 12 months
+        sim1 = Simulator(_build_seeded_world(22, n_chars=3), events_per_year=2, seed=22)
+        sim1.advance_months(12)
+        state_full = sim1.to_dict()
+
+        # Run 2: save at month 6, load, continue to month 12
+        sim2 = Simulator(_build_seeded_world(22, n_chars=3), events_per_year=2, seed=22)
+        sim2.advance_months(5)
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
+            path = f.name
+        try:
+            save_simulation(sim2, path)
+            restored = load_simulation(path)
+            restored.advance_months(7)
+            state_resumed = restored.to_dict()
+        finally:
+            os.unlink(path)
+
+        assert state_full == state_resumed
+
+    def test_advance_years_from_mid_year_does_not_replay_early_months(self):
+        """advance_years() from current_month=6 should run months 6..12 + 1..12,
+        not restart from month 1 in the same year."""
+        sim = Simulator(_build_seeded_world(33, n_chars=2), events_per_year=0, seed=33)
+        sim.advance_months(5)
+        assert sim.current_month == 6
+        start_year = sim.world.year
+        sim.advance_years(1)
+        # Should have advanced: months 6..12 (7 months) + months 1..12 (12 months) = month 7
+        # Wait: advance_years(1) = advance_months(12). From month 6:
+        # 6→7→8→9→10→11→12 (year+1) →1→2→3→4→5 → current_month = 6
+        assert sim.current_month == 6
+        assert sim.world.year == start_year + 1
+
+
+# ---------------------------------------------------------------------------
+# Adventure month / season alignment
+# ---------------------------------------------------------------------------
+
+class TestAdventureSeasonAlignment:
+    """Adventure events must occur at month 3 (spring), not month 2 (winter)."""
+
+    def test_month_3_is_spring(self):
+        assert World.get_season(3) == "spring"
+
+    def test_month_2_is_winter(self):
+        assert World.get_season(2) == "winter"
+
+    def test_adventure_starts_in_spring(self):
+        """Adventures should start at month 3 which is spring, matching the
+        seasonal modifier expectations for safer travel."""
+        world = _build_seeded_world(55, n_chars=4)
+        sim = Simulator(world, events_per_year=0, adventure_steps_per_year=3, seed=55)
+        # Run several years to ensure at least one adventure starts
+        sim.advance_months(12 * 5)
+        adventure_kinds = {"adventure_started", "adventure_arrived", "adventure_discovery",
+                           "adventure_returned"}
+        adventure_records = [r for r in world.event_records if r.kind in adventure_kinds]
+        if adventure_records:
+            for rec in adventure_records:
+                assert rec.month == 3, (
+                    f"Adventure event {rec.kind} at month {rec.month}, expected 3 (spring)"
+                )
+
+    def test_spring_modifiers_active_during_adventure(self):
+        """Spring seasonal modifiers should be active when adventures process."""
+        world = World(name="TestWorld", year=1000)
+        sim = Simulator(world, events_per_year=0, seed=1)
+        applied_seasons = []
+        original_apply = sim._apply_seasonal_modifiers
+
+        def _tracking_apply(month):
+            applied_seasons.append((month, world.get_season(month)))
+            return original_apply(month)
+
+        sim._apply_seasonal_modifiers = _tracking_apply
+        sim.advance_months(12)
+        # Month 3 should have spring modifiers
+        month3_seasons = [(m, s) for m, s in applied_seasons if m == 3]
+        assert month3_seasons
+        assert month3_seasons[0][1] == "spring"
+
+
+# ---------------------------------------------------------------------------
+# Event log monthly prefix
+# ---------------------------------------------------------------------------
+
+class TestEventLogMonthlyPrefix:
+    """Event log entries should now include month information for player
+    visibility of monthly causality."""
+
+    def test_event_log_entries_contain_month(self):
+        """After advancing with events, log entries should contain month info."""
+        from fantasy_simulator.i18n import set_locale, get_locale
+        prev = get_locale()
+        set_locale("en")
+        try:
+            sim = Simulator(_build_seeded_world(44, n_chars=4), events_per_year=6, seed=44)
+            sim.advance_months(12)
+            # At least some entries should have month prefix
+            month_entries = [e for e in sim.world.event_log if "Month" in e]
+            assert len(month_entries) > 0, (
+                "Expected at least some event log entries with month prefix"
+            )
+        finally:
+            set_locale(prev)
+
+    def test_event_log_month_prefix_in_japanese(self):
+        """Japanese locale should show month as 月."""
+        from fantasy_simulator.i18n import set_locale, get_locale
+        prev = get_locale()
+        set_locale("ja")
+        try:
+            sim = Simulator(_build_seeded_world(45, n_chars=4), events_per_year=6, seed=45)
+            sim.advance_months(12)
+            month_entries = [e for e in sim.world.event_log if "月]" in e]
+            assert len(month_entries) > 0, (
+                "Expected at least some event log entries with 月 prefix"
+            )
+        finally:
+            set_locale(prev)

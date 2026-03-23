@@ -182,12 +182,13 @@ class Simulator:
         visibility: str = "public",
     ) -> WorldEventRecord:
         """Record a structured world event and mirror it to the legacy text log."""
-        self.world.log_event(description)
+        effective_month = self.current_month if month is None else month
+        self.world.log_event(description, month=effective_month)
         record = WorldEventRecord(
             record_id=generate_record_id(self.id_rng),
             kind=kind,
             year=self.world.year if year is None else year,
-            month=self.current_month if month is None else month,
+            month=effective_month,
             location_id=location_id,
             primary_actor_id=primary_actor_id,
             secondary_actor_ids=[] if secondary_actor_ids is None else list(secondary_actor_ids),
@@ -274,10 +275,15 @@ class Simulator:
         self.advance_years(years)
 
     def advance_years(self, years: int = 1) -> None:
-        """Advance the simulation by a public number of whole years."""
-        self.pending_notifications.clear()
-        for _ in range(years):
-            self._run_year()
+        """Advance the simulation by *years* whole in-world years.
+
+        Implemented via ``advance_months(years * 12)`` so that mid-year state
+        is always respected: if ``current_month`` is not 1, the remaining
+        months of the current year are processed first, then full subsequent
+        years follow.  This avoids the previous issue where ``_run_year()``
+        unconditionally replayed months 1..12 from a mid-year snapshot.
+        """
+        self.advance_months(years * 12)
 
     def advance_months(self, months: int = 1) -> None:
         """Advance the simulation by *months* in-world months.
@@ -286,49 +292,65 @@ class Simulator:
         world.advance_time(1) is called and per-year tracking sets are cleared,
         then processing continues with month 1 of the next year.
 
-        Unlike advance_years(), this method respects the current position within
-        the year so partial-year advancement is supported.
+        Always respects the current position within the year so partial-year
+        advancement is supported.  ``advance_years()`` delegates here.
         """
         self.pending_notifications.clear()
         for _ in range(months):
+            if self.current_month == 1:
+                # Reset per-year tracking at the start of each new year
+                self._recently_completed_adventures.clear()
+                self._favorites_worsened_this_year.clear()
             self._run_month(self.current_month)
             if self.current_month == 12:
                 self.world.advance_time(1)
-                self._recently_completed_adventures.clear()
-                self._favorites_worsened_this_year.clear()
             self.current_month = (self.current_month % 12) + 1
 
     def advance_until_pause(self, max_years: int = 12) -> Dict[str, Any]:
-        """Advance the simulation until a pause condition triggers or max_years.
+        """Advance the simulation month-by-month until a pause condition triggers.
 
-        Returns a dict with 'years_advanced', 'pause_reason', and 'pause_priority'.
+        Returns a dict with 'months_advanced', 'years_advanced', 'pause_reason',
+        and 'pause_priority'.  The monthly granularity allows pause conditions
+        (e.g. dying, pending decisions) to fire at the exact month they occur
+        rather than waiting until the end of the year.
+
         This implements the conditional auto-advance system (design §4.4).
         """
         self.pending_notifications.clear()
         # These are "recent year" markers and should not trigger
-        # repeated 0-year pauses across separate auto-advance requests.
+        # repeated 0-month pauses across separate auto-advance requests.
         self._favorites_worsened_this_year.clear()
         self._recently_completed_adventures.clear()
         preexisting_reason = self._check_pause_conditions()
         if preexisting_reason is not None:
             return {
+                "months_advanced": 0,
                 "years_advanced": 0,
                 "pause_reason": preexisting_reason,
                 "pause_priority": self.AUTO_PAUSE_PRIORITIES.get(preexisting_reason, 0),
             }
-        years_advanced = 0
-        for _ in range(max_years):
-            self._run_year()
-            years_advanced += 1
+        max_months = max_years * 12
+        months_advanced = 0
+        for _ in range(max_months):
+            if self.current_month == 1:
+                self._recently_completed_adventures.clear()
+                self._favorites_worsened_this_year.clear()
+            self._run_month(self.current_month)
+            if self.current_month == 12:
+                self.world.advance_time(1)
+            self.current_month = (self.current_month % 12) + 1
+            months_advanced += 1
             reason = self._check_pause_conditions()
             if reason is not None:
                 return {
-                    "years_advanced": years_advanced,
+                    "months_advanced": months_advanced,
+                    "years_advanced": months_advanced // 12,
                     "pause_reason": reason,
                     "pause_priority": self.AUTO_PAUSE_PRIORITIES.get(reason, 0),
                 }
         return {
-            "years_advanced": years_advanced,
+            "months_advanced": months_advanced,
+            "years_advanced": months_advanced // 12,
             "pause_reason": "years_elapsed",
             "pause_priority": self.AUTO_PAUSE_PRIORITIES["years_elapsed"],
         }
@@ -378,23 +400,15 @@ class Simulator:
     def _run_year(self) -> None:
         """Process a full year by running each month in strict chronological order.
 
-        Delegates all per-month logic to _run_month() so that events are always
-        timestamped to the month in which they actually occur.  This replaces
-        the old single-pass approach where random events received arbitrary
-        month labels and all processing collapsed into one undifferentiated year.
+        Implemented via the shared month-loop so that ``advance_years()``,
+        ``advance_months()``, and ``_run_year()`` all use the same code path.
+        This is kept as a convenience method for legacy callers (e.g. old tests
+        that call ``_run_year()`` directly).
         """
-        # Reset per-year tracking for pause conditions
-        self._recently_completed_adventures.clear()
-        self._favorites_worsened_this_year.clear()
-
-        for month in range(1, 13):
-            self._run_month(month)
-
-        self.world.advance_time(1)
-        # Reset so that current_month reflects the start of the next year.
-        # advance_months() already applies this reset via its modular counter;
-        # keeping them consistent avoids divergence in serialised snapshots.
-        self.current_month = 1
+        # advance_months handles per-year tracking resets, month counting,
+        # and advance_time(1) when month 12 completes.
+        remaining = 12 - self.current_month + 1
+        self.advance_months(remaining)
 
     def _events_for_month(self, month: int) -> int:
         """Number of random events to generate this month.
@@ -423,21 +437,22 @@ class Simulator:
         Seasonal modifiers are applied at entry and reverted on exit (even on
         exception) via a try/finally guard.
 
-        Per-month processing order:
+        Processing is distributed across the year to avoid concentrating
+        everything in a single month:
 
-        1.  Seasonal modifiers applied (all months).
-        2.  Dying resolution, natural-death checks, injury recovery (month 1).
-        3.  Rumor aging — once per year at month 1.
-        4.  Adventure start and full-year progression (month 2).
-        5.  Random events distributed by ``SIMULATION_DENSITY`` (all months).
-        6.  Rumor generation from this month's events (all months).
-        7.  State propagation and rumor trim (month 12).
-        8.  Seasonal modifiers reverted (all months, via finally).
+        - Month 1 (winter): Dying resolution, natural-death checks. Rumor aging.
+        - Month 2 (winter): Injury recovery (early year, before adventure season).
+        - Month 3 (spring): Adventure start and full-year progression.
+        - Month 12 (winter): State propagation and rumor trim.
+        - All months: Random events (density-scaled), rumor generation.
+
+        Season mapping (``World.get_season``):
+            12/1/2 = winter, 3/4/5 = spring, 6/7/8 = summer, 9/10/11 = autumn.
         """
         self.current_month = month
         self._apply_seasonal_modifiers(month)
         try:
-            # --- Year-opening events (month 1) ---
+            # --- Year-opening: dying resolution and natural death (month 1, winter) ---
             if month == 1:
                 self._resolve_dying_characters()
                 for char in list(self.world.characters):
@@ -448,18 +463,21 @@ class Simulator:
                         if result.event_type == "condition_worsened" and char.favorite:
                             self._favorites_worsened_this_year.add(char.char_id)
                         self._record_event(result, location_id=char.location_id)
-                self._recover_injuries()
                 # Age existing rumors once per year at year-start
                 active, expired = age_rumors(self.world.rumors, months=12)
                 self.world.rumors = active
                 self.world.rumor_archive.extend(expired)
 
-            # --- Adventure start and progression (month 2, spring) ---
+            # --- Injury recovery (month 2, before adventure season) ---
             if month == 2:
+                self._recover_injuries()
+
+            # --- Adventure start and progression (month 3, spring) ---
+            if month == 3:
                 self._maybe_start_adventure()
                 self._advance_adventures()
 
-            # --- Random events distributed by SIMULATION_DENSITY ---
+            # --- Random events distributed by SIMULATION_DENSITY (all months) ---
             for _ in range(self._events_for_month(month)):
                 result = self.event_system.generate_random_event(
                     self.world.characters, self.world, rng=self.rng
@@ -471,7 +489,7 @@ class Simulator:
                 loc_id = primary_char.location_id if primary_char else None
                 self._record_event(result, location_id=loc_id)
 
-            # --- Rumor generation from this month's events ---
+            # --- Rumor generation from this month's events (all months) ---
             new_rumors = generate_rumors_for_period(
                 self.world, year=self.world.year, month=month, max_rumors=3, rng=self.rng,
             )
