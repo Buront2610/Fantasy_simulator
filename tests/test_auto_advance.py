@@ -51,6 +51,15 @@ class TestAutoAdvanceBasics:
         result = sim.advance_until_pause(max_years=2)
         assert result["years_advanced"] <= 2
 
+    def test_preexisting_pause_is_checked_before_advance(self, sim):
+        char = sim.world.characters[0]
+        char.injury_status = "dying"
+        start_year = sim.world.year
+        result = sim.advance_until_pause(max_years=3)
+        assert result["years_advanced"] == 0
+        assert result["pause_reason"] == "dying_any"
+        assert sim.world.year == start_year
+
     def test_years_elapsed_is_default_reason(self, sim):
         """If no specific condition triggers, default reason is years_elapsed."""
         result = sim.advance_until_pause(max_years=1)
@@ -60,6 +69,14 @@ class TestAutoAdvanceBasics:
             "dying_spotlighted", "pending_decision",
             "condition_worsened_favorite",
         )
+
+    def test_ephemeral_pause_markers_are_cleared_between_auto_advance_calls(self, sim):
+        char = sim.world.characters[0]
+        char.favorite = True
+        sim._favorites_worsened_this_year.add(char.char_id)
+        # stale yearly marker should not stop immediately.
+        result = sim.advance_until_pause(max_years=1)
+        assert result["years_advanced"] >= 1
 
 
 class TestDyingPauseConditions:
