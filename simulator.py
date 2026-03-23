@@ -51,6 +51,9 @@ class Simulator:
         # filters, and save/load paths. The canonical structured history lives
         # in world.event_records.
         self.history: List[EventResult] = []
+        # Mutable progress marker for structured event timestamps within the
+        # current simulated year. This value is serialized and restored as-is
+        # to preserve in-progress context across save/load.
         self.current_month: int = 1
         self.rng = random.Random(seed)
         self.id_rng = random.Random(self._id_seed_from_seed(seed))
@@ -386,12 +389,25 @@ class Simulator:
         report = generate_yearly_report(self.world, year)
         return format_yearly_report(report)
 
+    def get_latest_completed_report_year(self) -> int:
+        """Return the latest year that should be used for end-of-year reports.
+
+        Preference is "last completed year" (`world.year - 1`), but this
+        method avoids hard-coded epoch values by falling back to the earliest
+        known event-record year (or current year if no records exist).
+        """
+        candidate = self.world.year - 1
+        if self.world.event_records:
+            earliest_record_year = min(r.year for r in self.world.event_records)
+        else:
+            earliest_record_year = self.world.year
+        if candidate < earliest_record_year:
+            return self.world.year
+        return candidate
+
     def get_latest_yearly_report(self) -> str:
         """Generate and format a yearly report for the most recent completed year."""
-        year = self.world.year - 1
-        if year < 1000:
-            year = self.world.year
-        return self.get_yearly_report(year)
+        return self.get_yearly_report(self.get_latest_completed_report_year())
 
     def get_character_story(self, char_id: str) -> str:
         """Return the life story of a single character.

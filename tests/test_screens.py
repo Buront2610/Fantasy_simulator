@@ -7,6 +7,7 @@ import re
 import unittest
 import unicodedata
 from contextlib import redirect_stdout
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from character import Character
@@ -120,6 +121,39 @@ class TestRosterRendering(unittest.TestCase):
         self.assertEqual(len(table_lines), 2)
         widths = {_display_width(line) for line in table_lines}
         self.assertEqual(len(widths), 1)
+
+
+class TestMonthlyReportScreen(unittest.TestCase):
+    def setUp(self) -> None:
+        set_locale("en")
+
+    def test_month_season_hint_contains_all_months(self) -> None:
+        from screens import _month_season_hint
+
+        hint = _month_season_hint()
+        self.assertIn("1 (Winter)", hint)
+        self.assertIn("12 (Winter)", hint)
+        self.assertEqual(hint.count("("), 12)
+
+    def test_show_monthly_report_uses_latest_completed_report_year(self) -> None:
+        from screens import _show_monthly_report
+
+        sim = SimpleNamespace(
+            world=SimpleNamespace(year=1002),
+            get_latest_completed_report_year=lambda: 1001,
+            get_monthly_report=lambda year, month: f"REPORT {year}-{month}",
+        )
+
+        captured = io.StringIO()
+        with patch("screens._pause", return_value=None):
+            with patch("screens._get_numeric_choice", return_value=0):
+                with redirect_stdout(captured):
+                    _show_monthly_report(sim)
+
+        text = _ANSI_RE.sub("", captured.getvalue())
+        self.assertIn("Year: 1001", text)
+        self.assertIn("1 (Winter)", text)
+        self.assertIn("REPORT 1001-1", text)
 
 
 if __name__ == "__main__":

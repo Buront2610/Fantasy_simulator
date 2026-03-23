@@ -443,6 +443,24 @@ class TestSimulatorReportIntegration:
         # Should be for the most recently completed year
         assert "1001" in text
 
+    def test_get_latest_completed_report_year_without_records(self):
+        world = World(year=950)
+        sim = Simulator(world, events_per_year=0, seed=42)
+        assert sim.get_latest_completed_report_year() == 950
+
+    def test_get_latest_completed_report_year_uses_earliest_record_year(self):
+        world = World(year=1001)
+        world.record_event(WorldEventRecord(
+            record_id="r1",
+            kind="meeting",
+            year=1000,
+            month=4,
+            description="Meeting",
+            severity=1,
+        ))
+        sim = Simulator(world, events_per_year=0, seed=42)
+        assert sim.get_latest_completed_report_year() == 1000
+
     def test_get_summary_uses_world_event_records(self):
         """get_summary() should use WorldEventRecord, not history."""
         world = World()
@@ -516,6 +534,33 @@ _ADVENTURE_EVENT_KINDS = [
     "adventure_returned", "adventure_retreated", "adventure_update",
 ]
 
+_ALL_RECORDED_EVENT_KINDS = [
+    # EventSystem.generate_random_event()
+    "anniversary",
+    "romance",
+    "marriage",
+    "battle_fatal",
+    "battle",
+    "discovery",
+    "meeting",
+    "aging",
+    "death",
+    "skill_training",
+    "journey",
+    # Simulator structured/adventure events
+    "injury_recovery",
+    "adventure_started",
+    "adventure_arrived",
+    "adventure_choice",
+    "adventure_death",
+    "adventure_injured",
+    "adventure_discovery",
+    "adventure_returned_injured",
+    "adventure_returned",
+    "adventure_retreated",
+    "adventure_update",
+]
+
 
 class TestReportI18n:
     def test_report_keys_exist_en(self):
@@ -549,6 +594,21 @@ class TestReportI18n:
     def test_adventure_event_type_keys_ja(self):
         set_locale("ja")
         for kind in _ADVENTURE_EVENT_KINDS:
+            key = f"event_type_{kind}"
+            assert tr(key) != key, f"Missing ja i18n key: {key}"
+        set_locale("en")
+
+    def test_all_record_event_type_keys_en(self):
+        """All event kinds recorded in WorldEventRecord should have en i18n keys."""
+        set_locale("en")
+        for kind in _ALL_RECORDED_EVENT_KINDS:
+            key = f"event_type_{kind}"
+            assert tr(key) != key, f"Missing en i18n key: {key}"
+
+    def test_all_record_event_type_keys_ja(self):
+        """All event kinds recorded in WorldEventRecord should have ja i18n keys."""
+        set_locale("ja")
+        for kind in _ALL_RECORDED_EVENT_KINDS:
             key = f"event_type_{kind}"
             assert tr(key) != key, f"Missing ja i18n key: {key}"
         set_locale("en")

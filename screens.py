@@ -47,6 +47,20 @@ def _get_numeric_choice(prompt: str, count: int) -> Optional[int]:
     return idx
 
 
+def _month_season_hint() -> str:
+    """Return a compact month -> season hint for monthly report selection."""
+    season_by_month = {
+        1: "winter", 2: "winter", 3: "spring",
+        4: "spring", 5: "spring", 6: "summer",
+        7: "summer", 8: "summer", 9: "autumn",
+        10: "autumn", 11: "autumn", 12: "winter",
+    }
+    return ", ".join(
+        f"{month} ({tr('season_' + season_by_month[month])})"
+        for month in range(1, 13)
+    )
+
+
 # ---------------------------------------------------------------------------
 # Simulation helpers
 # ---------------------------------------------------------------------------
@@ -186,11 +200,10 @@ def _show_monthly_report(sim: Simulator) -> None:
     The user picks a month (1-12) within that year.  Reports are
     derived solely from event records, so content stays stable.
     """
-    year = sim.world.year - 1
-    if year < 1000:
-        year = sim.world.year
+    year = sim.get_latest_completed_report_year()
     print()
     print(f"  {tr('year_label')}: {year}")
+    print(f"  {_month_season_hint()}")
     month_idx = _get_numeric_choice(
         f"  {tr('monthly_report')} (1-12): ", 12,
     )
