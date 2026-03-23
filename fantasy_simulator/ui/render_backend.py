@@ -52,6 +52,16 @@ class RenderBackend(Protocol):
         """Print highlighted / accented text (e.g. in cyan)."""
         ...  # pragma: no cover
 
+    def format_status(self, text: str, positive: bool) -> str:
+        """Return *text* formatted as positive (green) or negative (red).
+
+        Intended for embedding inside a larger ``print_line`` call where
+        only part of the string carries semantic colour — e.g. a roster
+        row or a progress line with an inline alive-count.
+        Plain / test backends may return *text* unchanged.
+        """
+        ...  # pragma: no cover
+
 
 class PrintRenderBackend:
     """Default backend that delegates to plain ``print()`` with ANSI codes."""
@@ -100,3 +110,7 @@ class PrintRenderBackend:
     def print_highlighted(self, text: str) -> None:
         from .ui_helpers import cyan
         print(cyan(text))
+
+    def format_status(self, text: str, positive: bool) -> str:
+        from .ui_helpers import green, red
+        return green(text) if positive else red(text)

@@ -60,6 +60,10 @@ class RecordingRenderBackend:
     def print_highlighted(self, text: str) -> None:
         self.calls.append(("print_highlighted", text))
 
+    def format_status(self, text: str, positive: bool) -> str:
+        # Return plain text — no ANSI in tests
+        return text
+
     @property
     def text(self) -> str:
         """Concatenate all printed text for simple substring checks."""

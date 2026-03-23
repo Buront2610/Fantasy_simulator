@@ -130,6 +130,20 @@ class TestPrintRenderBackendColors(unittest.TestCase):
         self.assertIn("\033[36m", output)
         self.assertIn("item", _ANSI_RE.sub("", output))
 
+    def test_format_status_positive_uses_green(self) -> None:
+        result = self.backend.format_status("Alive", True)
+        self.assertIn("\033[32m", result)
+        self.assertIn("Alive", _ANSI_RE.sub("", result))
+
+    def test_format_status_negative_uses_red(self) -> None:
+        result = self.backend.format_status("Dead", False)
+        self.assertIn("\033[31m", result)
+        self.assertIn("Dead", _ANSI_RE.sub("", result))
+
+    def test_format_status_returns_string_not_none(self) -> None:
+        self.assertIsInstance(self.backend.format_status("X", True), str)
+        self.assertIsInstance(self.backend.format_status("X", False), str)
+
     def test_print_wrapped_uses_print_line(self) -> None:
         """print_wrapped must not call print() directly — it must go through
         self.print_line(), so a subclass can intercept all output."""
@@ -185,6 +199,9 @@ class TestCustomRenderBackend(unittest.TestCase):
 
             def print_highlighted(self, text: str) -> None:
                 self.lines.append(("highlighted", text))
+
+            def format_status(self, text: str, positive: bool) -> str:
+                return text  # plain, no ANSI
 
         backend = BufferRenderBackend()
         self.assertIsInstance(backend, RenderBackend)
