@@ -79,6 +79,13 @@ class TestBuildMapInfo(unittest.TestCase):
             self.assertEqual(cell.x, x)
             self.assertEqual(cell.y, y)
             self.assertFalse(cell.highlighted)
+            # Extended fields for future renderers
+            self.assertEqual(cell.prosperity, loc.prosperity)
+            self.assertEqual(cell.prosperity_label, loc.prosperity_label)
+            self.assertEqual(cell.mood, loc.mood)
+            self.assertEqual(cell.mood_label, loc.mood_label)
+            self.assertEqual(cell.rumor_heat, loc.rumor_heat)
+            self.assertEqual(cell.road_condition, loc.road_condition)
 
     def test_population_counts_alive_characters_only(self) -> None:
         """Population must count only alive characters at a location."""
@@ -336,6 +343,53 @@ class TestMapRenderInfoIsolation(unittest.TestCase):
         output = render_map_ascii(info)
         # The '*' icon should appear in the name row
         self.assertIn("* Highlighted", output)
+
+    def test_long_japanese_name_truncated_to_cell_width(self) -> None:
+        """A canonical_name wider than cell_width (20) is truncated with '...'
+        and the resulting line still fits exactly within the cell boundary."""
+        set_locale("ja")
+        # 12 full-width chars = 24 display columns > cell_width of 20
+        long_name = "非常に長い城の名前の詳細説明"
+        cell = MapCellInfo(
+            location_id="jp", canonical_name=long_name,
+            region_type="city", icon="C",
+            safety_label="安全", danger=10,
+            traffic_indicator="+", population=2,
+            x=0, y=0,
+        )
+        info = MapRenderInfo(
+            world_name="テスト", year=1, width=1, height=1,
+            cells={(0, 0): cell},
+        )
+        output = render_map_ascii(info)
+        lines = output.splitlines()
+        # Every content line must have the same display width
+        border_width = _display_width(lines[0])
+        for i, line in enumerate(lines):
+            w = _display_width(line)
+            self.assertEqual(
+                w, border_width,
+                f"Line {i} width={w} ≠ border width={border_width}: {line!r}",
+            )
+        # The name must be truncated (original doesn't fully appear)
+        name_line = lines[3]  # first content row after header
+        self.assertIn("...", name_line)
+        set_locale("en")
+
+    def test_extended_fields_have_defaults(self) -> None:
+        """MapCellInfo extended fields default to safe values even when
+        constructed with only the required fields."""
+        cell = MapCellInfo(
+            location_id="x", canonical_name="X", region_type="plains",
+            icon="P", safety_label="Peaceful", danger=0,
+            traffic_indicator="-", population=0, x=0, y=0,
+        )
+        self.assertEqual(cell.prosperity, 50)
+        self.assertEqual(cell.mood, 50)
+        self.assertEqual(cell.rumor_heat, 0)
+        self.assertEqual(cell.road_condition, 50)
+        self.assertEqual(cell.prosperity_label, "")
+        self.assertEqual(cell.mood_label, "")
 
 
 # ---------------------------------------------------------------------------

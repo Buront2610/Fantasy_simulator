@@ -71,7 +71,7 @@ fantasy_simulator/          # Main package
   main.py                   # CLI logic
   character.py              # Core character model
   character_creator.py      # Random, template, and interactive character creation
-  world.py                  # World state, locations, map, and world serialization
+  world.py                  # World state, locations, and world serialization
   events.py                 # Event generation, EventResult, WorldEventRecord
   adventure.py              # Multi-step adventure progression
   simulator.py              # Backward-compatible import path (delegates to simulation/)
@@ -91,6 +91,9 @@ fantasy_simulator/          # Main package
   ui/
     screens.py              # CLI screen and menu functions
     ui_helpers.py           # Display formatting and input utilities
+    map_renderer.py         # Map data extraction (MapCellInfo/MapRenderInfo) and ASCII rendering
+    input_backend.py        # InputBackend protocol and StdInputBackend
+    render_backend.py       # RenderBackend protocol and PrintRenderBackend
   content/
     world_data.py           # Races, jobs, locations, skills, lore definitions
   i18n/
@@ -123,5 +126,5 @@ docs/
 
 ## Near-Term Priorities
 
-- Separate UI/presentation concerns (PR-D) before expanding party adventure and AA map features
+- Begin party adventure features (PR-E) now that structural foundation (PR-A through PR-D) is complete
 - Maintain documentation source-of-truth alignment as the roadmap evolves

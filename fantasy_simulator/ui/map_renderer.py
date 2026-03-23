@@ -33,6 +33,13 @@ class MapCellInfo:
     All fields are plain values — no references to ``LocationState``
     or ``World``.  This makes the data trivially serialisable and
     testable without domain objects.
+
+    The current ASCII renderer uses a subset of these fields.
+    Additional fields (``prosperity``, ``prosperity_label``,
+    ``mood``, ``mood_label``, ``rumor_heat``, ``road_condition``)
+    are carried so that future renderers (Rich panels, AA maps,
+    colour-coded overlays) can visualise richer world state without
+    needing to touch domain code again.
     """
 
     location_id: str
@@ -46,6 +53,13 @@ class MapCellInfo:
     x: int
     y: int
     highlighted: bool = False
+    # Extended fields for future renderers ---------------------------------
+    prosperity: int = 50
+    prosperity_label: str = ""
+    mood: int = 50
+    mood_label: str = ""
+    rumor_heat: int = 0
+    road_condition: int = 50
 
 
 @dataclass
@@ -100,6 +114,12 @@ def build_map_info(
             x=x,
             y=y,
             highlighted=is_highlight,
+            prosperity=loc.prosperity,
+            prosperity_label=loc.prosperity_label,
+            mood=loc.mood,
+            mood_label=loc.mood_label,
+            rumor_heat=loc.rumor_heat,
+            road_condition=loc.road_condition,
         )
     return info
 
