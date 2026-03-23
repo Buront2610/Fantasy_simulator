@@ -238,12 +238,85 @@ class TestMigrations:
             },
         }
         result = migrate(data)
-        assert result["schema_version"] == 3
+        # v3 data is migrated forward to CURRENT_VERSION (now 4 after PR-E)
+        assert result["schema_version"] == CURRENT_VERSION
         assert result["characters"][0]["favorite"] is True
         assert result["world"]["grid"][0]["canonical_name"] == "Aethoria Capital"
+        # v3→v4 migration adds party fields to adventures (none here, so grid stays intact)
 
     def test_current_version_constant(self):
-        assert CURRENT_VERSION == 3
+        assert CURRENT_VERSION == 4
+
+    def test_v3_to_v4_adds_party_fields_to_adventures(self):
+        """PR-E migration adds party fields to existing AdventureRun data."""
+        data = {
+            "schema_version": 3,
+            "characters": [],
+            "world": {
+                "grid": [],
+                "event_records": [],
+                "active_adventures": [
+                    {
+                        "character_id": "hero1",
+                        "character_name": "Aldric",
+                        "adventure_id": "abc123",
+                        "origin": "loc_aethoria_capital",
+                        "destination": "loc_thornwood",
+                        "year_started": 1000,
+                        "state": "exploring",
+                        "injury_status": "none",
+                        "steps_taken": 1,
+                        "outcome": None,
+                        "loot_summary": [],
+                        "summary_log": [],
+                        "detail_log": [],
+                        "pending_choice": None,
+                        "resolution_year": None,
+                    }
+                ],
+                "completed_adventures": [],
+            },
+        }
+        result = migrate(data)
+        assert result["schema_version"] == 4
+
+        adv = result["world"]["active_adventures"][0]
+        # member_ids should default to [character_id] for solo legacy runs
+        assert adv["member_ids"] == ["hero1"]
+        assert adv["party_id"] is None
+        assert adv["policy"] == "cautious"
+        assert adv["retreat_rule"] == "on_serious"
+        assert adv["supply_state"] == "full"
+        assert adv["danger_level"] == 50
+
+    def test_v3_to_v4_already_has_member_ids_respected(self):
+        """If member_ids already exists (partial pre-migration), it is preserved."""
+        data = {
+            "schema_version": 3,
+            "characters": [],
+            "world": {
+                "grid": [],
+                "event_records": [],
+                "active_adventures": [
+                    {
+                        "character_id": "c1",
+                        "character_name": "A",
+                        "adventure_id": "xyz",
+                        "origin": "loc_aethoria_capital",
+                        "destination": "loc_thornwood",
+                        "year_started": 1000,
+                        "state": "traveling",
+                        "member_ids": ["c1", "c2"],   # already set
+                        "policy": "assault",
+                    }
+                ],
+                "completed_adventures": [],
+            },
+        }
+        result = migrate(data)
+        adv = result["world"]["active_adventures"][0]
+        assert adv["member_ids"] == ["c1", "c2"]
+        assert adv["policy"] == "assault"
 
     def test_future_version_raises_error(self):
         import pytest

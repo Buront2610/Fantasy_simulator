@@ -369,6 +369,35 @@ TEXT_EN: Dict[str, str] = {
     'season_unknown': 'Unknown',
     'monthly_report': 'Monthly report',
     'yearly_report': 'Yearly report',
+    # --- Party adventure strings (PR-E) ---
+    # Policy names (design §9.2)
+    'policy_cautious': 'Cautious Exploration',
+    'policy_swift': 'Swift Strike',
+    'policy_treasure': 'Treasure Hunt',
+    'policy_rescue': 'Rescue Priority',
+    'policy_relic': 'Relic Recovery',
+    'policy_assault': 'All-Out Assault',
+    # Supply states (design §9.1)
+    'supply_full': 'Full',
+    'supply_low': 'Low',
+    'supply_critical': 'Critical',
+    # Party formation / summary
+    'summary_party_set_out': '{party} set out from {origin} toward {destination}.',
+    'detail_party_set_out': '{party} began a joint expedition from {origin} toward {destination}.',
+    # Auto-retreat (design §9.5)
+    'summary_party_retreated_auto': "{name}'s party retreated from {destination}.",
+    'detail_party_retreated_auto': (
+        "{name}'s party pulled back from {destination} and began the return journey."
+    ),
+    # Scouting (no-discovery exploring step)
+    'summary_adventure_scouting': '{name} scouted the area around {destination}.',
+    'detail_adventure_scouting': (
+        '{name} carefully surveyed the surroundings of {destination} but found nothing of note.'
+    ),
+    # UI labels
+    'party_members_label': 'Party',
+    'party_policy_label': 'Policy',
+    'party_supply_label': 'Supply',
 }
 
 TERMS_EN: Dict[str, str] = {}

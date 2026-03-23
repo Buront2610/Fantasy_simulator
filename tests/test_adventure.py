@@ -11,7 +11,19 @@ from fantasy_simulator.adventure import (
     CHOICE_PRESS_ON,
     CHOICE_RETREAT,
     CHOICE_WITHDRAW,
+    POLICY_CAUTIOUS,
+    POLICY_ASSAULT,
+    POLICY_TREASURE,
+    RETREAT_ON_SERIOUS,
+    RETREAT_ON_TROPHY,
+    RETREAT_ON_SUPPLY,
+    RETREAT_NEVER,
+    SUPPLY_FULL,
+    SUPPLY_LOW,
+    SUPPLY_CRITICAL,
+    ALL_POLICIES,
     create_adventure_run,
+    select_party_policy,
 )
 from fantasy_simulator.character import Character
 from fantasy_simulator.i18n import set_locale
@@ -271,6 +283,400 @@ def test_adventure_death_clears_spouse_on_survivor():
 
     assert spouse.spouse_id is None
     assert any("Hero" in h for h in spouse.history)
+
+
+# ---------------------------------------------------------------------------
+# PR-E: Party adventure tests
+# ---------------------------------------------------------------------------
+
+def _make_party_run(leader, members, world, policy=POLICY_CAUTIOUS, retreat_rule=RETREAT_ON_SERIOUS):
+    """Helper: create a party AdventureRun linked to members."""
+    run = AdventureRun(
+        character_id=leader.char_id,
+        character_name=leader.name,
+        origin=leader.location_id,
+        destination="loc_thornwood",
+        year_started=world.year,
+        state="exploring",
+        member_ids=[m.char_id for m in members],
+        policy=policy,
+        retreat_rule=retreat_rule,
+        danger_level=50,
+    )
+    for m in members:
+        m.active_adventure_id = run.adventure_id
+    world.add_adventure(run)
+    return run
+
+
+def test_party_adventure_round_trip_serialization():
+    """Party fields survive to_dict / from_dict round-trip."""
+    run = AdventureRun(
+        character_id="c1",
+        character_name="Aldric",
+        origin="loc_aethoria_capital",
+        destination="loc_thornwood",
+        year_started=1000,
+        member_ids=["c1", "c2", "c3"],
+        party_id="party_abc",
+        policy=POLICY_TREASURE,
+        retreat_rule=RETREAT_ON_TROPHY,
+        supply_state=SUPPLY_LOW,
+        danger_level=75,
+    )
+    payload = run.to_dict()
+    restored = AdventureRun.from_dict(payload)
+
+    assert restored.member_ids == ["c1", "c2", "c3"]
+    assert restored.party_id == "party_abc"
+    assert restored.policy == POLICY_TREASURE
+    assert restored.retreat_rule == RETREAT_ON_TROPHY
+    assert restored.supply_state == SUPPLY_LOW
+    assert restored.danger_level == 75
+    assert restored.is_party is True
+
+
+def test_party_backward_compat_no_member_ids():
+    """from_dict with no member_ids (pre-PR-E save) defaults to [character_id]."""
+    data = {
+        "character_id": "hero1",
+        "character_name": "Aldric",
+        "origin": "loc_aethoria_capital",
+        "destination": "loc_thornwood",
+        "year_started": 1000,
+        # no member_ids key (old save format)
+    }
+    run = AdventureRun.from_dict(data)
+    assert run.member_ids == ["hero1"]
+    assert run.is_party is False
+    assert run.policy == POLICY_CAUTIOUS
+    assert run.retreat_rule == RETREAT_ON_SERIOUS
+
+
+def test_is_party_property():
+    """is_party is True only when len(member_ids) > 1."""
+    solo = AdventureRun(
+        character_id="c1", character_name="A",
+        origin="loc_aethoria_capital", destination="loc_thornwood",
+        year_started=1000, member_ids=["c1"],
+    )
+    party = AdventureRun(
+        character_id="c1", character_name="A",
+        origin="loc_aethoria_capital", destination="loc_thornwood",
+        year_started=1000, member_ids=["c1", "c2"],
+    )
+    empty = AdventureRun(
+        character_id="c1", character_name="A",
+        origin="loc_aethoria_capital", destination="loc_thornwood",
+        year_started=1000,
+    )
+    assert solo.is_party is False
+    assert party.is_party is True
+    assert empty.is_party is False
+
+
+def test_combat_score_scales_injury_chance():
+    """High STR+CON lowers injury_chance; low STR+CON raises it.
+
+    Design §9.6: STR/CON → 正面戦闘・耐久.
+    """
+    strong_char = Character(
+        name="Tank", age=25, gender="Male", race="Human", job="Warrior",
+        strength=90, constitution=90, dexterity=50, wisdom=50,
+        location_id="loc_aethoria_capital",
+    )
+    weak_char = Character(
+        name="Scholar", age=25, gender="Female", race="Human", job="Mage",
+        strength=15, constitution=15, dexterity=50, wisdom=50,
+        location_id="loc_aethoria_capital",
+    )
+    run = AdventureRun(
+        character_id="x", character_name="X",
+        origin="loc_aethoria_capital", destination="loc_thornwood",
+        year_started=1000, danger_level=50,
+    )
+    strong_chance = run._compute_injury_chance([strong_char])
+    weak_chance = run._compute_injury_chance([weak_char])
+
+    assert strong_chance < weak_chance, (
+        f"Expected strong_chance ({strong_chance:.3f}) < weak_chance ({weak_chance:.3f})"
+    )
+    # Sanity bounds: must stay within clamped range [0.04, 0.22]
+    assert 0.04 <= strong_chance <= 0.22
+    assert 0.04 <= weak_chance <= 0.22
+
+
+def test_danger_level_scales_injury_chance():
+    """Higher danger_level raises injury_chance; lower reduces it.
+
+    Design §9.6: location danger affects risk.
+    """
+    char = _make_character()
+    run_safe = AdventureRun(
+        character_id="x", character_name="X",
+        origin="loc_aethoria_capital", destination="loc_thornwood",
+        year_started=1000, danger_level=10,
+    )
+    run_dangerous = AdventureRun(
+        character_id="x", character_name="X",
+        origin="loc_aethoria_capital", destination="loc_thornwood",
+        year_started=1000, danger_level=90,
+    )
+    safe_chance = run_safe._compute_injury_chance([char])
+    dangerous_chance = run_dangerous._compute_injury_chance([char])
+
+    assert safe_chance < dangerous_chance, (
+        f"Expected safe ({safe_chance:.3f}) < dangerous ({dangerous_chance:.3f})"
+    )
+
+
+def test_party_ability_score_averages():
+    """Party ability scores are averaged across all living members."""
+    char_a = Character(
+        name="A", age=25, gender="Male", race="Human", job="Warrior",
+        strength=80, constitution=80, dexterity=50, wisdom=50, intelligence=50,
+        location_id="loc_aethoria_capital",
+    )
+    char_b = Character(
+        name="B", age=25, gender="Female", race="Human", job="Mage",
+        strength=20, constitution=20, dexterity=50, wisdom=50, intelligence=80,
+        location_id="loc_aethoria_capital",
+    )
+    run = AdventureRun(
+        character_id="x", character_name="X",
+        origin="loc_aethoria_capital", destination="loc_thornwood",
+        year_started=1000,
+    )
+    combat = run._combat_score([char_a, char_b])
+    lore = run._lore_score([char_a, char_b])
+
+    # combat = avg of (STR+CON)/2: (80+80)/2=80, (20+20)/2=20 → avg=50
+    assert abs(combat - 50.0) < 0.01
+    # lore = avg INT: (50 + 80) / 2 = 65
+    assert abs(lore - 65.0) < 0.01
+
+
+def test_retreat_on_serious_triggers_when_member_serious():
+    """RETREAT_ON_SERIOUS returns True if any member is serious or dying."""
+    healthy = _make_character("Healthy")
+    serious = Character(
+        name="Serious", age=30, gender="Female", race="Human", job="Warrior",
+        location_id="loc_aethoria_capital", injury_status="serious",
+    )
+    run = AdventureRun(
+        character_id="x", character_name="X",
+        origin="loc_aethoria_capital", destination="loc_thornwood",
+        year_started=1000, retreat_rule=RETREAT_ON_SERIOUS,
+    )
+    assert run._should_auto_retreat([healthy]) is False
+    assert run._should_auto_retreat([healthy, serious]) is True
+
+
+def test_retreat_on_trophy_triggers_when_loot_present():
+    """RETREAT_ON_TROPHY returns True once any loot is in loot_summary."""
+    char = _make_character()
+    run = AdventureRun(
+        character_id="x", character_name="X",
+        origin="loc_aethoria_capital", destination="loc_thornwood",
+        year_started=1000, retreat_rule=RETREAT_ON_TROPHY,
+    )
+    assert run._should_auto_retreat([char]) is False
+    run.loot_summary.append("an ancient relic")
+    assert run._should_auto_retreat([char]) is True
+
+
+def test_retreat_on_supply_triggers_when_critical():
+    """RETREAT_ON_SUPPLY returns True when supply_state is critical."""
+    char = _make_character()
+    run = AdventureRun(
+        character_id="x", character_name="X",
+        origin="loc_aethoria_capital", destination="loc_thornwood",
+        year_started=1000, retreat_rule=RETREAT_ON_SUPPLY,
+        supply_state=SUPPLY_FULL,
+    )
+    assert run._should_auto_retreat([char]) is False
+    run.supply_state = SUPPLY_CRITICAL
+    assert run._should_auto_retreat([char]) is True
+
+
+def test_retreat_never_never_triggers():
+    """RETREAT_NEVER never auto-retreats regardless of conditions."""
+    char = _make_character()
+    char.injury_status = "dying"
+    run = AdventureRun(
+        character_id="x", character_name="X",
+        origin="loc_aethoria_capital", destination="loc_thornwood",
+        year_started=1000, retreat_rule=RETREAT_NEVER,
+        supply_state=SUPPLY_CRITICAL,
+    )
+    run.loot_summary.append("relic")
+    assert run._should_auto_retreat([char]) is False
+
+
+def test_party_auto_retreat_on_serious_member(monkeypatch):
+    """A party adventure auto-retreats when a member reaches 'serious' during exploring.
+
+    Design §9.5: retreat if someone is serious or dying.
+    """
+    world = World()
+    leader = _make_character("Aldric")
+    companion = _make_character("Lysara")
+    world.add_character(leader)
+    world.add_character(companion)
+
+    companion.injury_status = "serious"  # companion is already serious
+
+    run = _make_party_run(
+        leader, [leader, companion], world,
+        policy=POLICY_CAUTIOUS, retreat_rule=RETREAT_ON_SERIOUS,
+    )
+
+    # No injury roll needed — auto-retreat should trigger immediately
+    summaries = run.step(leader, world, rng=FakeRng([0.99, 0.99]))
+
+    assert run.state == "returning", f"Expected returning, got {run.state}"
+    assert summaries, "Expected at least one summary"
+    assert any("retreated" in s.lower() or "撤退" in s for s in summaries)
+
+
+def test_solo_run_ignores_retreat_rule_on_self_injury():
+    """Solo run does NOT auto-retreat even when the solo char is dying.
+
+    Auto-retreat is a party-only mechanic (design: leader-character alone
+    cannot 'retreat as a party').  The existing injury/death roll handles it.
+    """
+    world = World()
+    char = _make_character()
+    char.injury_status = "dying"
+    world.add_character(char)
+
+    run = AdventureRun(
+        character_id=char.char_id,
+        character_name=char.name,
+        origin=char.location_id,
+        destination="loc_thornwood",
+        year_started=world.year,
+        state="exploring",
+        member_ids=[char.char_id],   # solo = 1 member → is_party = False
+        retreat_rule=RETREAT_ON_SERIOUS,
+    )
+    char.active_adventure_id = run.adventure_id
+    world.add_adventure(run)
+
+    # Roll that lands in the critical zone (death for dying char)
+    # With STR=60, CON=55 (from _make_character) and danger_level=50:
+    # injury_chance ≈ 0.157, critical_chance ≈ 0.21  → roll 0.20 hits critical
+    run.step(char, world, rng=FakeRng([0.20]))
+
+    # Should die (not auto-retreat) since is_party = False
+    assert not char.alive
+    assert run.outcome == "death"
+
+
+def test_party_member_cleanup_on_adventure_resolve():
+    """When party adventure resolves, all non-leader members have active_adventure_id cleared."""
+    world = World()
+    leader = _make_character("Aldric")
+    companion = _make_character("Lysara")
+    world.add_character(leader)
+    world.add_character(companion)
+
+    run = _make_party_run(leader, [leader, companion], world)
+    run.state = "returning"
+
+    # Advance through the returning step
+    run.step(leader, world, rng=FakeRng([0.99]))
+
+    assert run.is_resolved
+    assert leader.active_adventure_id is None
+    assert companion.active_adventure_id is None
+
+
+def test_create_adventure_run_sets_member_ids():
+    """create_adventure_run initialises member_ids to [char_id] for solo run."""
+    world = World()
+    char = _make_character()
+    world.add_character(char)
+    run = create_adventure_run(char, world, rng=FakeRng([0.99]))
+
+    assert run.member_ids == [char.char_id]
+    assert run.is_party is False
+
+
+def test_select_party_policy_returns_valid_policy():
+    """select_party_policy always returns a policy from ALL_POLICIES."""
+    rng = FakeRng([0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
+    members = [_make_character("A"), _make_character("B")]
+    for _ in range(10):
+        policy = select_party_policy(members, rng)
+        assert policy in ALL_POLICIES, f"Unexpected policy: {policy}"
+
+
+def test_select_party_policy_wisdom_favours_cautious():
+    """High-WIS party tends toward POLICY_CAUTIOUS more than POLICY_ASSAULT."""
+    class FixedRng:
+        def random(self):
+            return 0.0   # always picks top-ranked policy
+
+        def choice(self, options):
+            return options[0]
+
+    wise_party = [
+        Character(
+            name="A", age=25, gender="Male", race="Human", job="Mage",
+            strength=20, constitution=20, dexterity=50, wisdom=90, intelligence=50,
+            location_id="loc_aethoria_capital",
+        )
+    ]
+    policy = select_party_policy(wise_party, FixedRng())
+    # Wisdom scores highest for CAUTIOUS and RESCUE — should NOT be ASSAULT
+    assert policy != POLICY_ASSAULT, f"Unexpected policy for high-WIS: {policy}"
+
+
+def test_simulator_starts_party_adventure():
+    """When multiple candidates exist, some adventures become party runs."""
+    world = World()
+    for i in range(6):
+        c = _make_character(f"Hero{i}")
+        world.add_character(c)
+    sim = Simulator(world, events_per_year=0, adventure_steps_per_year=0, seed=42)
+
+    # Force party formation by setting rng to always go party path
+    class PartyForcedRng:
+        """Always passes 25% gate and always picks party formation."""
+        def __init__(self):
+            self._calls = 0
+
+        def random(self):
+            self._calls += 1
+            # Call 1: < 0.25 → proceed to adventure start
+            # Call 2: < 0.30 → party formation
+            if self._calls % 2 == 1:
+                return 0.10   # < 0.25, proceed
+            return 0.10       # < 0.30, form party
+
+        def choice(self, options):
+            return options[0]
+
+        def sample(self, population, k):
+            return list(population[:k])
+
+        def choices(self, population, weights=None, k=1):
+            return [population[0]] * k
+
+        def randint(self, lo, hi):
+            return lo
+
+        def getrandbits(self, n):
+            return 0
+
+    sim.rng = PartyForcedRng()
+    sim.id_rng = PartyForcedRng()
+    sim._maybe_start_adventure()
+
+    party_runs = [r for r in world.active_adventures if r.is_party]
+    assert party_runs, "Expected at least one party adventure run"
+    assert len(party_runs[0].member_ids) >= 2
 
 
 def test_adventure_death_clears_spouse_via_simulator_integration():

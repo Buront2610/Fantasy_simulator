@@ -2,17 +2,32 @@
 
 Handles adventure creation, step-by-step progression, dead-character
 resolution, and player-facing query methods.
+
+PR-E: Extended with party adventure formation (design §9.1–§9.4).
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from ..adventure import AdventureRun, create_adventure_run
+from ..adventure import (
+    AdventureRun,
+    RETREAT_ON_SERIOUS,
+    SUPPLY_FULL,
+    create_adventure_run,
+    generate_adventure_id,
+    select_party_policy,
+)
 from ..i18n import tr
 
 if TYPE_CHECKING:
     from ..character import Character
+
+
+# Maximum party size for auto-formed parties
+_MAX_PARTY_SIZE = 3
+# Probability that a new adventure attempt forms a party (vs solo)
+_PARTY_FORMATION_CHANCE = 0.30
 
 
 class AdventureMixin:
@@ -28,7 +43,7 @@ class AdventureMixin:
     """
 
     def _maybe_start_adventure(self) -> None:
-        """Start at most one new adventure in the current year."""
+        """Start at most one new adventure (solo or party) in the current year."""
         candidates = [
             c for c in self.world.characters
             if c.alive and c.active_adventure_id is None
@@ -37,6 +52,14 @@ class AdventureMixin:
         if not candidates or self.rng.random() >= 0.25:
             return
 
+        # 30% chance to form a party adventure when enough candidates exist
+        if len(candidates) >= 2 and self.rng.random() < _PARTY_FORMATION_CHANCE:
+            self._start_party_adventure(candidates)
+        else:
+            self._start_solo_adventure(candidates)
+
+    def _start_solo_adventure(self, candidates: List["Character"]) -> None:
+        """Pick one candidate and start a solo adventure."""
         char = self.rng.choice(candidates)
         run = create_adventure_run(char, self.world, rng=self.rng, id_rng=self.id_rng)
         char.active_adventure_id = run.adventure_id
@@ -56,6 +79,80 @@ class AdventureMixin:
             primary_actor_id=char.char_id,
             severity=2,
         )
+
+    def _start_party_adventure(self, candidates: List["Character"]) -> None:
+        """Form a small party from candidates and start a shared adventure.
+
+        Party size: 2–_MAX_PARTY_SIZE members.
+        Leader is the first selected character.
+        Policy is AI-selected unless spotlighted/playable leader is present
+        (player UI hook reserved for future enhancement).
+        Design §9.3: policy selection by character status.
+        """
+        size = self.rng.choice(range(2, _MAX_PARTY_SIZE + 1))
+        size = min(size, len(candidates))
+        members = self.rng.sample(candidates, size)
+        leader = members[0]
+
+        # Build adventure on leader
+        run = create_adventure_run(leader, self.world, rng=self.rng, id_rng=self.id_rng)
+
+        # Apply party data
+        run.member_ids = [m.char_id for m in members]
+        run.party_id = generate_adventure_id(self.id_rng)
+        run.policy = select_party_policy(members, self.rng)
+        run.retreat_rule = RETREAT_ON_SERIOUS
+        run.supply_state = SUPPLY_FULL
+        # danger_level already set in create_adventure_run from destination.danger
+
+        # Override the initial summary with party text if multi-member
+        if len(members) > 1:
+            party_names = self._format_party_names(members)
+            origin_name = self.world.location_name(run.origin)
+            dest_name = self.world.location_name(run.destination)
+            run.summary_log = [
+                tr("summary_party_set_out", party=party_names,
+                   origin=origin_name, destination=dest_name)
+            ]
+            run.detail_log = [
+                tr("detail_party_set_out", party=party_names,
+                   origin=origin_name, destination=dest_name)
+            ]
+
+        # Mark all members as on this adventure
+        for member in members:
+            member.active_adventure_id = run.adventure_id
+            member.add_history(
+                tr(
+                    "set_out_for_adventure",
+                    year=self.world.year,
+                    origin=self.world.location_name(run.origin),
+                    destination=self.world.location_name(run.destination),
+                )
+            )
+
+        self.world.add_adventure(run)
+        self._record_world_event(
+            run.summary_log[-1],
+            kind="adventure_started",
+            location_id=run.origin,
+            primary_actor_id=leader.char_id,
+            severity=2,
+        )
+
+    @staticmethod
+    def _format_party_names(members: List["Character"], max_shown: int = 3) -> str:
+        """Return a display string for party members  (e.g. 'Aldric & Lysara')."""
+        names = [m.name for m in members[:max_shown]]
+        result = " & ".join(names)
+        if len(members) > max_shown:
+            result += f" +{len(members) - max_shown}"
+        return result
+
+    def _location_danger_level(self, location_id: str) -> int:
+        """Return the danger level (0-100) of a location, defaulting to 50."""
+        loc = self.world.grid.get(location_id)
+        return getattr(loc, "danger", 50) if loc is not None else 50
 
     def _advance_adventures(self) -> None:
         """Advance active adventures by multiple internal steps per year."""
@@ -100,6 +197,12 @@ class AdventureMixin:
         run.outcome = "death"
         run.resolution_year = self.world.year
         char.active_adventure_id = None
+        # Clear all other party members
+        for mid in run.member_ids:
+            if mid != run.character_id:
+                member = self.world.get_character_by_id(mid)
+                if member is not None:
+                    member.active_adventure_id = None
         char.add_history(
             tr(
                 "history_adventure_detail",
@@ -125,10 +228,36 @@ class AdventureMixin:
             status = tr(status_key)
             origin_name = self.world.location_name(run.origin)
             dest_name = self.world.location_name(run.destination)
-            summaries.append(
-                f"{run.character_name}: {origin_name} -> {dest_name} [{status}]"
-            )
+            # Show all party members for party adventures
+            if run.is_party:
+                party_names = self._build_party_display_names(run)
+                summaries.append(
+                    f"{party_names}: {origin_name} -> {dest_name} [{status}]"
+                )
+            else:
+                summaries.append(
+                    f"{run.character_name}: {origin_name} -> {dest_name} [{status}]"
+                )
         return summaries
+
+    def _build_party_display_names(self, run: AdventureRun) -> str:
+        """Return display names for party members, falling back to leader name."""
+        names = []
+        for mid in run.member_ids:
+            c = self.world.get_character_by_id(mid)
+            if c is not None:
+                names.append(c.name)
+        if not names:
+            names = [run.character_name]
+        return self._format_party_names_from_list(names)
+
+    @staticmethod
+    def _format_party_names_from_list(names: List[str], max_shown: int = 3) -> str:
+        shown = names[:max_shown]
+        result = " & ".join(shown)
+        if len(names) > max_shown:
+            result += f" +{len(names) - max_shown}"
+        return result
 
     def get_adventure_details(self, adventure_id: str) -> List[str]:
         """Return detailed log entries for a specific adventure."""

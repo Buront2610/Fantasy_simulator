@@ -384,6 +384,18 @@ def _show_adventure_details(sim: Simulator, ctx: UIContext | None = None) -> Non
         f"  {tr('route'):<11}: {sim.world.location_name(run.origin)} -> "
         f"{sim.world.location_name(run.destination)}"
     )
+    # Show party members for multi-member adventures
+    if run.is_party:
+        member_names = []
+        for mid in run.member_ids:
+            c = sim.world.get_character_by_id(mid)
+            if c is not None:
+                member_names.append(c.name)
+        if not member_names:
+            member_names = [run.character_name]
+        out.print_line(f"  {tr('party_members_label'):<11}: {', '.join(member_names)}")
+        out.print_line(f"  {tr('party_policy_label'):<11}: {tr(f'policy_{run.policy}')}")
+        out.print_line(f"  {tr('party_supply_label'):<11}: {tr(f'supply_{run.supply_state}')}")
     out.print_line(f"  {tr('state'):<11}: {tr(f'state_{run.state}')}")
     out.print_line(
         f"  {tr('outcome'):<11}: {tr(f'outcome_{run.outcome}') if run.outcome else tr('unresolved')}"

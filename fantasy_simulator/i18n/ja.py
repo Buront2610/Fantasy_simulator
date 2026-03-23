@@ -369,6 +369,31 @@ TEXT_JA: Dict[str, str] = {
     'season_unknown': '不明',
     'monthly_report': '月報',
     'yearly_report': '年報',
+    # --- パーティ冒険文字列 (PR-E) ---
+    # 方針名 (design §9.2)
+    'policy_cautious': '慎重探索',
+    'policy_swift': '最短踏破',
+    'policy_treasure': '金策重視',
+    'policy_rescue': '救助優先',
+    'policy_relic': '遺物回収',
+    'policy_assault': '殲滅志向',
+    # 補給状態 (design §9.1)
+    'supply_full': '十分',
+    'supply_low': '少ない',
+    'supply_critical': '危機的',
+    # パーティ編成・サマリー
+    'summary_party_set_out': '{party} は {origin} を出発し、{destination} へ向かった。',
+    'detail_party_set_out': '{party} は {origin} から {destination} へ合同遠征を開始した。',
+    # 自動撤退 (design §9.5)
+    'summary_party_retreated_auto': '{name} たちのパーティは {destination} から撤退した。',
+    'detail_party_retreated_auto': '{name} たちのパーティは {destination} から引き返し、帰路についた。',
+    # 偵察（発見なし探索ステップ）
+    'summary_adventure_scouting': '{name} は {destination} 周辺を偵察した。',
+    'detail_adventure_scouting': '{name} は {destination} の周囲を慎重に調査したが、特筆すべきものは見つからなかった。',
+    # UI ラベル
+    'party_members_label': 'パーティ',
+    'party_policy_label': '方針',
+    'party_supply_label': '補給',
 }
 
 TERMS_JA: Dict[str, str] = {
