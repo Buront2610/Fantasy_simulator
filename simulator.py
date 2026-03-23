@@ -55,6 +55,9 @@ class Simulator:
         # current simulated year. This value is serialized and restored as-is
         # to preserve in-progress context across save/load.
         self.current_month: int = 1
+        # Baseline year used for "latest completed report year" fallback when
+        # the simulation has not yet completed a full year.
+        self.start_year: int = world.year
         self.rng = random.Random(seed)
         self.id_rng = random.Random(self._id_seed_from_seed(seed))
 
@@ -392,18 +395,17 @@ class Simulator:
     def get_latest_completed_report_year(self) -> int:
         """Return the latest year that should be used for end-of-year reports.
 
-        Preference is "last completed year" (`world.year - 1`), but this
-        method avoids hard-coded epoch values by falling back to the earliest
-        known event-record year (or current year if no records exist).
+        Preference is "last completed year" (`world.year - 1`). If the
+        simulation has not completed even one full year yet, this falls back
+        to the simulator baseline (`start_year`). If historical event records
+        from earlier years exist (e.g. imported data), that earlier year is
+        also respected as a valid lower bound.
         """
         candidate = self.world.year - 1
+        baseline = self.start_year
         if self.world.event_records:
-            earliest_record_year = min(r.year for r in self.world.event_records)
-        else:
-            earliest_record_year = self.world.year
-        if candidate < earliest_record_year:
-            return self.world.year
-        return candidate
+            baseline = min(baseline, min(r.year for r in self.world.event_records))
+        return max(candidate, baseline)
 
     def get_latest_yearly_report(self) -> str:
         """Generate and format a yearly report for the most recent completed year."""
@@ -468,6 +470,7 @@ class Simulator:
             "events_per_year": self.events_per_year,
             "adventure_steps_per_year": self.adventure_steps_per_year,
             "current_month": self.current_month,
+            "start_year": self.start_year,
             "locale": get_locale(),
             "rng_state": repr(self.rng.getstate()),
             "id_rng_state": repr(self.id_rng.getstate()),
@@ -496,6 +499,7 @@ class Simulator:
         if not sim._restore_rng_state(sim.id_rng, data.get("id_rng_state")):
             sim.id_rng.seed(sim._legacy_id_seed(data))
         sim.current_month = max(1, min(12, data.get("current_month", 1)))
+        sim.start_year = data.get("start_year", sim.world.year)
         sim.history = [
             EventResult.from_dict(ev) for ev in data.get("history", [])
         ]

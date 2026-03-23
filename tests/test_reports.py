@@ -448,6 +448,13 @@ class TestSimulatorReportIntegration:
         sim = Simulator(world, events_per_year=0, seed=42)
         assert sim.get_latest_completed_report_year() == 950
 
+    def test_get_latest_completed_report_year_without_records_after_advance(self):
+        world = World(year=950)
+        sim = Simulator(world, events_per_year=0, seed=42)
+        sim.advance_years(2)
+        assert sim.world.year == 952
+        assert sim.get_latest_completed_report_year() == 951
+
     def test_get_latest_completed_report_year_uses_earliest_record_year(self):
         world = World(year=1001)
         world.record_event(WorldEventRecord(
@@ -496,6 +503,17 @@ class TestSimulatorReportIntegration:
         sim2 = Simulator.from_dict(data)
         assert sim2.current_month == 7
 
+    def test_start_year_serialization_round_trip(self):
+        world = World(year=1234)
+        c = _make_char("Hero")
+        world.add_character(c)
+        sim = Simulator(world, events_per_year=0, seed=42)
+        sim.advance_years(1)
+        data = sim.to_dict()
+        sim2 = Simulator.from_dict(data)
+        assert sim2.start_year == 1234
+        assert sim2.get_latest_completed_report_year() == 1234
+
     def test_current_month_from_dict_clamped(self):
         """Loading a save with month=0 should clamp to 1."""
         world = World()
@@ -506,6 +524,16 @@ class TestSimulatorReportIntegration:
         data["current_month"] = 0
         sim2 = Simulator.from_dict(data)
         assert sim2.current_month == 1
+
+    def test_start_year_from_dict_defaults_to_world_year(self):
+        world = World(year=1005)
+        c = _make_char("Hero")
+        world.add_character(c)
+        sim = Simulator(world, events_per_year=0, seed=42)
+        data = sim.to_dict()
+        data.pop("start_year", None)
+        sim2 = Simulator.from_dict(data)
+        assert sim2.start_year == 1005
 
     def test_resolve_adventure_choice_has_valid_month(self):
         """Events from resolve_adventure_choice must have month in 1..12."""
