@@ -217,7 +217,11 @@ def generate_rumor_from_event(
     if record.severity < _MIN_SEVERITY_FOR_RUMOR:
         return None
 
-    if rng.random() > _RUMOR_BASE_CHANCE:
+    # Higher severity events are more likely to spawn rumors.
+    # severity 4+ gets a +0.25 bonus, severity 3 gets +0.10.
+    severity_bonus = 0.25 if record.severity >= 4 else (0.10 if record.severity >= 3 else 0.0)
+    chance = min(_RUMOR_BASE_CHANCE + severity_bonus, 1.0)
+    if rng.random() > chance:
         return None
 
     same_location = (

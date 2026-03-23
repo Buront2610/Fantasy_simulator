@@ -150,7 +150,8 @@ def _make_event(severity=3, kind="battle", year=1000, month=6,
 
 
 def test_generate_rumor_from_high_severity_event():
-    rng = random.Random(42)
+    # Seed 0 deterministically generates a rumor for severity 4
+    rng = random.Random(0)
     event = _make_event(severity=4)
     rumor = generate_rumor_from_event(
         event,
@@ -159,12 +160,10 @@ def test_generate_rumor_from_high_severity_event():
         current_month=6,
         rng=rng,
     )
-    # With seed 42, the random check should pass for severity 4
-    # But it's possible to get None due to random chance
-    if rumor is not None:
-        assert rumor.reliability in RELIABILITY_LEVELS
-        assert rumor.source_event_id == "evt_test"
-        assert rumor.category == "battle"
+    assert rumor is not None, "Seed 0 + severity 4 should always generate a rumor"
+    assert rumor.reliability in RELIABILITY_LEVELS
+    assert rumor.source_event_id == "evt_test"
+    assert rumor.category == "battle"
 
 
 def test_generate_rumor_rejects_low_severity():
@@ -414,10 +413,11 @@ def test_should_notify_spotlighted_serious():
 def test_simulator_generates_rumors_during_run():
     """Simulator should generate rumors during yearly progression."""
     world = _make_world_with_events()
-    sim = Simulator(world, seed=42)
+    # Seed 0 deterministically produces at least one rumor from
+    # the high-severity events seeded in _make_world_with_events.
+    sim = Simulator(world, seed=0)
     sim.advance_years(1)
-    # After one year, events should have been generated and possibly rumors
-    # We can't guarantee exact count due to randomness, but structure should be valid
+    assert len(world.rumors) > 0, "At least one rumor should be generated with seed 0"
     for rumor in world.rumors:
         assert rumor.reliability in RELIABILITY_LEVELS
 

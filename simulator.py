@@ -76,8 +76,6 @@ class Simulator:
     NOTIFICATION_THRESHOLDS: Dict[str, Any] = {
         "favorite_any": True,          # any event involving a favorite is notified
         "spotlight_serious": True,     # spotlighted char: severity >= 3
-        "auto_pause_dying": True,      # dying triggers auto-pause
-        "auto_pause_months": 6,        # force a notification at least every N months
         "rumor_high_heat": 70,         # rumor_heat >= 70 triggers location notification
     }
 
@@ -270,7 +268,13 @@ class Simulator:
                 )
 
     def _generate_and_age_rumors(self) -> None:
-        """Generate new rumors from recent events and age existing ones."""
+        """Generate new rumors from recent events and age existing ones.
+
+        Age existing rumors first, then append new ones so freshly
+        generated rumors start at age 0 instead of immediately gaining
+        12 months of age.
+        """
+        self.world.rumors = age_rumors(self.world.rumors, months=12)
         new_rumors = generate_rumors_for_period(
             self.world,
             year=self.world.year,
@@ -279,7 +283,6 @@ class Simulator:
             rng=self.rng,
         )
         self.world.rumors.extend(new_rumors)
-        self.world.rumors = age_rumors(self.world.rumors, months=12)
         self.world.rumors = trim_rumors(self.world.rumors)
 
     def _maybe_start_adventure(self) -> None:

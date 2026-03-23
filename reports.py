@@ -180,8 +180,9 @@ def generate_monthly_report(
             notable_events=notable_loc,
         ))
 
-    # Rumor entries — only rumors created within the report period or still
-    # fresh enough to be relevant (age <= 6 months from the report date)
+    # Rumor entries — only non-expired rumors created within the last 6
+    # months relative to the report date (freshness window per §10.2).
+    _RUMOR_FRESHNESS_MONTHS = 6
     report_abs_month = year * 12 + month
     rumor_entries = [
         RumorReportEntry(
@@ -191,7 +192,9 @@ def generate_monthly_report(
             category=r.category,
         )
         for r in world.rumors
-        if not r.is_expired and (r.year_created * 12 + r.month_created) <= report_abs_month
+        if not r.is_expired
+        and (r.year_created * 12 + r.month_created) <= report_abs_month
+        and (report_abs_month - (r.year_created * 12 + r.month_created)) <= _RUMOR_FRESHNESS_MONTHS
     ]
 
     return MonthlyReport(

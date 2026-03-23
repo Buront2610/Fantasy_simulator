@@ -442,6 +442,7 @@ class EventSystem:
             if run is not None and not run.is_resolved:
                 run.state = "resolved"
                 run.outcome = "death"
+                run.resolution_year = world.year
                 run.pending_choice = None
                 world.complete_adventure(adventure_id)
         char.active_adventure_id = None
