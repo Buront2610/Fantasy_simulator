@@ -31,7 +31,7 @@ class TestScreensImport(unittest.TestCase):
     """Verify that screens module imports without errors."""
 
     def test_module_importable(self) -> None:
-        import screens  # noqa: F401
+        import fantasy_simulator.ui.screens  # noqa: F401
 
     def test_public_screen_functions_exist(self) -> None:
         from fantasy_simulator.ui.screens import (

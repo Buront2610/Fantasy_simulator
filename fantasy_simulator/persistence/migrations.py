@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Dict
 
-from world_data import (
+from ..content.world_data import (
     NAME_TO_LOCATION_ID,
     fallback_location_id,
     get_location_state_defaults,

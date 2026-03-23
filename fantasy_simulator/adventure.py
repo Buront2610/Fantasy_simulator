@@ -9,11 +9,11 @@ import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from i18n import tr, tr_term
+from .i18n import tr, tr_term
 
 if TYPE_CHECKING:
-    from character import Character
-    from world import World
+    from .character import Character
+    from .world import World
 
 
 ADVENTURE_DISCOVERIES = [
