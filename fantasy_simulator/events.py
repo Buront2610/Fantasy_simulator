@@ -81,6 +81,7 @@ class WorldEventRecord:
     description: str = ""
     severity: int = 1
     visibility: str = "public"
+    tags: List[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         self.severity = max(1, min(5, self.severity))
@@ -98,6 +99,7 @@ class WorldEventRecord:
             "description": self.description,
             "severity": self.severity,
             "visibility": self.visibility,
+            "tags": list(self.tags),
         }
 
     @classmethod
@@ -113,6 +115,7 @@ class WorldEventRecord:
             description=data.get("description", ""),
             severity=data.get("severity", 1),
             visibility=data.get("visibility", "public"),
+            tags=list(data.get("tags", [])),
         )
 
     @classmethod
