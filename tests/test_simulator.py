@@ -500,6 +500,7 @@ class TestInjuryRecovery:
             {
                 "random": lambda self: 0.1,
                 "choice": lambda self, options: options[0],
+                "randint": lambda self, lo, hi: lo,
             },
         )()
         sim._run_year()
@@ -520,6 +521,7 @@ class TestInjuryRecovery:
             {
                 "random": lambda self: 0.9,
                 "choice": lambda self, options: options[0],
+                "randint": lambda self, lo, hi: lo,
             },
         )()
         sim._run_year()
@@ -645,7 +647,8 @@ class TestWorldEventRecordIntegration:
             {
                 "random": lambda self: next(self.values),
                 "choice": lambda self, options: options[0],
-                "values": iter([0.9, 0.1, 0.0, 0.9, 0.3, 0.9]),
+                "randint": lambda self, lo, hi: lo,
+                "values": iter([0.9, 0.1, 0.0, 0.9, 0.3, 0.9] + [0.5] * 20),
             },
         )()
 

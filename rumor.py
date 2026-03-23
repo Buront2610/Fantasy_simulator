@@ -245,8 +245,9 @@ def generate_rumor_from_event(
     else:
         description = tr("rumor_vague_event")
 
+    rumor_id = f"rum_{rng.getrandbits(48):012x}" if hasattr(rng, 'getrandbits') else f"rum_{uuid.uuid4().hex[:12]}"
     return Rumor(
-        id=f"rum_{uuid.uuid4().hex[:12]}",
+        id=rumor_id,
         category=_category_from_event_kind(record.kind),
         source_location_id=record.location_id,
         target_subject=record.primary_actor_id or "",
@@ -271,10 +272,12 @@ def generate_rumors_for_period(
 ) -> List[Rumor]:
     """Generate rumors from recent events for a given period.
 
-    Scans events from the current and previous months, filtering by
-    severity and random chance.
+    Scans events within the lookback window ending at *month*, filtering
+    by severity and random chance.  The default 12-month window ensures
+    that yearly batch generation (called at month 12) captures events
+    from the entire year rather than only the final quarter.
     """
-    lookback_months = 3
+    lookback_months = 12
     cutoff_year = year
     cutoff_month = month - lookback_months
     while cutoff_month < 1:
