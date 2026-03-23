@@ -149,6 +149,12 @@ class TestCustomRenderBackend(unittest.TestCase):
             def print_warning(self, text: str) -> None:
                 self.lines.append(("warning", text))
 
+            def print_wrapped(self, text: str, indent: int = 4) -> None:
+                self.lines.append(("wrapped", text))
+
+            def print_dim(self, text: str) -> None:
+                self.lines.append(("dim", text))
+
         backend = BufferRenderBackend()
         self.assertIsInstance(backend, RenderBackend)
 
@@ -158,14 +164,18 @@ class TestCustomRenderBackend(unittest.TestCase):
         backend.print_error("err")
         backend.print_success("ok")
         backend.print_warning("warn")
+        backend.print_wrapped("long text")
+        backend.print_dim("faint")
 
-        self.assertEqual(len(backend.lines), 6)
+        self.assertEqual(len(backend.lines), 8)
         self.assertEqual(backend.lines[0], ("line", "hello"))
         self.assertEqual(backend.lines[1], ("heading", "TITLE"))
         self.assertEqual(backend.lines[2], ("sep", "-", 20))
         self.assertEqual(backend.lines[3], ("error", "err"))
         self.assertEqual(backend.lines[4], ("success", "ok"))
         self.assertEqual(backend.lines[5], ("warning", "warn"))
+        self.assertEqual(backend.lines[6], ("wrapped", "long text"))
+        self.assertEqual(backend.lines[7], ("dim", "faint"))
 
 
 if __name__ == "__main__":

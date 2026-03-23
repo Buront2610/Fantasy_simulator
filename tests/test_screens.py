@@ -8,7 +8,6 @@ import unittest
 import unicodedata
 from contextlib import redirect_stdout
 from types import SimpleNamespace
-from unittest.mock import patch
 
 from fantasy_simulator.character import Character
 from fantasy_simulator.i18n import set_locale
@@ -96,6 +95,9 @@ class TestMainEntryPoint(unittest.TestCase):
 class TestRosterRendering(unittest.TestCase):
     def test_show_roster_keeps_header_and_rows_same_display_width_in_japanese(self) -> None:
         from fantasy_simulator.ui.screens import _show_roster
+        from fantasy_simulator.ui.ui_context import UIContext
+        from fantasy_simulator.ui.input_backend import StdInputBackend
+        from fantasy_simulator.ui.render_backend import PrintRenderBackend
 
         set_locale("ja")
         world = World()
@@ -110,10 +112,15 @@ class TestRosterRendering(unittest.TestCase):
             )
         )
 
+        # Build a context with a no-op pause
+        class NoopInputBackend(StdInputBackend):
+            def pause(self, message: str = "") -> None:
+                pass
+        ctx = UIContext(inp=NoopInputBackend(), out=PrintRenderBackend())
+
         captured = io.StringIO()
-        with patch("fantasy_simulator.ui.screens._pause", return_value=None):
-            with redirect_stdout(captured):
-                _show_roster(world)
+        with redirect_stdout(captured):
+            _show_roster(world, ctx=ctx)
 
         lines = [_ANSI_RE.sub("", line) for line in captured.getvalue().splitlines()]
         table_lines = [line for line in lines if "名前" in line or "人間 戦士" in line]
@@ -137,6 +144,8 @@ class TestMonthlyReportScreen(unittest.TestCase):
 
     def test_show_monthly_report_uses_latest_completed_report_year(self) -> None:
         from fantasy_simulator.ui.screens import _show_monthly_report
+        from fantasy_simulator.ui.ui_context import UIContext
+        from fantasy_simulator.ui.render_backend import PrintRenderBackend
 
         sim = SimpleNamespace(
             world=SimpleNamespace(year=1002),
@@ -144,11 +153,23 @@ class TestMonthlyReportScreen(unittest.TestCase):
             get_monthly_report=lambda year, month: f"REPORT {year}-{month}",
         )
 
+        # Build a recording input backend that returns "1" for the month choice
+        # and does nothing for pause
+        class ScriptedInputBackend:
+            def read_line(self, prompt: str = "") -> str:
+                return "1"
+
+            def choose_key(self, prompt, pairs, default=None):
+                return pairs[0][0]
+
+            def pause(self, message: str = "") -> None:
+                pass
+
+        ctx = UIContext(inp=ScriptedInputBackend(), out=PrintRenderBackend())
+
         captured = io.StringIO()
-        with patch("fantasy_simulator.ui.screens._pause", return_value=None):
-            with patch("fantasy_simulator.ui.screens._get_numeric_choice", return_value=0):
-                with redirect_stdout(captured):
-                    _show_monthly_report(sim)
+        with redirect_stdout(captured):
+            _show_monthly_report(sim, ctx=ctx)
 
         text = _ANSI_RE.sub("", captured.getvalue())
         self.assertIn("Year: 1001", text)

@@ -39,6 +39,14 @@ class RenderBackend(Protocol):
         """Print a warning message (e.g. in yellow)."""
         ...  # pragma: no cover
 
+    def print_wrapped(self, text: str, indent: int = 4) -> None:
+        """Print word-wrapped text with the given indentation."""
+        ...  # pragma: no cover
+
+    def print_dim(self, text: str) -> None:
+        """Print dimmed / muted text."""
+        ...  # pragma: no cover
+
 
 class PrintRenderBackend:
     """Default backend that delegates to plain ``print()`` with ANSI codes."""
@@ -65,3 +73,11 @@ class PrintRenderBackend:
     def print_warning(self, text: str) -> None:
         from .ui_helpers import yellow
         print(yellow(text))
+
+    def print_wrapped(self, text: str, indent: int = 4) -> None:
+        from .ui_helpers import _print_wrapped
+        _print_wrapped(text, indent)
+
+    def print_dim(self, text: str) -> None:
+        from .ui_helpers import dim
+        print(dim(text))
