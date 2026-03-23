@@ -275,13 +275,12 @@ class Simulator:
         self.advance_years(years)
 
     def advance_years(self, years: int = 1) -> None:
-        """Advance the simulation by *years* whole in-world years.
+        """Advance the simulation by exactly *years × 12* months.
 
         Implemented via ``advance_months(years * 12)`` so that mid-year state
-        is always respected: if ``current_month`` is not 1, the remaining
-        months of the current year are processed first, then full subsequent
-        years follow.  This avoids the previous issue where ``_run_year()``
-        unconditionally replayed months 1..12 from a mid-year snapshot.
+        is always respected: processing starts from ``current_month`` and
+        advances exactly ``years * 12`` months forward, wrapping across year
+        boundaries naturally.
         """
         self.advance_months(years * 12)
 
