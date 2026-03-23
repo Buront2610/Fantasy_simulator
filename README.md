@@ -9,7 +9,7 @@ occasionally influence.
 
 ## Features
 
-- Yearly time progression in the CLI, with monthly simulation/report foundations under development
+- Yearly time progression in the CLI, with monthly reports, rumors, and event-record foundations implemented but true monthly progression not yet complete
 - Character generation with random and template-based creation
 - Event system for meetings, journeys, discoveries, training, battles, aging,
   marriage, and natural death

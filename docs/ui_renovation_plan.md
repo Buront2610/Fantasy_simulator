@@ -2,7 +2,7 @@
 
 この文書は、`Fantasy_simulator` のユーザインタフェース（UI）を現状の簡素な CLI から、物語生成ゲームにふさわしい魅力的な体験へ進化させるための計画書である。前半では現状の問題と目標を整理し、後半では5つの専門領域（世界シミュレーション、運営型シム、インタラクティブ叙述、4X設計、ソフトウェアアーキテクチャ）の視点から提案された改善策をまとめる。最後に採用するライブラリや段階的な実行計画を提示する。
 
-> **関連文書**: 本計画は `docs/implementation_plan.md`（vNext 実装計画書）の `location_id` 移行・`WorldEventRecord` 導入・UI 連携規約、および `docs/next_version_plan.md` の `NarrativeContext` / `MapRenderInfo` 設計を前提としている。データモデルや migration の詳細はそれぞれの文書を参照のこと。
+> **関連文書**: 本計画は `docs/implementation_plan.md`（公式な実装順・PR 分割・完了条件の正本）の `location_id` 移行・`WorldEventRecord` 導入・UI 連携規約、および `docs/next_version_plan.md` の `NarrativeContext` / `MapRenderInfo` 設計を前提としている。UI 改造の実装順や着手条件が他文書と衝突する場合は `docs/implementation_plan.md` を優先する。データモデルや migration の詳細はそれぞれの文書を参照のこと。
 
 ## はじめに：現状の問題点
 
