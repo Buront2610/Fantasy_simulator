@@ -10,7 +10,7 @@ New read-paths should consume ``world.event_records`` exclusively.
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from ..adventure import AdventureRun
 from ..events import EventResult, WorldEventRecord, generate_record_id
@@ -89,7 +89,9 @@ class EventRecorderMixin:
             source_char.add_relation_tag(target_id, tag, source_event_id=record_id)
 
     @staticmethod
-    def _classify_adventure_summary(previous_state: str, run: AdventureRun) -> tuple:
+    def _classify_adventure_summary(
+        previous_state: str, run: AdventureRun,
+    ) -> Tuple[str, str, int]:
         if previous_state == "traveling":
             return "adventure_arrived", run.destination, 2
         if previous_state == "waiting_for_choice":

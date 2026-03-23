@@ -12,7 +12,12 @@ from fantasy_simulator.world import World
 
 
 def _make_sim(seed=42):
-    """Create a Simulator with a seeded World for deterministic testing."""
+    """Create a Simulator with an empty seeded World for deterministic testing.
+
+    The World has no characters by default, which is intentional for tests
+    that verify structural behavior (imports, serialization, impact tracking).
+    Tests that need events to be generated should add characters explicitly.
+    """
     from fantasy_simulator.simulation import Simulator
     world = World()
     return Simulator(world, events_per_year=12, seed=seed)
