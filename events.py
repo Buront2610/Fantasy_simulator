@@ -153,6 +153,12 @@ class EventSystem:
         "marriage": 5,
     }
 
+    @staticmethod
+    def _new_relation_source_id(prefix: str, rng: Any = random) -> str:
+        if hasattr(rng, "getrandbits"):
+            return f"{prefix}_{rng.getrandbits(48):012x}"
+        return f"{prefix}_{uuid.uuid4().hex[:12]}"
+
     def event_marriage(self, char1: Character, char2: Character, world: World, rng: Any = random) -> EventResult:
         """Two characters with strong mutual affection may get married."""
         rel1 = char1.get_relationship(char2.char_id)
