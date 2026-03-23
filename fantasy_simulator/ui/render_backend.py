@@ -8,6 +8,7 @@ touching input or domain code.
 
 from __future__ import annotations
 
+import textwrap
 from typing import Protocol, runtime_checkable
 
 
@@ -47,6 +48,10 @@ class RenderBackend(Protocol):
         """Print dimmed / muted text."""
         ...  # pragma: no cover
 
+    def print_highlighted(self, text: str) -> None:
+        """Print highlighted / accented text (e.g. in cyan)."""
+        ...  # pragma: no cover
+
 
 class PrintRenderBackend:
     """Default backend that delegates to plain ``print()`` with ANSI codes."""
@@ -75,9 +80,23 @@ class PrintRenderBackend:
         print(yellow(text))
 
     def print_wrapped(self, text: str, indent: int = 4) -> None:
-        from .ui_helpers import _print_wrapped
-        _print_wrapped(text, indent)
+        prefix = " " * indent
+        for line in text.splitlines():
+            if line.strip():
+                for wrapped in textwrap.wrap(
+                    line,
+                    width=70,
+                    initial_indent=prefix,
+                    subsequent_indent=prefix,
+                ):
+                    self.print_line(wrapped)
+            else:
+                self.print_line()
 
     def print_dim(self, text: str) -> None:
         from .ui_helpers import dim
         print(dim(text))
+
+    def print_highlighted(self, text: str) -> None:
+        from .ui_helpers import cyan
+        print(cyan(text))

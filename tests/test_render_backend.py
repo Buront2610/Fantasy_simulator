@@ -121,6 +121,34 @@ class TestPrintRenderBackendColors(unittest.TestCase):
         self.assertIn("\033[33m", output)
         self.assertIn("caution", _ANSI_RE.sub("", output))
 
+    def test_highlighted_uses_cyan(self) -> None:
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            self.backend.print_highlighted("item")
+        output = buf.getvalue()
+        # Cyan is ANSI code 36
+        self.assertIn("\033[36m", output)
+        self.assertIn("item", _ANSI_RE.sub("", output))
+
+    def test_print_wrapped_uses_print_line(self) -> None:
+        """print_wrapped must not call print() directly — it must go through
+        self.print_line(), so a subclass can intercept all output."""
+        lines: list = []
+
+        class CapturingBackend(PrintRenderBackend):
+            def print_line(self, text: str = "") -> None:  # type: ignore[override]
+                lines.append(text)
+
+        backend = CapturingBackend()
+        captured = io.StringIO()
+        with redirect_stdout(captured):
+            backend.print_wrapped("Hello world, this is a test of wrapping.", indent=2)
+
+        # All output must have been captured by print_line override
+        self.assertTrue(len(lines) > 0, "print_line was never called")
+        # Nothing should have leaked to actual stdout
+        self.assertEqual(captured.getvalue(), "")
+
 
 class TestCustomRenderBackend(unittest.TestCase):
     """A custom class can satisfy the RenderBackend protocol."""
@@ -155,6 +183,9 @@ class TestCustomRenderBackend(unittest.TestCase):
             def print_dim(self, text: str) -> None:
                 self.lines.append(("dim", text))
 
+            def print_highlighted(self, text: str) -> None:
+                self.lines.append(("highlighted", text))
+
         backend = BufferRenderBackend()
         self.assertIsInstance(backend, RenderBackend)
 
@@ -166,8 +197,9 @@ class TestCustomRenderBackend(unittest.TestCase):
         backend.print_warning("warn")
         backend.print_wrapped("long text")
         backend.print_dim("faint")
+        backend.print_highlighted("accent")
 
-        self.assertEqual(len(backend.lines), 8)
+        self.assertEqual(len(backend.lines), 9)
         self.assertEqual(backend.lines[0], ("line", "hello"))
         self.assertEqual(backend.lines[1], ("heading", "TITLE"))
         self.assertEqual(backend.lines[2], ("sep", "-", 20))
@@ -176,6 +208,7 @@ class TestCustomRenderBackend(unittest.TestCase):
         self.assertEqual(backend.lines[5], ("warning", "warn"))
         self.assertEqual(backend.lines[6], ("wrapped", "long text"))
         self.assertEqual(backend.lines[7], ("dim", "faint"))
+        self.assertEqual(backend.lines[8], ("highlighted", "accent"))
 
 
 if __name__ == "__main__":

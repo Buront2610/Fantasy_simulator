@@ -57,6 +57,9 @@ class RecordingRenderBackend:
     def print_dim(self, text: str) -> None:
         self.calls.append(("print_dim", text))
 
+    def print_highlighted(self, text: str) -> None:
+        self.calls.append(("print_highlighted", text))
+
     @property
     def text(self) -> str:
         """Concatenate all printed text for simple substring checks."""
@@ -387,6 +390,60 @@ class TestNoPrintLeaks(unittest.TestCase):
         captured = io.StringIO()
         with redirect_stdout(captured):
             screen_world_lore(ctx=ctx)
+
+        stdout_text = captured.getvalue()
+        self.assertEqual(stdout_text, "", f"Leaked to stdout: {stdout_text!r}")
+
+    def test_screen_new_simulation_produces_no_stdout(self) -> None:
+        """The full new-simulation path (build world, run sim, show results)
+        must not leak any bytes to stdout when backends are injected."""
+        from fantasy_simulator.ui.screens import screen_new_simulation
+
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(answers=["4", "1"], menu_keys=["back_to_main"])
+        ctx = UIContext(inp=inp, out=out)
+
+        captured = io.StringIO()
+        with redirect_stdout(captured):
+            screen_new_simulation(ctx=ctx)
+
+        stdout_text = captured.getvalue()
+        self.assertEqual(stdout_text, "", f"Leaked to stdout: {stdout_text!r}")
+
+    def test_advance_simulation_produces_no_stdout(self) -> None:
+        """_advance_simulation must not leak to stdout."""
+        from fantasy_simulator.ui.screens import _build_default_world, _advance_simulation
+        from fantasy_simulator.simulator import Simulator
+
+        world = _build_default_world(num_characters=4, seed=42)
+        sim = Simulator(world, events_per_year=2)
+        sim.advance_years(1)
+
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend()
+        ctx = UIContext(inp=inp, out=out)
+
+        captured = io.StringIO()
+        with redirect_stdout(captured):
+            _advance_simulation(sim, 1, ctx=ctx)
+
+        stdout_text = captured.getvalue()
+        self.assertEqual(stdout_text, "", f"Leaked to stdout: {stdout_text!r}")
+
+    def test_main_exit_produces_no_stdout(self) -> None:
+        """main() exit path must not leak to stdout."""
+        from fantasy_simulator.main import main
+
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(menu_keys=["exit"])
+        ctx = UIContext(inp=inp, out=out)
+
+        captured = io.StringIO()
+        with redirect_stdout(captured):
+            try:
+                main(ctx=ctx)
+            except SystemExit:
+                pass
 
         stdout_text = captured.getvalue()
         self.assertEqual(stdout_text, "", f"Leaked to stdout: {stdout_text!r}")

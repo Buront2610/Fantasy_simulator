@@ -4,7 +4,6 @@ ui_helpers.py - Display formatting and input utilities for the CLI.
 
 from __future__ import annotations
 
-import textwrap
 import unicodedata
 from typing import List, Optional
 
@@ -52,23 +51,9 @@ def _hr(char: str = "=",
     return "  " + char * width
 
 
-def _pause() -> None:
-    input(dim(f"\n  {tr('press_enter')} "))
-
-
-def _print_wrapped(text: str, indent: int = 4) -> None:
-    prefix = " " * indent
-    for line in text.splitlines():
-        if line.strip():
-            for wrapped in textwrap.wrap(
-                line,
-                width=70,
-                initial_indent=prefix,
-                subsequent_indent=prefix,
-            ):
-                print(wrapped)
-        else:
-            print()
+def _pause(message: str = "") -> None:
+    suffix = f"  {message}\n" if message else ""
+    input(dim(f"\n{suffix}  {tr('press_enter')} "))
 
 
 def display_width(text: str) -> int:
@@ -121,6 +106,8 @@ def _choose_key(
     This avoids locale-dependent control flow.
     """
     print()
+    if prompt:
+        print(f"  {bold(prompt)}")
     for i, (_key, label) in enumerate(key_label_pairs, 1):
         marker = green(">") if str(i) == default else " "
         print(f"  {marker} {cyan(str(i))}.  {label}")

@@ -54,4 +54,4 @@ class StdInputBackend:
 
     def pause(self, message: str = "") -> None:
         from .ui_helpers import _pause
-        _pause()
+        _pause(message)
