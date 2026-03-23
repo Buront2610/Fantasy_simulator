@@ -3,6 +3,7 @@ fantasy_simulator/main.py - CLI entry point logic for the Fantasy Simulator.
 
 Display helpers  -> ui/ui_helpers.py
 Screen functions -> ui/screens.py
+UI context       -> ui/ui_context.py
 """
 
 from __future__ import annotations
@@ -18,18 +19,24 @@ from .ui.screens import (
     screen_new_simulation,
     screen_world_lore,
 )
-from .ui.ui_helpers import HEADER, _choose_key, _hr, bold, yellow
+from .ui.ui_helpers import HEADER, bold, yellow
+from .ui.ui_context import UIContext, _default_ctx
 
 
-def main() -> None:
+def main(ctx: UIContext | None = None) -> None:
+    ctx = _default_ctx(ctx)
+    out = ctx.out
+    inp = ctx.inp
+
     set_locale("ja")
-    print(yellow(HEADER))
+    out.print_line(yellow(HEADER))
 
     while True:
-        print("\n" + _hr("="))
-        print(bold(f"  {tr('main_menu')}"))
-        print(_hr("="))
-        choice = _choose_key(
+        out.print_line()
+        out.print_separator("=")
+        out.print_heading(f"  {tr('main_menu')}")
+        out.print_separator("=")
+        choice = inp.choose_key(
             tr("main_menu_prompt"),
             [
                 ("start_new_sim", tr("start_new_sim")),
@@ -43,17 +50,17 @@ def main() -> None:
         )
 
         if choice == "start_new_sim":
-            screen_new_simulation()
+            screen_new_simulation(ctx=ctx)
         elif choice == "create_custom_sim":
-            screen_custom_simulation()
+            screen_custom_simulation(ctx=ctx)
         elif choice == "load_saved_sim":
-            sim = _load_simulation_snapshot()
+            sim = _load_simulation_snapshot(ctx=ctx)
             if sim is not None:
-                _show_results(sim)
+                _show_results(sim, ctx=ctx)
         elif choice == "read_world_lore":
-            screen_world_lore()
+            screen_world_lore(ctx=ctx)
         elif choice == "language_menu":
-            _select_language()
+            _select_language(ctx=ctx)
         else:
-            print(f"\n  {bold(yellow(tr('farewell')))}\n")
+            out.print_line(f"\n  {bold(yellow(tr('farewell')))}\n")
             sys.exit(0)

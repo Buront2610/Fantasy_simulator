@@ -5,11 +5,14 @@ character_creator.py - Interactive and programmatic character creation.
 from __future__ import annotations
 
 import random
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from .character import Character, random_stats
 from .i18n import tr
 from .content.world_data import JOBS, RACES, ALL_SKILLS
+
+if TYPE_CHECKING:
+    from .ui.ui_context import UIContext
 
 
 _TEMPLATES: Dict[str, Dict] = {
@@ -116,35 +119,40 @@ def _random_name(gender: str, rng: Any = random) -> str:
 class CharacterCreator:
     """Factory for creating Character instances."""
 
-    def create_interactive(self) -> Character:
-        print("\n" + "=" * 50)
-        print(f"  {tr('interactive_character_creation')}")
-        print("=" * 50)
+    def create_interactive(self, ctx: "UIContext | None" = None) -> Character:
+        from .ui.ui_context import _default_ctx
+        ctx = _default_ctx(ctx)
+        out = ctx.out
 
-        name = self._prompt(tr("enter_character_name"), default=_random_name("Non-binary"))
-        gender = self._prompt_choice(tr("choose_gender"), _GENDERS, default="Non-binary")
+        out.print_line()
+        out.print_separator("=", 50)
+        out.print_line(f"  {tr('interactive_character_creation')}")
+        out.print_separator("=", 50)
+
+        name = self._prompt(tr("enter_character_name"), default=_random_name("Non-binary"), ctx=ctx)
+        gender = self._prompt_choice(tr("choose_gender"), _GENDERS, default="Non-binary", ctx=ctx)
 
         race_names = [r[0] for r in RACES]
-        print(f"\n  {tr('available_races')}:")
+        out.print_line(f"\n  {tr('available_races')}:")
         for i, (rname, rdesc, _) in enumerate(RACES, 1):
-            print(f"  {i}. {rname:12s} - {rdesc[:60]}...")
-        race = self._prompt_choice(tr("choose_race"), race_names, default=race_names[0])
+            out.print_line(f"  {i}. {rname:12s} - {rdesc[:60]}...")
+        race = self._prompt_choice(tr("choose_race"), race_names, default=race_names[0], ctx=ctx)
 
         job_names = [j[0] for j in JOBS]
-        print(f"\n  {tr('available_jobs')}:")
+        out.print_line(f"\n  {tr('available_jobs')}:")
         for i, (jname, jdesc, _) in enumerate(JOBS, 1):
-            print(f"  {i}. {jname:12s} - {jdesc[:60]}...")
-        job = self._prompt_choice(tr("choose_job"), job_names, default=job_names[0])
+            out.print_line(f"  {i}. {jname:12s} - {jdesc[:60]}...")
+        job = self._prompt_choice(tr("choose_job"), job_names, default=job_names[0], ctx=ctx)
 
-        age_str = self._prompt(tr("enter_starting_age"), default="20")
+        age_str = self._prompt(tr("enter_starting_age"), default="20", ctx=ctx)
         try:
             age = max(15, min(80, int(age_str)))
         except ValueError:
             age = 20
 
-        print(f"\n  {tr('stat_distribution_info')}")
-        print(f"  {tr('accept_default_stats')}")
-        stats = self._allocate_stats()
+        out.print_line(f"\n  {tr('stat_distribution_info')}")
+        out.print_line(f"  {tr('accept_default_stats')}")
+        stats = self._allocate_stats(ctx=ctx)
 
         race_bonuses = next((r[2] for r in RACES if r[0] == race), {})
         for stat, bonus in race_bonuses.items():
@@ -156,8 +164,8 @@ class CharacterCreator:
 
         char = Character(name=name, age=age, gender=gender, race=race, job=job, skills=skills, **stats)
         char.add_history(f"Born into the world as a {race} {job}.")
-        print(f"\n  {tr('character_created')}")
-        print(char.stat_block())
+        out.print_line(f"\n  {tr('character_created')}")
+        out.print_line(char.stat_block())
         return char
 
     def create_random(self, name: Optional[str] = None, rng: Any = random) -> Character:
@@ -215,19 +223,24 @@ class CharacterCreator:
         return char
 
     @staticmethod
-    def _prompt(message: str, default: str = "") -> str:
+    def _prompt(message: str, default: str = "", ctx: "UIContext | None" = None) -> str:
+        from .ui.ui_context import _default_ctx
+        ctx = _default_ctx(ctx)
         display = f"  > {message}"
         if default:
             display += f" [{default}]"
         display += ": "
-        raw = input(display).strip()
+        raw = ctx.inp.read_line(display).strip()
         return raw if raw else default
 
     @staticmethod
-    def _prompt_choice(message: str, choices: List[str], default: str) -> str:
+    def _prompt_choice(message: str, choices: List[str], default: str,
+                       ctx: "UIContext | None" = None) -> str:
+        from .ui.ui_context import _default_ctx
+        ctx = _default_ctx(ctx)
         display = f"  > {message} ({'/'.join(choices)}) [{default}]: "
         while True:
-            raw = input(display).strip()
+            raw = ctx.inp.read_line(display).strip()
             if not raw:
                 return default
             if raw.isdigit():
@@ -238,17 +251,19 @@ class CharacterCreator:
             if len(matches) == 1:
                 return matches[0]
             if len(matches) > 1:
-                print(f"  {tr('ambiguous_choice', matches=', '.join(matches))}")
+                ctx.out.print_line(f"  {tr('ambiguous_choice', matches=', '.join(matches))}")
             else:
-                print(f"  {tr('invalid_options', choices=', '.join(choices))}")
+                ctx.out.print_line(f"  {tr('invalid_options', choices=', '.join(choices))}")
 
     @staticmethod
-    def _allocate_stats() -> Dict[str, int]:
+    def _allocate_stats(ctx: "UIContext | None" = None) -> Dict[str, int]:
+        from .ui.ui_context import _default_ctx
+        ctx = _default_ctx(ctx)
         stat_names = ["strength", "intelligence", "dexterity", "wisdom", "charisma", "constitution"]
         defaults = {s: 10 for s in stat_names}
         total_points = 60
 
-        raw = input(f"  > {tr('manually_distribute_stats')}: ").strip().lower()
+        raw = ctx.inp.read_line(f"  > {tr('manually_distribute_stats')}: ").strip().lower()
         if raw != "y":
             return defaults
 
@@ -258,20 +273,20 @@ class CharacterCreator:
             remaining_stats = len(stat_names) - i
             max_allowed = min(40, left - (remaining_stats - 1) * 10)
             while True:
-                raw_val = input(f"  > {stat.capitalize():15s} (10-40, {left} pts left): ").strip()
+                raw_val = ctx.inp.read_line(f"  > {stat.capitalize():15s} (10-40, {left} pts left): ").strip()
                 if not raw_val:
                     val = 10
                 else:
                     try:
                         val = int(raw_val)
                     except ValueError:
-                        print(f"  {tr('please_enter_number')}")
+                        ctx.out.print_line(f"  {tr('please_enter_number')}")
                         continue
                 if val < 10 or val > max_allowed:
-                    print(f"  {tr('must_be_between', lo=10, hi=max_allowed)}")
+                    ctx.out.print_line(f"  {tr('must_be_between', lo=10, hi=max_allowed)}")
                     continue
                 if left - val < (remaining_stats - 1) * 10:
-                    print(f"  {tr('not_enough_points_left', max_allowed=max_allowed)}")
+                    ctx.out.print_line(f"  {tr('not_enough_points_left', max_allowed=max_allowed)}")
                     continue
                 allocated[stat] = val
                 break
