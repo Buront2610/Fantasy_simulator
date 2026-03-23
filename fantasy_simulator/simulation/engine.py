@@ -73,10 +73,12 @@ class Simulator(
         self.events_per_year = events_per_year
         self.adventure_steps_per_year = adventure_steps_per_year
         self.event_system = EventSystem()
-        # Compatibility cache of EventResult objects for legacy summaries,
-        # filters, and save/load paths. The canonical structured history lives
-        # in world.event_records.  Treated as a compatibility adapter —
-        # new read-paths should use world.event_records instead.
+        # Compatibility cache of EventResult objects.  Only populated via
+        # _record_event(); events that go directly through _record_world_event()
+        # (adventure lifecycle, injury recovery) do NOT appear here.  The
+        # canonical structured history lives in world.event_records.  This
+        # list is still persisted for save/load compatibility but should be
+        # treated as an incomplete, gradually-retiring adapter.
         self.history: List[EventResult] = []
         # Mutable progress marker for structured event timestamps within the
         # current simulated year. This value is serialized and restored as-is
@@ -278,7 +280,13 @@ class Simulator(
     # ------------------------------------------------------------------
 
     def to_dict(self) -> Dict[str, Any]:
-        """Serialise simulator state, including compatibility history."""
+        """Serialise simulator state.
+
+        ``event_records`` is the canonical store by policy, but ``history``
+        and ``event_log`` (inside ``world.to_dict()``) are still persisted
+        for save/load backward compatibility.  Reducing to a single
+        persisted representation is a future task.
+        """
         return {
             "world": self.world.to_dict(),
             "characters": [char.to_dict() for char in self.world.characters],

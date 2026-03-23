@@ -1,8 +1,14 @@
 """Summary, report, story, and event-log access for the Simulator.
 
-All read-paths in this module use ``world.event_records`` as the canonical
-data source.  ``history`` and ``event_log`` are treated as compatibility
-adapters — new code should not add direct reads from them.
+``world.event_records`` is the canonical data source by policy.  New
+read-paths should query ``event_records`` (via ``events_by_kind()``).
+
+``history`` and ``event_log`` remain as compatibility adapters.  Note that
+``history`` is only populated via ``_record_event()`` (not
+``_record_world_event()``), so ``events_by_type()`` sees a strict subset
+of what ``events_by_kind()`` can return.  All three stores are still
+persisted for save/load compatibility; the permanent reduction to a
+single persisted representation is a future task.
 """
 
 from __future__ import annotations
@@ -162,11 +168,16 @@ class QueryMixin:
     def events_by_type(self, event_type: str) -> List[EventResult]:
         """Return legacy EventResult entries of the given type.
 
-        .. note::
-            This method reads from ``self.history`` (compatibility adapter)
-            for backward compatibility with callers expecting ``EventResult``
-            objects.  New code should query ``world.event_records`` and
-            filter by ``record.kind`` instead.
+        .. warning:: Incomplete view
+            This method reads from ``self.history``, which is only populated
+            by ``_record_event()`` — that is, events originating from
+            ``EventResult`` objects (random events, natural death, dying
+            resolution).  Events created directly by the simulation loop
+            (e.g. ``adventure_started``, ``adventure_choice``,
+            ``injury_recovery``) go through ``_record_world_event()`` and
+            do **not** appear in ``history``.
+
+            Use ``events_by_kind()`` for a complete view of all event types.
         """
         return [ev for ev in self.history if ev.event_type == event_type]
 

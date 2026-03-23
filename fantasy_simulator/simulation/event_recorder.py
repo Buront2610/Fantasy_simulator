@@ -1,11 +1,26 @@
 """Event recording across all transitional event stores.
 
-During the Phase C migration, event recording writes to:
-- ``world.event_records`` — the canonical structured store
-- ``world.event_log`` — display-derived formatted text buffer
-- ``simulator.history`` — compatibility cache of EventResult objects
+``world.event_records`` is the canonical structured store by policy.
+All new read-paths should consume ``world.event_records`` exclusively.
 
-New read-paths should consume ``world.event_records`` exclusively.
+However, the persistence layer still serializes all three stores:
+
+- ``world.event_records`` — canonical structured store (read + write)
+- ``world.event_log`` — display-derived formatted text buffer (persisted
+  for CLI compatibility; derived from ``event_records`` at write-time)
+- ``simulator.history`` — legacy ``EventResult`` cache (persisted for
+  save/load compatibility; only populated via ``_record_event()``, **not**
+  via ``_record_world_event()`` — see note below)
+
+.. important::
+   ``_record_world_event()`` writes to ``event_records`` and ``event_log``
+   but does **not** append to ``history``.  Only ``_record_event()`` (which
+   wraps ``_record_world_event()``) also writes to ``history``.  Events
+   such as ``adventure_started``, ``adventure_choice``, and
+   ``injury_recovery`` go through ``_record_world_event()`` directly,
+   so they are visible in ``event_records`` and ``event_log`` but **not**
+   in ``history``.  ``events_by_type()`` therefore cannot see those events.
+   Use ``events_by_kind()`` on ``event_records`` instead.
 """
 
 from __future__ import annotations
@@ -49,7 +64,17 @@ class EventRecorderMixin:
         severity: int = 1,
         visibility: str = "public",
     ) -> WorldEventRecord:
-        """Record a structured world event and mirror it to the legacy text log."""
+        """Record a structured world event to ``event_records`` and ``event_log``.
+
+        This method does **not** append to ``self.history``.  Events that
+        originate from an ``EventResult`` (random events, natural death,
+        dying resolution) are routed through ``_record_event()`` instead,
+        which calls this method *and* appends to ``history``.
+
+        Events created directly by the simulation loop (adventure lifecycle,
+        injury recovery, etc.) call this method only, so they appear in
+        ``event_records`` and ``event_log`` but not in ``history``.
+        """
         effective_month = self.current_month if month is None else month
         self.world.log_event(description, month=effective_month)
         record = WorldEventRecord(
@@ -112,12 +137,15 @@ class EventRecorderMixin:
         return "adventure_update", run.destination, 1
 
     def _record_event(self, result: EventResult, location_id: Optional[str] = None) -> None:
-        """Mirror an EventResult into all transitional event stores.
+        """Mirror an EventResult into **all three** transitional event stores.
 
-        During the Phase C migration:
-        - ``history`` keeps the legacy EventResult view alive (compatibility adapter)
-        - ``world.event_log`` keeps CLI-facing formatted strings alive (display-derived)
-        - ``world.event_records`` is the canonical structured event history
+        This is the only code path that writes to ``history``:
+
+        - ``history`` — appends the raw ``EventResult`` (legacy adapter;
+          only events routed through this method are visible to
+          ``events_by_type()``)
+        - ``world.event_log`` — appends a formatted text line (display-derived)
+        - ``world.event_records`` — appends a ``WorldEventRecord`` (canonical)
         """
         self.history.append(result)
         severity = self._SEVERITY_MAP.get(result.event_type, 1)
