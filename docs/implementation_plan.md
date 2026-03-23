@@ -1,733 +1,748 @@
-# Fantasy Simulator vNext 実装計画書
+# Fantasy Simulator 今後の実装計画書
 
 **プロジェクト名**: Fantasy Simulator  
 **世界名**: Aethoria（エイソリア）  
-**版**: Implementation Plan v1.0  
-**最終更新**: 2026-03-22  
-**位置づけ**: 本書は `docs/next_version_plan.md`（設計書）および詳細レビューフィードバックに基づき、vNext 開発の全工程・PR 分割・migration 方針・ID 規則・通知密度・location 参照修正方針までを**公式実装計画として**明文化したものです。
+**版**: Implementation Plan v2.0  
+**最終更新**: 2026-03-23  
+**位置づけ**: 本書は、現在の実装状況・既存の設計文書・追加レビュー評価を踏まえ、今後の公式な実装順序と文書の正本を定める実装計画書である。
 
-> **注意（設計書との関係）**: `docs/next_version_plan.md` §15 の migration 例（v1〜v4）は設計上の参考例です。**正式な migration chain・ID 規則・location 参照修正方針は本計画書に従ってください。** 設計書側にも「正式は implementation_plan.md に従う」旨の但し書きを追加する PR（後述 PR-0）を推奨します。
-
----
-
-## 0. 本文書の目的
-
-本書は次の目的を同時に満たす。
-
-1. **Safety Invariant の確立**  
-   `character.location_id` は常に有効な `LocationState.id` を参照する。これを第 1 目標とし、以後のすべての実装判断はこの不変条件を優先する。
-
-2. **移行方針の確定**  
-   現行コードの `Location`（名前文字列）から `LocationState`（id ベース）への一括移行方針を定め、一時的互換ラッパーの扱いを明記する。
-
-3. **PR 分割と必須作業リストの確定**  
-   各フェーズで何を作り、どこで合流するかを具体的に示す。
-
-4. **過去の誤りへの対応明記**  
-   `LocationState` 設計ズレ・旧 migration 例・互換プロパティ問題・イベント密度混在などを整理し、再発を防ぐ。
+> **文書の優先順位**: 実装順序・完了条件・PR 分割・現状認識の正本は本書とする。`docs/next_version_plan.md` は中長期の設計目標、`docs/ui_renovation_plan.md` は UI 改造方針、`README.md` は現状の公開サマリーを担う。差分が出た場合は、まず本書に追記して吸収し、そのうえで README を同期する。
 
 ---
 
-## 1. Safety Invariant（第1目標）
+## 1. 本書の目的
 
-```
-Invariant SI-1: character.location_id は常に有効な LocationState.id を参照する。
-Invariant SI-2: world.get_location_by_id(character.location_id) は None を返さない。
-Invariant SI-3: すべての WorldEventRecord.location_id は有効な LocationState.id を参照する（または None）。
-```
+本書は、現在の `Fantasy_simulator` の実装状況を踏まえ、今後どの順序で何を実装し、どのような単位で安全に前進させるかを定めるための計画書である。
 
-これらは以下のすべての PR でテストによって保証する。違反したコードはレビューで差し戻す。
+本計画は、既存の `docs/implementation_plan.md`、`docs/next_version_plan.md`、`docs/ui_renovation_plan.md` の内容を実装現実に合わせて再整理し、次の 4 点を明確にすることを目的とする。
+
+1. 現在の到達点
+2. 次に着手すべき実装
+3. Phase 4 以降へ安全に進むための前提整備
+4. 文書の source of truth と README 同期方針
 
 ---
 
-## 2. 過去の誤りと対応方針
+## 2. 文書ガバナンスと source of truth
 
-| 誤り・問題 | 原因 | 本計画での対応 |
+今回のレビューで最も重要な指摘は、「実装の遅れ」そのものよりも、**何を現状とみなし、どの文書を優先して意思決定するかが分散し始めている**ことだった。
+
+### 2.1 文書ごとの役割
+
+| 文書 | 役割 | 優先度 |
 |---|---|---|
-| `LocationState` 設計ズレ（`id` なし案など） | 設計書初稿が `name` 参照を引き継いでいた | §3 で `id`/`canonical_name` を正式定義 |
-| 設計書 §15 migration 例が旧案（`Location` 互換混在） | 設計書が実装コードと非同期に進化 | 本計画書の migration chain を正式とし、設計書には但し書き追加 |
-| `character.location`（str）の互換ラッパー温存 | 段階的移行のために残した互換プロパティが技術的負債化 | PR-3 で一括置換。互換ラッパーは PR-3 完了後に削除（§6 参照） |
-| イベント密度と通知密度の混在 | 内部生成頻度と UI 通知頻度が同一変数で管理されていた | §8 で分離方針を定義 |
-| 旧セーブの `location` フィールドが名前文字列 | `character.location = "Aethoria Capital"` 形式が長期運用された | §5 の name→id 対応表で migration v2 にて一括変換 |
+| `docs/implementation_plan.md` | 公式な実装順、PR 分割、着手条件、完了条件、現状認識 | 最優先 |
+| `docs/next_version_plan.md` | vNext の目標設計、将来像、To-Be の仕様詳細 | 参照用 |
+| `docs/ui_renovation_plan.md` | UI の段階的刷新方針と技術選定 | 参照用 |
+| `README.md` | 現在の公開サマリー、起動方法、近接優先事項 | 本書と同期 |
+
+### 2.2 運用ルール
+
+- 実装順の変更、Phase の入れ替え、PR の完了条件変更は **本書を先に更新する**。
+- `README.md` は「理想像」ではなく、**現状と近接優先事項を誤読なく伝える文書**として扱う。
+- `docs/next_version_plan.md` と `docs/ui_renovation_plan.md` に残る将来像は活かすが、実装順の判断は本書を優先する。
+- 差分が出たまま次の PR に持ち越さず、PR-0 で正本の扱いを確定する。
 
 ---
 
-## 3. LocationState 正式定義
+## 3. 現状認識
 
-### 3.1 クラス定義
+### 3.1 すでに進んでいる領域
 
-```python
-@dataclass
-class LocationState:
-    id: str               # 不変の識別子 例: "loc_aethoria_capital"
-    canonical_name: str   # 表示用正式名 例: "Aethoria Capital"
-    description: str
-    region_type: str
-    x: int
-    y: int
-    prosperity: int        # 0-100
-    safety: int            # 0-100
-    mood: int              # 0-100
-    danger: int            # 0-100
-    traffic: int           # 0-100
-    rumor_heat: int        # 0-100
-    road_condition: int    # 0-100
-    visited: bool = False
-    controlling_faction_id: str | None = None
-    recent_event_ids: list[str] = field(default_factory=list)
-    aliases: list[str] = field(default_factory=list)      # TODO: 将来 LocationAlias 型（設計書 §6.1）を導入する場合はここを置き換える
-    memorial_ids: list[str] = field(default_factory=list)
-```
+現行 main ブランチでは、以下の基礎実装がかなり進んでいる。
 
-### 3.2 ID 規則（ID Convention）
+- `schema_version` と migration 基盤
+- `location_id` ベース参照への移行
+- `LocationState` の基礎導入
+- `WorldEventRecord` の導入
+- `favorite` / `spotlighted` / `playable` の導入
+- rumor の基本導入
+- 月報 / 年報の基本導入
+- dying / rescue / 段階的負傷の基礎導入
+- 条件付き自動進行の土台
+- 状態表示付きの簡易マップ
+- save/load と旧データ互換への配慮
 
-```
-ルール: id = "loc_" + (canonical_name を小文字にし、空白・特殊文字をアンダースコアで置換した slug)
-例:
-  "Aethoria Capital"  → "loc_aethoria_capital"
-  "Frostpeak Summit"  → "loc_frostpeak_summit"
-  "The Grey Pass"     → "loc_the_grey_pass"
-  "Goblin Warrens"    → "loc_goblin_warrens"
-  "Sunken Ruins"      → "loc_sunken_ruins"
-```
+これにより、本プロジェクトはすでに「単純な年次ログ生成 CLI」からは脱しており、vNext の骨格に相当する下地を持っている。
 
-`loc_` プレフィックスにより、他の種別の ID（`char_`, `quest_` 等）との衝突を防ぎ、文字列を見ただけで地点 ID と分かる。
+### 3.2 まだ未完成の領域
 
-**ルール: built-in 地点の id は `DEFAULT_LOCATIONS` で固定する。一度確定した id は変更しない。**
+一方で、設計書が本来目指している完成形には未到達な点も明確である。
 
-### 3.3 DEFAULT_LOCATIONS の更新形式
+- 真の月次進行は未完成
+- `simulator.py` の責務集中が強い
+- イベントストアが移行途中の三重構造にある
+- UI 層と domain 層の分離が不十分
+- `AdventureRun` はまだパーティ中心設計に達していない
+- live trace / memorial / alias は設計上の受け皿はあるが、実際にデータを生成・投入する処理は未導入
+- `CharacterNarrativeState` / `CharacterAbilities` / `Relationship` 構造化は未完了
+- `WorldEventRecord.tags` / `summary_key` は未導入
+- `SIMULATION_DENSITY` は未導入
+- `NarrativeContext` 主体の文脈依存叙述は未導入
+- 高密度 AA マップは未着手
 
-現行の `(name, description, region_type, x, y)` タプルを以下に拡張する。
+### 3.3 現在の判断
 
-```python
-# (id, canonical_name, description, region_type, x, y)
-DEFAULT_LOCATIONS = [
-    ("loc_frostpeak_summit",   "Frostpeak Summit",   "A jagged mountain crowned with eternal ice.",                  "mountain", 0, 0),
-    ("loc_the_grey_pass",      "The Grey Pass",       "A treacherous alpine pass haunted by wind spirits.",           "mountain", 1, 0),
-    ("loc_skyveil_monastery",  "Skyveil Monastery",   "A cliffside monastery where monks study the ley-lines.",       "village",  2, 0),
-    ("loc_ironvein_mine",      "Ironvein Mine",        "A deep mine rich in enchanted ore — and old curses.",          "dungeon",  3, 0),
-    ("loc_stormwatch_keep",    "Stormwatch Keep",      "A fortress overlooking the northern sea.",                     "mountain", 4, 0),
-    ("loc_thornwood",          "Thornwood",            "A dense forest that hums with restless magic.",                "forest",   0, 1),
-    ("loc_ashenvale",          "Ashenvale",            "Charred woodland recovering from a decade-old wildfire.",      "forest",   1, 1),
-    ("loc_silverbrook",        "Silverbrook",          "A prosperous trading town built on a swift silver river.",     "city",     2, 1),
-    ("loc_goblin_warrens",     "Goblin Warrens",       "A network of tunnels teeming with mischievous creatures.",     "dungeon",  3, 1),
-    ("loc_eastwatch_tower",    "Eastwatch Tower",      "A lone watchtower staffed by a rotating ranger garrison.",     "village",  4, 1),
-    ("loc_elderroot_forest",   "Elderroot Forest",     "An ancient forest whose trees remember the Cataclysm.",        "forest",   0, 2),
-    ("loc_millhaven",          "Millhaven",            "A quiet farming village known for its legendary apple wine.",  "village",  1, 2),
-    ("loc_aethoria_capital",   "Aethoria Capital",     "The grand capital — heart of trade, politics, and intrigue.",  "city",     2, 2),
-    ("loc_sunken_ruins",       "Sunken Ruins",         "Ruins of a pre-Cataclysm city, half-swallowed by the earth.", "dungeon",  3, 2),
-    ("loc_saltmarsh",          "Saltmarsh",            "A fishing village where sailors whisper of sea monsters.",     "village",  4, 2),
-    ("loc_dragonbone_ridge",   "Dragonbone Ridge",     "A ridge littered with the bones of ancient dragons.",          "mountain", 0, 3),
-    ("loc_dusty_crossroads",   "Dusty Crossroads",     "A well-worn junction where merchants rest and rumours spread.", "plains",  1, 3),
-    ("loc_hearthglow_town",    "Hearthglow Town",      "A warm, welcoming town renowned for its healers' guild.",      "city",     2, 3),
-    ("loc_mirefen_swamp",      "Mirefen Swamp",        "A murky swamp hiding both treasure and terrible dangers.",     "dungeon",  3, 3),
-    ("loc_dawnport",           "Dawnport",             "A busy harbour city that never truly sleeps.",                 "city",     4, 3),
-    ("loc_sunbaked_plains",    "Sunbaked Plains",      "Vast golden plains scorched by an unrelenting sun.",           "plains",   0, 4),
-    ("loc_sandstone_outpost",  "Sandstone Outpost",    "A small desert outpost at the edge of the known world.",       "village",  1, 4),
-    ("loc_the_verdant_vale",   "The Verdant Vale",     "A lush valley sheltered from harsh winds — a true paradise.", "village",  2, 4),
-    ("loc_obsidian_crater",    "Obsidian Crater",      "A massive crater from the Cataclysm, still faintly glowing.", "dungeon",  3, 4),
-    ("loc_coral_cove",         "Coral Cove",           "A hidden cove home to a secretive community of sea-mages.",    "city",     4, 4),
-]
-```
+現段階は「派手な新機能を増やす段階」ではなく、**Phase 4 の本命機能を安全に積める構造へ整える段階**である。
+
+したがって今後の優先順位は、次のように定める。
+
+1. 文書正本の確定と README 同期
+2. フォルダ構造・責務境界の整備
+3. 真の月次進行への移行
+4. イベントストアと参照経路の整理
+5. UI の責務分離
+6. その後に Phase 4 本体へ着手
 
 ---
 
-## 4. Character.location_id への移行
+## 4. 基本方針
 
-### 4.1 移行前後の比較
+### 4.1 破壊的改修を避ける
 
-| 項目 | 移行前（現行） | 移行後（vNext） |
-|---|---|---|
-| フィールド名 | `character.location: str` | `character.location_id: str` |
-| 値の型 | 地点名（例: `"Aethoria Capital"`） | 地点 ID（例: `"loc_aethoria_capital"`） |
-| 参照先 | `World._location_name_index[name]` | `World.get_location_by_id(id)` |
-| 表示用の名前取得 | `character.location` そのもの | `world.get_location_by_id(character.location_id).canonical_name` |
+本プロジェクトは save/load と migration を重視しているため、大規模な一括破壊ではなく、段階的移行を原則とする。
 
-### 4.2 互換ラッパーを置かない方針
+### 4.2 設計書どおりではなく、設計書に安全に近づく
 
-**`character.location` 互換プロパティは PR-3 では追加しない。**
+理想構造を一度に完成させるのではなく、現在の実装規模と保守コストに合わせ、二段階で近づける。
 
-以前の計画では互換プロパティを挟んで段階的に移行する案があったが、これは安全でない。理由：
+### 4.3 新規機能より先に構造を整える
 
-- 現行コードの `character.location` は**場所名文字列**（例: `"Aethoria Capital"`）を返すことを前提とする
-- 互換プロパティが `location_id`（例: `"loc_aethoria_capital"`）を返せば、`character.location == "Aethoria Capital"` という比較が静かに壊れる
-- 互換プロパティが `canonical_name` を返す場合でも、`_location_name_index` を引く旧コードやシリアライザが壊れる
-- どちらのフォールバックでも「透過」にならない
+Phase 4 のパーティ冒険、live trace、AA マップは魅力的だが、現構造のまま積み増すと保守性が急速に落ちる。
 
-**正しい方針（PR-3 の Definition of Done）**:
+### 4.4 正規データ源を明確にする
 
-1. `character.location_id: str` を正式フィールドとする
-2. PR-3 内で `\.location\b` を grep して **全参照を同一 PR で置換**する:
-   - ID 比較・インデックス参照 → `character.location_id`
-   - 表示・ログ出力 → `world.get_location_by_id(character.location_id).canonical_name`
-3. **旧 `character.location` 参照ゼロ**を PR-3 のマージ条件とする
-4. 互換プロパティは追加しない
+今後追加される集計・表示・物語生成は、必ず `World.event_records` を起点とする方向へ統一する。
 
-これにより意味の食い違いが起きない。
+### 4.5 設計書間の差分は、計画書側で明示的に吸収する
+
+既存の `next_version_plan.md`、`implementation_plan.md`、`ui_renovation_plan.md` の間には、実装の先行・後行に伴う差分がある。今後は「未反映の差分を次で直す」ではなく、**本計画書側に追記して吸収し、実装順と責務を明確に保つ**。
+
+### 4.6 README は常に「現状の顔」と同期する
+
+README は採用済み構造・現在の起動方法・近接優先事項を伝える文書であり、将来像だけを先行して書かない。レビューで指摘されたように、README が古いままだと構造整理よりも関係性深化やローカライズ拡張が先だと誤読されやすいため、PR-0 で同期方針を組み込む。
 
 ---
 
-## 5. Migration Chain（正式版）
+## 5. 今後の実装方針の全体像
 
-### 5.1 バージョン表
+今後の計画は、以下の 6 段階で進める。
 
-| Version | 変更内容 | 対応 PR |
-|---|---|---|
-| v0 | schema_version なし（旧形式） | — |
-| v1 | `schema_version: 1` 追加のみ | PR-2 |
-| v2 | `Character.location`（name str）→ `Character.location_id`（id str）一括変換 | PR-3 |
-| v3 | `LocationState` 正式導入 + `WorldEventRecord` 導入 | PR-3（v2 と同一 PR） |
-| v4 | `Relationship` 構造化 + `ReputationEntry` 導入 | Phase 3 の PR |
+### Phase A: 最小 package 化とフォルダ構造改善
 
-> **設計書 §15 の migration 例は旧案（v1=schema_version + `job→adventure_job`, v2=LocationState, v3=Relationship, v4=dying）です。本計画書の上記テーブルを正式とします。** 主な差分: `job→adventure_job` は採用しない（設計書 §15.3 の v1 の記述は概念例）。v2 で location 参照を一括修正する。v3 で `LocationState` + `WorldEventRecord` を同時導入する。
+**目的**:
 
-### 5.2 Migration 関数の骨格
+- 今後の大規模改修に耐える入れ物を先に作る
+- 既存 PR-1 相当の未回収部分をここで回収する
 
-```python
-# persistence/migrations.py
+### Phase B: 真の月次進行への移行
 
-CURRENT_VERSION = 3
+**目的**:
 
-MIGRATIONS: dict[int, Callable[[dict], dict]] = {
-    1: migrate_v0_to_v1,  # schema_version 追加
-    2: migrate_v1_to_v2,  # location name → location_id
-    3: migrate_v2_to_v3,  # LocationState 正式化 + WorldEventRecord 導入
-}
+- 年次ループに month を貼る実装から脱却する
+- 設計書の時間モデルへ近づける
 
+### Phase C: イベントストアと責務分離の整理
 
-def apply_migrations(data: dict) -> dict:
-    version = data.get("schema_version", 0)
-    for target_version in range(version + 1, CURRENT_VERSION + 1):
-        migrate_fn = MIGRATIONS.get(target_version)
-        if migrate_fn is None:
-            raise MigrationError(f"No migration function for version {target_version}")
-        data = migrate_fn(data)
-    return data
+**目的**:
+
+- `World.event_records` を正規ストアとして明確化する
+- `simulator.py` の責務を分割する
+
+### Phase D: UI 層の整理
+
+**目的**:
+
+- domain と presentation を切り離す
+- 将来の Rich / Textual / AA UI の基盤を整える
+
+### Phase E: Phase 4 本体着手
+
+**目的**:
+
+- パーティ冒険
+- live trace
+- memorial / alias
+- 高密度 AA マップ
+
+### Phase F: `NarrativeContext` と文脈依存叙述
+
+**目的**:
+
+- relation tags, memorial, world memory を文脈依存のテキストへ接続する
+- `NarrativeContext` とテンプレート選択基盤を導入する
+- Phase E の成果物を「読む価値のある群像劇」へ引き上げる
+
+---
+
+## 6. フォルダ構造改善方針
+
+### 6.1 いきなり最終形にしない
+
+設計書では次のような理想構造が示されている。
+
+- `core/`
+- `mechanics/`
+- `narrative/`
+- `persistence/`
+- `ui/`
+- `i18n/`
+
+しかし、現状の実装規模では、これを一気に導入すると差分が大きくなりすぎる。そのため、まずは最小 package 化を先行する。
+
+### 6.2 第一段階の新構造
+
+```text
+fantasy_simulator/
+  __init__.py
+  __main__.py
+  main.py
+  character.py
+  world.py
+  events.py
+  adventure.py
+  simulator.py
+  persistence/
+    save_load.py
+    migrations.py
+  ui/
+    screens.py
+    ui_helpers.py
+  content/
+    world_data.py
+  i18n/
+    engine.py
+    ja.py
+    en.py
 ```
 
-### 5.3 migrate_v1_to_v2 — location name → location_id の一括変換
+### 6.3 第二段階の目標構造
 
-```python
-# 旧セーブの location フィールド（名前文字列）を id へ変換する
-LOCATION_NAME_TO_ID: dict[str, str] = {
-    "Frostpeak Summit":  "loc_frostpeak_summit",
-    "The Grey Pass":     "loc_the_grey_pass",
-    "Skyveil Monastery": "loc_skyveil_monastery",
-    "Ironvein Mine":     "loc_ironvein_mine",
-    "Stormwatch Keep":   "loc_stormwatch_keep",
-    "Thornwood":         "loc_thornwood",
-    "Ashenvale":         "loc_ashenvale",
-    "Silverbrook":       "loc_silverbrook",
-    "Goblin Warrens":    "loc_goblin_warrens",
-    "Eastwatch Tower":   "loc_eastwatch_tower",
-    "Elderroot Forest":  "loc_elderroot_forest",
-    "Millhaven":         "loc_millhaven",
-    "Aethoria Capital":  "loc_aethoria_capital",
-    "Sunken Ruins":      "loc_sunken_ruins",
-    "Saltmarsh":         "loc_saltmarsh",
-    "Dragonbone Ridge":  "loc_dragonbone_ridge",
-    "Dusty Crossroads":  "loc_dusty_crossroads",
-    "Hearthglow Town":   "loc_hearthglow_town",
-    "Mirefen Swamp":     "loc_mirefen_swamp",
-    "Dawnport":          "loc_dawnport",
-    "Sunbaked Plains":   "loc_sunbaked_plains",
-    "Sandstone Outpost": "loc_sandstone_outpost",
-    "The Verdant Vale":  "loc_the_verdant_vale",
-    "Obsidian Crater":   "loc_obsidian_crater",
-    "Coral Cove":        "loc_coral_cove",
-}
+第一段階完了後、必要に応じて以下へ再整理する。
 
-
-def _name_to_id(name: str) -> str:
-    """name → id を対応表で解決。不明な場合は loc_ + slug フォールバック。"""
-    if name in LOCATION_NAME_TO_ID:
-        return LOCATION_NAME_TO_ID[name]
-    # フォールバック: "loc_" + slug 変換（小文字・空白→アンダースコア・特殊文字除去）
-    # built-in 地点は必ず対応表で解決されるため、このパスはユーザー追加地点のみ
-    import re
-    slug = re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
-    return f"loc_{slug}"
-
-
-def migrate_v1_to_v2(data: dict) -> dict:
-    data = dict(data)
-    data["schema_version"] = 2
-    for char_data in data.get("characters", []):
-        old_location = char_data.pop("location", "loc_aethoria_capital")
-        char_data["location_id"] = _name_to_id(old_location)
-    return data
+```text
+fantasy_simulator/
+  __init__.py
+  __main__.py
+  app/
+    cli.py
+  core/
+    character.py
+    world.py
+    location.py
+    relationships.py
+  simulation/
+    engine.py
+    timeline.py
+    notifications.py
+  mechanics/
+    events.py
+    adventure.py
+    rumor.py
+    quests.py
+  narrative/
+    reports.py
+    context.py
+    templates.py
+  persistence/
+    save_load.py
+    migrations.py
+    schema.py
+  ui/
+    screens.py
+    ui_helpers.py
+    map_renderer.py
+    input_backend.py
+    render_backend.py
+  i18n/
+    engine.py
+    ja.py
+    en.py
+  content/
+    world_data.py
+    defaults.py
 ```
 
-> **slug はフォールバックのみ。** built-in 地点は必ず `LOCATION_NAME_TO_ID` 対応表で変換する。対応表に存在しない名前（ユーザー追加地点など）のみ slug を使う。
+### 6.4 重要な判断
 
-### 5.4 旧セーブ互換の保証範囲
+- `Character` の大分解は急がない
+- `simulator.py` は移動だけで済ませず、後続 Phase で責務分割する
+- `world_data.py` は早めに `content/` へ移す
+- UI の最終整理は `ui/` 作成後に進める
 
-| 保証する | 保証しない |
-|---|---|
-| schema_version=0〜2 の旧セーブが正常に読み込める | migration 前に `character.location_id` への直接アクセス |
-| migration 後に SI-1〜SI-3 が成立する | 旧セーブを migration なしで使うことの動作正確性 |
-| `LOCATION_NAME_TO_ID` の全 built-in 地点を網羅 | ユーザー追加地点のフォールバック slug が完全一致すること |
+### 6.5 テスト移行方針
 
----
+package 化では、現状の `conftest.py` と各テストの import がルート直下構成を前提にしている点を必ず処理する。
 
-## 6. location 参照修正方針
+方針:
 
-### 6.1 基本方針
-
-**一気に参照置換する。段階的な名前参照残存は認めない。**
-
-現行コードで `character.location`（名前文字列）を参照している箇所をすべて PR-3 で `character.location_id` に一括置換する。
-
-### 6.2 影響ファイル一覧（現行コード調査結果）
-
-| ファイル | 対象コード | 修正内容 |
-|---|---|---|
-| `character.py` | `self.location: str = location` | `self.location_id: str = location_id`（`__init__` 引数も `location_id` に変更） |
-| `character.py` | `to_dict()` の `"location": self.location` | `"location_id": self.location_id` |
-| `character.py` | `from_dict()` の `location=data.get("location", ...)` | `location_id=data.get("location_id", "loc_aethoria_capital")` |
-| `world.py` | `character.location` 参照（`add_character`, `get_characters_at_location` 等） | `character.location_id` に変更 |
-| `world.py` | `_location_name_index` → `_location_id_index` | id ベースのインデックスに変更 |
-| `world.py` | `get_location_by_name()` | `get_location_by_id()` を追加。`get_location_by_name()` は deprecated |
-| `events.py` | `character.location` 参照 | `character.location_id` に変更 |
-| `adventure.py` | `character.location` 参照 | `character.location_id` に変更 |
-| `screens.py` | `character.location` 表示 | `world.get_location_by_id(character.location_id).canonical_name` 経由に変更 |
-| `character_creator.py` | `location="Aethoria Capital"` デフォルト | `location_id="loc_aethoria_capital"` に変更 |
-
-### 6.3 置換の順序
-
-1. `world_data.py`: `DEFAULT_LOCATIONS` を id 付き形式（`loc_` プレフィックス）に更新
-2. `world.py`: `LocationState` 定義、`_location_id_index`、`get_location_by_id()` 追加
-3. `character.py`: `location: str` → `location_id: str`（互換プロパティは追加しない）
-4. 上記以外の参照ファイル（`events.py`, `adventure.py`, `screens.py`, `character_creator.py`）: 一括修正
-5. テスト: 全テストが通過することを確認
-6. grep で `character\.location\b`（`location_id` を除く）が残っていないことを確認 → PR-3 マージ条件
+- `conftest.py` の `sys.path` 設定を package 構造へ合わせて更新する
+- 必要に応じて `__init__.py` で再 export を用意する
+- テスト import の一括書き換えは PR-A の作業項目として明示する
+- Phase A 完了条件に「既存全テスト通過」を含める
 
 ---
 
-## 7. Favorite / Spotlight / Playable の先行導入
+## 7. 優先順位つき実装計画
 
-**月報（Phase 2）前に PR-2.5 として導入する。**
+### 7.1 最優先: PR-0（文書正本確定 + README 同期）
 
-これらのフラグなしに月報の「注目人物」欄を実装できないため、Phase 1 完了直後に以下を追加する。
+**目的**:
 
-```python
-# character.py へ追加
-favorite: bool = False       # プレイヤーが手動でマーク。月報に必ず掲載
-spotlighted: bool = False    # 自動または手動の一時注目。dying 時に高優先通知
-playable: bool = False       # 主人公モード中フラグ。方針選択をプレイヤーが担う
-```
+- どの文書を正本とするかを明文化し、今後の実装判断のブレを止める
+- README が古い状態像を示し続けることを防ぐ
 
-### 7.1 各フラグの意味と使用箇所
-
-| フラグ | セット主体 | 効果 |
-|---|---|---|
-| `favorite` | プレイヤー手動 | 月報必掲載・年報特記・通知優先度 +20 |
-| `spotlighted` | プレイヤー / 自動 | dying 時通知優先度 +40・月報に行動詳細 |
-| `playable` | プレイヤー手動 | 冒険方針をプレイヤーが直接選択（§9.3 設計書参照） |
-
-### 7.2 セーブ互換
-
-- `to_dict()` / `from_dict()` に追加。デフォルト値は `False`。
-- migration 不要（旧セーブで欠損時は `False` として読み込む）。
-
----
-
-## 8. イベント密度と通知密度の分離
-
-### 8.1 問題の整理
-
-現行コードでは「イベントが生成される頻度」と「プレイヤーに通知する頻度」が実質的に同一である。これにより、シミュレーション内部の豊かさと UI のノイズがトレードオフになっている。
-
-### 8.2 分離方針
-
-```
-内部イベント密度（simulation density）: シミュレーション内で月次に生成するイベントの数と種類
-通知密度（notification density）:       プレイヤーの UI に表示・中断を引き起こすイベントの閾値
-```
-
-これらを独立したパラメータとして管理する。
-
-```python
-# simulator.py または config.py
-SIMULATION_DENSITY = {
-    "minor_events_per_month_per_char": 0.3,  # NPC1体あたり月間軽微イベント期待値
-    "major_events_per_month_per_char": 0.05, # 重大イベント期待値
-}
-
-NOTIFICATION_THRESHOLDS = {
-    "favorite_any":       True,   # favorite のいかなるイベントも通知
-    "spotlight_serious":  True,   # spotlighted が serious 以上で通知
-    "auto_pause_dying":   True,   # dying 発生で自動停止
-    "auto_pause_months":  6,      # 最大 N ヶ月で一度通知
-    "rumor_high_heat":    70,     # rumor_heat >= 70 で地域通知
-}
-```
-
-### 8.3 月報・年報への反映
-
-- 月報は `NOTIFICATION_THRESHOLDS` に従い生成（内部イベントをすべて出力しない）。
-- 内部 `WorldEventRecord` はすべて記録するが、月報への掲載は重要度フィルタを通す。
-- 詳細ログ（全イベント）はデバッグモードまたは「詳細表示」で閲覧可能とする。
-
-### 8.4 UI 連携規約
-
-- `WorldEventRecord` は世界側の正規イベント表現とし、保存・通知密度判定・月報/年報集計の基準にする。
-- UI / report 層が `EventRecord` 等の表示用レコードを用いる場合、それは `WorldEventRecord` から導出する非永続の view model とし、新たな正規スキーマは増やさない。
-- `ui/` パッケージ化、renderer / input interface 定義、`screens.py` / `ui_helpers.py` の facade 化は PR-1〜PR-3 と並行して先行着手してよい。
-- ただし `location_id` / `WorldEventRecord` を前提とする表示刷新（マップ再設計、月報/年報、イベントフィルタ UI）は PR-3 完了後に切り替える。
-- 詳細な画面刷新方針は `docs/ui_renovation_plan.md` に従う。
-
----
-
-## 9. PR 分割計画（必須 PR リスト）
-
-### PR-0（推奨・任意）: 設計書但し書き追加
-
-- `docs/next_version_plan.md` §15 に「正式な migration chain・location 参照修正方針は `docs/implementation_plan.md` に従う」旨の但し書きを追加
-- コード変更なし
-
-### PR-1: パッケージ構造化
-
-**ゴール**: ロジック変更なし、全テスト通過  
-**作業**:
-- `requirements-dev.txt` 追加（`pytest>=7.0`, `hypothesis>=6.0`）
-- `docs/` 以下の README 更新（任意）
-- CI 通過確認
-
-**マージ条件**: 全テスト通過、flake8 通過
-
----
-
-### PR-2: schema_version と migration 基盤 ✅ 完了（PR #11 にて実装）
-
-**ゴール**: 旧セーブの schema_version 欠損を安全に扱える
-**作業**:
-- [x] `persistence/migrations.py`（または `migrations.py`）を新規作成
-  - `CURRENT_VERSION = 2`
-  - `migrate_v1_to_v2`（schema_version 追加 + location name→id 変換）
-  - `migrate(data)` 関数（未来バージョン拒否を含む）
-- [x] `save_load.py` の `load_simulation` で `migrate` を呼び出す
-- [x] テスト: `test_migrations.py` にて v1 セーブの読み込みテスト + 未来バージョン拒否テスト
-
-**マージ条件**: 全テスト通過、migration chain のテスト存在
-
----
-
-### PR-2.5: Favorite / Spotlight / Playable フラグ追加 ✅ 完了
-
-**ゴール**: 月報実装前に注目フラグを安定させる  
-**作業**:
-- [x] `character.py` に `favorite`, `spotlighted`, `playable` フラグ追加
-- [x] `to_dict()` / `from_dict()` に対応追加（デフォルト False）
-- [x] テスト: `test_character.py` にフラグの serialize/deserialize テスト追加
-
-**マージ条件**: 全テスト通過、旧セーブ互換確認（デフォルト False）
-
----
-
-### PR-3: LocationState 導入 + location 参照一括修正 ✅ 完了
-
-**ゴール**: SI-1 〜 SI-3 を確立する。これが Phase 1 の最重要 PR。
 **作業**:
 
-1. [x] `world_data.py`: `DEFAULT_LOCATIONS` を `(id, canonical_name, description, region_type, x, y)` 形式に更新（`loc_` プレフィックス付き id）
-2. `world.py`:
-   - [x] `Location` dataclass → `LocationState` dataclass（§3.1 の定義：prosperity, safety, mood 等の状態量追加）
-   - [x] `_location_id_index: Dict[str, Location]` 追加
-   - [x] `get_location_by_id(id: str)` 追加
-   - [x] `location_name(location_id)` 追加（フォールバック付き）
-   - [x] `render_map()` に danger/safety_label/traffic 簡易表示追加（設計書 §18.2）
-3. [x] `character.py`:
-   - `location: str` → `location_id: str`（互換プロパティは追加しない）
-4. [ ] `character_creator.py`: `location="Aethoria Capital"` → `location_id="loc_aethoria_capital"`（変更不要だった — character_creator.py に location 参照なし）
-5. [x] `events.py` / `adventure.py` / `screens.py`: `character.location` → `character.location_id` に一括置換 + `WorldEventRecord` 導入
-6. [x] `migrations.py`: `CURRENT_VERSION = 2`、`migrate_v1_to_v2`（location name→id 変換）追加
+- `docs/implementation_plan.md` を公式な実装順の正本として明記する
+- `docs/next_version_plan.md` と `docs/ui_renovation_plan.md` の役割を整理する
+- `README.md` の現状認識と近接優先事項を本書に同期する
+- 「README は現状の公開サマリー」「設計書は将来像」「本書は実装順」という分担を固定する
 
-**テスト要件**:
-- [x] migration v1→v2 のテスト（全 built-in 地点名が正しく `loc_` 付き id に変換される）
-- [x] 旧セーブ（`location: "Aethoria Capital"` 形式）の読み込みテスト
-- [x] SI-1 〜 SI-3 の不変条件テスト（全キャラの `location_id` が有効 id を参照する）
+**完了条件**:
 
-**マージ条件**:
-- 全テスト通過、SI-1 〜 SI-3 のテストが存在、flake8 通過
-- `character\.location\b`（`location_id` を除く）の grep 結果がゼロ（旧参照ゼロ）
+- 文書間の優先順位が明記されている
+- README が現状と近接優先事項を誤読なく伝える
+- 以後の PR が「どの文書に従うべきか」で迷わない
 
-**残作業**: Phase 1 としては完了。以後は Phase 2 以降の report / rumor / UI adapter へ進む。
+### 7.2 次点: Phase A
+
+#### A-1. `fantasy_simulator/` パッケージの作成
+
+**目的**:
+
+- 実行経路を package ベースへ寄せる
+- 将来の import 整理をやりやすくする
+
+**作業**:
+
+- `fantasy_simulator/__init__.py` 作成
+- `fantasy_simulator/__main__.py` 作成
+- ルート `main.py` を薄い互換ラッパーへ変更
+
+**完了条件**:
+
+- `python -m fantasy_simulator` で実行できる
+- 既存の起動方法も当面壊れない
+
+#### A-2. `persistence/`, `ui/`, `content/`, `i18n/` の先行分離
+
+**目的**:
+
+- 依存の少ない層から先に整理する
+
+**作業**:
+
+- `save_load.py` → `persistence/save_load.py`
+- `migrations.py` → `persistence/migrations.py`
+- `screens.py` → `ui/screens.py`
+- `ui_helpers.py` → `ui/ui_helpers.py`
+- `world_data.py` → `content/world_data.py`
+- `i18n.py` の分割準備
+- `conftest.py` の `sys.path` 設定更新
+- テスト import の移行方針策定と必要箇所の一括修正
+
+**完了条件**:
+
+- 既存テスト通過
+- import パス整理完了
+- ロジック変更なし
+- package 化後も save/load と CLI 起動の互換が保たれる
+
+#### A-3. `i18n/` 分離
+
+**目的**:
+
+- テンプレート層拡張に備える
+
+**作業**:
+
+- `i18n/engine.py`
+- `i18n/ja.py`
+- `i18n/en.py`
+
+**完了条件**:
+
+- 既存翻訳関数の互換維持
+- 既存テスト通過
+
+### 7.3 その次: Phase B
+
+#### B-1. `_run_year()` から `_run_month()` への移行
+
+**目的**:
+
+- 真の月次進行を導入する
+
+**作業**:
+
+- `advance_months()` 導入
+- `_run_month()` 導入
+- `current_month` を表示値ではなく処理本体へ昇格
+- rumor、季節補正、冒険進行、通知判定を月次に揃える
+- `WorldEventRecord.tags` の最小導入
+- `SIMULATION_DENSITY` の導入可否をここで判断し、可能なら最小版を追加する
+
+**完了条件**:
+
+- 月ごとの処理順が固定される
+- rumor aging / generation が自然な月次になる
+- 季節補正が実処理順に沿って働く
+- Phase E で必要となるイベント分類の基礎が整う
+
+#### B-2. 月次 determinism テスト
+
+**目的**:
+
+- 今後の refactor を安全にする
+
+**作業**:
+
+- seed 固定 world 生成テスト
+- seed 固定 12 ヶ月進行テスト
+- 月次スナップショット比較
+
+**完了条件**:
+
+- 月次進行の再現性が CI で担保される
+
+### 7.4 並行: Phase C
+
+#### C-1. `simulator.py` の責務分割
+
+**目的**:
+
+- 月次化後の肥大化を防ぐ
+
+**分割先候補**:
+
+- `simulation/engine.py`
+- `simulation/timeline.py`
+- `simulation/notifications.py`
+- `simulation/adventure_coordinator.py`
+
+**完了条件**:
+
+- `simulator.py` が単一責務へ近づく
+- 月次処理、通知判定、冒険進行が独立して読める
+
+#### C-2. イベントストア一本化
+
+**目的**:
+
+- 正規データ源を統一する
+
+**方針**:
+
+- `World.event_records` を唯一の正規ストアとする
+- `Simulator.history` は互換 adapter
+- `World.event_log` は表示派生物
+
+**作業**:
+
+- summary 系の読取元を `event_records` に統一
+- report 系の読取元を `event_records` に統一
+- 新規コードから `history` / `event_log` を直接読まないようにする
+- イベント → 状態影響の追跡構造（`impact_log` もしくは同等の記録）を導入し、因果追跡の基盤を整える
+
+**完了条件**:
+
+- 新規読取側がすべて `event_records` 起点になる
+- `history` と `event_log` が補助層として扱われる
+- 状態変化の原因を後から辿れる
+
+### 7.5 その後: Phase D
+
+#### D-1. UI 描画責務の切り離し
+
+**目的**:
+
+- domain と表示ロジックを分離する
+
+**作業**:
+
+- `world.render_map()` の責務縮小
+- `ui/map_renderer.py` 導入
+- `MapRenderInfo` 的な中間表現導入
+- `screens.py` を画面遷移中心にする
+
+**完了条件**:
+
+- domain 層が直接文字列描画を持たない方向へ進む
+- map 表示の差し替えが可能になる
+
+#### D-2. UI バックエンド抽象
+
+**目的**:
+
+- 将来の Rich / Textual 導入を見据える
+
+**作業**:
+
+- `input_backend.py`
+- `render_backend.py`
+- 必要に応じて presenter 層導入
+- `wcwidth` など幅計算ユーティリティの導入
+- ロケール依存の制御フロー解消（表示文ではなくキーで分岐する）
+
+**完了条件**:
+
+- 入力と描画の依存点が限定される
+- UI 改造計画 Phase 0 の未着手項目を本 Phase で回収できる
+
+### 7.6 最後に着手: Phase E
+
+#### E-1. `AdventureRun` のパーティ化
+
+**目的**:
+
+- 冒険を群像劇の中核装置へ引き上げる
+
+**作業**:
+
+- `member_ids`
+- `party_id`
+- `policy`
+- `retreat_rule`
+- `supply_state`
+- 能力値依存 outcome
+- `playable` / `favorite` / `spotlighted` に応じた意思決定差
+
+**完了条件**:
+
+- 冒険がソロログではなくパーティ行動になる
+- プレイヤー介入の意味が増す
+
+#### E-2. live trace / memorial / alias
+
+**目的**:
+
+- 世界の長期記憶を可視化する
+
+**作業**:
+
+- 冒険の痕跡を地点へ残す
+- 記念碑・墓碑・地名変化を導入する
+- 長期観察の報酬を増やす
+- `NarrativeContext` 導入前でも最低限のテンプレート選択で memorial / alias テキストを安定生成する
+
+**完了条件**:
+
+- 土地の歴史が読めるようになる
+- 世界が「記憶を持つ」感触が出る
+
+#### E-3. 初期 AA マップ
+
+**目的**:
+
+- 文字ベース観測 UI の中核を強化する
+
+**作業**:
+
+- 地域図
+- 地点詳細図
+- 痕跡・危険・交通・噂熱の可視化
+
+**完了条件**:
+
+- 現在の簡易マップから一段進んだ観測 UI が成立する
+
+### 7.7 仕上げ: Phase F
+
+#### F-1. `NarrativeContext` 拡張
+
+**目的**:
+
+- 関係性、噂、土地の記憶、レポートを文脈依存の叙述へ接続する
+
+**作業**:
+
+- `narrative/context.py`
+- テンプレート選択の高度化
+- relation tags, memorial, reports, world memory との接続
+
+**完了条件**:
+
+- 群像劇の文面が単調な固定テンプレートから脱却する
+- 誰が誰をどう見ているかが文章選択に反映される
 
 ---
 
-### Phase 2 以降の PR（参考）
+## 8. PR 分割案
 
-| PR | 内容 | 依存 |
-|---|---|---|
-| PR-4 | 月報 / 年報 / 復帰サマリー + UI report adapter + イベントストア統合 | PR-2.5, PR-3 | ✅ 完了 |
-| PR-5 | Rumor / reliability / 通知密度分離 | PR-4 | ✅ 完了 |
-| PR-6 | 条件付き自動進行（AUTO_PAUSE_PRIORITIES） | PR-4 | ✅ 完了 |
-| PR-7 | Relationship 構造化（relation_tags） | PR-3 | ✅ 完了 |
-| PR-8 | dying / rescue / 死の段階化 | PR-7 | ✅ 完了 |
-| PR-9 | AdventureRun パーティ化 + 能力値依存 outcome | PR-8 |
-| PR-10 | live trace + memorial + alias | PR-9 |
-| PR-11 | map renderer 初期 AA 版 | PR-10 |
+### PR-0: 文書正本の確定 + README 同期
 
-#### PR-4 におけるイベントストア統合の完了条件
+**内容**:
 
-- `World.event_records` を世界イベントの唯一の正規ストアとする。
-- `World.event_log` は保存互換を維持しつつも、CLI / report renderer 用の派生テキストバッファとして扱う。
-- `Simulator.history` は旧 `EventResult` ベース API と save 互換のための adapter に限定し、新規の集計・UI・レポートコードからは参照しない。
-- `get_summary()` / event list / report 生成 / UI adapter は、順次 `WorldEventRecord` を読取元に置き換える。
-- PR-4 レビューでは「新規追加コードが `history` または `event_log` を正規データ源として読んでいない」ことを確認する。
+- `implementation_plan.md` を公式実装計画の正本として明記する
+- `next_version_plan.md` と `ui_renovation_plan.md` の役割を整理する
+- README に現状の到達点と近接優先事項を同期する
 
----
+### PR-A: 最小 package 化
 
-## 10. 必須テストサマリー
+**内容**:
 
-各 PR マージ前に以下のテストが存在し、通過することを確認する。
+- `fantasy_simulator/` 作成
+- `__main__.py`
+- `main.py` 互換ラッパー
+- `persistence/`, `ui/`, `content/`, `i18n/` の先行分離
+- `conftest.py` とテスト import の移行
 
-### 10.1 Safety Invariant テスト（PR-3 以降必須）
+**性質**:
 
-```python
-# tests/test_invariants.py
+- できるだけロジック変更なし
 
-def test_si1_all_characters_have_valid_location_id(world_fixture):
-    """SI-1: 全キャラの location_id が有効な LocationState.id を参照する。"""
-    for char in world_fixture.characters:
-        assert world_fixture.get_location_by_id(char.location_id) is not None, (
-            f"Character {char.name!r} has invalid location_id {char.location_id!r}"
-        )
+### PR-B: 月次エンジン化
 
+**内容**:
 
-def test_si2_location_never_returns_none_for_valid_char(world_fixture):
-    """SI-2: get_location_by_id は有効な location_id に対して None を返さない。"""
-    for char in world_fixture.characters:
-        loc = world_fixture.get_location_by_id(char.location_id)
-        assert loc is not None
+- `_run_month()` 導入
+- 月次処理順の固定
+- `WorldEventRecord.tags` の最小導入
+- 月次 determinism テスト
 
+### PR-C: `simulator.py` 分割 + イベントストア整理
 
-def test_si3_world_event_records_location_id(world_fixture):
-    """SI-3: WorldEventRecord.location_id は有効 id または None。"""
-    valid_ids = {loc.id for loc in world_fixture.grid.values()}
-    for record in world_fixture.event_records:
-        if record.location_id is not None:
-            assert record.location_id in valid_ids, (
-                f"WorldEventRecord has invalid location_id {record.location_id!r}"
-            )
-```
+**内容**:
 
-### 10.2 Migration テスト（PR-2, PR-3 必須）
+- `simulation/` 導入
+- `event_records` 正規化
+- `history` / `event_log` の adapter 化
+- `impact_log` ないし同等の因果追跡構造
 
-```python
-# tests/test_migrations.py
+### PR-D: UI 責務分離
 
-def test_migrate_v0_adds_schema_version():
-    data = {"characters": [], "world": {}}
-    result = apply_migrations(data)
-    assert result["schema_version"] == CURRENT_VERSION
+**内容**:
 
+- `map_renderer.py`
+- 描画用中間表現
+- `screens.py` の軽量化
+- `InputBackend`, presenter, `wcwidth`, ロケール依存分岐の解消
 
-def test_migrate_v1_to_v2_converts_all_builtin_locations():
-    """全 built-in 地点名が正しく id に変換される。"""
-    # 各 built-in 地点名だけを持つ最小キャラクターデータを生成
-    char_data = [{"name": "char", "location": name} for name in LOCATION_NAME_TO_ID.keys()]
-    data = {"schema_version": 1, "characters": char_data}
-    result = migrate_v1_to_v2(data)
-    for char, (name, expected_id) in zip(result["characters"], LOCATION_NAME_TO_ID.items()):
-        assert char["location_id"] == expected_id, (
-            f"Location {name!r} should map to {expected_id!r}, got {char['location_id']!r}"
-        )
+### PR-E: パーティ冒険 Phase 1
 
+**内容**:
 
-def test_old_save_roundtrip(tmp_path):
-    """旧セーブ（schema_version なし）が正常に読み込める。"""
-    # 旧セーブ形式: location フィールドに場所名文字列
-    old_save = {
-        "characters": [{"name": "Aldric", "location": "Aethoria Capital"}],
-        "world": {"year": 1000},
-    }
-    path = tmp_path / "old_save.json"
-    path.write_text(json.dumps(old_save))
-    sim = load_simulation(str(path))
-    assert sim is not None
-    char = sim.world.characters[0]
-    assert char.location_id == "loc_aethoria_capital"
-```
+- `member_ids`
+- `policy`
+- `retreat_rule`
+- `supply_state`
+- outcome 改善
 
-### 10.3 Favorite / Spotlight / Playable テスト（PR-2.5 必須）
+### PR-F: world memory
 
-```python
-# tests/test_character.py への追記
+**内容**:
 
-def test_favorite_flag_serialization():
-    # 最小限の必須フィールドでキャラクターを生成
-    char = Character(
-        name="Aldric", age=25, gender="male", race="Human", job="Warrior",
-        favorite=True,
-    )
-    d = char.to_dict()
-    assert d["favorite"] is True
-    char2 = Character.from_dict(d)
-    assert char2.favorite is True
+- live trace
+- memorial
+- alias
+- 最小 `NarrativeContext` / テンプレート選択基盤
 
+### PR-G: AA マップ初版
 
-def test_flags_default_false_on_old_save():
-    """旧セーブに favorite/spotlighted/playable がなくてもデフォルト False で読み込める。"""
-    # favorite/spotlighted/playable キーが存在しない旧形式データ
-    data = {
-        "name": "Aldric", "age": 25, "gender": "male",
-        "race": "Human", "job": "Warrior",
-        "location": "Aethoria Capital",  # 旧形式: location フィールド
-    }
-    char = Character.from_dict(data)
-    assert char.favorite is False
-    assert char.spotlighted is False
-    assert char.playable is False
-```
+**内容**:
 
-### 10.4 イベント密度 / 通知密度テスト（PR-5 必須）
+- 世界全体図
+- 地域図
+- 地点詳細図の初期版
 
-```python
-def test_simulation_generates_events_without_notifications():
-    """内部イベントが生成されても、通知閾値を超えなければ月報に掲載されない。"""
-    # notification threshold を高く設定
-    # 月次進行で内部イベントは記録されるが、月報は空
-    ...
+### PR-H: `NarrativeContext` 拡張
 
+**内容**:
 
-def test_notification_fires_on_dying_spotlight():
-    """spotlighted キャラが dying になったとき通知が発生する。"""
-    ...
-```
-
-### 10.5 決定論テスト（Phase 1 完了後必須）
-
-```python
-def test_seed_fixed_world_generation_is_deterministic():
-    """同じ seed で世界生成すると同じ結果になる。"""
-    world1 = _build_default_world(seed=42)
-    world2 = _build_default_world(seed=42)
-    assert world1.to_dict() == world2.to_dict()
-
-
-def test_seed_fixed_12_months_is_deterministic():
-    """同じ seed で 12 ヶ月進行すると同じスナップショットになる。"""
-    sim1 = Simulator(seed=42)
-    sim2 = Simulator(seed=42)
-    for _ in range(12):
-        sim1.step()
-        sim2.step()
-    assert sim1.to_dict() == sim2.to_dict()
-```
+- `narrative/context.py`
+- テンプレート選択の高度化
+- relation tags, memorial, reports との接続
 
 ---
 
-## 11. フェーズ要約
+## 9. 進捗管理上の判断基準
 
-| Phase | PR | 主な成果物 | Safety Invariant | 状態 |
-|---|---|---|---|---|
-| Phase 0 | PR-0 | 設計書但し書き | — | 未着手 |
-| Phase 1a | PR-1, PR-2 | パッケージ整備・migration 基盤 | 未確立（旧コード） | ✅ 完了 |
-| Phase 1b | PR-2.5 | Favorite/Spotlight/Playable | 未確立 | ✅ 完了 |
-| Phase 1c | PR-3 | LocationState・location_id 一括移行（旧参照ゼロ） | **SI-1〜SI-3 確立** | ✅ 完了 |
-| Phase 2 | PR-4〜6 | 月報・Rumor・自動進行 | SI 維持 | ✅ 完了 |
-| Phase 3 | PR-7〜8 | Relationship（relation_tags）・dying / rescue | SI 維持 | ✅ 完了 |
-| Phase 4 | PR-9〜11 | パーティ冒険・AA マップ | SI 維持 |
-| Phase 5 | 未定 | Vow/secrecy 体系化 | SI 維持 |
+各 Phase を開始する前に、以下を確認する。
 
----
+### Phase B 着手条件
 
-## 12. 不変条件の完全リスト
+- PR-A 完了
+- package 化後の CI 安定
+- save/load と migration の既存互換が維持されている
 
-本計画書で追加・確認した不変条件を設計書 §15.5 に加えて以下に列挙する。
+### Phase C 着手条件
 
-| ID | 不変条件 | 確立 PR | 状態 |
-|---|---|---|---|
-| SI-1 | `character.location_id` は有効な `LocationState.id` を参照する | PR-3 | ✅ 完了 |
-| SI-2 | `world.get_location_by_id(character.location_id)` は None を返さない | PR-3 | ✅ 完了 |
-| SI-3 | `WorldEventRecord.location_id` は有効 id または None | PR-3 | ✅ WorldEventRecord 導入済（PR #11） |
-| SI-4 | `schema_version` はすべての save データに存在する | PR-2 | ✅ 完了（PR #11） |
-| SI-5 | `dead` キャラは active adventure の member でない | PR-8 | ✅ 完了（PR #18） |
-| SI-6 | `retired` キャラは frontline quest を持たない | PR-8 |
-| SI-7 | `rumor.reliability` は `{"certain","plausible","doubtful","false"}` の値のみ | PR-5 | ✅ 完了（PR #18） |
-| SI-8 | `memorial.subject_ids` の全 id は存在するキャラを参照する | PR-10 |
-| SI-9 | `month` は 1 以上の正整数 | PR-3 |
-| SI-10 | 状態量（prosperity 等）は 0〜100 の範囲 | PR-3 | ✅ 完了 |
-| SI-11 | `dying` キャラは `alive=True` を維持する | PR-8 | ✅ 完了 |
-| SI-12 | active adventure の `member_ids` は全員 `alive=True` | PR-8 | ✅ 完了 |
+- `_run_month()` ベースが成立
+- 月次テストが通る
+
+### Phase D 着手条件
+
+- `event_records` が正規ストアとして扱える
+- UI が読みに行くデータ源が整理されている
+
+### Phase E 着手条件
+
+- 月次進行が安定
+- UI / simulation / persistence の責務境界が見えている
+
+> Phase B 完了後、Phase C / D の進行と衝突しない範囲では Phase E-1 の最小版を並行着手してよい。
+
+### Phase F 着手条件
+
+- memorial / alias / live trace のデータが揃っている
+- relation tags や reports を `NarrativeContext` の入力にできる
 
 ---
 
-## 13. 開発開始判断（2026年3月時点）
+## 10. いま最初に着手すべきこと
 
-### 13.1 スタート条件
+本書の結論として、直近で最初に着手すべき実装は **PR-0** である。
 
-以下がすべて満たされた時点で Phase 1a（PR-1）の開発を開始できる。
+**理由**:
 
-- [x] 本計画書（`docs/implementation_plan.md`）が main ブランチにマージされている
-- [x] `docs/next_version_plan.md` が参照可能である
-- [ ] PR-0（設計書但し書き）をマージするか、スキップの合意がある
-- [x] `requirements-dev.txt` の内容（pytest, hypothesis のバージョン）の合意がある
+- 文書正本の確定は以後の全改修の前提になる
+- README を古い年次進行中心の姿のままにすると、実装順の判断基準がぶれる
+- package 化を現構造のまま進めるより先に、「何が現状で何が目標か」を人間が誤読しない状態にする価値が高い
+- そのうえで package 化を最優先に進めると、月次化・責務分離・UI 分離の土台を安全に作れる
 
-### 13.2 最初に着手すべき PR
+したがって、今後の実装順は次で固定する。
 
-**PR-2 → PR-2.5 → PR-3 の順が最優先。**
-
-PR-1（パッケージ構造化）はロジック変更がなく安全だが、構造化が完了するまで PR-3 を待つ必要は**ない**。  
-PR-3 の location 参照一括修正が最も技術的負債を解消するため、チームのリソースが許す限り PR-3 を早期にマージすることを推奨する。
-
-### 13.3 リスク項目
-
-| リスク | 対策 |
-|---|---|
-| PR-3 が大規模になり review コストが高い | §6.3 の置換順序で細分化し、差分を読みやすくする |
-| 旧セーブの location 名に typo や独自名が含まれる | `loc_` + slug フォールバックで対応。load 時に警告ログを出す |
-| PR-3 後に `character.location` への参照が残存する | PR-3 マージ前に `character\.location\b` grep を CI で実行する |
-| テストの決定論性が崩れる | PR-3 で seed 固定テストを追加し、CI で必ず実行する |
+1. PR-0: 文書正本の確定 + README 同期
+2. PR-A: 最小 package 化
+3. PR-B: 月次エンジン化
+4. PR-C: `simulator.py` 分割 + イベントストア整理
+5. PR-D: UI 責務分離
+6. PR-E: パーティ冒険
+7. PR-F: live trace / memorial / alias
+8. PR-G: AA マップ
+9. PR-H: `NarrativeContext` 拡張
 
 ---
 
-## 14. PR-5 レビュー結果と設計修正（2026年3月）
+## 11. レビューを踏まえた補足判断
 
-PR-5（Rumor / reliability / 通知密度分離）に対するレビューで以下の設計上の問題が
-特定され、修正された。今後の PR でも同様の観点でレビューすること。
+今回の評価から、以下を明示的に追記する。
 
-### 14.1 修正済み問題
+### 11.1 エンジン安定化を content 拡張より優先する
 
-| # | 問題 | 対応 |
-|---|---|---|
-| 1 | 噂生成が年末一括（月12）で、月1-11 の月報に噂が載らない | 月1-12 を順次走査して噂を生成するよう `_generate_and_age_rumors` を変更 |
-| 2 | 過去の月報が rumor 消去で不安定になる（コメントと実装の不一致） | `rumor_archive` を導入。期限切れ・件数超過の噂をアーカイブし、レポートは両方を参照 |
-| 3 | 噂候補が配列順で選ばれ、最近の重要イベントが落ちる | `(-month, -severity)` でソート後に `max_rumors` まで選択 |
-| 4 | DISCLOSURE テーブルの who/where/when が未使用 | `_build_rumor_description` で各次元を独立に判定し、部分的に曖昧な噂を生成 |
-| 5 | 通知密度は候補収集のみで UI 接続なし | `should_notify` + `pending_notifications` は下地のみ。UI 配線は PR-6 以降 |
-| 6 | `propagate_state` が danger/traffic を飽和させる | 年次ベースライン減衰（`_decay_toward_baseline`）と方向性キャップを追加 |
+月次の決定論、旧 save 互換、不変条件、観測 UI の情報密度が安定する前に content を増やし始めない。
 
-### 14.2 通知密度の現状（Issue 5 補足）
+### 11.2 パーティ冒険は「イベント追加」ではなく「選択の価値を上げるルール実装」として扱う
 
-PR-5 時点での通知密度機能の状態:
+`policy`、`retreat_rule`、`supply_state`、能力値依存 outcome を噛み合わせ、プレイヤー介入が結果構造を変える段階に達してから拡張する。
 
-- **完了**: `should_notify()` による閾値判定、`pending_notifications` へのキュー蓄積
-- **未完了**: report / screen への接続、`auto_pause_dying` / `auto_pause_months` の反映
-- **方針**: PR-6（条件付き自動進行）で UI 接続を完了する。PR-5 単体では
-  「通知候補を貯める下地ができた」が正確な評価
+### 11.3 world memory は月次進行の信頼性が前提
 
-### 14.3 専門家レビュー要約
+live trace、memorial、alias は「状態を持つ世界」を厚くするが、月次の因果順が曖昧なままでは蓄積の手触りが弱くなる。よって Phase B を省略しない。
 
-PR-5 に対して5名の設計者視点でレビューを実施した。主な指摘と対応方針:
+### 11.4 `NarrativeContext` は副次機能ではなく主機能候補として扱う
 
-| レビュアー | 主な指摘 | 対応状況 |
-|---|---|---|
-| Bob Nystrom | report が「歴史 view」を名乗るが入力が可変 `world.rumors` | ✅ `rumor_archive` で永続化 |
-| Tarn Adams | 噂に地理的伝搬がない。場所ごとの情報格差が必要 | 📋 Phase 5 で `listener_location_id` を本格活用 |
-| Tynan Sylvester | 月報と噂の時制ずれで学習ループが壊れる | ✅ 月次生成に変更 |
-| Emily Short | DISCLOSURE が出力に反映されていない | ✅ 部分マスク型噂生成を実装 |
-| Soren Johnson | 噂候補が RNG 癖でなく世界の法則を反映すべき | ✅ severity/month ソート |
-
-### 14.4 今後の課題（Phase 5 以降）
-
-- 噂の地理的伝搬（場所ごとの情報格差、`rumor_heat` 連動）
-- 語り部システムとの統合（設計書 §11.5）
-- 噂追跡依頼（設計書 §11.6）
-- `secrecy` フィールドと噂暴露イベントの同時設計
+群像劇の文章が単調な固定テンプレートへ寄ることを防ぐため、Phase F は先送り可能な装飾ではなく、Phase E の成果を読み物として成立させる仕上げ段階とみなす。
 
 ---
 
-*以上をもって、本書を Fantasy Simulator vNext の公式実装計画書とする。*
+## 12. 結論
+
+Fantasy Simulator は、すでに基礎設計の多くをコードへ落とし込めている。
+
+ただし今は、魅力的な新機能を足すより先に、その新機能を壊さず支えられる構造を整える段階にある。そのため本計画では、**文書正本の確定と README 同期を最初に行い、その後に package 化・月次化・イベント整理・UI 分離を経てから Phase 4 本体へ入る**順序を採用する。
+
+この順序で進めれば、将来のパーティ冒険、世界の長期記憶、AA ベース観測 UI、文脈依存叙述まで、無理なく積み上げられる見込みが高い。
+
+以上を、今後の公式な実装進行方針とする。
