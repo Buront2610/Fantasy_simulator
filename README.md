@@ -9,7 +9,7 @@ occasionally influence.
 
 ## Features
 
-- World simulation with a public yearly CLI flow and growing monthly/report foundations
+- Yearly time progression in the CLI, with monthly simulation/report foundations under development
 - Character generation with random and template-based creation
 - Event system for meetings, journeys, discoveries, training, battles, aging,
   marriage, and natural death
