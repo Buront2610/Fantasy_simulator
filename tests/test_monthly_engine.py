@@ -166,7 +166,6 @@ class TestAdvanceMonths:
     def test_pending_notifications_cleared_at_start(self):
         sim = Simulator(_build_seeded_world(5, n_chars=3), events_per_year=4, seed=5)
         # Inject a synthetic notification so we can verify clearing
-        from fantasy_simulator.events import WorldEventRecord
         sim.pending_notifications.append(
             WorldEventRecord(kind="test_marker", year=1000, month=1)
         )
