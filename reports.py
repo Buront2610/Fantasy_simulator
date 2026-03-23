@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Dict, List, Set
 
 from i18n import tr
+from rumor import RUMOR_MAX_AGE_MONTHS
 
 if TYPE_CHECKING:
     from events import WorldEventRecord
@@ -180,22 +181,27 @@ def generate_monthly_report(
             notable_events=notable_loc,
         ))
 
-    # Rumor entries — only non-expired rumors created within the last 6
-    # months relative to the report date (freshness window per §10.2).
+    # Rumor entries — evaluate expiration and freshness relative to the
+    # report's own year/month so that historical reports stay stable even
+    # after the simulation advances and ages/removes rumors.
     _RUMOR_FRESHNESS_MONTHS = 6
     report_abs_month = year * 12 + month
-    rumor_entries = [
-        RumorReportEntry(
+    rumor_entries = []
+    for r in world.rumors:
+        created_abs = r.year_created * 12 + r.month_created
+        if created_abs > report_abs_month:
+            continue
+        age_at_report = report_abs_month - created_abs
+        if age_at_report >= RUMOR_MAX_AGE_MONTHS:
+            continue
+        if age_at_report > _RUMOR_FRESHNESS_MONTHS:
+            continue
+        rumor_entries.append(RumorReportEntry(
             rumor_id=r.id,
             description=r.description,
             reliability=r.reliability,
             category=r.category,
-        )
-        for r in world.rumors
-        if not r.is_expired
-        and (r.year_created * 12 + r.month_created) <= report_abs_month
-        and (report_abs_month - (r.year_created * 12 + r.month_created)) <= _RUMOR_FRESHNESS_MONTHS
-    ]
+        ))
 
     return MonthlyReport(
         year=year,
