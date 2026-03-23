@@ -11,6 +11,8 @@ from fantasy_simulator.ui.ui_helpers import (
     _c,
     _choose_key,
     _hr,
+    _read_menu_choice,
+    _render_menu,
     bold,
     cyan,
     dim,
@@ -62,33 +64,69 @@ class TestLayoutHelpers(unittest.TestCase):
         self.assertIn("FANTASY SIMULATOR", HEADER)
 
 
-class TestChooseKey(unittest.TestCase):
-    """_choose_key returns the key, not the display label."""
+class TestRenderMenu(unittest.TestCase):
+    """_render_menu prints items to stdout — no input()."""
+
+    def test_renders_all_items(self) -> None:
+        import io
+        from contextlib import redirect_stdout
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            _render_menu("Choose", [("a", "Alpha"), ("b", "Beta")])
+        text = buf.getvalue()
+        self.assertIn("Alpha", text)
+        self.assertIn("Beta", text)
+
+    def test_renders_prompt_when_non_empty(self) -> None:
+        import io
+        from contextlib import redirect_stdout
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            _render_menu("My Prompt", [("x", "X")])
+        self.assertIn("My Prompt", buf.getvalue())
+
+    def test_skips_prompt_when_empty(self) -> None:
+        import io
+        from contextlib import redirect_stdout
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            _render_menu("", [("x", "X")])
+        self.assertNotIn("My Prompt", buf.getvalue())
+
+
+class TestReadMenuChoice(unittest.TestCase):
+    """_read_menu_choice validates and returns the key."""
 
     @patch("builtins.input", return_value="2")
     def test_returns_key_not_label(self, _mock_input: object) -> None:
-        result = _choose_key(
-            "Pick one",
+        result = _read_menu_choice(
             [("alpha", "Alpha Label"), ("beta", "Beta Label")],
         )
         self.assertEqual(result, "beta")
 
     @patch("builtins.input", return_value="1")
     def test_returns_first_key(self, _mock_input: object) -> None:
-        result = _choose_key(
-            "Pick one",
+        result = _read_menu_choice(
             [("first", "First"), ("second", "Second")],
         )
         self.assertEqual(result, "first")
 
     @patch("builtins.input", return_value="")
     def test_default_selection(self, _mock_input: object) -> None:
-        result = _choose_key(
-            "Pick one",
+        result = _read_menu_choice(
             [("a", "A"), ("b", "B")],
             default="2",
         )
         self.assertEqual(result, "b")
+
+
+class TestChooseKeyCompat(unittest.TestCase):
+    """_choose_key backward-compat wrapper delegates to render + read."""
+
+    @patch("builtins.input", return_value="1")
+    def test_returns_key(self, _mock_input: object) -> None:
+        result = _choose_key("Pick", [("k", "K Label")])
+        self.assertEqual(result, "k")
 
 
 if __name__ == "__main__":

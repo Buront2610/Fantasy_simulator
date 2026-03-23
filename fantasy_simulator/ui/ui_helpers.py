@@ -94,16 +94,15 @@ def fit_display_width(text: str, width: int, suffix: str = "...") -> str:
     return clipped + " " * (width - display_width(clipped))
 
 
-def _choose_key(
+def _render_menu(
     prompt: str,
     key_label_pairs: List[tuple[str, str]],
     default: Optional[str] = None,
-) -> str:
-    """Display a numbered menu and return the **key** of the selected item.
+) -> None:
+    """Print menu items to stdout.  Pure rendering — no ``input()`` call.
 
     *key_label_pairs* is a list of ``(key, display_label)`` tuples.
     *default* is a 1-based index string (e.g. ``"1"``).
-    This avoids locale-dependent control flow.
     """
     print()
     if prompt:
@@ -112,6 +111,16 @@ def _choose_key(
         marker = green(">") if str(i) == default else " "
         print(f"  {marker} {cyan(str(i))}.  {label}")
     print()
+
+
+def _read_menu_choice(
+    key_label_pairs: List[tuple[str, str]],
+    default: Optional[str] = None,
+) -> str:
+    """Read and validate a 1-based menu index, return the corresponding key.
+
+    Pure input — assumes the menu options have already been rendered.
+    """
     while True:
         hint = f" (default {default})" if default else ""
         raw = input(f"  {bold(tr('your_choice'))}{hint}: ").strip()
@@ -120,3 +129,14 @@ def _choose_key(
         if raw.isdigit() and 1 <= int(raw) <= len(key_label_pairs):
             return key_label_pairs[int(raw) - 1][0]
         print(red(f"  {tr('invalid_choice')}"))
+
+
+# Kept for backward compatibility with external code / tests that import it.
+def _choose_key(
+    prompt: str,
+    key_label_pairs: List[tuple[str, str]],
+    default: Optional[str] = None,
+) -> str:
+    """Display a numbered menu and return the **key** of the selected item."""
+    _render_menu(prompt, key_label_pairs, default)
+    return _read_menu_choice(key_label_pairs, default)

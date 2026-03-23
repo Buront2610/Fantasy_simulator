@@ -159,7 +159,7 @@ def _show_results(sim: Simulator, ctx: UIContext | None = None) -> None:
         out.print_separator("=")
         out.print_heading(f"  {tr('post_results')}")
         out.print_separator("=")
-        action = inp.choose_key(
+        action = ctx.choose_key(
             tr("what_to_view"),
             [
                 ("advance_1_year", tr("advance_1_year")),
@@ -486,7 +486,7 @@ def _load_simulation_snapshot(ctx: UIContext | None = None) -> Optional[Simulato
 
 def _select_language(ctx: UIContext | None = None) -> None:
     ctx = _default_ctx(ctx)
-    action = ctx.inp.choose_key(
+    action = ctx.choose_key(
         tr("load_language_prompt"),
         [
             ("ja", tr("language_option_ja")),
@@ -545,7 +545,7 @@ def screen_custom_simulation(ctx: UIContext | None = None) -> None:
     custom_chars: List[Character] = []
 
     while True:
-        action = inp.choose_key(
+        action = ctx.choose_key(
             tr("add_character_or_start"),
             [
                 ("create_interactive", tr("create_character_interactively")),

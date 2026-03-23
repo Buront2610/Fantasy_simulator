@@ -20,6 +20,8 @@ Example (testing)::
 
 from __future__ import annotations
 
+from typing import List, Optional, Tuple
+
 from .input_backend import InputBackend, StdInputBackend
 from .render_backend import RenderBackend, PrintRenderBackend
 
@@ -30,6 +32,10 @@ class UIContext:
     All screen / menu functions accept an optional ``ctx`` parameter.
     If ``None`` is passed they create a default ``UIContext`` internally,
     so the change is fully backward-compatible.
+
+    ``choose_key()`` is the orchestrating facade that separates rendering
+    (delegated to ``self.out``) from reading (delegated to ``self.inp``),
+    so swapping either backend independently works as expected.
     """
 
     __slots__ = ("inp", "out")
@@ -41,6 +47,21 @@ class UIContext:
     ) -> None:
         self.inp: InputBackend = inp or StdInputBackend()
         self.out: RenderBackend = out or PrintRenderBackend()
+
+    def choose_key(
+        self,
+        prompt: str,
+        key_label_pairs: List[Tuple[str, str]],
+        default: Optional[str] = None,
+    ) -> str:
+        """Render a numbered menu then read and return the selected key.
+
+        Rendering goes through ``self.out.print_menu()``; reading goes through
+        ``self.inp.read_menu_key()``.  The two responsibilities are fully
+        separated so any combination of backends works correctly.
+        """
+        self.out.print_menu(prompt, key_label_pairs, default)
+        return self.inp.read_menu_key(key_label_pairs, default)
 
 
 def _default_ctx(ctx: UIContext | None) -> UIContext:

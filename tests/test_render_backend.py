@@ -16,6 +16,7 @@ import io
 import re
 import unittest
 from contextlib import redirect_stdout
+from unittest.mock import patch
 
 from fantasy_simulator.ui.render_backend import PrintRenderBackend, RenderBackend
 
@@ -163,6 +164,25 @@ class TestPrintRenderBackendColors(unittest.TestCase):
         # Nothing should have leaked to actual stdout
         self.assertEqual(captured.getvalue(), "")
 
+    def test_print_menu_renders_items_to_stdout(self) -> None:
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            self.backend.print_menu(
+                "Choose",
+                [("a", "Alpha"), ("b", "Beta")],
+                default="1",
+            )
+        text = buf.getvalue()
+        self.assertIn("Alpha", text)
+        self.assertIn("Beta", text)
+
+    def test_print_menu_no_input_call(self) -> None:
+        """print_menu must not call input() — only rendering, no reading."""
+        with patch("builtins.input", side_effect=AssertionError("input() was called")):
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                self.backend.print_menu("Pick", [("x", "X")])
+
 
 class TestCustomRenderBackend(unittest.TestCase):
     """A custom class can satisfy the RenderBackend protocol."""
@@ -202,6 +222,9 @@ class TestCustomRenderBackend(unittest.TestCase):
 
             def format_status(self, text: str, positive: bool) -> str:
                 return text  # plain, no ANSI
+
+            def print_menu(self, prompt, key_label_pairs, default=None) -> None:
+                self.lines.append(("menu", prompt, len(key_label_pairs)))
 
         backend = BufferRenderBackend()
         self.assertIsInstance(backend, RenderBackend)

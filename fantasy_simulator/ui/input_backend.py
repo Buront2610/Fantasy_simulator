@@ -19,16 +19,16 @@ class InputBackend(Protocol):
         """Read a single line of text from the user."""
         ...  # pragma: no cover
 
-    def choose_key(
+    def read_menu_key(
         self,
-        prompt: str,
         key_label_pairs: List[Tuple[str, str]],
         default: Optional[str] = None,
     ) -> str:
-        """Display a numbered menu and return the **key** of the selected item.
+        """Read and validate a menu selection, return the corresponding key.
 
-        *key_label_pairs* is ``[(key, display_label), ...]``.
-        *default* is a 1-based index string (e.g. ``"1"``).
+        Assumes the menu options have already been rendered by
+        ``RenderBackend.print_menu()``.  *key_label_pairs* is
+        ``[(key, display_label), ...]``; *default* is a 1-based index string.
         """
         ...  # pragma: no cover
 
@@ -43,14 +43,13 @@ class StdInputBackend:
     def read_line(self, prompt: str = "") -> str:
         return input(prompt)
 
-    def choose_key(
+    def read_menu_key(
         self,
-        prompt: str,
         key_label_pairs: List[Tuple[str, str]],
         default: Optional[str] = None,
     ) -> str:
-        from .ui_helpers import _choose_key
-        return _choose_key(prompt, key_label_pairs, default)
+        from .ui_helpers import _read_menu_choice
+        return _read_menu_choice(key_label_pairs, default)
 
     def pause(self, message: str = "") -> None:
         from .ui_helpers import _pause

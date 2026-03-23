@@ -26,7 +26,6 @@ from .ui.ui_context import UIContext, _default_ctx
 def main(ctx: UIContext | None = None) -> None:
     ctx = _default_ctx(ctx)
     out = ctx.out
-    inp = ctx.inp
 
     set_locale("ja")
     out.print_heading(HEADER)
@@ -36,7 +35,7 @@ def main(ctx: UIContext | None = None) -> None:
         out.print_separator("=")
         out.print_heading(f"  {tr('main_menu')}")
         out.print_separator("=")
-        choice = inp.choose_key(
+        choice = ctx.choose_key(
             tr("main_menu_prompt"),
             [
                 ("start_new_sim", tr("start_new_sim")),

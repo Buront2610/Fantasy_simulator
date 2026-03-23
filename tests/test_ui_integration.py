@@ -64,6 +64,9 @@ class RecordingRenderBackend:
         # Return plain text — no ANSI in tests
         return text
 
+    def print_menu(self, prompt: str, key_label_pairs, default=None) -> None:
+        self.calls.append(("print_menu", prompt, len(key_label_pairs)))
+
     @property
     def text(self) -> str:
         """Concatenate all printed text for simple substring checks."""
@@ -87,9 +90,8 @@ class ScriptedInputBackend:
             return val
         return ""
 
-    def choose_key(
+    def read_menu_key(
         self,
-        prompt: str,
         key_label_pairs: List[Tuple[str, str]],
         default: Optional[str] = None,
     ) -> str:

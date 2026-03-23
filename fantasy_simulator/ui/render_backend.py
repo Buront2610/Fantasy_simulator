@@ -9,7 +9,7 @@ touching input or domain code.
 from __future__ import annotations
 
 import textwrap
-from typing import Protocol, runtime_checkable
+from typing import List, Optional, Protocol, Tuple, runtime_checkable
 
 
 @runtime_checkable
@@ -50,6 +50,20 @@ class RenderBackend(Protocol):
 
     def print_highlighted(self, text: str) -> None:
         """Print highlighted / accented text (e.g. in cyan)."""
+        ...  # pragma: no cover
+
+    def print_menu(
+        self,
+        prompt: str,
+        key_label_pairs: List[Tuple[str, str]],
+        default: Optional[str] = None,
+    ) -> None:
+        """Render a numbered menu.
+
+        Displays *prompt* as a heading, then each ``(key, label)`` pair as
+        a numbered item.  The selected item is not read here — that is
+        handled by ``InputBackend.read_menu_key()``.
+        """
         ...  # pragma: no cover
 
     def format_status(self, text: str, positive: bool) -> str:
@@ -110,6 +124,15 @@ class PrintRenderBackend:
     def print_highlighted(self, text: str) -> None:
         from .ui_helpers import cyan
         print(cyan(text))
+
+    def print_menu(
+        self,
+        prompt: str,
+        key_label_pairs: List[Tuple[str, str]],
+        default: Optional[str] = None,
+    ) -> None:
+        from .ui_helpers import _render_menu
+        _render_menu(prompt, key_label_pairs, default)
 
     def format_status(self, text: str, positive: bool) -> str:
         from .ui_helpers import green, red
