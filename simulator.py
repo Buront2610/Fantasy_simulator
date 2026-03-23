@@ -91,13 +91,26 @@ class Simulator:
         "years_elapsed": 10,
     }
 
-    # Seasonal modifiers applied to locations each year (design §5.7)
+    # Seasonal modifiers applied to locations each year (design §5.7).
+    # Mapped to actual region_types: city, village, forest, dungeon, mountain, plains, sea.
     SEASONAL_MODIFIERS: Dict[tuple, Dict[str, int]] = {
+        # Winter: mountains & forests become treacherous, sea routes close
         ("winter", "mountain"): {"danger": +30, "road_condition": -20},
+        ("winter", "forest"): {"danger": +15, "road_condition": -15},
         ("winter", "sea"): {"traffic": -20},
-        ("spring", "village"): {"mood": +10},
+        ("winter", "plains"): {"road_condition": -10},
+        # Spring: settlements brighten, forests become safer
+        ("spring", "village"): {"mood": +10, "traffic": +10},
+        ("spring", "city"): {"mood": +5, "traffic": +10},
+        ("spring", "forest"): {"danger": -10},
+        # Summer: cities & sea routes thrive, plains easy to traverse
         ("summer", "city"): {"traffic": +20},
+        ("summer", "sea"): {"traffic": +20, "danger": -10},
+        ("summer", "plains"): {"traffic": +15},
+        # Autumn: wilds grow dangerous, dungeons more active
         ("autumn", "plains"): {"danger": +10},
+        ("autumn", "forest"): {"danger": +10},
+        ("autumn", "dungeon"): {"danger": +15},
     }
 
     # --- Notification density configuration (§8 of implementation_plan) ---

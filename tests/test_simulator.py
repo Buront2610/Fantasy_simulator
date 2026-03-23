@@ -765,6 +765,45 @@ class TestSeasonalModifiers:
         sim._revert_seasonal_modifiers()
         assert loc.mood == original_mood
 
+    def test_autumn_forest_increases_danger(self):
+        world = World(name="TestWorld", year=1000)
+        sim = Simulator(world, events_per_year=0, seed=1)
+        forest_locs = [loc for loc in world.grid.values() if loc.region_type == "forest"]
+        if not forest_locs:
+            pytest.skip("No forest locations in default world")
+        loc = forest_locs[0]
+        original_danger = loc.danger
+        sim._apply_seasonal_modifiers(10)  # October = autumn
+        assert loc.danger > original_danger or loc.danger == 100
+        sim._revert_seasonal_modifiers()
+        assert loc.danger == original_danger
+
+    def test_summer_sea_increases_traffic(self):
+        world = World(name="TestWorld", year=1000)
+        sim = Simulator(world, events_per_year=0, seed=1)
+        sea_locs = [loc for loc in world.grid.values() if loc.region_type == "sea"]
+        if not sea_locs:
+            pytest.skip("No sea locations in default world")
+        loc = sea_locs[0]
+        original_traffic = loc.traffic
+        sim._apply_seasonal_modifiers(7)  # July = summer
+        assert loc.traffic > original_traffic or loc.traffic == 100
+        sim._revert_seasonal_modifiers()
+        assert loc.traffic == original_traffic
+
+    def test_winter_forest_increases_danger(self):
+        world = World(name="TestWorld", year=1000)
+        sim = Simulator(world, events_per_year=0, seed=1)
+        forest_locs = [loc for loc in world.grid.values() if loc.region_type == "forest"]
+        if not forest_locs:
+            pytest.skip("No forest locations in default world")
+        loc = forest_locs[0]
+        original_danger = loc.danger
+        sim._apply_seasonal_modifiers(1)  # January = winter
+        assert loc.danger > original_danger or loc.danger == 100
+        sim._revert_seasonal_modifiers()
+        assert loc.danger == original_danger
+
     def test_get_season_helper(self):
         assert World.get_season(1) == "winter"
         assert World.get_season(3) == "spring"
