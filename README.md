@@ -48,6 +48,13 @@ current roadmap for true monthly progression, simulator refactoring, UI
 separation, and later phase features is maintained in
 [`docs/implementation_plan.md`](docs/implementation_plan.md).
 
+**Compatibility note (PR-A):** CLI launch (`python -m fantasy_simulator` and
+`python main.py`) and save/load compatibility are preserved. However, old
+bare-module imports such as `from i18n import tr` or `from world import World`
+are **no longer supported**. All imports must now use the package path, e.g.
+`from fantasy_simulator.i18n import tr`,
+`from fantasy_simulator.world import World`.
+
 Run tests:
 
 ```bash
