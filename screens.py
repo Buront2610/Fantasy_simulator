@@ -47,6 +47,20 @@ def _get_numeric_choice(prompt: str, count: int) -> Optional[int]:
     return idx
 
 
+def _month_season_hint() -> str:
+    """Return a compact month -> season hint for monthly report selection."""
+    season_by_month = {
+        1: "winter", 2: "winter", 3: "spring",
+        4: "spring", 5: "spring", 6: "summer",
+        7: "summer", 8: "summer", 9: "autumn",
+        10: "autumn", 11: "autumn", 12: "winter",
+    }
+    return ", ".join(
+        f"{month} ({tr('season_' + season_by_month[month])})"
+        for month in range(1, 13)
+    )
+
+
 # ---------------------------------------------------------------------------
 # Simulation helpers
 # ---------------------------------------------------------------------------
@@ -115,6 +129,8 @@ def _show_results(sim: Simulator) -> None:
             [
                 ("advance_1_year", tr("advance_1_year")),
                 ("advance_5_years", tr("advance_5_years")),
+                ("yearly_report", tr("yearly_report")),
+                ("monthly_report", tr("monthly_report")),
                 ("world_map", tr("world_map")),
                 ("character_roster", tr("character_roster")),
                 ("event_log_last_30", tr("event_log_last_30")),
@@ -134,6 +150,12 @@ def _show_results(sim: Simulator) -> None:
             _advance_simulation(sim, 1)
         elif action == "advance_5_years":
             _advance_simulation(sim, 5)
+        elif action == "yearly_report":
+            print()
+            print(sim.get_latest_yearly_report())
+            _pause()
+        elif action == "monthly_report":
+            _show_monthly_report(sim)
         elif action == "world_map":
             print()
             print(world.render_map())
@@ -170,6 +192,27 @@ def _show_results(sim: Simulator) -> None:
             _pause()
         else:
             break
+
+
+def _show_monthly_report(sim: Simulator) -> None:
+    """Show a monthly report for the latest completed year.
+
+    The user picks a month (1-12) within that year.  Reports are
+    derived solely from event records, so content stays stable.
+    """
+    year = sim.get_latest_completed_report_year()
+    print()
+    print(f"  {tr('year_label')}: {year}")
+    print(f"  {_month_season_hint()}")
+    month_idx = _get_numeric_choice(
+        f"  {tr('monthly_report')} (1-12): ", 12,
+    )
+    if month_idx is None:
+        return
+    month = month_idx + 1
+    print()
+    print(sim.get_monthly_report(year, month))
+    _pause()
 
 
 def _show_roster(world: World) -> None:

@@ -47,8 +47,8 @@ class TestI18n:
 
     def test_event_type_translations_in_english(self):
         set_locale("en")
-        assert tr("event_type_meeting") == "meeting"
-        assert tr("event_type_death") == "death"
+        assert tr("event_type_meeting") == "Meeting"
+        assert tr("event_type_death") == "Death"
         assert tr("times_suffix") == "times"
 
     def test_adventure_discovery_terms_in_japanese(self):

@@ -11,6 +11,12 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from adventure import AdventureRun, create_adventure_run
 from events import EventResult, EventSystem, WorldEventRecord, generate_record_id
 from i18n import get_locale, set_locale, tr, tr_term
+from reports import (
+    format_monthly_report,
+    format_yearly_report,
+    generate_monthly_report,
+    generate_yearly_report,
+)
 
 if TYPE_CHECKING:
     from character import Character
@@ -45,6 +51,13 @@ class Simulator:
         # filters, and save/load paths. The canonical structured history lives
         # in world.event_records.
         self.history: List[EventResult] = []
+        # Mutable progress marker for structured event timestamps within the
+        # current simulated year. This value is serialized and restored as-is
+        # to preserve in-progress context across save/load.
+        self.current_month: int = 1
+        # Baseline year used for "latest completed report year" fallback when
+        # the simulation has not yet completed a full year.
+        self.start_year: int = world.year
         self.rng = random.Random(seed)
         self.id_rng = random.Random(self._id_seed_from_seed(seed))
 
@@ -98,6 +111,7 @@ class Simulator:
         *,
         kind: str,
         year: Optional[int] = None,
+        month: Optional[int] = None,
         location_id: Optional[str] = None,
         primary_actor_id: Optional[str] = None,
         secondary_actor_ids: Optional[List[str]] = None,
@@ -111,6 +125,7 @@ class Simulator:
                 record_id=generate_record_id(self.id_rng),
                 kind=kind,
                 year=self.world.year if year is None else year,
+                month=self.current_month if month is None else month,
                 location_id=location_id,
                 primary_actor_id=primary_actor_id,
                 secondary_actor_ids=[] if secondary_actor_ids is None else list(secondary_actor_ids),
@@ -181,22 +196,32 @@ class Simulator:
             self._run_year()
 
     def _run_year(self) -> None:
-        """Process a single year."""
-        # --- Natural death checks ---
+        """Process a single year, stamping events with month 1..12.
+
+        NOTE: This is a month-stamped foundation, not a true month-level
+        simulation.  Events are *not* processed in chronological month
+        order — random events receive randomised month labels and the
+        simulation still mutates world state in a single pass per year.
+        Full month-ordered progression is a future milestone.
+        """
+        # --- Natural death checks (once per year, month 1) ---
+        self.current_month = 1
         for char in list(self.world.characters):
             result = self.event_system.check_natural_death(char, self.world, rng=self.rng)
             if result is not None:
                 self._record_event(result, location_id=char.location_id)
 
-        # --- Injury recovery ---
+        # --- Injury recovery (once per year, month 1) ---
         self._recover_injuries()
 
-        # --- Adventure start / progression ---
+        # --- Adventure start / progression (month 2) ---
+        self.current_month = 2
         self._maybe_start_adventure()
         self._advance_adventures()
 
-        # --- Random events ---
+        # --- Random events (randomly stamped with months 1-12) ---
         for _ in range(self.events_per_year):
+            self.current_month = self.rng.randint(1, 12)
             result = self.event_system.generate_random_event(
                 self.world.characters, self.world, rng=self.rng
             )
@@ -207,6 +232,7 @@ class Simulator:
             loc_id = primary_char.location_id if primary_char else None
             self._record_event(result, location_id=loc_id)
 
+        self.current_month = 12
         self.world.advance_time(1)
 
     def _recover_injuries(self) -> None:
@@ -314,14 +340,15 @@ class Simulator:
     # ------------------------------------------------------------------
 
     def get_summary(self) -> str:
-        """Return a human-readable summary of the entire simulation."""
-        total = len(self.history)
+        """Return a human-readable summary using WorldEventRecord as canonical source."""
+        records = self.world.event_records
+        total = len(records)
         alive = sum(1 for c in self.world.characters if c.alive)
         dead = sum(1 for c in self.world.characters if not c.alive)
 
         type_counts: Dict[str, int] = {}
-        for ev in self.history:
-            type_counts[ev.event_type] = type_counts.get(ev.event_type, 0) + 1
+        for rec in records:
+            type_counts[rec.kind] = type_counts.get(rec.kind, 0) + 1
 
         lines = [
             "=" * 60,
@@ -335,22 +362,54 @@ class Simulator:
             f"  {tr('event_breakdown')}:",
         ]
         for etype, count in sorted(type_counts.items(), key=lambda x: -x[1]):
-            localized_type = tr(f"event_type_{etype}")
+            i18n_key = f"event_type_{etype}"
+            localized_type = tr(i18n_key)
+            # Fallback: if tr() returned the key unchanged, show the raw kind
+            if localized_type == i18n_key:
+                localized_type = etype.replace("_", " ").capitalize()
             lines.append(f"    {localized_type:<20} {count:>4} {tr('times_suffix')}")
 
         lines.append("")
         lines.append(f"  {tr('notable_moments')}:")
-        # Pick up to 5 dramatic events
         dramatic = [
-            ev for ev in self.history
-            if ev.event_type in ("marriage", "battle_fatal", "death", "discovery")
+            rec for rec in records
+            if rec.kind in ("marriage", "battle_fatal", "death", "discovery")
         ]
         shown = dramatic[:5] if len(dramatic) >= 5 else dramatic
-        for ev in shown:
-            lines.append(f"    • {ev.description}")
+        for rec in shown:
+            lines.append(f"    • {rec.description}")
 
         lines.append("=" * 60)
         return "\n".join(lines)
+
+    def get_monthly_report(self, year: int, month: int) -> str:
+        """Generate and format a monthly report for the given year and month."""
+        report = generate_monthly_report(self.world, year, month)
+        return format_monthly_report(report)
+
+    def get_yearly_report(self, year: int) -> str:
+        """Generate and format a yearly report for the given year."""
+        report = generate_yearly_report(self.world, year)
+        return format_yearly_report(report)
+
+    def get_latest_completed_report_year(self) -> int:
+        """Return the latest year that should be used for end-of-year reports.
+
+        Preference is "last completed year" (`world.year - 1`). If the
+        simulation has not completed even one full year yet, this falls back
+        to the simulator baseline (`start_year`). If historical event records
+        from earlier years exist (e.g. imported data), that earlier year is
+        also respected as a valid lower bound.
+        """
+        candidate = self.world.year - 1
+        baseline = self.start_year
+        if self.world.event_records:
+            baseline = min(baseline, min(r.year for r in self.world.event_records))
+        return max(candidate, baseline)
+
+    def get_latest_yearly_report(self) -> str:
+        """Generate and format a yearly report for the most recent completed year."""
+        return self.get_yearly_report(self.get_latest_completed_report_year())
 
     def get_character_story(self, char_id: str) -> str:
         """Return the life story of a single character.
@@ -410,6 +469,8 @@ class Simulator:
             "characters": [char.to_dict() for char in self.world.characters],
             "events_per_year": self.events_per_year,
             "adventure_steps_per_year": self.adventure_steps_per_year,
+            "current_month": self.current_month,
+            "start_year": self.start_year,
             "locale": get_locale(),
             "rng_state": repr(self.rng.getstate()),
             "id_rng_state": repr(self.id_rng.getstate()),
@@ -437,6 +498,8 @@ class Simulator:
         sim._restore_rng_state(sim.rng, data.get("rng_state"))
         if not sim._restore_rng_state(sim.id_rng, data.get("id_rng_state")):
             sim.id_rng.seed(sim._legacy_id_seed(data))
+        sim.current_month = max(1, min(12, data.get("current_month", 1)))
+        sim.start_year = data.get("start_year", sim.world.year)
         sim.history = [
             EventResult.from_dict(ev) for ev in data.get("history", [])
         ]
@@ -499,6 +562,7 @@ class Simulator:
             self._record_world_event(
                 entry,
                 kind="adventure_choice",
+                month=self.current_month,
                 location_id=run.destination,
                 primary_actor_id=run.character_id,
             )
