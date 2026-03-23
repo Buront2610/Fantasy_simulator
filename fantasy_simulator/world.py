@@ -9,8 +9,8 @@ import unicodedata
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
-from i18n import tr, tr_term
-from world_data import (
+from .i18n import tr, tr_term
+from .content.world_data import (
     DEFAULT_LOCATIONS,
     NAME_TO_LOCATION_ID,
     WORLD_LORE,
@@ -19,10 +19,10 @@ from world_data import (
 )
 
 if TYPE_CHECKING:
-    from adventure import AdventureRun
-    from character import Character
-    from events import WorldEventRecord
-    from rumor import Rumor
+    from .adventure import AdventureRun
+    from .character import Character
+    from .events import WorldEventRecord
+    from .rumor import Rumor
 
 
 def _clamp_state(value: int) -> int:
@@ -727,9 +727,9 @@ class World:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "World":
-        from adventure import AdventureRun
-        from events import WorldEventRecord
-        from rumor import Rumor
+        from .adventure import AdventureRun
+        from .events import WorldEventRecord
+        from .rumor import Rumor
 
         world = cls(
             name=data["name"],

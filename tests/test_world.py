@@ -4,10 +4,10 @@ tests/test_world.py - Unit tests for the World class.
 
 import unicodedata
 
-from character import Character
-from i18n import set_locale
-from world import LocationState, World
-from world_data import get_location_state_defaults
+from fantasy_simulator.character import Character
+from fantasy_simulator.i18n import set_locale
+from fantasy_simulator.world import LocationState, World
+from fantasy_simulator.content.world_data import get_location_state_defaults
 
 
 def _make_char(name="Aldric", location_id="loc_aethoria_capital"):
@@ -155,7 +155,7 @@ class TestWorld:
         set_locale("en")
 
     def test_record_event_stores_structured_record(self):
-        from events import WorldEventRecord
+        from fantasy_simulator.events import WorldEventRecord
         world = World()
         record = WorldEventRecord(kind="battle", year=1001, location_id="loc_aethoria_capital")
         world.record_event(record)
@@ -163,7 +163,7 @@ class TestWorld:
         assert world.event_records[0].kind == "battle"
 
     def test_get_events_by_location(self):
-        from events import WorldEventRecord
+        from fantasy_simulator.events import WorldEventRecord
         world = World()
         world.record_event(WorldEventRecord(kind="battle", year=1001, location_id="loc_thornwood"))
         world.record_event(WorldEventRecord(kind="meeting", year=1001, location_id="loc_aethoria_capital"))
@@ -173,7 +173,7 @@ class TestWorld:
         assert all(r.location_id == "loc_thornwood" for r in results)
 
     def test_get_events_by_actor(self):
-        from events import WorldEventRecord
+        from fantasy_simulator.events import WorldEventRecord
         world = World()
         world.record_event(WorldEventRecord(
             kind="battle", year=1001, primary_actor_id="a1", secondary_actor_ids=["a2"],
@@ -185,7 +185,7 @@ class TestWorld:
         assert len(world.get_events_by_actor("unknown")) == 0
 
     def test_get_events_by_year(self):
-        from events import WorldEventRecord
+        from fantasy_simulator.events import WorldEventRecord
         world = World()
         world.record_event(WorldEventRecord(kind="battle", year=1001))
         world.record_event(WorldEventRecord(kind="meeting", year=1002))
@@ -194,7 +194,7 @@ class TestWorld:
         assert len(world.get_events_by_year(1002)) == 1
 
     def test_event_records_in_to_dict_round_trip(self):
-        from events import WorldEventRecord
+        from fantasy_simulator.events import WorldEventRecord
         world = World()
         world.record_event(WorldEventRecord(kind="battle", year=1001, location_id="loc_thornwood"))
         payload = world.to_dict()
@@ -216,7 +216,7 @@ class TestWorld:
         assert restored_capital.visited is True
 
     def test_from_dict_rebuilds_recent_event_ids_from_event_records(self):
-        from events import WorldEventRecord
+        from fantasy_simulator.events import WorldEventRecord
 
         world = World()
         payload = world.to_dict()
@@ -234,7 +234,7 @@ class TestWorld:
         assert thornwood.recent_event_ids == ["r1", "r2"]
 
     def test_trimming_event_records_removes_dangling_recent_event_ids(self):
-        from events import WorldEventRecord
+        from fantasy_simulator.events import WorldEventRecord
 
         world = World()
         world.MAX_EVENT_RECORDS = 2

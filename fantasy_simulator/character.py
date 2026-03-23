@@ -8,8 +8,8 @@ import random
 import uuid
 from typing import Any, Dict, List, Optional
 
-from i18n import tr, tr_term
-from world_data import NAME_TO_LOCATION_ID, fallback_location_id
+from .i18n import tr, tr_term
+from .content.world_data import NAME_TO_LOCATION_ID, fallback_location_id
 
 
 class Character:

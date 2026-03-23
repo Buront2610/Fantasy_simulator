@@ -3,10 +3,10 @@ tests/test_reports.py - Unit tests for the reports module.
 """
 
 import pytest
-from character import Character
-from events import WorldEventRecord
-from i18n import get_locale, set_locale, tr
-from reports import (
+from fantasy_simulator.character import Character
+from fantasy_simulator.events import WorldEventRecord
+from fantasy_simulator.i18n import get_locale, set_locale, tr
+from fantasy_simulator.reports import (
     CharacterReportEntry,
     MonthlyReport,
     YearlyReport,
@@ -15,8 +15,8 @@ from reports import (
     generate_monthly_report,
     generate_yearly_report,
 )
-from simulator import Simulator
-from world import World
+from fantasy_simulator.simulator import Simulator
+from fantasy_simulator.world import World
 
 
 # ---------------------------------------------------------------------------
@@ -113,7 +113,7 @@ class TestWorldEventRecordMonth:
         assert rec.month == 1
 
     def test_from_event_result_month_defaults_to_one(self):
-        from events import EventResult
+        from fantasy_simulator.events import EventResult
         er = EventResult(description="test", event_type="meeting", year=1000)
         rec = WorldEventRecord.from_event_result(er)
         assert rec.month == 1
@@ -347,7 +347,7 @@ class TestFormatMonthlyReport:
 
     def test_empty_world_section_not_shown(self):
         """If all location entries have no notable events, no World section header."""
-        from reports import LocationReportEntry
+        from fantasy_simulator.reports import LocationReportEntry
         loc = LocationReportEntry(
             location_id="loc_test", name="Test", event_count=1,
             notable_events=[],

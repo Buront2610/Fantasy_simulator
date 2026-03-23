@@ -14,12 +14,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Dict, List, Set
 
-from i18n import tr
-from rumor import RUMOR_MAX_AGE_MONTHS
+from .i18n import tr
+from .rumor import RUMOR_MAX_AGE_MONTHS
 
 if TYPE_CHECKING:
-    from events import WorldEventRecord
-    from world import World
+    from .events import WorldEventRecord
+    from .world import World
 
 
 # ------------------------------------------------------------------

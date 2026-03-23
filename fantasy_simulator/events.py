@@ -13,15 +13,15 @@ import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
-from world_data import (
+from .content.world_data import (
     DISCOVERY_ITEMS,
     JOURNEY_EVENTS,
 )
-from i18n import tr, tr_term
+from .i18n import tr, tr_term
 
 if TYPE_CHECKING:
-    from character import Character
-    from world import World
+    from .character import Character
+    from .world import World
 
 
 def generate_record_id(rng: Optional[Any] = None) -> str:
@@ -530,7 +530,7 @@ class EventSystem:
 
     def event_skill_training(self, char: Character, world: World, rng: Any = random) -> EventResult:
         if not char.skills:
-            from world_data import ALL_SKILLS
+            from .content.world_data import ALL_SKILLS
 
             starter = rng.choice(ALL_SKILLS)
             char.skills[starter] = 0

@@ -1,6 +1,6 @@
 """Tests for world_data.py data integrity."""
 
-from world_data import (
+from fantasy_simulator.content.world_data import (
     ALL_SKILLS,
     BATTLE_OUTCOMES_LOSE,
     BATTLE_OUTCOMES_WIN,

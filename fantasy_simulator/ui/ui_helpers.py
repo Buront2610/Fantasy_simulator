@@ -8,7 +8,7 @@ import textwrap
 import unicodedata
 from typing import List, Optional
 
-from i18n import tr
+from ..i18n import tr
 
 
 def _c(text: str, code: str) -> str:

@@ -6,12 +6,12 @@ from __future__ import annotations
 
 from typing import Any, List, Optional
 
-from character import Character
-from character_creator import CharacterCreator
-from i18n import set_locale, tr, tr_term
-from save_load import load_simulation, save_simulation
-from simulator import Simulator
-from ui_helpers import (
+from ..character import Character
+from ..character_creator import CharacterCreator
+from ..i18n import set_locale, tr, tr_term
+from ..persistence.save_load import load_simulation, save_simulation
+from ..simulator import Simulator
+from .ui_helpers import (
     _choose_key,
     _hr,
     _pause,
@@ -24,8 +24,8 @@ from ui_helpers import (
     red,
     yellow,
 )
-from world import World
-from world_data import JOBS, RACES, WORLD_LORE
+from ..world import World
+from ..content.world_data import JOBS, RACES, WORLD_LORE
 
 
 # ---------------------------------------------------------------------------

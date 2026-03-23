@@ -2,13 +2,13 @@
 tests/test_migrations.py - Unit tests for schema migration.
 """
 
-from migrations import (
+from fantasy_simulator.persistence.migrations import (
     CURRENT_VERSION,
     _migrate_v1_to_v2,
     _migrate_v2_to_v3,
     migrate,
 )
-from world_data import NAME_TO_LOCATION_ID
+from fantasy_simulator.content.world_data import NAME_TO_LOCATION_ID
 
 
 class TestMigrations:

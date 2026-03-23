@@ -7,9 +7,9 @@ from __future__ import annotations
 import random
 from typing import Any, Dict, List, Optional
 
-from character import Character, random_stats
-from i18n import tr
-from world_data import JOBS, RACES, ALL_SKILLS
+from .character import Character, random_stats
+from .i18n import tr
+from .content.world_data import JOBS, RACES, ALL_SKILLS
 
 
 _TEMPLATES: Dict[str, Dict] = {

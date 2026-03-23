@@ -21,11 +21,11 @@ import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from i18n import tr
+from .i18n import tr
 
 if TYPE_CHECKING:
-    from events import WorldEventRecord
-    from world import World
+    from .events import WorldEventRecord
+    from .world import World
 
 # ------------------------------------------------------------------
 # Constants

@@ -8,20 +8,20 @@ import random
 import ast
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from adventure import AdventureRun, create_adventure_run
-from events import EventResult, EventSystem, WorldEventRecord, generate_record_id
-from i18n import get_locale, set_locale, tr, tr_term
-from reports import (
+from .adventure import AdventureRun, create_adventure_run
+from .events import EventResult, EventSystem, WorldEventRecord, generate_record_id
+from .i18n import get_locale, set_locale, tr, tr_term
+from .reports import (
     format_monthly_report,
     format_yearly_report,
     generate_monthly_report,
     generate_yearly_report,
 )
-from rumor import age_rumors, generate_rumors_for_period, trim_rumors
+from .rumor import age_rumors, generate_rumors_for_period, trim_rumors
 
 if TYPE_CHECKING:
-    from character import Character
-    from world import World
+    from .character import Character
+    from .world import World
 
 
 class Simulator:
@@ -797,8 +797,8 @@ class Simulator:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Simulator":
         """Rebuild a simulator from a serialised snapshot."""
-        from character import Character
-        from world import World
+        from .character import Character
+        from .world import World
 
         world = World.from_dict(data["world"])
         characters = [

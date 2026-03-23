@@ -8,8 +8,8 @@ import json
 import logging
 from typing import Any, Optional
 
-from migrations import CURRENT_VERSION, migrate
-from simulator import Simulator
+from .migrations import CURRENT_VERSION, migrate
+from ..simulator import Simulator
 
 logger = logging.getLogger(__name__)
 

@@ -5,10 +5,10 @@ tests/test_events.py - Unit tests for the EventSystem.
 import random
 
 import pytest
-from character import Character
-from events import EventResult, EventSystem
-from i18n import get_locale, set_locale
-from world import World
+from fantasy_simulator.character import Character
+from fantasy_simulator.events import EventResult, EventSystem
+from fantasy_simulator.i18n import get_locale, set_locale
+from fantasy_simulator.world import World
 
 
 # ---------------------------------------------------------------------------
@@ -515,7 +515,7 @@ class TestGenerateRandomEvent:
 
 class TestWorldEventRecord:
     def test_to_dict_round_trip(self):
-        from events import WorldEventRecord
+        from fantasy_simulator.events import WorldEventRecord
         record = WorldEventRecord(
             kind="battle",
             year=1005,
@@ -536,7 +536,7 @@ class TestWorldEventRecord:
         assert restored.severity == 3
 
     def test_from_event_result(self):
-        from events import WorldEventRecord
+        from fantasy_simulator.events import WorldEventRecord
         result = EventResult(
             description="A battle occurred.",
             affected_characters=["abc123", "def456"],
@@ -554,14 +554,14 @@ class TestWorldEventRecord:
         assert record.description == "A battle occurred."
 
     def test_from_event_result_no_actors(self):
-        from events import WorldEventRecord
+        from fantasy_simulator.events import WorldEventRecord
         result = EventResult(description="Nothing happened.", year=1000)
         record = WorldEventRecord.from_event_result(result)
         assert record.primary_actor_id is None
         assert record.secondary_actor_ids == []
 
     def test_default_values(self):
-        from events import WorldEventRecord
+        from fantasy_simulator.events import WorldEventRecord
         record = WorldEventRecord()
         assert record.kind == "generic"
         assert record.year == 0
