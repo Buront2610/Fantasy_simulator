@@ -694,3 +694,81 @@ class TestWorldEventRecordIntegration:
         restored = load_simulation(str(path))
         assert restored is not None
         assert len(restored.world.event_records) == original_count
+
+
+# ---------------------------------------------------------------------------
+# Seasonal Modifiers (design §5.7)
+# ---------------------------------------------------------------------------
+
+class TestSeasonalModifiers:
+    """Tarn Adams: Seasons should meaningfully affect world conditions."""
+
+    def test_winter_mountain_increases_danger(self):
+        world = World(name="TestWorld", year=1000)
+        sim = Simulator(world, events_per_year=0, seed=1)
+        mountain_locs = [loc for loc in world.grid.values() if loc.region_type == "mountain"]
+        if not mountain_locs:
+            pytest.skip("No mountain locations in default world")
+        loc = mountain_locs[0]
+        original_danger = loc.danger
+        sim._apply_seasonal_modifiers(1)  # January = winter
+        assert loc.danger > original_danger or loc.danger == 100  # clamped at 100
+        sim._revert_seasonal_modifiers()
+        assert loc.danger == original_danger
+
+    def test_non_winter_no_mountain_modifier(self):
+        world = World(name="TestWorld", year=1000)
+        sim = Simulator(world, events_per_year=0, seed=1)
+        mountain_locs = [loc for loc in world.grid.values() if loc.region_type == "mountain"]
+        if not mountain_locs:
+            pytest.skip("No mountain locations in default world")
+        loc = mountain_locs[0]
+        original_danger = loc.danger
+        sim._apply_seasonal_modifiers(7)  # July = summer
+        assert loc.danger == original_danger
+        sim._revert_seasonal_modifiers()
+
+    def test_get_season_helper(self):
+        assert World.get_season(1) == "winter"
+        assert World.get_season(3) == "spring"
+        assert World.get_season(7) == "summer"
+        assert World.get_season(10) == "autumn"
+        assert World.get_season(12) == "winter"
+
+
+# ---------------------------------------------------------------------------
+# Recovery stages (design §8)
+# ---------------------------------------------------------------------------
+
+class TestStagedInjuryRecovery:
+    """Design §8: Staged recovery serious→injured→none."""
+
+    def test_serious_can_recover_to_injured(self):
+        world = World(name="TestWorld", year=1000)
+        char = Character(
+            name="Wounded", age=30, gender="male", race="Human", job="Warrior",
+            strength=50, dexterity=50, constitution=50,
+            injury_status="serious",
+        )
+        world.add_character(char)
+        sim = Simulator(world, events_per_year=0, seed=1)
+        # Run many years to get the 30% recovery
+        recovered = False
+        for _ in range(50):
+            sim._recover_injuries()
+            if char.injury_status == "injured":
+                recovered = True
+                break
+        assert recovered, "Expected serious→injured recovery within 50 attempts"
+
+    def test_dying_not_recovered_by_recover_injuries(self):
+        world = World(name="TestWorld", year=1000)
+        char = Character(
+            name="Dying", age=30, gender="male", race="Human", job="Warrior",
+            strength=50, dexterity=50, constitution=50,
+            injury_status="dying",
+        )
+        world.add_character(char)
+        sim = Simulator(world, events_per_year=0, seed=1)
+        sim._recover_injuries()
+        assert char.injury_status == "dying"

@@ -134,3 +134,42 @@ class TestRelationTagsFromEvents:
                 tagged = True
                 break
         assert tagged, "Expected friend tag after positive meetings"
+
+
+class TestRelationTagSources:
+    """Design §7.4: Source event tracking for relation tags."""
+
+    def test_source_event_recorded(self):
+        char = _make_char()
+        char.add_relation_tag("abc123", "friend", source_event_id="evt_001")
+        key = "abc123:friend"
+        assert key in char.relation_tag_sources
+        assert "evt_001" in char.relation_tag_sources[key]
+
+    def test_multiple_sources_same_tag(self):
+        char = _make_char()
+        char.add_relation_tag("abc123", "friend", source_event_id="evt_001")
+        char.add_relation_tag("abc123", "friend", source_event_id="evt_002")
+        key = "abc123:friend"
+        assert len(char.relation_tag_sources[key]) == 2
+
+    def test_source_idempotent(self):
+        char = _make_char()
+        char.add_relation_tag("abc123", "friend", source_event_id="evt_001")
+        char.add_relation_tag("abc123", "friend", source_event_id="evt_001")
+        key = "abc123:friend"
+        assert len(char.relation_tag_sources[key]) == 1
+
+    def test_no_source_when_none(self):
+        char = _make_char()
+        char.add_relation_tag("abc123", "friend")
+        assert char.relation_tag_sources == {}
+
+    def test_source_survives_serialization(self):
+        char = _make_char()
+        char.add_relation_tag("abc123", "rival", source_event_id="evt_battle_01")
+        data = char.to_dict()
+        restored = Character.from_dict(data)
+        key = "abc123:rival"
+        assert key in restored.relation_tag_sources
+        assert "evt_battle_01" in restored.relation_tag_sources[key]

@@ -82,6 +82,9 @@ class Character:
         self.relation_tags: Dict[str, List[str]] = (
             relation_tags if relation_tags is not None else {}
         )
+        # Source event IDs for each (char_id, tag) pair (design §7.4)
+        # e.g. {("abc123", "friend"): ["evt_001"], ("def456", "rival"): ["evt_002"]}
+        self.relation_tag_sources: Dict[str, List[str]] = {}
 
     @staticmethod
     def _clamp(value: int, lo: int = 1, hi: int = 100) -> int:
@@ -130,11 +133,19 @@ class Character:
         self.injury_status = progression.get(self.injury_status, self.injury_status)
         return self.injury_status
 
-    def add_relation_tag(self, other_id: str, tag: str) -> None:
-        """Add a relation tag for another character (idempotent)."""
+    def add_relation_tag(self, other_id: str, tag: str, source_event_id: Optional[str] = None) -> None:
+        """Add a relation tag for another character (idempotent).
+
+        Optionally records the source event that caused this tag (design §7.4).
+        """
         tags = self.relation_tags.setdefault(other_id, [])
         if tag not in tags:
             tags.append(tag)
+        if source_event_id:
+            key = f"{other_id}:{tag}"
+            sources = self.relation_tag_sources.setdefault(key, [])
+            if source_event_id not in sources:
+                sources.append(source_event_id)
 
     def has_relation_tag(self, other_id: str, tag: str) -> bool:
         """Check if a relation tag exists for another character."""
@@ -200,6 +211,7 @@ class Character:
             "injury_status": self.injury_status,
             "active_adventure_id": self.active_adventure_id,
             "relation_tags": {k: list(v) for k, v in self.relation_tags.items()},
+            "relation_tag_sources": {k: list(v) for k, v in self.relation_tag_sources.items()},
         }
 
     @classmethod
@@ -214,7 +226,7 @@ class Character:
         if location_id is None:
             old_name = data.get("location", "Aethoria Capital")
             location_id = NAME_TO_LOCATION_ID.get(old_name, fallback_location_id(old_name))
-        return cls(
+        char = cls(
             name=data["name"],
             age=data["age"],
             gender=data["gender"],
@@ -242,6 +254,10 @@ class Character:
                 k: list(v) for k, v in data.get("relation_tags", {}).items()
             },
         )
+        char.relation_tag_sources = {
+            k: list(v) for k, v in data.get("relation_tag_sources", {}).items()
+        }
+        return char
 
     def __repr__(self) -> str:  # pragma: no cover
         status = "alive" if self.alive else "deceased"

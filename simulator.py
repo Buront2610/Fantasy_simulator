@@ -64,6 +64,9 @@ class Simulator:
         # Events that passed the should_notify() threshold during the
         # most recent advance_years() call, available for the UI layer.
         self.pending_notifications: List[WorldEventRecord] = []
+        # Adventures completed during the current year, used by
+        # _check_pause_conditions() for the party_returned condition.
+        self._recently_completed_adventures: List[AdventureRun] = []
 
     # Severity scale: 1=minor, 2=notable, 3=significant, 4=major, 5=critical
     _SEVERITY_MAP: Dict[str, int] = {
@@ -83,6 +86,15 @@ class Simulator:
         "dying_any": 60,
         "condition_worsened_favorite": 50,
         "months_elapsed": 10,
+    }
+
+    # Seasonal modifiers applied to locations each year (design §5.7)
+    SEASONAL_MODIFIERS: Dict[tuple, Dict[str, int]] = {
+        ("winter", "mountain"): {"danger": +30, "road_condition": -20},
+        ("winter", "trade_road"): {"traffic": -20},
+        ("spring", "settlement"): {"mood": +10},
+        ("summer", "port"): {"traffic": +20},
+        ("autumn", "lawless_road"): {"danger": +10},
     }
 
     # --- Notification density configuration (§8 of implementation_plan) ---
@@ -277,6 +289,15 @@ class Simulator:
                                 self.AUTO_PAUSE_PRIORITIES["pending_decision"]))
                 break
 
+        # Party returned (design §4.4: check recently completed adventures)
+        if self._recently_completed_adventures:
+            for run in self._recently_completed_adventures:
+                char = self.world.get_character_by_id(run.character_id)
+                if char and (char.favorite or char.spotlighted):
+                    reasons.append(("party_returned",
+                                    self.AUTO_PAUSE_PRIORITIES["party_returned"]))
+                    break
+
         if not reasons:
             return None
         reasons.sort(key=lambda x: -x[1])
@@ -291,6 +312,8 @@ class Simulator:
         simulation still mutates world state in a single pass per year.
         Full month-ordered progression is a future milestone.
         """
+        # Reset per-year tracking for pause conditions
+        self._recently_completed_adventures.clear()
         # --- Natural death checks (once per year, month 1) ---
         self.current_month = 1
         for char in list(self.world.characters):
@@ -303,6 +326,9 @@ class Simulator:
 
         # --- Injury recovery (once per year, month 1) ---
         self._recover_injuries()
+
+        # --- Apply seasonal modifiers before adventures & events ---
+        self._apply_seasonal_modifiers(self.current_month)
 
         # --- Adventure start / progression (month 2) ---
         self.current_month = 2
@@ -321,6 +347,9 @@ class Simulator:
             primary_char = self.world.get_character_by_id(primary_id) if primary_id else None
             loc_id = primary_char.location_id if primary_char else None
             self._record_event(result, location_id=loc_id)
+
+        # --- Revert seasonal modifiers before propagation ---
+        self._revert_seasonal_modifiers()
 
         # --- State propagation and rumor generation (once per year at month 12) ---
         self.current_month = 12
@@ -375,6 +404,36 @@ class Simulator:
                     location_id=char.location_id,
                     primary_actor_id=char.char_id,
                 )
+
+    def _apply_seasonal_modifiers(self, month: int) -> None:
+        """Apply seasonal modifiers to locations based on current month (design §5.7).
+
+        Modifiers are temporary adjustments applied before events/adventures
+        and reversed after, so they influence outcomes without permanently
+        drifting location stats.
+        """
+        season = self.world.get_season(month)
+        self._active_seasonal_deltas: List[tuple] = []
+        for (s, region), deltas in self.SEASONAL_MODIFIERS.items():
+            if s != season:
+                continue
+            for loc in self.world.grid.values():
+                if loc.region_type != region:
+                    continue
+                for attr, delta in deltas.items():
+                    if not hasattr(loc, attr):
+                        continue
+                    old_val = getattr(loc, attr)
+                    new_val = max(0, min(100, old_val + delta))
+                    setattr(loc, attr, new_val)
+                    self._active_seasonal_deltas.append((loc, attr, new_val - old_val))
+
+    def _revert_seasonal_modifiers(self) -> None:
+        """Revert seasonal modifiers applied by _apply_seasonal_modifiers."""
+        for loc, attr, applied_delta in self._active_seasonal_deltas:
+            old_val = getattr(loc, attr)
+            setattr(loc, attr, max(0, min(100, old_val - applied_delta)))
+        self._active_seasonal_deltas.clear()
 
     def _generate_and_age_rumors(self) -> None:
         """Generate rumors monthly and age existing ones.
@@ -471,6 +530,7 @@ class Simulator:
                 if not char.alive:
                     self.event_system.handle_death_side_effects(char, self.world)
                 if run.is_resolved:
+                    self._recently_completed_adventures.append(run)
                     self.world.complete_adventure(run.adventure_id)
                 elif not had_pending_choice and run.pending_choice is not None:
                     paused_until_next_year.add(run.adventure_id)
@@ -492,6 +552,7 @@ class Simulator:
             )
         )
         self.event_system.handle_death_side_effects(char, self.world)
+        self._recently_completed_adventures.append(run)
         self.world.complete_adventure(run.adventure_id)
 
     # ------------------------------------------------------------------

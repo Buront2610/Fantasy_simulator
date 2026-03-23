@@ -147,3 +147,57 @@ class TestPausePriorityOrdering:
         char2.injury_status = "dying"  # dying_any
         reason = sim._check_pause_conditions()
         assert reason == "dying_any"
+
+
+class TestPartyReturnedPause:
+    """Design §4.4: Party returned should pause for favorite/spotlighted."""
+
+    def test_party_returned_pauses_for_favorite(self, sim):
+        from adventure import AdventureRun
+        char = sim.world.characters[0]
+        char.favorite = True
+        run = AdventureRun(
+            character_id=char.char_id,
+            character_name=char.name,
+            origin="loc_aethoria_capital",
+            destination="loc_thornwood",
+            year_started=1000,
+            state="resolved",
+            outcome="safe_return",
+        )
+        sim._recently_completed_adventures = [run]
+        reason = sim._check_pause_conditions()
+        assert reason == "party_returned"
+
+    def test_no_pause_for_non_favorite_return(self, sim):
+        from adventure import AdventureRun
+        char = sim.world.characters[0]
+        char.favorite = False
+        char.spotlighted = False
+        run = AdventureRun(
+            character_id=char.char_id,
+            character_name=char.name,
+            origin="loc_aethoria_capital",
+            destination="loc_thornwood",
+            year_started=1000,
+            state="resolved",
+            outcome="safe_return",
+        )
+        sim._recently_completed_adventures = [run]
+        reason = sim._check_pause_conditions()
+        assert reason is None
+
+    def test_recently_completed_cleared_each_year(self, sim):
+        from adventure import AdventureRun
+        run = AdventureRun(
+            character_id="char0000",
+            character_name="Char0",
+            origin="loc_aethoria_capital",
+            destination="loc_thornwood",
+            year_started=1000,
+            state="resolved",
+            outcome="safe_return",
+        )
+        sim._recently_completed_adventures = [run]
+        sim._run_year()
+        assert sim._recently_completed_adventures == []
