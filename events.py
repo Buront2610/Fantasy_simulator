@@ -150,6 +150,12 @@ class EventSystem:
         "marriage": 5,
     }
 
+    @staticmethod
+    def _new_relation_source_id(prefix: str, rng: Any = random) -> str:
+        if hasattr(rng, "getrandbits"):
+            return f"{prefix}_{rng.getrandbits(48):012x}"
+        return f"{prefix}_{uuid.uuid4().hex[:12]}"
+
     def event_marriage(self, char1: Character, char2: Character, world: World, rng: Any = random) -> EventResult:
         """Two characters with strong mutual affection may get married."""
         rel1 = char1.get_relationship(char2.char_id)
@@ -202,8 +208,9 @@ class EventSystem:
         char1.spouse_id = char2.char_id
         char2.spouse_id = char1.char_id
         char1.update_mutual_relationship(char2, 20)
-        char1.add_relation_tag(char2.char_id, "spouse")
-        char2.add_relation_tag(char1.char_id, "spouse")
+        marriage_event_id = self._new_relation_source_id("evt_marriage", rng=rng)
+        char1.add_relation_tag(char2.char_id, "spouse", source_event_id=marriage_event_id)
+        char2.add_relation_tag(char1.char_id, "spouse", source_event_id=marriage_event_id)
         stat_changes = {
             char1.char_id: {"wisdom": 2, "charisma": 1},
             char2.char_id: {"wisdom": 2, "charisma": 1},
@@ -254,8 +261,9 @@ class EventSystem:
         loser.apply_stat_delta(loser_losses)
         winner.update_mutual_relationship(loser, -20, delta_other=-30)
         # Relation tags: mark as rival
-        winner.add_relation_tag(loser.char_id, "rival")
-        loser.add_relation_tag(winner.char_id, "rival")
+        battle_event_id = self._new_relation_source_id("evt_battle", rng=rng)
+        winner.add_relation_tag(loser.char_id, "rival", source_event_id=battle_event_id)
+        loser.add_relation_tag(winner.char_id, "rival", source_event_id=battle_event_id)
 
         # Death staging: worsen injury instead of instant death
         old_status = loser.injury_status
@@ -340,11 +348,13 @@ class EventSystem:
 
         # Relation tags based on affinity level
         if avg_after >= 50:
-            char1.add_relation_tag(char2.char_id, "friend")
-            char2.add_relation_tag(char1.char_id, "friend")
+            meeting_event_id = self._new_relation_source_id("evt_meeting", rng=rng)
+            char1.add_relation_tag(char2.char_id, "friend", source_event_id=meeting_event_id)
+            char2.add_relation_tag(char1.char_id, "friend", source_event_id=meeting_event_id)
         elif avg_after <= -50:
-            char1.add_relation_tag(char2.char_id, "rival")
-            char2.add_relation_tag(char1.char_id, "rival")
+            meeting_event_id = self._new_relation_source_id("evt_meeting", rng=rng)
+            char1.add_relation_tag(char2.char_id, "rival", source_event_id=meeting_event_id)
+            char2.add_relation_tag(char1.char_id, "rival", source_event_id=meeting_event_id)
 
         if avg_after > 10:
             desc = tr(
@@ -651,8 +661,9 @@ class EventSystem:
             char.injury_status = "serious"
             rescuer = allies_at_loc[0] if allies_at_loc else None
             if rescuer:
-                char.add_relation_tag(rescuer.char_id, "savior")
-                rescuer.add_relation_tag(char.char_id, "rescued")
+                rescue_event_id = self._new_relation_source_id("evt_rescue", rng=rng)
+                char.add_relation_tag(rescuer.char_id, "savior", source_event_id=rescue_event_id)
+                rescuer.add_relation_tag(char.char_id, "rescued", source_event_id=rescue_event_id)
                 desc = tr(
                     "dying_rescued_by",
                     name=char.name,

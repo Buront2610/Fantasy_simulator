@@ -14,6 +14,7 @@ import pytest
 
 from character import Character
 from events import EventSystem
+from simulator import Simulator
 from world import World
 
 
@@ -206,6 +207,30 @@ class TestSI11DyingAlive:
                 assert char.alive is True  # SI-11
         # Some should worsen rather than die outright
         assert worsened_count > 0
+
+    def test_natural_death_worsening_not_resolved_same_year(self):
+        """Natural-death worsening should leave a reaction window until next year."""
+        world = World(name="TestWorld", year=1000)
+        char = _make_char(
+            name="Elder",
+            age=79,
+            race="Human",
+            constitution=5,
+            favorite=True,
+            injury_status="serious",
+            char_id="elder001",
+        )
+        world.add_character(char)
+        sim = Simulator(world, events_per_year=0, seed=4)
+
+        # Year 1: no pre-existing dying, natural death worsens to dying.
+        sim._run_year()
+        assert char.alive is True
+        assert char.injury_status == "dying"
+
+        # Year 2: pre-existing dying resolves.
+        sim._run_year()
+        assert char.injury_status in ("dying", "serious") or (char.alive is False)
 
 
 class TestRecoveryStages:

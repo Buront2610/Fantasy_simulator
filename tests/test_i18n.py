@@ -77,3 +77,9 @@ class TestI18n:
         set_locale("en")
         assert tr("injury_status_none") == "none"
         assert tr("injury_status_injured") == "injured"
+
+    def test_auto_pause_years_elapsed_translation_exists(self):
+        set_locale("ja")
+        assert tr("auto_pause_years_elapsed") == "時間が経過しました"
+        set_locale("en")
+        assert tr("auto_pause_years_elapsed") == "Time has passed"

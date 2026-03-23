@@ -67,6 +67,9 @@ class Simulator:
         # Adventures completed during the current year, used by
         # _check_pause_conditions() for the party_returned condition.
         self._recently_completed_adventures: List[AdventureRun] = []
+        # Favorites whose condition worsened this year, used for
+        # event-based condition_worsened_favorite pause checks.
+        self._favorites_worsened_this_year: set[str] = set()
 
     # Severity scale: 1=minor, 2=notable, 3=significant, 4=major, 5=critical
     _SEVERITY_MAP: Dict[str, int] = {
@@ -85,16 +88,16 @@ class Simulator:
         "party_returned": 70,
         "dying_any": 60,
         "condition_worsened_favorite": 50,
-        "months_elapsed": 10,
+        "years_elapsed": 10,
     }
 
     # Seasonal modifiers applied to locations each year (design §5.7)
     SEASONAL_MODIFIERS: Dict[tuple, Dict[str, int]] = {
         ("winter", "mountain"): {"danger": +30, "road_condition": -20},
-        ("winter", "trade_road"): {"traffic": -20},
-        ("spring", "settlement"): {"mood": +10},
-        ("summer", "port"): {"traffic": +20},
-        ("autumn", "lawless_road"): {"danger": +10},
+        ("winter", "sea"): {"traffic": -20},
+        ("spring", "village"): {"mood": +10},
+        ("summer", "city"): {"traffic": +20},
+        ("autumn", "plains"): {"danger": +10},
     }
 
     # --- Notification density configuration (§8 of implementation_plan) ---
@@ -154,7 +157,7 @@ class Simulator:
         secondary_actor_ids: Optional[List[str]] = None,
         severity: int = 1,
         visibility: str = "public",
-    ) -> None:
+    ) -> WorldEventRecord:
         """Record a structured world event and mirror it to the legacy text log."""
         self.world.log_event(description)
         record = WorldEventRecord(
@@ -175,6 +178,37 @@ class Simulator:
         # Surface notable events to the UI layer via notification thresholds
         if self.should_notify(record):
             self.pending_notifications.append(record)
+        return record
+
+    def _link_relation_tag_source_from_record(self, result: EventResult, record_id: str) -> None:
+        """Attach canonical WorldEventRecord IDs to relation tag sources."""
+        chars = [self.world.get_character_by_id(cid) for cid in result.affected_characters]
+        chars = [char for char in chars if char is not None]
+        if result.event_type in ("battle", "battle_fatal") and len(chars) >= 2:
+            chars[0].add_relation_tag(chars[1].char_id, "rival", source_event_id=record_id)
+            chars[1].add_relation_tag(chars[0].char_id, "rival", source_event_id=record_id)
+            return
+        if result.event_type == "marriage" and len(chars) >= 2:
+            chars[0].add_relation_tag(chars[1].char_id, "spouse", source_event_id=record_id)
+            chars[1].add_relation_tag(chars[0].char_id, "spouse", source_event_id=record_id)
+            return
+        if result.event_type == "meeting" and len(chars) >= 2:
+            for tag in ("friend", "rival"):
+                if chars[0].has_relation_tag(chars[1].char_id, tag):
+                    chars[0].add_relation_tag(chars[1].char_id, tag, source_event_id=record_id)
+                if chars[1].has_relation_tag(chars[0].char_id, tag):
+                    chars[1].add_relation_tag(chars[0].char_id, tag, source_event_id=record_id)
+            return
+        if result.event_type != "dying_rescued" or not chars:
+            return
+        rescued = chars[0]
+        for candidate in self.world.characters:
+            if candidate.char_id == rescued.char_id:
+                continue
+            if rescued.has_relation_tag(candidate.char_id, "savior") and candidate.has_relation_tag(rescued.char_id, "rescued"):
+                rescued.add_relation_tag(candidate.char_id, "savior", source_event_id=record_id)
+                candidate.add_relation_tag(rescued.char_id, "rescued", source_event_id=record_id)
+                break
 
     @staticmethod
     def _classify_adventure_summary(previous_state: str, run: AdventureRun) -> tuple[str, str, int]:
@@ -207,7 +241,7 @@ class Simulator:
         """
         self.history.append(result)
         severity = self._SEVERITY_MAP.get(result.event_type, 1)
-        self._record_world_event(
+        record = self._record_world_event(
             result.description,
             kind=result.event_type,
             year=result.year,
@@ -216,6 +250,7 @@ class Simulator:
             secondary_actor_ids=result.affected_characters[1:],
             severity=severity,
         )
+        self._link_relation_tag_source_from_record(result, record.record_id)
 
     # ------------------------------------------------------------------
     # Main simulation loop
@@ -244,6 +279,13 @@ class Simulator:
         This implements the conditional auto-advance system (design §4.4).
         """
         self.pending_notifications.clear()
+        preexisting_reason = self._check_pause_conditions()
+        if preexisting_reason is not None:
+            return {
+                "years_advanced": 0,
+                "pause_reason": preexisting_reason,
+                "pause_priority": self.AUTO_PAUSE_PRIORITIES.get(preexisting_reason, 0),
+            }
         years_advanced = 0
         for _ in range(max_years):
             self._run_year()
@@ -257,8 +299,8 @@ class Simulator:
                 }
         return {
             "years_advanced": years_advanced,
-            "pause_reason": "months_elapsed",
-            "pause_priority": self.AUTO_PAUSE_PRIORITIES["months_elapsed"],
+            "pause_reason": "years_elapsed",
+            "pause_priority": self.AUTO_PAUSE_PRIORITIES["years_elapsed"],
         }
 
     def _check_pause_conditions(self) -> Optional[str]:
@@ -278,7 +320,7 @@ class Simulator:
                 else:
                     reasons.append(("dying_any",
                                     self.AUTO_PAUSE_PRIORITIES["dying_any"]))
-            if char.favorite and char.injury_status == "serious":
+            if char.favorite and char.char_id in self._favorites_worsened_this_year:
                 reasons.append(("condition_worsened_favorite",
                                 self.AUTO_PAUSE_PRIORITIES["condition_worsened_favorite"]))
 
@@ -314,15 +356,19 @@ class Simulator:
         """
         # Reset per-year tracking for pause conditions
         self._recently_completed_adventures.clear()
-        # --- Natural death checks (once per year, month 1) ---
+        self._favorites_worsened_this_year.clear()
+
+        # --- Dying resolution for pre-existing dying characters (month 1) ---
         self.current_month = 1
+        self._resolve_dying_characters()
+
+        # --- Natural death checks (once per year, month 1) ---
         for char in list(self.world.characters):
             result = self.event_system.check_natural_death(char, self.world, rng=self.rng)
             if result is not None:
+                if result.event_type == "condition_worsened" and char.favorite:
+                    self._favorites_worsened_this_year.add(char.char_id)
                 self._record_event(result, location_id=char.location_id)
-
-        # --- Dying resolution (design §8.3) ---
-        self._resolve_dying_characters()
 
         # --- Injury recovery (once per year, month 1) ---
         self._recover_injuries()
