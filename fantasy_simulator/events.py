@@ -82,6 +82,7 @@ class WorldEventRecord:
     severity: int = 1
     visibility: str = "public"
     tags: List[str] = field(default_factory=list)
+    impacts: List[Dict[str, Any]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         self.severity = max(1, min(5, self.severity))
@@ -100,6 +101,7 @@ class WorldEventRecord:
             "severity": self.severity,
             "visibility": self.visibility,
             "tags": list(self.tags),
+            "impacts": list(self.impacts),
         }
 
     @classmethod
@@ -116,6 +118,7 @@ class WorldEventRecord:
             severity=data.get("severity", 1),
             visibility=data.get("visibility", "public"),
             tags=list(data.get("tags", [])),
+            impacts=list(data.get("impacts", [])),
         )
 
     @classmethod

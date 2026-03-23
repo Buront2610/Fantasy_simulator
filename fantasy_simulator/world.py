@@ -551,18 +551,34 @@ class World:
                         if record_id in surviving_ids
                     ]
 
-    def apply_event_impact(self, kind: str, location_id: Optional[str]) -> None:
-        """Update location state quantities based on an event kind (design §5.5)."""
+    def apply_event_impact(self, kind: str, location_id: Optional[str]) -> List[Dict[str, Any]]:
+        """Update location state quantities based on an event kind (design §5.5).
+
+        Returns a list of impact dicts recording the state changes applied,
+        each containing ``target_type``, ``target_id``, ``attribute``,
+        ``old_value``, ``new_value``, and ``delta``.
+        """
+        impacts: List[Dict[str, Any]] = []
         if location_id is None:
-            return
+            return impacts
         loc = self._location_id_index.get(location_id)
         if loc is None:
-            return
+            return impacts
         deltas = _EVENT_IMPACT.get(kind, {})
         for attr, delta in deltas.items():
             old = getattr(loc, attr, None)
             if old is not None:
-                setattr(loc, attr, _clamp_state(old + delta))
+                new_val = _clamp_state(old + delta)
+                setattr(loc, attr, new_val)
+                impacts.append({
+                    "target_type": "location",
+                    "target_id": location_id,
+                    "attribute": attr,
+                    "old_value": old,
+                    "new_value": new_val,
+                    "delta": new_val - old,
+                })
+        return impacts
 
     # Annual decay rate: each year, event-driven deviations from baseline
     # decay by this fraction toward the region-type default, preventing

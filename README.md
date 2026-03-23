@@ -9,7 +9,7 @@ occasionally influence.
 
 ## Features
 
-- Yearly time progression in the CLI, with monthly reports, rumors, and event-record foundations implemented but true monthly progression not yet complete
+- Yearly time progression in the CLI, with monthly-resolution engine powering all simulation advancement
 - Character generation with random and template-based creation
 - Event system for meetings, journeys, discoveries, training, battles, aging,
   marriage, and natural death
@@ -22,7 +22,7 @@ occasionally influence.
   - automatic default resolution when choices are left unresolved
 - Save/load support for simulation snapshots
 - Schema-versioned save migration support for older data
-- Structured world event records, rumors, and monthly/yearly reports
+- Structured world event records with causal impact tracking, rumors, and monthly/yearly reports
 - CLI localization support for Japanese and English
 
 ## Running
@@ -43,9 +43,10 @@ Or using the legacy entry point:
 python main.py
 ```
 
-The codebase has been migrated to a `fantasy_simulator/` package layout. The
-current roadmap for true monthly progression, simulator refactoring, UI
-separation, and later phase features is maintained in
+The codebase has been migrated to a `fantasy_simulator/` package layout with a
+`simulation/` sub-package for separated concerns (engine, timeline, notifications,
+event recording, adventure coordination, and query/reporting). The current roadmap
+for UI separation and later phase features is maintained in
 [`docs/implementation_plan.md`](docs/implementation_plan.md).
 
 **Compatibility note (PR-A):** CLI launch (`python -m fantasy_simulator` and
@@ -71,11 +72,19 @@ fantasy_simulator/          # Main package
   character.py              # Core character model
   character_creator.py      # Random, template, and interactive character creation
   world.py                  # World state, locations, map, and world serialization
-  events.py                 # Event generation and resolution
+  events.py                 # Event generation, EventResult, WorldEventRecord
   adventure.py              # Multi-step adventure progression
-  simulator.py              # Simulation orchestration
+  simulator.py              # Backward-compatible import path (delegates to simulation/)
   reports.py                # Monthly and yearly report view generation
   rumor.py                  # Rumor generation and lifecycle helpers
+  simulation/               # Simulator split into single-responsibility modules
+    __init__.py             # Re-exports Simulator
+    engine.py               # Core Simulator class (orchestration, loops, serialization)
+    timeline.py             # Monthly processing, seasonal modifiers, dying/injury
+    notifications.py        # Notification threshold evaluation
+    event_recorder.py       # Event recording across all event stores
+    adventure_coordinator.py # Adventure lifecycle management
+    queries.py              # Summary, report, story, and event-log access
   persistence/
     save_load.py            # Snapshot save/load helpers
     migrations.py           # Schema migration for save compatibility
@@ -107,7 +116,6 @@ docs/
 
 ## Current Limitations
 
-- Event causality is still fairly lightweight and can be deepened further.
 - Some generated event text is still English-first even when the CLI language is
   set to Japanese.
 - The simulation is tuned for readability and experimentation rather than
@@ -115,7 +123,5 @@ docs/
 
 ## Near-Term Priorities
 
-- Complete true monthly progression and deterministic monthly test coverage
-- Split `simulator.py` responsibilities and normalize `World.event_records` as the canonical event store
-- Separate UI/presentation concerns before expanding party adventure and AA map features
+- Separate UI/presentation concerns (PR-D) before expanding party adventure and AA map features
 - Maintain documentation source-of-truth alignment as the roadmap evolves
