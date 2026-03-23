@@ -45,8 +45,10 @@ python main.py
 
 The codebase has been migrated to a `fantasy_simulator/` package layout with a
 `simulation/` sub-package for separated concerns (engine, timeline, notifications,
-event recording, adventure coordination, and query/reporting). The current roadmap
-for UI separation and later phase features is maintained in
+event recording, adventure coordination, and query/reporting). The UI layer is
+fully abstracted through `InputBackend` / `RenderBackend` protocols and a
+`UIContext` dependency container, making it swappable to Rich, prompt_toolkit,
+or Textual without touching domain code. The current roadmap is maintained in
 [`docs/implementation_plan.md`](docs/implementation_plan.md).
 
 **Compatibility note (PR-A):** CLI launch (`python -m fantasy_simulator` and
@@ -91,6 +93,7 @@ fantasy_simulator/          # Main package
   ui/
     screens.py              # CLI screen and menu functions
     ui_helpers.py           # Display formatting and input utilities
+    ui_context.py           # UIContext dependency container (InputBackend + RenderBackend)
     map_renderer.py         # Map data extraction (MapCellInfo/MapRenderInfo) and ASCII rendering
     input_backend.py        # InputBackend protocol and StdInputBackend
     render_backend.py       # RenderBackend protocol and PrintRenderBackend
