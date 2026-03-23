@@ -165,11 +165,13 @@ class TestAdvanceMonths:
 
     def test_pending_notifications_cleared_at_start(self):
         sim = Simulator(_build_seeded_world(5, n_chars=3), events_per_year=4, seed=5)
-        # Prime some notifications by advancing 3 months
-        sim.advance_months(3)
-        # After advancing with events, there should be notifications pending
-        assert len(sim.pending_notifications) > 0 or True  # may be empty if no notable events
-        # A zero-month advance should clear pending_notifications
+        # Inject a synthetic notification so we can verify clearing
+        from fantasy_simulator.events import WorldEventRecord
+        sim.pending_notifications.append(
+            WorldEventRecord(kind="test_marker", year=1000, month=1)
+        )
+        assert len(sim.pending_notifications) == 1
+        # Any advance_months() call must clear pending_notifications at entry
         sim.advance_months(0)
         assert sim.pending_notifications == []
 
@@ -374,8 +376,8 @@ class TestMonthlyAutoPause:
         assert result["months_advanced"] >= 1
 
     def test_auto_pause_mid_year_does_not_complete_year(self):
-        """If a pause triggers mid-year, world.year should NOT have advanced
-        past the current year."""
+        """A very old, low-constitution character must trigger dying_any
+        before 5 years elapse — the auto-pause should fire mid-year."""
         world = World(name="TestWorld", year=1000)
         char = Character(
             "Doomed", age=95, gender="male", race="Human", job="Farmer",
@@ -385,10 +387,10 @@ class TestMonthlyAutoPause:
         world.add_character(char)
         sim = Simulator(world, events_per_year=0, adventure_steps_per_year=0, seed=42)
         result = sim.advance_until_pause(max_years=5)
-        # Very old, low-constitution character should eventually trigger
-        # condition_worsened or death, hopefully mid-year
-        assert result["pause_reason"] in (
-            "dying_any", "condition_worsened_favorite", "years_elapsed",
+        # With seed=42, age=95, constitution=10, the character reliably
+        # degrades to "dying" within 5 years, triggering dying_any.
+        assert result["pause_reason"] == "dying_any", (
+            f"Expected dying_any but got {result['pause_reason']}"
         )
 
     def test_pending_decision_pauses_at_month_3(self):

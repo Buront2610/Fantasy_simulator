@@ -397,15 +397,16 @@ class Simulator:
         return reasons[0][0]
 
     def _run_year(self) -> None:
-        """Process a full year by running each month in strict chronological order.
+        """Run the remaining months of the current year through to month 12.
 
-        Implemented via the shared month-loop so that ``advance_years()``,
-        ``advance_months()``, and ``_run_year()`` all use the same code path.
-        This is kept as a convenience method for legacy callers (e.g. old tests
-        that call ``_run_year()`` directly).
+        If ``current_month`` is 1, this processes a full 12-month cycle.
+        If called mid-year (e.g. ``current_month == 6``), only months 6..12
+        are processed — earlier months are **not** replayed.
+
+        Implemented via ``advance_months()`` so all simulation advancement
+        shares the same code path.  Kept as a convenience for legacy callers
+        (e.g. older tests that call ``_run_year()`` directly).
         """
-        # advance_months handles per-year tracking resets, month counting,
-        # and advance_time(1) when month 12 completes.
         remaining = 12 - self.current_month + 1
         self.advance_months(remaining)
 
