@@ -67,6 +67,9 @@ class Simulator:
         # Adventures completed during the current year, used by
         # _check_pause_conditions() for the party_returned condition.
         self._recently_completed_adventures: List[AdventureRun] = []
+        # Favorites whose condition worsened this year, used for
+        # event-based condition_worsened_favorite pause checks.
+        self._favorites_worsened_this_year: set[str] = set()
 
     # Severity scale: 1=minor, 2=notable, 3=significant, 4=major, 5=critical
     _SEVERITY_MAP: Dict[str, int] = {
@@ -85,16 +88,16 @@ class Simulator:
         "party_returned": 70,
         "dying_any": 60,
         "condition_worsened_favorite": 50,
-        "months_elapsed": 10,
+        "years_elapsed": 10,
     }
 
     # Seasonal modifiers applied to locations each year (design §5.7)
     SEASONAL_MODIFIERS: Dict[tuple, Dict[str, int]] = {
         ("winter", "mountain"): {"danger": +30, "road_condition": -20},
-        ("winter", "trade_road"): {"traffic": -20},
-        ("spring", "settlement"): {"mood": +10},
-        ("summer", "port"): {"traffic": +20},
-        ("autumn", "lawless_road"): {"danger": +10},
+        ("winter", "sea"): {"traffic": -20},
+        ("spring", "village"): {"mood": +10},
+        ("summer", "city"): {"traffic": +20},
+        ("autumn", "plains"): {"danger": +10},
     }
 
     # --- Notification density configuration (§8 of implementation_plan) ---
@@ -257,8 +260,8 @@ class Simulator:
                 }
         return {
             "years_advanced": years_advanced,
-            "pause_reason": "months_elapsed",
-            "pause_priority": self.AUTO_PAUSE_PRIORITIES["months_elapsed"],
+            "pause_reason": "years_elapsed",
+            "pause_priority": self.AUTO_PAUSE_PRIORITIES["years_elapsed"],
         }
 
     def _check_pause_conditions(self) -> Optional[str]:
@@ -278,7 +281,7 @@ class Simulator:
                 else:
                     reasons.append(("dying_any",
                                     self.AUTO_PAUSE_PRIORITIES["dying_any"]))
-            if char.favorite and char.injury_status == "serious":
+            if char.favorite and char.char_id in self._favorites_worsened_this_year:
                 reasons.append(("condition_worsened_favorite",
                                 self.AUTO_PAUSE_PRIORITIES["condition_worsened_favorite"]))
 
@@ -314,15 +317,19 @@ class Simulator:
         """
         # Reset per-year tracking for pause conditions
         self._recently_completed_adventures.clear()
-        # --- Natural death checks (once per year, month 1) ---
+        self._favorites_worsened_this_year.clear()
+
+        # --- Dying resolution for pre-existing dying characters (month 1) ---
         self.current_month = 1
+        self._resolve_dying_characters()
+
+        # --- Natural death checks (once per year, month 1) ---
         for char in list(self.world.characters):
             result = self.event_system.check_natural_death(char, self.world, rng=self.rng)
             if result is not None:
+                if result.event_type == "condition_worsened" and char.favorite:
+                    self._favorites_worsened_this_year.add(char.char_id)
                 self._record_event(result, location_id=char.location_id)
-
-        # --- Dying resolution (design §8.3) ---
-        self._resolve_dying_characters()
 
         # --- Injury recovery (once per year, month 1) ---
         self._recover_injuries()

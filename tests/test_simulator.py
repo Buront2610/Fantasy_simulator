@@ -728,6 +728,32 @@ class TestSeasonalModifiers:
         assert loc.danger == original_danger
         sim._revert_seasonal_modifiers()
 
+    def test_summer_city_increases_traffic(self):
+        world = World(name="TestWorld", year=1000)
+        sim = Simulator(world, events_per_year=0, seed=1)
+        city_locs = [loc for loc in world.grid.values() if loc.region_type == "city"]
+        if not city_locs:
+            pytest.skip("No city locations in default world")
+        loc = city_locs[0]
+        original_traffic = loc.traffic
+        sim._apply_seasonal_modifiers(7)  # July = summer
+        assert loc.traffic >= original_traffic
+        sim._revert_seasonal_modifiers()
+        assert loc.traffic == original_traffic
+
+    def test_spring_village_increases_mood(self):
+        world = World(name="TestWorld", year=1000)
+        sim = Simulator(world, events_per_year=0, seed=1)
+        village_locs = [loc for loc in world.grid.values() if loc.region_type == "village"]
+        if not village_locs:
+            pytest.skip("No village locations in default world")
+        loc = village_locs[0]
+        original_mood = loc.mood
+        sim._apply_seasonal_modifiers(4)  # April = spring
+        assert loc.mood >= original_mood
+        sim._revert_seasonal_modifiers()
+        assert loc.mood == original_mood
+
     def test_get_season_helper(self):
         assert World.get_season(1) == "winter"
         assert World.get_season(3) == "spring"

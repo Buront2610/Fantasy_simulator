@@ -102,6 +102,8 @@ class TestRelationTagsFromEvents:
         event_system.event_battle(char1, char2, world, rng=rng)
         assert char1.has_relation_tag(char2.char_id, "rival")
         assert char2.has_relation_tag(char1.char_id, "rival")
+        assert f"{char2.char_id}:rival" in char1.relation_tag_sources
+        assert f"{char1.char_id}:rival" in char2.relation_tag_sources
 
     def test_marriage_creates_spouse_tags(self, world, event_system):
         char1 = _make_char("Bride", age=25, char_id="bride001")
@@ -116,6 +118,8 @@ class TestRelationTagsFromEvents:
         assert result.event_type == "marriage"
         assert char1.has_relation_tag(char2.char_id, "spouse")
         assert char2.has_relation_tag(char1.char_id, "spouse")
+        assert f"{char2.char_id}:spouse" in char1.relation_tag_sources
+        assert f"{char1.char_id}:spouse" in char2.relation_tag_sources
 
     def test_positive_meeting_creates_friend_tags(self, world, event_system):
         char1 = _make_char("Friendly1", char_id="frien001")
@@ -132,6 +136,8 @@ class TestRelationTagsFromEvents:
             event_system.event_meeting(char1, char2, world, rng=rng)
             if char1.has_relation_tag(char2.char_id, "friend"):
                 tagged = True
+                assert f"{char2.char_id}:friend" in char1.relation_tag_sources
+                assert f"{char1.char_id}:friend" in char2.relation_tag_sources
                 break
         assert tagged, "Expected friend tag after positive meetings"
 
