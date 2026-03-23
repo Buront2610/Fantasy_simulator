@@ -34,12 +34,18 @@ Requirements:
 Start the CLI:
 
 ```bash
+python -m fantasy_simulator
+```
+
+Or using the legacy entry point:
+
+```bash
 python main.py
 ```
 
-The repository does not yet use the planned package entry point by default. The
-current roadmap for package migration, true monthly progression, UI separation,
-and later phase features is maintained in
+The codebase has been migrated to a `fantasy_simulator/` package layout. The
+current roadmap for true monthly progression, simulator refactoring, UI
+separation, and later phase features is maintained in
 [`docs/implementation_plan.md`](docs/implementation_plan.md).
 
 Run tests:
@@ -50,21 +56,38 @@ python -m pytest
 
 ## Project Structure
 
-- `character.py`: core character model
-- `character_creator.py`: random, template, and interactive character creation
-- `world.py`: world state, locations, map, and world serialization
-- `events.py`: event generation and event resolution
-- `adventure.py`: multi-step adventure progression
-- `simulator.py`: current simulation orchestration
-- `reports.py`: monthly and yearly report view generation
-- `rumor.py`: rumor generation and lifecycle helpers
-- `migrations.py`: schema migration helpers for save compatibility
-- `save_load.py`: snapshot save/load helpers
-- `main.py`: CLI interface
-- `docs/implementation_plan.md`: current implementation roadmap and phase order
-- `docs/next_version_plan.md`: long-range design target
-- `docs/ui_renovation_plan.md`: UI renovation strategy
-- `tests/`: automated tests
+```
+fantasy_simulator/          # Main package
+  __init__.py
+  __main__.py               # python -m fantasy_simulator entry point
+  main.py                   # CLI logic
+  character.py              # Core character model
+  character_creator.py      # Random, template, and interactive character creation
+  world.py                  # World state, locations, map, and world serialization
+  events.py                 # Event generation and resolution
+  adventure.py              # Multi-step adventure progression
+  simulator.py              # Simulation orchestration
+  reports.py                # Monthly and yearly report view generation
+  rumor.py                  # Rumor generation and lifecycle helpers
+  persistence/
+    save_load.py            # Snapshot save/load helpers
+    migrations.py           # Schema migration for save compatibility
+  ui/
+    screens.py              # CLI screen and menu functions
+    ui_helpers.py           # Display formatting and input utilities
+  content/
+    world_data.py           # Races, jobs, locations, skills, lore definitions
+  i18n/
+    engine.py               # Localization helpers (tr, tr_term, set_locale)
+    ja.py                   # Japanese text and terms
+    en.py                   # English text and terms
+main.py                     # Compatibility wrapper (delegates to package)
+tests/                      # Automated tests
+docs/
+  implementation_plan.md    # Implementation roadmap and phase order
+  next_version_plan.md      # Long-range design target
+  ui_renovation_plan.md     # UI renovation strategy
+```
 
 ## Design Direction
 
@@ -85,8 +108,7 @@ python -m pytest
 
 ## Near-Term Priorities
 
-- Maintain documentation source-of-truth alignment as the roadmap evolves
-- Move toward package-based structure and clearer module boundaries
 - Complete true monthly progression and deterministic monthly test coverage
-- Normalize `World.event_records` as the canonical event store
+- Split `simulator.py` responsibilities and normalize `World.event_records` as the canonical event store
 - Separate UI/presentation concerns before expanding party adventure and AA map features
+- Maintain documentation source-of-truth alignment as the roadmap evolves

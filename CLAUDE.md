@@ -15,7 +15,10 @@ Python CLI世界・生活シミュレーション。ファンタジー世界「A
 ## Commands
 
 ```bash
-# 実行
+# 実行（推奨）
+python -m fantasy_simulator
+
+# 実行（互換ラッパー）
 python main.py
 
 # テスト
@@ -31,18 +34,30 @@ flake8 --max-line-length=120 --exclude=node_modules,__pycache__ . && python -m p
 ## Architecture
 
 ```
-main.py              → CLIエントリーポイント・メニューループ
-├── screens.py       → UI画面（メニュー、セットアップ、結果表示）
-├── ui_helpers.py    → 表示ユーティリティ（色付き出力、メニュー選択）
-├── simulator.py     → 年次シミュレーション管理
-│   ├── events.py    → イベント生成・解決（出会い、旅、発見、訓練、戦闘、結婚、死亡）
-│   └── adventure.py → 複数ステップの冒険進行
-├── world.py         → ワールドマップ（5x5グリッド）、ロケーション、キャラ管理
-├── world_data.py    → ゲームコンテンツ定義（種族、職業、スキル、場所）
-├── character.py     → キャラクターモデル（能力値、スキル、関係性）
-├── character_creator.py → キャラクター生成（ランダム、テンプレート、対話式）
-├── save_load.py     → JSON形式のセーブ/ロード
-└── i18n.py          → ローカライゼーション（600+翻訳文字列）
+main.py                              → 互換ラッパー（fantasy_simulator.main を呼ぶだけ）
+fantasy_simulator/
+├── __main__.py                      → python -m fantasy_simulator エントリーポイント
+├── main.py                          → CLIメニューループ本体
+├── simulator.py                     → 年次シミュレーション管理
+│   ├── events.py                    → イベント生成・解決
+│   └── adventure.py                 → 複数ステップの冒険進行
+├── world.py                         → ワールドマップ（5x5グリッド）、ロケーション、キャラ管理
+├── character.py                     → キャラクターモデル（能力値、スキル、関係性）
+├── character_creator.py             → キャラクター生成（ランダム、テンプレート、対話式）
+├── reports.py                       → 月報・年報のビュー生成
+├── rumor.py                         → 噂の生成・ライフサイクル
+├── persistence/
+│   ├── save_load.py                 → JSON形式のセーブ/ロード
+│   └── migrations.py               → セーブデータのスキーマ移行
+├── ui/
+│   ├── screens.py                   → UI画面（メニュー、セットアップ、結果表示）
+│   └── ui_helpers.py                → 表示ユーティリティ（色付き出力、メニュー選択）
+├── content/
+│   └── world_data.py                → ゲームコンテンツ定義（種族、職業、スキル、場所）
+└── i18n/
+    ├── engine.py                    → ローカライゼーションエンジン（tr, tr_term, set_locale）
+    ├── ja.py                        → 日本語テキスト・用語
+    └── en.py                        → 英語テキスト・用語
 ```
 
 ## Coding Conventions
@@ -50,7 +65,7 @@ main.py              → CLIエントリーポイント・メニューループ
 - **行の最大長**: 120文字（flake8で強制、CIで検証）
 - **命名規則**: snake_case（変数・関数）、PascalCase（クラス）、UPPER_SNAKE_CASE（定数）
 - **インポート順**: 標準ライブラリ → サードパーティ → ローカル
-- **ローカライゼーション**: ユーザー向け文字列は `i18n.py` の `tr()` / `tr_term()` 経由で取得。辞書は `_TEXT` / `_TERMS`。ハードコードしない
+- **ローカライゼーション**: ユーザー向け文字列は `i18n/engine.py` の `tr()` / `tr_term()` 経由で取得。テキストは `i18n/ja.py` / `i18n/en.py` に分離。ハードコードしない
 - **シリアライゼーション**: `to_dict()` / `from_dict()` パターンでJSON化
 - **テスト**: 各モジュールに対応するテストファイルが `tests/test_<module>.py` に存在。共有fixtureは各テストファイル内で定義（conftest.pyは現在sys.path設定のみ）
 
@@ -59,7 +74,7 @@ main.py              → CLIエントリーポイント・メニューループ
 - `node_modules/`、`__pycache__/`、`.pytest_cache/` を編集・コミットしない
 - `.env` ファイルをコミットしない
 - 既存のテストを削除しない（修正・追加のみ）
-- `i18n.py` の翻訳キー構造を壊さない
+- `i18n/ja.py` / `i18n/en.py` の翻訳キー構造を壊さない
 - `console.log` や `print` デバッグ文を本番コードに残さない
 - flake8 のルールを無視しない（`# noqa` は最終手段、理由をコメントで説明すること）
 
@@ -73,8 +88,8 @@ main.py              → CLIエントリーポイント・メニューループ
 
 ## Localization Rules
 
-- `_TEXT` / `_TERMS` はlocale-first構造: `{"ja": {"key": "値"}, "en": {"key": "value"}}`
-- 新しい文字列は各locale辞書にキーを追加する
+- テキストは `i18n/ja.py` (`TEXT_JA`, `TERMS_JA`) と `i18n/en.py` (`TEXT_EN`, `TERMS_EN`) に分離
+- 新しい文字列は `ja.py` と `en.py` の両方に追加する
 - 翻訳キーはドット区切りの階層構造（例: `"events.battle.victory"`）
 - 英語と日本語の両方を必ず追加する
 - `tr("key", **kwargs)` で取得（内部で `format(**kwargs)` 済み、`.format()` 連鎖は不要）。フォールバックは英語
