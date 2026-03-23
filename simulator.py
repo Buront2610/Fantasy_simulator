@@ -51,7 +51,13 @@ class Simulator:
         # filters, and save/load paths. The canonical structured history lives
         # in world.event_records.
         self.history: List[EventResult] = []
+        # Mutable progress marker for structured event timestamps within the
+        # current simulated year. This value is serialized and restored as-is
+        # to preserve in-progress context across save/load.
         self.current_month: int = 1
+        # Baseline year used for "latest completed report year" fallback when
+        # the simulation has not yet completed a full year.
+        self.start_year: int = world.year
         self.rng = random.Random(seed)
         self.id_rng = random.Random(self._id_seed_from_seed(seed))
 
@@ -386,12 +392,24 @@ class Simulator:
         report = generate_yearly_report(self.world, year)
         return format_yearly_report(report)
 
+    def get_latest_completed_report_year(self) -> int:
+        """Return the latest year that should be used for end-of-year reports.
+
+        Preference is "last completed year" (`world.year - 1`). If the
+        simulation has not completed even one full year yet, this falls back
+        to the simulator baseline (`start_year`). If historical event records
+        from earlier years exist (e.g. imported data), that earlier year is
+        also respected as a valid lower bound.
+        """
+        candidate = self.world.year - 1
+        baseline = self.start_year
+        if self.world.event_records:
+            baseline = min(baseline, min(r.year for r in self.world.event_records))
+        return max(candidate, baseline)
+
     def get_latest_yearly_report(self) -> str:
         """Generate and format a yearly report for the most recent completed year."""
-        year = self.world.year - 1
-        if year < 1000:
-            year = self.world.year
-        return self.get_yearly_report(year)
+        return self.get_yearly_report(self.get_latest_completed_report_year())
 
     def get_character_story(self, char_id: str) -> str:
         """Return the life story of a single character.
@@ -452,6 +470,7 @@ class Simulator:
             "events_per_year": self.events_per_year,
             "adventure_steps_per_year": self.adventure_steps_per_year,
             "current_month": self.current_month,
+            "start_year": self.start_year,
             "locale": get_locale(),
             "rng_state": repr(self.rng.getstate()),
             "id_rng_state": repr(self.id_rng.getstate()),
@@ -480,6 +499,7 @@ class Simulator:
         if not sim._restore_rng_state(sim.id_rng, data.get("id_rng_state")):
             sim.id_rng.seed(sim._legacy_id_seed(data))
         sim.current_month = max(1, min(12, data.get("current_month", 1)))
+        sim.start_year = data.get("start_year", sim.world.year)
         sim.history = [
             EventResult.from_dict(ev) for ev in data.get("history", [])
         ]
