@@ -2,7 +2,7 @@
 
 These tests verify:
 - StdInputBackend.read_line delegates to builtin input().
-- StdInputBackend.choose_key delegates to _choose_key and returns key, not label.
+- StdInputBackend.read_menu_key reads a validated index and returns the key.
 - StdInputBackend.pause delegates to _pause without error.
 - A custom class satisfying the InputBackend protocol works polymorphically.
 - Default argument edge cases are handled.
@@ -42,8 +42,8 @@ class TestStdInputBackendReadLine(unittest.TestCase):
         self.assertEqual(result, "  spaced  ")
 
 
-class TestStdInputBackendChooseKey(unittest.TestCase):
-    """StdInputBackend.choose_key must return the key, not the display label."""
+class TestStdInputBackendReadMenuKey(unittest.TestCase):
+    """StdInputBackend.read_menu_key must return the key, not the display label."""
 
     def setUp(self) -> None:
         set_locale("en")
@@ -51,16 +51,14 @@ class TestStdInputBackendChooseKey(unittest.TestCase):
 
     @patch("builtins.input", return_value="2")
     def test_returns_key_for_selected_option(self, _mock: MagicMock) -> None:
-        result = self.backend.choose_key(
-            "Pick one",
+        result = self.backend.read_menu_key(
             [("alpha", "Alpha Label"), ("beta", "Beta Label")],
         )
         self.assertEqual(result, "beta")
 
     @patch("builtins.input", return_value="1")
     def test_returns_first_key(self, _mock: MagicMock) -> None:
-        result = self.backend.choose_key(
-            "Pick one",
+        result = self.backend.read_menu_key(
             [("first", "First Choice"), ("second", "Second Choice")],
         )
         self.assertEqual(result, "first")
@@ -68,8 +66,7 @@ class TestStdInputBackendChooseKey(unittest.TestCase):
     @patch("builtins.input", return_value="")
     def test_default_selection(self, _mock: MagicMock) -> None:
         """Empty input with default='2' should select the second item."""
-        result = self.backend.choose_key(
-            "Pick one",
+        result = self.backend.read_menu_key(
             [("a", "A"), ("b", "B")],
             default="2",
         )
@@ -78,8 +75,7 @@ class TestStdInputBackendChooseKey(unittest.TestCase):
     @patch("builtins.input", return_value="1")
     def test_single_option(self, _mock: MagicMock) -> None:
         """A menu with only one option should still work."""
-        result = self.backend.choose_key(
-            "One choice",
+        result = self.backend.read_menu_key(
             [("only", "The Only Option")],
         )
         self.assertEqual(result, "only")
@@ -111,8 +107,8 @@ class TestCustomInputBackend(unittest.TestCase):
                 self.calls.append(("read_line", prompt))
                 return "recorded"
 
-            def choose_key(self, prompt, key_label_pairs, default=None):
-                self.calls.append(("choose_key", prompt, len(key_label_pairs)))
+            def read_menu_key(self, key_label_pairs, default=None):
+                self.calls.append(("read_menu_key", len(key_label_pairs)))
                 return key_label_pairs[0][0]
 
             def pause(self, message: str = "") -> None:
@@ -124,7 +120,7 @@ class TestCustomInputBackend(unittest.TestCase):
         # Verify it works
         self.assertEqual(backend.read_line("test> "), "recorded")
         self.assertEqual(
-            backend.choose_key("Q", [("k", "K")]),
+            backend.read_menu_key([("k", "K")]),
             "k",
         )
         backend.pause("done")

@@ -20,15 +20,7 @@ from ..character_creator import CharacterCreator
 from ..i18n import set_locale, tr, tr_term
 from ..persistence.save_load import load_simulation, save_simulation
 from ..simulator import Simulator
-from .ui_helpers import (
-    bold,
-    cyan,
-    dim,
-    fit_display_width,
-    green,
-    red,
-    yellow,
-)
+from .ui_helpers import fit_display_width
 from ..world import World
 from ..content.world_data import JOBS, RACES, WORLD_LORE
 
@@ -91,15 +83,15 @@ def _run_simulation(world: World, years: int, ctx: UIContext | None = None) -> S
     ctx = _default_ctx(ctx)
     out = ctx.out
     out.print_line()
-    out.print_line(f"  {bold(tr('running_simulation_details', years=years, events=8))}")
+    out.print_heading(f"  {tr('running_simulation_details', years=years, events=8)}")
     sim = Simulator(world, events_per_year=8)
     for _ in range(years):
         sim.advance_years(1)
         alive = sum(1 for c in world.characters if c.alive)
         out.print_line(
-            f"  {tr('year_label')} {world.year}  |  {green(str(alive))} {tr('alive')}"
+            f"  {tr('year_label')} {world.year}  |  {out.format_status(str(alive), True)} {tr('alive')}"
         )
-    out.print_line(f"  {green('*')}  {tr('simulation_complete')}")
+    out.print_success(f"  {tr('simulation_complete')}")
     return sim
 
 
@@ -110,16 +102,17 @@ def _advance_simulation(sim: Simulator, years: int, ctx: UIContext | None = None
     out = ctx.out
 
     out.print_line()
-    out.print_line(f"  {bold(tr('advancing_simulation'))} (+{years} years)")
+    out.print_heading(f"  {tr('advancing_simulation')} (+{years} years)")
     for _ in range(years):
         sim.advance_years(1)
         pending = len(sim.get_pending_adventure_choices())
         alive = sum(1 for c in sim.world.characters if c.alive)
         out.print_line(
-            f"  {tr('year_label')} {sim.world.year}  |  {green(str(alive))} {tr('alive')}  |  "
-            f"{yellow(str(pending))} {tr('pending_choices')}"
+            f"  {tr('year_label')} {sim.world.year}  |  "
+            f"{out.format_status(str(alive), True)} {tr('alive')}  |  "
+            f"{pending} {tr('pending_choices')}"
         )
-    out.print_line(f"  {green('*')}  {tr('simulation_advanced_to_year', year=sim.world.year)}")
+    out.print_success(f"  {tr('simulation_advanced_to_year', year=sim.world.year)}")
 
 
 def _advance_auto(sim: Simulator, ctx: UIContext | None = None) -> None:
@@ -128,26 +121,26 @@ def _advance_auto(sim: Simulator, ctx: UIContext | None = None) -> None:
     out = ctx.out
 
     out.print_line()
-    out.print_line(f"  {bold(tr('advancing_auto'))}")
+    out.print_heading(f"  {tr('advancing_auto')}")
     result = sim.advance_until_pause(max_years=12)
     months = result["months_advanced"]
     reason = result["pause_reason"]
     alive = sum(1 for c in sim.world.characters if c.alive)
     pending = len(sim.get_pending_adventure_choices())
     out.print_line(
-        f"  {tr('year_label')} {sim.world.year}  |  {green(str(alive))} {tr('alive')}  |  "
-        f"{yellow(str(pending))} {tr('pending_choices')}"
+        f"  {tr('year_label')} {sim.world.year}  |  "
+        f"{out.format_status(str(alive), True)} {tr('alive')}  |  "
+        f"{pending} {tr('pending_choices')}"
     )
     reason_key = f"auto_pause_{reason}"
     reason_text = tr(reason_key)
     years = months // 12
     remainder_months = months % 12
     if remainder_months == 0:
-        out.print_line(f"  {yellow('!')}  {tr('auto_paused_after', years=years)}: {reason_text}")
+        out.print_warning(f"  {tr('auto_paused_after', years=years)}: {reason_text}")
     else:
-        out.print_line(
-            f"  {yellow('!')}  {tr('auto_paused_after_months', years=years, months=remainder_months)}: "
-            f"{reason_text}"
+        out.print_warning(
+            f"  {tr('auto_paused_after_months', years=years, months=remainder_months)}: {reason_text}"
         )
 
 
@@ -166,7 +159,7 @@ def _show_results(sim: Simulator, ctx: UIContext | None = None) -> None:
         out.print_separator("=")
         out.print_heading(f"  {tr('post_results')}")
         out.print_separator("=")
-        action = inp.choose_key(
+        action = ctx.choose_key(
             tr("what_to_view"),
             [
                 ("advance_1_year", tr("advance_1_year")),
@@ -292,7 +285,7 @@ def _show_roster(world: World, ctx: UIContext | None = None) -> None:
             tr("status_alive") if c.alive else tr("status_dead"),
             10,
         )
-        status = green(status_text) if c.alive else red(status_text)
+        status = out.format_status(status_text, c.alive)
         name_trunc = fit_display_width(c.name, 22)
         racejob = fit_display_width(f"{tr_term(c.race)} {tr_term(c.job)}", 22)
         loc_trunc = fit_display_width(world.location_name(c.location_id), 20)
@@ -312,7 +305,7 @@ def _show_single_story(sim: Simulator, ctx: UIContext | None = None) -> None:
 
     out.print_line()
     for i, c in enumerate(world.characters, 1):
-        status = green(tr("status_alive")) if c.alive else red(tr("status_dead"))
+        status = out.format_status(tr("status_alive") if c.alive else tr("status_dead"), c.alive)
         out.print_line(
             f"  {i:>2}. [{status}] {c.name} ({tr_term(c.race)} {tr_term(c.job)}, "
             f"{tr('age_short_label')} {c.age})"
@@ -493,7 +486,7 @@ def _load_simulation_snapshot(ctx: UIContext | None = None) -> Optional[Simulato
 
 def _select_language(ctx: UIContext | None = None) -> None:
     ctx = _default_ctx(ctx)
-    action = ctx.inp.choose_key(
+    action = ctx.choose_key(
         tr("load_language_prompt"),
         [
             ("ja", tr("language_option_ja")),
@@ -532,7 +525,8 @@ def screen_new_simulation(ctx: UIContext | None = None) -> None:
     years = max(1, min(200, years))
 
     world = _build_default_world(num_characters=num)
-    out.print_line(f"\n  {green('*')}  {tr('world_created', world=world.name, count=num)}")
+    out.print_line()
+    out.print_success(f"  {tr('world_created', world=world.name, count=num)}")
     sim = _run_simulation(world, years, ctx=ctx)
     _show_results(sim, ctx=ctx)
 
@@ -551,7 +545,7 @@ def screen_custom_simulation(ctx: UIContext | None = None) -> None:
     custom_chars: List[Character] = []
 
     while True:
-        action = inp.choose_key(
+        action = ctx.choose_key(
             tr("add_character_or_start"),
             [
                 ("create_interactive", tr("create_character_interactively")),
@@ -565,13 +559,15 @@ def screen_custom_simulation(ctx: UIContext | None = None) -> None:
             char = creator.create_interactive(ctx=ctx)
             world.add_character(char)
             custom_chars.append(char)
-            out.print_line(f"\n  {green('*')}  {tr('character_added', name=char.name)}")
+            out.print_line()
+            out.print_success(f"  {tr('character_added', name=char.name)}")
         elif action == "create_random":
             char = creator.create_random()
             world.add_character(char)
             custom_chars.append(char)
             msg = tr('random_character_added', name=char.name, race=tr_term(char.race), job=tr_term(char.job))
-            out.print_line(f"\n  {green('*')}  {msg}")
+            out.print_line()
+            out.print_success(f"  {msg}")
         elif action == "create_template":
             templates = CharacterCreator.list_templates()
             out.print_line(f"\n  {tr('available_templates')}: " + ", ".join(templates))
@@ -581,10 +577,12 @@ def screen_custom_simulation(ctx: UIContext | None = None) -> None:
                 char = creator.create_from_template(tmpl_name, name=char_name)
                 world.add_character(char)
                 custom_chars.append(char)
-                out.print_line(
-                    f"\n  {green('*')}  "
-                    f"{tr('template_character_added', name=char.name, race=tr_term(char.race), job=tr_term(char.job))}"
+                out.print_line()
+                msg = tr(
+                    'template_character_added',
+                    name=char.name, race=tr_term(char.race), job=tr_term(char.job),
                 )
+                out.print_success(f"  {msg}")
             except ValueError as exc:
                 out.print_error(f"  {tr('error_prefix')}: {exc}")
         else:
@@ -622,16 +620,17 @@ def screen_world_lore(ctx: UIContext | None = None) -> None:
         bonus_str = ", ".join(
             f"{stat} {'+' if v >= 0 else ''}{v}" for stat, v in bonuses.items() if v != 0
         )
-        out.print_line(f"  {cyan(rname)}")
+        out.print_highlighted(f"  {rname}")
         out.print_wrapped(rdesc)
         if bonus_str:
-            out.print_line(f"    {dim(tr('bonuses') + ':')} {bonus_str}")
+            out.print_dim(f"    {tr('bonuses')}: {bonus_str}")
         out.print_line()
     out.print_heading(f"  {tr('jobs_classes')}")
     out.print_separator()
     for jname, jdesc, jskills in JOBS:
         skills_str = ', '.join(tr_term(skill) for skill in jskills)
-        out.print_line(f"  {cyan(tr_term(jname))}  |  {tr('primary_skills_label')}: {skills_str}")
+        out.print_highlighted(f"  {tr_term(jname)}")
+        out.print_line(f"    {tr('primary_skills_label')}: {skills_str}")
         out.print_wrapped(jdesc)
         out.print_line()
     ctx.inp.pause()

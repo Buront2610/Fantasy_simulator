@@ -8,7 +8,8 @@ touching input or domain code.
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
+import textwrap
+from typing import List, Optional, Protocol, Tuple, runtime_checkable
 
 
 @runtime_checkable
@@ -47,6 +48,34 @@ class RenderBackend(Protocol):
         """Print dimmed / muted text."""
         ...  # pragma: no cover
 
+    def print_highlighted(self, text: str) -> None:
+        """Print highlighted / accented text (e.g. in cyan)."""
+        ...  # pragma: no cover
+
+    def print_menu(
+        self,
+        prompt: str,
+        key_label_pairs: List[Tuple[str, str]],
+        default: Optional[str] = None,
+    ) -> None:
+        """Render a numbered menu.
+
+        Displays *prompt* as a heading, then each ``(key, label)`` pair as
+        a numbered item.  The selected item is not read here — that is
+        handled by ``InputBackend.read_menu_key()``.
+        """
+        ...  # pragma: no cover
+
+    def format_status(self, text: str, positive: bool) -> str:
+        """Return *text* formatted as positive (green) or negative (red).
+
+        Intended for embedding inside a larger ``print_line`` call where
+        only part of the string carries semantic colour — e.g. a roster
+        row or a progress line with an inline alive-count.
+        Plain / test backends may return *text* unchanged.
+        """
+        ...  # pragma: no cover
+
 
 class PrintRenderBackend:
     """Default backend that delegates to plain ``print()`` with ANSI codes."""
@@ -75,9 +104,36 @@ class PrintRenderBackend:
         print(yellow(text))
 
     def print_wrapped(self, text: str, indent: int = 4) -> None:
-        from .ui_helpers import _print_wrapped
-        _print_wrapped(text, indent)
+        prefix = " " * indent
+        for line in text.splitlines():
+            if line.strip():
+                for wrapped in textwrap.wrap(
+                    line,
+                    width=70,
+                    initial_indent=prefix,
+                    subsequent_indent=prefix,
+                ):
+                    self.print_line(wrapped)
+            else:
+                self.print_line()
 
     def print_dim(self, text: str) -> None:
         from .ui_helpers import dim
         print(dim(text))
+
+    def print_highlighted(self, text: str) -> None:
+        from .ui_helpers import cyan
+        print(cyan(text))
+
+    def print_menu(
+        self,
+        prompt: str,
+        key_label_pairs: List[Tuple[str, str]],
+        default: Optional[str] = None,
+    ) -> None:
+        from .ui_helpers import _render_menu
+        _render_menu(prompt, key_label_pairs, default)
+
+    def format_status(self, text: str, positive: bool) -> str:
+        from .ui_helpers import green, red
+        return green(text) if positive else red(text)

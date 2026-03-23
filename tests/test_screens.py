@@ -159,7 +159,7 @@ class TestMonthlyReportScreen(unittest.TestCase):
             def read_line(self, prompt: str = "") -> str:
                 return "1"
 
-            def choose_key(self, prompt, pairs, default=None):
+            def read_menu_key(self, pairs, default=None):
                 return pairs[0][0]
 
             def pause(self, message: str = "") -> None:

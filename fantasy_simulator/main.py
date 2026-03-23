@@ -19,24 +19,23 @@ from .ui.screens import (
     screen_new_simulation,
     screen_world_lore,
 )
-from .ui.ui_helpers import HEADER, bold, yellow
+from .ui.ui_helpers import HEADER
 from .ui.ui_context import UIContext, _default_ctx
 
 
 def main(ctx: UIContext | None = None) -> None:
     ctx = _default_ctx(ctx)
     out = ctx.out
-    inp = ctx.inp
 
     set_locale("ja")
-    out.print_line(yellow(HEADER))
+    out.print_heading(HEADER)
 
     while True:
         out.print_line()
         out.print_separator("=")
         out.print_heading(f"  {tr('main_menu')}")
         out.print_separator("=")
-        choice = inp.choose_key(
+        choice = ctx.choose_key(
             tr("main_menu_prompt"),
             [
                 ("start_new_sim", tr("start_new_sim")),
@@ -62,5 +61,7 @@ def main(ctx: UIContext | None = None) -> None:
         elif choice == "language_menu":
             _select_language(ctx=ctx)
         else:
-            out.print_line(f"\n  {bold(yellow(tr('farewell')))}\n")
+            out.print_line()
+            out.print_heading(f"  {tr('farewell')}")
+            out.print_line()
             sys.exit(0)
