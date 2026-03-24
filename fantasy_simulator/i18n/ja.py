@@ -484,6 +484,8 @@ TEXT_JA: Dict[str, str] = {
     'map_nav_region': '地域図（周辺を拡大）',
     'map_nav_detail': '地点詳細',
     'map_nav_legacy': 'クラシック表示',
+    'map_legend_routes': '道路記号',
+    'map_legend_site_marker': '地点',
 }
 
 TERMS_JA: Dict[str, str] = {

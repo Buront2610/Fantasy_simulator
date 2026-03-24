@@ -488,6 +488,8 @@ TEXT_EN: Dict[str, str] = {
     'map_nav_region': 'Region map (zoom into area)',
     'map_nav_detail': 'Location detail',
     'map_nav_legacy': 'Classic grid view',
+    'map_legend_routes': 'Route lines',
+    'map_legend_site_marker': 'Location',
 }
 
 TERMS_EN: Dict[str, str] = {

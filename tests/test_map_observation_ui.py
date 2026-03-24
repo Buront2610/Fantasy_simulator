@@ -24,6 +24,13 @@ from fantasy_simulator.ui.map_renderer import (
     render_location_detail,
     _overlay_suffix,
 )
+from fantasy_simulator.ui.atlas_renderer import (
+    render_atlas_overview,
+    _build_atlas_canvas,
+    _bresenham,
+    _terrain_char,
+    _overlay_suffix as _atlas_overlay_suffix,
+)
 from fantasy_simulator.world import World
 
 
@@ -287,6 +294,138 @@ class TestCJKWidth(unittest.TestCase):
         output = render_world_overview(info)
         self.assertIn("Aethoria", output)
         # Should contain Japanese legend title
+        self.assertIn("凡例", output)
+        set_locale("en")
+
+
+class TestBresenham(unittest.TestCase):
+    """Verify Bresenham line drawing helper."""
+
+    def test_horizontal_line(self) -> None:
+        pts = _bresenham(0, 0, 5, 0)
+        self.assertEqual(len(pts), 6)
+        self.assertEqual(pts[0], (0, 0))
+        self.assertEqual(pts[-1], (5, 0))
+
+    def test_vertical_line(self) -> None:
+        pts = _bresenham(0, 0, 0, 4)
+        self.assertEqual(len(pts), 5)
+
+    def test_diagonal_line(self) -> None:
+        pts = _bresenham(0, 0, 3, 3)
+        self.assertIn((0, 0), pts)
+        self.assertIn((3, 3), pts)
+
+    def test_single_point(self) -> None:
+        pts = _bresenham(2, 2, 2, 2)
+        self.assertEqual(pts, [(2, 2)])
+
+
+class TestTerrainChar(unittest.TestCase):
+    """Verify terrain character selection is deterministic."""
+
+    def test_deterministic(self) -> None:
+        c1 = _terrain_char("forest", 10, 20)
+        c2 = _terrain_char("forest", 10, 20)
+        self.assertEqual(c1, c2)
+
+    def test_forest_chars(self) -> None:
+        chars = set(_terrain_char("forest", x, y) for x in range(20) for y in range(20))
+        # Should use characters from the forest palette "TtYf"
+        self.assertTrue(chars.issubset(set("TtYf")))
+
+    def test_unknown_biome_fallback(self) -> None:
+        ch = _terrain_char("unknown_biome", 0, 0)
+        self.assertIn(ch, ".,',")
+
+
+class TestAtlasOverlaySuffix(unittest.TestCase):
+    """Verify atlas_renderer's own _overlay_suffix."""
+
+    def test_matches_map_renderer(self) -> None:
+        cell = MapCellInfo(
+            location_id="x", canonical_name="X", region_type="city",
+            icon="@", safety_label="ok", danger=80, traffic_indicator="",
+            population=0, x=0, y=0, danger_band="high",
+            has_memorial=True, has_alias=True, recent_death_site=True,
+        )
+        self.assertEqual(_atlas_overlay_suffix(cell), "!ma+")
+
+
+class TestBuildAtlasCanvas(unittest.TestCase):
+    """Verify atlas canvas generation produces correct structure."""
+
+    def setUp(self) -> None:
+        set_locale("en")
+        self.info = _make_simple_info()
+
+    def test_canvas_dimensions(self) -> None:
+        canvas = _build_atlas_canvas(self.info)
+        self.assertEqual(len(canvas), 30)  # _ATLAS_H
+        self.assertEqual(len(canvas[0]), 72)  # _ATLAS_W
+
+    def test_canvas_has_ocean(self) -> None:
+        canvas = _build_atlas_canvas(self.info)
+        flat = "".join("".join(row) for row in canvas)
+        self.assertIn("~", flat)
+
+    def test_canvas_has_site_markers(self) -> None:
+        canvas = _build_atlas_canvas(self.info)
+        flat = "".join("".join(row) for row in canvas)
+        self.assertIn("@", flat)
+
+    def test_empty_info_returns_ocean(self) -> None:
+        empty = MapRenderInfo(world_name="Empty", year=1, width=3, height=3)
+        canvas = _build_atlas_canvas(empty)
+        flat = "".join("".join(row) for row in canvas)
+        # All ocean
+        self.assertTrue(all(c == "~" for c in flat))
+
+
+class TestRenderAtlasOverview(unittest.TestCase):
+    """Verify render_atlas_overview produces readable atlas map."""
+
+    def setUp(self) -> None:
+        set_locale("en")
+        self.info = _make_simple_info()
+
+    def test_contains_world_name_and_year(self) -> None:
+        output = render_atlas_overview(self.info)
+        self.assertIn("TestWorld", output)
+        self.assertIn("10", output)
+
+    def test_contains_site_labels(self) -> None:
+        output = render_atlas_overview(self.info)
+        self.assertIn("TestTown", output)
+        self.assertIn("ForestCamp", output)
+
+    def test_contains_legend(self) -> None:
+        output = render_atlas_overview(self.info)
+        self.assertIn("Legend", output)
+
+    def test_contains_terrain_chars(self) -> None:
+        output = render_atlas_overview(self.info)
+        # Should contain varied terrain characters, not just ~
+        has_land = any(c in output for c in ".,TtYfnNh^")
+        self.assertTrue(has_land, "Atlas should contain land terrain characters")
+
+    def test_contains_route_legend(self) -> None:
+        output = render_atlas_overview(self.info)
+        self.assertIn("Route lines", output)
+
+    def test_output_from_real_world(self) -> None:
+        world = World()
+        info = build_map_info(world)
+        output = render_atlas_overview(info)
+        self.assertIn("Aethoria", output)
+        self.assertIn("Legend", output)
+
+    def test_japanese_locale(self) -> None:
+        set_locale("ja")
+        world = World()
+        info = build_map_info(world)
+        output = render_atlas_overview(info)
+        self.assertIn("Aethoria", output)
         self.assertIn("凡例", output)
         set_locale("en")
 

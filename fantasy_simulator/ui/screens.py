@@ -247,10 +247,12 @@ def _show_results(sim: Simulator, ctx: UIContext | None = None) -> None:
 def _show_world_map(sim: Simulator, ctx: UIContext | None = None) -> None:
     """Three-layer map navigation: overview -> region -> detail.
 
-    PR-G2: Allows the player to view the world at three zoom levels,
-    reading danger, traffic, rumor, memorials, and aliases from the map.
+    PR-G2: Atlas-based world map.  The overview renders a continent-
+    scale terrain canvas where locations are anchor points -- not a
+    direct visualization of the 5x5 grid.
     """
-    from .map_renderer import build_map_info, render_world_overview, render_region_map, render_location_detail
+    from .map_renderer import build_map_info, render_region_map, render_location_detail
+    from .atlas_renderer import render_atlas_overview
 
     ctx = _default_ctx(ctx)
     out = ctx.out
@@ -260,7 +262,7 @@ def _show_world_map(sim: Simulator, ctx: UIContext | None = None) -> None:
 
     while True:
         out.print_line()
-        out.print_line(render_world_overview(info))
+        out.print_line(render_atlas_overview(info))
         out.print_line()
 
         action = ctx.choose_key(
