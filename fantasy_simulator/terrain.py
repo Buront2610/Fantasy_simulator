@@ -149,6 +149,8 @@ class Site:
         y: Terrain grid y coordinate where this site sits.
         site_type: Logical type (city, village, dungeon, etc.).
         importance: 0-100 scale for label prioritisation on maps.
+        atlas_x: Pre-computed atlas canvas x coordinate (-1 = unset).
+        atlas_y: Pre-computed atlas canvas y coordinate (-1 = unset).
     """
 
     location_id: str
@@ -156,15 +158,22 @@ class Site:
     y: int
     site_type: str = "city"
     importance: int = 50
+    atlas_x: int = -1
+    atlas_y: int = -1
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        d: Dict[str, Any] = {
             "location_id": self.location_id,
             "x": self.x,
             "y": self.y,
             "site_type": self.site_type,
             "importance": self.importance,
         }
+        if self.atlas_x >= 0:
+            d["atlas_x"] = self.atlas_x
+        if self.atlas_y >= 0:
+            d["atlas_y"] = self.atlas_y
+        return d
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Site":
@@ -174,6 +183,8 @@ class Site:
             y=data["y"],
             site_type=data.get("site_type", "city"),
             importance=data.get("importance", 50),
+            atlas_x=data.get("atlas_x", -1),
+            atlas_y=data.get("atlas_y", -1),
         )
 
 
@@ -330,6 +341,54 @@ class TerrainMap:
 
 
 # ------------------------------------------------------------------
+# AtlasLayout — persistent macro geography layer (PR-G2 item 7)
+# ------------------------------------------------------------------
+
+@dataclass
+class AtlasLayout:
+    """Persistent macro geography for the atlas-scale map.
+
+    Stores continent outlines, sea area names, and major mountain
+    ranges as named regions so the atlas renderer can draw a stable
+    map without regenerating the geography on every render.
+
+    ``continents``
+        Each entry is ``{"name": str, "cells": [(x, y), ...]}``.
+    ``seas``
+        Named ocean / sea areas: ``{"name": str, "cells": [(x, y), ...]}``.
+    ``mountain_ranges``
+        Named ranges: ``{"name": str, "cells": [(x, y), ...]}``.
+    ``canvas_w`` / ``canvas_h``
+        Atlas canvas dimensions the layout was generated for.
+    """
+
+    canvas_w: int = 72
+    canvas_h: int = 30
+    continents: List[Dict[str, Any]] = field(default_factory=list)
+    seas: List[Dict[str, Any]] = field(default_factory=list)
+    mountain_ranges: List[Dict[str, Any]] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "canvas_w": self.canvas_w,
+            "canvas_h": self.canvas_h,
+            "continents": self.continents,
+            "seas": self.seas,
+            "mountain_ranges": self.mountain_ranges,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "AtlasLayout":
+        return cls(
+            canvas_w=data.get("canvas_w", 72),
+            canvas_h=data.get("canvas_h", 30),
+            continents=data.get("continents", []),
+            seas=data.get("seas", []),
+            mountain_ranges=data.get("mountain_ranges", []),
+        )
+
+
+# ------------------------------------------------------------------
 # Default terrain generation for the legacy 5x5 world
 # ------------------------------------------------------------------
 
@@ -457,5 +516,18 @@ def build_default_terrain(
                 to_site_id=neighbor_id,
                 route_type=route_type,
             ))
+
+    # --- Compute atlas coordinates for each site ---
+    # These are deterministic projections from grid coords to atlas canvas
+    # and are persisted so the atlas is stable across renders.
+    atlas_w, atlas_h = 72, 30
+    atlas_margin_x, atlas_margin_y = 6, 3
+    atlas_avail_w = atlas_w - 2 * atlas_margin_x
+    atlas_avail_h = atlas_h - 2 * atlas_margin_y
+    atlas_step_x = atlas_avail_w / max(width - 1, 1)
+    atlas_step_y = atlas_avail_h / max(height - 1, 1)
+    for site in sites:
+        site.atlas_x = int(atlas_margin_x + site.x * atlas_step_x)
+        site.atlas_y = int(atlas_margin_y + site.y * atlas_step_y)
 
     return tmap, sites, routes

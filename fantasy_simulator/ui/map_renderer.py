@@ -88,6 +88,9 @@ class MapCellInfo:
     has_site: bool = True
     site_type: str = ""
     site_importance: int = 50
+    # PR-G2: pre-computed atlas coordinates (-1 = compute on the fly)
+    atlas_x: int = -1
+    atlas_y: int = -1
 
 
 @dataclass
@@ -248,6 +251,8 @@ def build_map_info(
             has_site=has_site,
             site_type=site_type,
             site_importance=site_importance,
+            atlas_x=site.atlas_x if site else -1,
+            atlas_y=site.atlas_y if site else -1,
         )
     return info
 
@@ -468,6 +473,10 @@ def render_region_map(
     info: MapRenderInfo,
     center_location_id: str,
     radius: int = 2,
+    *,
+    site_memorials: Optional[Dict[str, List[str]]] = None,
+    site_aliases: Optional[Dict[str, List[str]]] = None,
+    site_traces: Optional[Dict[str, List[str]]] = None,
 ) -> str:
     """Render a zoomed region map around a selected site.
 
@@ -615,6 +624,32 @@ def render_region_map(
                 f"    {r.from_site_id} <-> {r.to_site_id}"
                 f" ({tr_term(r.route_type)}){blocked}"
             )
+
+    # --- World memory: landmarks (memorials, aliases, traces) ---
+    _mem = site_memorials or {}
+    _ali = site_aliases or {}
+    _tra = site_traces or {}
+    has_memory = False
+    for cell in sorted(info.cells.values(), key=lambda c: (c.y, c.x)):
+        if not (x_min <= cell.x <= x_max and y_min <= cell.y <= y_max):
+            continue
+        loc_id = cell.location_id
+        mem_items = _mem.get(loc_id, [])
+        ali_items = _ali.get(loc_id, [])
+        tra_items = _tra.get(loc_id, [])
+        if not mem_items and not ali_items and not tra_items:
+            continue
+        if not has_memory:
+            lines.append("")
+            lines.append(f"  {tr('map_region_landmarks')}:")
+            has_memory = True
+        lines.append(f"    {cell.canonical_name}:")
+        if ali_items:
+            lines.append(f"      {tr('map_landmark_alias')}: {', '.join(ali_items[:3])}")
+        for mem in mem_items[:2]:
+            lines.append(f"      {tr('map_landmark_memorial')}: {mem}")
+        for tra in tra_items[:2]:
+            lines.append(f"      {tr('map_landmark_trace')}: {tra}")
 
     return "\n".join(lines)
 

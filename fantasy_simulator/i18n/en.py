@@ -498,6 +498,18 @@ TEXT_EN: Dict[str, str] = {
     'map_legend_site_quiet': 'Quiet (low traffic)',
     'map_legend_traffic_high': 'High traffic',
     'map_legend_rumor_high': 'High rumor heat',
+    # PR-G2+: atlas mode / direct selection / region landmarks
+    'atlas_site_list': 'Sites on atlas',
+    'map_nav_select': 'Jump to site (direct selection)',
+    'map_nav_mode': 'Switch atlas display mode',
+    'atlas_mode_prompt': 'Display mode',
+    'atlas_mode_wide': 'Wide atlas (full)',
+    'atlas_mode_compact': 'Compact atlas (narrow)',
+    'atlas_mode_minimal': 'Minimal (text only)',
+    'map_region_landmarks': 'Landmarks & World Memory',
+    'map_landmark_alias': 'Also known as',
+    'map_landmark_memorial': 'Memorial',
+    'map_landmark_trace': 'Recent',
 }
 
 TERMS_EN: Dict[str, str] = {

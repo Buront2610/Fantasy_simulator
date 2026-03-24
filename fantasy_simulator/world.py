@@ -17,6 +17,7 @@ from .content.world_data import (
     get_location_state_defaults,
 )
 from .terrain import (
+    AtlasLayout,
     RouteEdge,
     Site,
     TerrainMap,
@@ -341,6 +342,8 @@ class World:
         self.sites: List[Site] = []
         self.routes: List[RouteEdge] = []
         self._site_index: Dict[str, Site] = {}
+        # PR-G2: persistent macro geography layer
+        self.atlas_layout: Optional[AtlasLayout] = None
         if not _skip_defaults:
             self._build_default_map()
 
@@ -864,6 +867,9 @@ class World:
             result["sites"] = [s.to_dict() for s in self.sites]
         if self.routes:
             result["routes"] = [r.to_dict() for r in self.routes]
+        # PR-G2: persist atlas layout
+        if self.atlas_layout is not None:
+            result["atlas_layout"] = self.atlas_layout.to_dict()
         return result
 
     @classmethod
@@ -926,6 +932,10 @@ class World:
             world._rebuild_site_index()
         else:
             world._build_terrain_from_grid()
+
+        # PR-G2: restore atlas layout if present.
+        if "atlas_layout" in data:
+            world.atlas_layout = AtlasLayout.from_dict(data["atlas_layout"])
 
         world.normalize_after_load()
         return world

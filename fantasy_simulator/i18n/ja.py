@@ -494,6 +494,18 @@ TEXT_JA: Dict[str, str] = {
     'map_legend_site_quiet': '静かな地点（低交通量）',
     'map_legend_traffic_high': '高交通量',
     'map_legend_rumor_high': '高い噂の熱量',
+    # PR-G2+: アトラスモード / 直接選択 / 地域ランドマーク
+    'atlas_site_list': 'アトラス上の地点',
+    'map_nav_select': '地点へジャンプ（直接選択）',
+    'map_nav_mode': 'アトラス表示モード切替',
+    'atlas_mode_prompt': '表示モード',
+    'atlas_mode_wide': 'ワイドアトラス（全幅）',
+    'atlas_mode_compact': 'コンパクトアトラス（狭幅）',
+    'atlas_mode_minimal': 'ミニマル（テキストのみ）',
+    'map_region_landmarks': 'ランドマーク＆世界の記憶',
+    'map_landmark_alias': '別名',
+    'map_landmark_memorial': '記念碑',
+    'map_landmark_trace': '最近の出来事',
 }
 
 TERMS_JA: Dict[str, str] = {

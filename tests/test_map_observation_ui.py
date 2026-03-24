@@ -772,5 +772,285 @@ class TestAtlasLegendOcean(unittest.TestCase):
         self.assertIn("o=", output)  # Quiet marker in legend
 
 
+class TestAtlasCompact(unittest.TestCase):
+    """Verify compact atlas renderer produces reasonable output."""
+
+    def test_compact_contains_terrain(self) -> None:
+        set_locale("en")
+        info = _make_simple_info()
+        from fantasy_simulator.ui.atlas_renderer import render_atlas_compact
+        output = render_atlas_compact(info)
+        # Should contain some terrain chars
+        self.assertTrue(any(c in output for c in "~.,T^n"))
+
+    def test_compact_contains_site_markers(self) -> None:
+        set_locale("en")
+        info = _make_simple_info()
+        from fantasy_simulator.ui.atlas_renderer import render_atlas_compact
+        output = render_atlas_compact(info)
+        has_marker = any(m in output for m in ("O", "@", "o"))
+        self.assertTrue(has_marker, "Compact atlas should show site markers")
+
+    def test_compact_shorter_than_wide(self) -> None:
+        set_locale("en")
+        info = _make_simple_info()
+        from fantasy_simulator.ui.atlas_renderer import render_atlas_compact
+        compact = render_atlas_compact(info)
+        wide = render_atlas_overview(info)
+        self.assertLess(len(compact), len(wide))
+
+
+class TestAtlasMinimal(unittest.TestCase):
+    """Verify minimal atlas renderer produces text-only summary."""
+
+    def test_minimal_contains_world_name(self) -> None:
+        set_locale("en")
+        info = _make_simple_info()
+        from fantasy_simulator.ui.atlas_renderer import render_atlas_minimal
+        output = render_atlas_minimal(info)
+        self.assertIn("TestWorld", output)
+
+    def test_minimal_lists_sites(self) -> None:
+        set_locale("en")
+        info = _make_simple_info()
+        from fantasy_simulator.ui.atlas_renderer import render_atlas_minimal
+        output = render_atlas_minimal(info)
+        self.assertIn("TestTown", output)
+        self.assertIn("ForestCamp", output)
+
+    def test_minimal_no_terrain_chars(self) -> None:
+        set_locale("en")
+        info = _make_simple_info()
+        from fantasy_simulator.ui.atlas_renderer import render_atlas_minimal
+        output = render_atlas_minimal(info)
+        # Minimal should not contain terrain canvas characters like ~ for ocean
+        lines = output.strip().split("\n")
+        for line in lines:
+            self.assertNotIn("~~~~", line)
+
+
+class TestAtlasLabeledSites(unittest.TestCase):
+    """Verify atlas_labeled_sites returns correct site list."""
+
+    def test_returns_all_sites(self) -> None:
+        set_locale("en")
+        info = _make_simple_info()
+        from fantasy_simulator.ui.atlas_renderer import atlas_labeled_sites
+        labeled = atlas_labeled_sites(info)
+        self.assertEqual(len(labeled), 2)
+        names = [name for _, name in labeled]
+        self.assertIn("TestTown", names)
+        self.assertIn("ForestCamp", names)
+
+    def test_ordered_by_importance(self) -> None:
+        set_locale("en")
+        info = _make_simple_info()
+        # TestTown has default importance 50, ForestCamp has default 50
+        # But let's set explicit importance
+        info.cells[(1, 1)].site_importance = 80
+        info.cells[(0, 0)].site_importance = 20
+        from fantasy_simulator.ui.atlas_renderer import atlas_labeled_sites
+        labeled = atlas_labeled_sites(info)
+        self.assertEqual(labeled[0][1], "TestTown")
+        self.assertEqual(labeled[1][1], "ForestCamp")
+
+
+class TestAtlasLayoutModel(unittest.TestCase):
+    """Verify AtlasLayout data model serialization."""
+
+    def test_round_trip(self) -> None:
+        from fantasy_simulator.terrain import AtlasLayout
+        layout = AtlasLayout(
+            canvas_w=72, canvas_h=30,
+            continents=[{"name": "Main", "cells": [(10, 5), (11, 5)]}],
+            seas=[{"name": "Great Ocean", "cells": []}],
+            mountain_ranges=[{"name": "Spine", "cells": [(20, 10)]}],
+        )
+        d = layout.to_dict()
+        restored = AtlasLayout.from_dict(d)
+        self.assertEqual(restored.canvas_w, 72)
+        self.assertEqual(restored.canvas_h, 30)
+        self.assertEqual(len(restored.continents), 1)
+        self.assertEqual(restored.continents[0]["name"], "Main")
+        self.assertEqual(len(restored.seas), 1)
+        self.assertEqual(len(restored.mountain_ranges), 1)
+
+    def test_default_values(self) -> None:
+        from fantasy_simulator.terrain import AtlasLayout
+        layout = AtlasLayout()
+        self.assertEqual(layout.canvas_w, 72)
+        self.assertEqual(layout.canvas_h, 30)
+        self.assertEqual(layout.continents, [])
+
+
+class TestSiteAtlasCoordinates(unittest.TestCase):
+    """Verify atlas_x / atlas_y are computed and persisted on Site."""
+
+    def test_default_world_sites_have_atlas_coords(self) -> None:
+        world = World()
+        for site in world.sites:
+            self.assertGreaterEqual(site.atlas_x, 0,
+                                    f"Site {site.location_id} missing atlas_x")
+            self.assertGreaterEqual(site.atlas_y, 0,
+                                    f"Site {site.location_id} missing atlas_y")
+
+    def test_atlas_coords_round_trip(self) -> None:
+        from fantasy_simulator.terrain import Site
+        site = Site(
+            location_id="loc_test", x=2, y=3,
+            site_type="city", importance=80,
+            atlas_x=20, atlas_y=10,
+        )
+        d = site.to_dict()
+        self.assertEqual(d["atlas_x"], 20)
+        self.assertEqual(d["atlas_y"], 10)
+        restored = Site.from_dict(d)
+        self.assertEqual(restored.atlas_x, 20)
+        self.assertEqual(restored.atlas_y, 10)
+
+    def test_atlas_coords_absent_defaults_to_minus_one(self) -> None:
+        from fantasy_simulator.terrain import Site
+        site = Site.from_dict({
+            "location_id": "loc_test", "x": 0, "y": 0,
+        })
+        self.assertEqual(site.atlas_x, -1)
+        self.assertEqual(site.atlas_y, -1)
+
+
+class TestAtlasLayoutOnWorld(unittest.TestCase):
+    """Verify atlas_layout is persisted on World."""
+
+    def test_world_to_dict_includes_atlas_layout(self) -> None:
+        from fantasy_simulator.terrain import AtlasLayout
+        world = World()
+        world.atlas_layout = AtlasLayout(
+            continents=[{"name": "TestContinent", "cells": []}],
+        )
+        d = world.to_dict()
+        self.assertIn("atlas_layout", d)
+        self.assertEqual(d["atlas_layout"]["continents"][0]["name"], "TestContinent")
+
+    def test_world_from_dict_restores_atlas_layout(self) -> None:
+        from fantasy_simulator.terrain import AtlasLayout
+        world = World()
+        world.atlas_layout = AtlasLayout(
+            continents=[{"name": "Restored", "cells": []}],
+        )
+        d = {"world": world.to_dict(), "schema_version": 7}
+        d.update(world.to_dict())
+        restored = World.from_dict(d)
+        self.assertIsNotNone(restored.atlas_layout)
+        self.assertEqual(restored.atlas_layout.continents[0]["name"], "Restored")
+
+    def test_world_without_atlas_layout_is_none(self) -> None:
+        world = World()
+        d = world.to_dict()
+        d.pop("atlas_layout", None)
+        restored = World.from_dict(d)
+        self.assertIsNone(restored.atlas_layout)
+
+
+class TestMigrationV6toV7(unittest.TestCase):
+    """Verify v6→v7 migration adds atlas layout and site atlas coords."""
+
+    def test_migration_adds_atlas_layout(self) -> None:
+        from fantasy_simulator.persistence.migrations import _migrate_v6_to_v7
+        data = {
+            "schema_version": 6,
+            "world": {
+                "width": 3, "height": 2,
+                "sites": [
+                    {"location_id": "loc_a", "x": 0, "y": 0, "site_type": "city", "importance": 80},
+                    {"location_id": "loc_b", "x": 1, "y": 0, "site_type": "village", "importance": 40},
+                ],
+            },
+        }
+        result = _migrate_v6_to_v7(data)
+        self.assertEqual(result["schema_version"], 7)
+        layout = result["world"]["atlas_layout"]
+        self.assertEqual(layout["canvas_w"], 72)
+        self.assertEqual(len(layout["continents"]), 1)
+
+    def test_migration_adds_atlas_coords_to_sites(self) -> None:
+        from fantasy_simulator.persistence.migrations import _migrate_v6_to_v7
+        data = {
+            "schema_version": 6,
+            "world": {
+                "width": 5, "height": 5,
+                "sites": [
+                    {"location_id": "loc_a", "x": 0, "y": 0, "site_type": "city", "importance": 80},
+                    {"location_id": "loc_b", "x": 4, "y": 4, "site_type": "village", "importance": 40},
+                ],
+            },
+        }
+        result = _migrate_v6_to_v7(data)
+        sites = result["world"]["sites"]
+        for site in sites:
+            self.assertIn("atlas_x", site)
+            self.assertIn("atlas_y", site)
+            self.assertGreaterEqual(site["atlas_x"], 0)
+            self.assertGreaterEqual(site["atlas_y"], 0)
+        # First site at (0,0) should be near margin
+        self.assertEqual(sites[0]["atlas_x"], 6)
+        self.assertEqual(sites[0]["atlas_y"], 3)
+
+
+class TestRegionMapLandmarks(unittest.TestCase):
+    """Verify region map shows world memory landmarks."""
+
+    def test_region_map_shows_aliases(self) -> None:
+        set_locale("en")
+        info = _make_simple_info()
+        output = render_region_map(
+            info, "loc_test_town",
+            site_aliases={"loc_test_town": ["The Old City"]},
+        )
+        self.assertIn("The Old City", output)
+
+    def test_region_map_shows_memorials(self) -> None:
+        set_locale("en")
+        info = _make_simple_info()
+        output = render_region_map(
+            info, "loc_test_town",
+            site_memorials={"loc_test_town": ["Brave Hero fell here (Year 1001)"]},
+        )
+        self.assertIn("Brave Hero", output)
+
+    def test_region_map_shows_traces(self) -> None:
+        set_locale("en")
+        info = _make_simple_info()
+        output = render_region_map(
+            info, "loc_test_town",
+            site_traces={"loc_test_town": ["Adventurer passed through"]},
+        )
+        self.assertIn("Adventurer passed through", output)
+
+    def test_region_map_no_landmarks_when_none(self) -> None:
+        set_locale("en")
+        info = _make_simple_info()
+        output = render_region_map(info, "loc_test_town")
+        self.assertNotIn("Landmarks", output)
+
+
+class TestAtlasUsesStoredCoords(unittest.TestCase):
+    """Verify atlas renderer uses pre-computed atlas coordinates."""
+
+    def test_stored_coords_used_in_canvas(self) -> None:
+        """When atlas_x/atlas_y are set, the renderer should use them."""
+        set_locale("en")
+        info = MapRenderInfo(world_name="CoordTest", year=1, width=3, height=3)
+        # Place a site with explicit atlas coords
+        info.cells[(1, 1)] = MapCellInfo(
+            location_id="loc_stored", canonical_name="StoredSite",
+            region_type="city", icon="@", safety_label="ok",
+            danger=10, traffic_indicator="", population=0,
+            x=1, y=1, danger_band="low",
+            atlas_x=35, atlas_y=15,  # centre of atlas
+        )
+        canvas = _build_atlas_canvas(info)
+        # The site marker should appear at (35, 15) on the canvas
+        self.assertIn(canvas[15][35], ("O", "@", "o"))
+
+
 if __name__ == "__main__":
     unittest.main()

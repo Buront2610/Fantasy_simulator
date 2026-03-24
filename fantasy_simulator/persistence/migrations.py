@@ -14,7 +14,7 @@ from ..content.world_data import (
 )
 from ..terrain import REGION_TYPE_TO_BIOME, SITE_IMPORTANCE
 
-CURRENT_VERSION = 6
+CURRENT_VERSION = 7
 
 
 def migrate(data: Dict[str, Any]) -> Dict[str, Any]:
@@ -33,6 +33,7 @@ def migrate(data: Dict[str, Any]) -> Dict[str, Any]:
         4: _migrate_v3_to_v4,
         5: _migrate_v4_to_v5,
         6: _migrate_v5_to_v6,
+        7: _migrate_v6_to_v7,
     }
     for target_version in range(version + 1, CURRENT_VERSION + 1):
         data = migrations[target_version](data)
@@ -307,4 +308,45 @@ def _migrate_v5_to_v6(data: Dict[str, Any]) -> Dict[str, Any]:
     world_data["sites"] = sites
     world_data["routes"] = routes
     data["schema_version"] = 6
+    return data
+
+
+def _migrate_v6_to_v7(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Add atlas_layout and per-site atlas coordinates (PR-G2 items 7-8).
+
+    Computes atlas_x / atlas_y for each site from the grid coordinates
+    and creates a minimal atlas_layout structure.  Pre-v7 saves have
+    no atlas geometry — this migration generates it deterministically.
+    """
+    world_data = data.setdefault("world", {})
+    width = world_data.get("width", 5)
+    height = world_data.get("height", 5)
+
+    atlas_w = 72
+    atlas_h = 30
+    margin_x = 6
+    margin_y = 3
+    avail_w = atlas_w - 2 * margin_x
+    avail_h = atlas_h - 2 * margin_y
+    step_x = avail_w / max(width - 1, 1)
+    step_y = avail_h / max(height - 1, 1)
+
+    # Compute atlas coordinates for existing sites.
+    sites = world_data.get("sites", [])
+    for site in sites:
+        gx = site.get("x", 0)
+        gy = site.get("y", 0)
+        site["atlas_x"] = int(margin_x + gx * step_x)
+        site["atlas_y"] = int(margin_y + gy * step_y)
+
+    # Create a default atlas_layout with one continent covering all sites.
+    world_data["atlas_layout"] = {
+        "canvas_w": atlas_w,
+        "canvas_h": atlas_h,
+        "continents": [{"name": "Main Continent", "cells": []}],
+        "seas": [{"name": "Great Ocean", "cells": []}],
+        "mountain_ranges": [],
+    }
+
+    data["schema_version"] = 7
     return data

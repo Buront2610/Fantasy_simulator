@@ -222,7 +222,13 @@ def _cluster_sites(
 def _build_atlas_canvas(  # noqa: C901 — linear but long
     info: "MapRenderInfo",
 ) -> List[List[str]]:
-    """Generate the full atlas canvas from *MapRenderInfo*."""
+    """Generate the full atlas canvas from *MapRenderInfo*.
+
+    When cells carry pre-computed ``atlas_x`` / ``atlas_y`` coordinates
+    (≥ 0), those are reused instead of re-projecting from the grid.
+    This ensures the atlas map is stable across renders and matches
+    the coordinates persisted in the save file.
+    """
     w, h = _ATLAS_W, _ATLAS_H
     canvas: List[List[str]] = [["~"] * w for _ in range(h)]
 
@@ -239,8 +245,11 @@ def _build_atlas_canvas(  # noqa: C901 — linear but long
     biome_seeds: List[Tuple[int, int, str]] = []
 
     for (gx, gy), cell in info.cells.items():
-        ax = int(_MARGIN_X + gx * step_x)
-        ay = int(_MARGIN_Y + gy * step_y)
+        if cell.atlas_x >= 0 and cell.atlas_y >= 0:
+            ax, ay = cell.atlas_x, cell.atlas_y
+        else:
+            ax = int(_MARGIN_X + gx * step_x)
+            ay = int(_MARGIN_Y + gy * step_y)
         site_atlas[cell.location_id] = (ax, ay)
         biome_seeds.append((ax, ay, cell.terrain_biome))
 
@@ -543,3 +552,141 @@ def render_atlas_overview(info: "MapRenderInfo") -> str:
     )
 
     return "\n".join(lines)
+
+
+# ------------------------------------------------------------------
+# Compact atlas (narrow terminals, ~40 cols)
+# ------------------------------------------------------------------
+
+_COMPACT_W = 40
+_COMPACT_H = 16
+
+
+def render_atlas_compact(info: "MapRenderInfo") -> str:
+    """Render a compact atlas overview for narrow terminals.
+
+    Half the width of the full atlas.  Shows terrain canvas, site
+    markers, and a minimal legend.
+    """
+    w, h = _COMPACT_W, _COMPACT_H
+    canvas: List[List[str]] = [["~"] * w for _ in range(h)]
+
+    if not info.cells:
+        return "\n".join("  " + "".join(row) for row in canvas)
+
+    avail_w = w - 4
+    avail_h = h - 2
+    step_x = avail_w / max(info.width - 1, 1)
+    step_y = avail_h / max(info.height - 1, 1)
+
+    site_atlas: Dict[str, Tuple[int, int]] = {}
+    biome_seeds: List[Tuple[int, int, str]] = []
+
+    for (gx, gy), cell in info.cells.items():
+        if cell.atlas_x >= 0 and cell.atlas_y >= 0:
+            # Scale pre-computed coords to compact size
+            ax = int(cell.atlas_x * w / _ATLAS_W)
+            ay = int(cell.atlas_y * h / _ATLAS_H)
+        else:
+            ax = int(2 + gx * step_x)
+            ay = int(1 + gy * step_y)
+        ax = max(0, min(w - 1, ax))
+        ay = max(0, min(h - 1, ay))
+        site_atlas[cell.location_id] = (ax, ay)
+        biome_seeds.append((ax, ay, cell.terrain_biome))
+
+    # Simple land mask: radius-2 circle around each site
+    land: List[List[bool]] = [[False] * w for _ in range(h)]
+    for ax, ay in site_atlas.values():
+        for dy2 in range(-2, 3):
+            for dx2 in range(-3, 4):
+                ny, nx = ay + dy2, ax + dx2
+                if 0 <= ny < h and 0 <= nx < w:
+                    land[ny][nx] = True
+
+    for py in range(h):
+        for px in range(w):
+            if not land[py][px]:
+                canvas[py][px] = _terrain_char("ocean", px, py)
+                continue
+            best_d = float("inf")
+            best_biome = "plains"
+            for sx, sy, biome in biome_seeds:
+                d = (px - sx) ** 2 + (py - sy) ** 2
+                if d < best_d:
+                    best_d = d
+                    best_biome = biome
+            if best_biome == "ocean":
+                best_biome = "coast"
+            canvas[py][px] = _terrain_char(best_biome, px, py)
+
+    # Place markers
+    for cell in sorted(info.cells.values(), key=lambda c: -c.site_importance):
+        pos = site_atlas.get(cell.location_id)
+        if pos:
+            ax, ay = pos
+            if 0 <= ay < h and 0 <= ax < w:
+                marker = _SITE_MARKERS.get(cell.traffic_band, _SITE_MARKER)
+                canvas[ay][ax] = marker
+
+    header = f"  {info.world_name} ({tr('map_year')}: {info.year})"
+    lines: List[str] = [header, ""]
+    for row in canvas:
+        lines.append("  " + "".join(row).rstrip())
+    return "\n".join(lines)
+
+
+# ------------------------------------------------------------------
+# Minimal text summary (no canvas)
+# ------------------------------------------------------------------
+
+def render_atlas_minimal(info: "MapRenderInfo") -> str:
+    """Render a minimal text summary of the world (no map canvas).
+
+    Lists sites grouped by importance, with danger/traffic/rumor
+    indicators.  Suitable for screen readers and very narrow terminals.
+    """
+    header = (
+        f"  {tr('map_overview_title')}: "
+        f"{info.world_name} ({tr('map_year')}: {info.year})"
+    )
+    lines: List[str] = [header, ""]
+
+    cells_sorted = sorted(
+        info.cells.values(),
+        key=lambda c: (-c.site_importance, c.canonical_name),
+    )
+
+    for idx, cell in enumerate(cells_sorted, 1):
+        overlay = _overlay_suffix(cell)
+        overlay_str = f" [{overlay}]" if overlay else ""
+        lines.append(
+            f"  {idx:>2}. {cell.canonical_name}"
+            f" ({tr_term(cell.region_type)}){overlay_str}"
+        )
+
+    if info.routes:
+        lines.append("")
+        lines.append(f"  {tr('map_overview_routes')}: {len(info.routes)}")
+
+    return "\n".join(lines)
+
+
+# ------------------------------------------------------------------
+# Atlas labeled sites (for direct selection - item 11)
+# ------------------------------------------------------------------
+
+def atlas_labeled_sites(info: "MapRenderInfo") -> List[Tuple[str, str]]:
+    """Return ``(location_id, display_name)`` for atlas-labeled sites.
+
+    Sites are returned in importance-descending order, matching the
+    label priority used by ``_place_labels``.
+    """
+    cells_sorted = sorted(
+        info.cells.values(),
+        key=lambda c: (-c.site_importance, c.canonical_name),
+    )
+    return [
+        (cell.location_id, cell.canonical_name)
+        for cell in cells_sorted
+    ]
