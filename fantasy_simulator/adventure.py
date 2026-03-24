@@ -699,7 +699,14 @@ def create_adventure_run(
     rng: Any = random,
     id_rng: Any = random,
 ) -> "AdventureRun":
-    """Create a new solo adventure for a character using nearby risky terrain when possible."""
+    """Create a new base adventure run for the leader character.
+
+    The returned run is initialized with the given character as its leader and
+    only member (a solo run). Callers may later extend this into a party
+    adventure by adding additional members and overriding party-related fields.
+    The origin and destination are chosen using nearby risky terrain when
+    possible.
+    """
     neighbors = world.get_neighboring_locations(character.location_id)
     risky = [loc for loc in neighbors if loc.region_type in ("forest", "mountain", "dungeon")]
     if not risky:
