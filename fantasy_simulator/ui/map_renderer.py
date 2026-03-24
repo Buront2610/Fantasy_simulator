@@ -354,7 +354,7 @@ _DANGER_MARKERS: Dict[str, str] = {"low": " ", "medium": ".", "high": "!"}
 _TRAFFIC_MARKERS: Dict[str, str] = {"low": " ", "medium": "o", "high": "O"}
 #: Overlay marker for rumor heat band
 _RUMOR_MARKERS: Dict[str, str] = {"low": " ", "medium": "~", "high": "?"}
-_MAX_REGION_STANDOUT_ITEMS = 3
+_MAX_REGION_STANDOUT_ITEMS = 4
 _OPEN_ROUTE_MARKER = "<->"
 _BLOCKED_ROUTE_MARKER = "x->"
 _UNKNOWN_ROUTE_TYPE_PRIORITY = 99
@@ -471,6 +471,35 @@ def _pick_region_danger_target(
         )
 
     return min(danger_candidates, key=priority)
+
+
+def _pick_region_rumor_target(
+    visible_cells: List[MapCellInfo],
+    center_cell: MapCellInfo,
+    connected_open_ids: Set[str],
+    connected_blocked_ids: Set[str],
+) -> Optional[MapCellInfo]:
+    """Return one rumor hotspot using the same local-decision priorities."""
+    rumor_candidates = [cell for cell in visible_cells if cell.rumor_heat_band == "high"]
+    if not rumor_candidates:
+        return None
+
+    def priority(cell: MapCellInfo) -> Tuple[int, int, int, str]:
+        if cell.location_id in connected_open_ids:
+            reachability = 0
+        elif cell.location_id not in connected_blocked_ids:
+            reachability = 1
+        else:
+            reachability = 2
+        distance = abs(cell.x - center_cell.x) + abs(cell.y - center_cell.y)
+        return (
+            reachability,
+            -cell.rumor_heat,
+            distance,
+            cell.canonical_name.lower(),
+        )
+
+    return min(rumor_candidates, key=priority)
 
 
 def _has_world_memory(
@@ -810,6 +839,12 @@ def render_region_map(
         connected_open_ids,
         connected_blocked_ids,
     )
+    rumor_target = _pick_region_rumor_target(
+        visible_cells,
+        center_cell,
+        connected_open_ids,
+        connected_blocked_ids,
+    )
     blocked_notice = _pick_blocked_route_notice(region_routes, center_location_id, cells_by_id)
     if blocked_notice is not None:
         blocked_destination = _route_endpoint_name(
@@ -820,6 +855,9 @@ def render_region_map(
 
     if danger_target is not None:
         standout_lines.append(tr("map_region_focus_danger", location=danger_target.canonical_name))
+
+    if rumor_target is not None:
+        standout_lines.append(tr("map_region_focus_rumor", location=rumor_target.canonical_name))
 
     memorials = site_memorials or {}
     aliases = site_aliases or {}

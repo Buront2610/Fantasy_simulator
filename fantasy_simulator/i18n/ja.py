@@ -476,6 +476,7 @@ TEXT_JA: Dict[str, str] = {
     'map_region_focus': 'この地域で注目すべきこと',
     'map_region_focus_route': '経路: {destination} へ {route_type}{blocked}',
     'map_region_focus_danger': '危険: {location} は高危険度の地点',
+    'map_region_focus_rumor': '噂: {location} では話題が熱い',
     'map_region_focus_landmark': 'ランドマーク: {location} には土地の記憶が残る',
     'map_region_focus_landmark_memorial': '記念碑: {location} には記憶を留める碑がある',
     'map_region_focus_landmark_alias': '別称: {location} には別の呼び名がある',

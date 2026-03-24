@@ -480,6 +480,7 @@ TEXT_EN: Dict[str, str] = {
     'map_region_focus': 'What stands out here',
     'map_region_focus_route': 'Route: {destination} via {route_type}{blocked}',
     'map_region_focus_danger': 'Danger: {location} is a high-risk site',
+    'map_region_focus_rumor': 'Rumor: {location} is buzzing with talk',
     'map_region_focus_landmark': 'Landmark: {location} carries local memory',
     'map_region_focus_landmark_memorial': 'Memorial: {location} holds a lasting memorial',
     'map_region_focus_landmark_alias': 'Alias: {location} is known by another name',
