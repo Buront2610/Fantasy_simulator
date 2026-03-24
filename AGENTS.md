@@ -7,10 +7,15 @@ Fantasy Simulator: Python CLI世界シミュレーション（Aethoria）。Pyth
 ## Architecture
 
 - **エントリーポイント**: `python -m fantasy_simulator` → `fantasy_simulator/main.py`（互換: `python main.py`）
-- **シミュレーション**: `simulator.py` が年次ループを管理、`events.py` がイベント生成、`adventure.py` が冒険進行
-- **データモデル**: `character.py`（キャラ）、`world.py`（ワールド・マップ）、`content/world_data.py`（ゲーム定義）
-- **UI**: `ui/screens.py`（画面制御）、`ui/ui_helpers.py`（表示ユーティリティ）
-- **永続化**: `persistence/save_load.py`（JSON）、`i18n/`（多言語）
+- **シミュレーション**: `simulation/engine.py` が月次進行を統括し、`simulation/` 配下へ責務分割済み。
+  `simulator.py` は後方互換ラッパー
+- **イベント/冒険**: `events.py` がイベント生成、`adventure.py` が冒険進行と保留選択を担当
+- **ワールドモデル**: `world.py` が `LocationState`・world memory・state propagation を管理。
+  `terrain.py` が terrain/site/route/atlas layout を担当
+- **UI**: `ui/screens.py` が画面制御、`ui/map_renderer.py` / `ui/atlas_renderer.py` が地図描画、
+  `ui/presenters.py` / `ui/view_models.py` が表示整形を担当
+- **永続化**: `persistence/save_load.py`（JSON）、`persistence/migrations.py`（現行 schema v7）
+- **叙述補助**: `narrative/context.py` と `narrative/template_history.py` が最小 NarrativeContext を提供
 
 ## Directory Structure
 
@@ -24,17 +29,36 @@ Fantasy_simulator/
 │   ├── character.py                     # Character クラス
 │   ├── character_creator.py             # キャラクター生成
 │   ├── world.py                         # World クラス、LocationState
+│   ├── terrain.py                       # TerrainMap / Site / RouteEdge / AtlasLayout
 │   ├── simulator.py                     # Simulator クラス（年次ループ）
 │   ├── events.py                        # EventSystem クラス
 │   ├── adventure.py                     # Adventure クラス
 │   ├── reports.py                       # 月報・年報生成
 │   ├── rumor.py                         # 噂システム
+│   ├── narrative/
+│   │   ├── context.py                   # 最小 NarrativeContext
+│   │   ├── template_history.py          # テンプレート冷却履歴
+│   │   └── constants.py                 # narrative 用定数
+│   ├── simulation/
+│   │   ├── engine.py                    # 月次シミュレーション統括
+│   │   ├── timeline.py                  # 月次進行・季節・状態遷移
+│   │   ├── notifications.py             # 自動停止判定・通知
+│   │   ├── event_recorder.py            # event_records 追記
+│   │   ├── adventure_coordinator.py     # 冒険進行調停
+│   │   └── queries.py                   # summary / story / report 参照
 │   ├── persistence/
 │   │   ├── save_load.py                 # セーブ/ロード
 │   │   └── migrations.py               # スキーマ移行
 │   ├── ui/
 │   │   ├── screens.py                   # UI画面
-│   │   └── ui_helpers.py                # 表示ヘルパー
+│   │   ├── ui_helpers.py                # 表示ヘルパー
+│   │   ├── map_renderer.py              # グリッド/地域/地点描画
+│   │   ├── atlas_renderer.py            # アトラス表示
+│   │   ├── ui_context.py                # 入出力依存コンテナ
+│   │   ├── input_backend.py             # 入力抽象
+│   │   ├── render_backend.py            # 出力抽象
+│   │   ├── presenters.py                # 画面向け整形
+│   │   └── view_models.py               # UI view model
 │   ├── content/
 │   │   └── world_data.py               # 種族、職業、スキル定義
 │   └── i18n/
@@ -95,7 +119,8 @@ flake8 --max-line-length=120 --exclude=node_modules,__pycache__ . && python -m p
 ### レビュー推奨
 - `content/world_data.py` のゲームバランスに関わる値
 - `character.py` のシリアライゼーション構造
-- `simulator.py` のシミュレーションループ変更
+- `simulation/engine.py` / `simulation/timeline.py` の進行ループ変更
+- `world.py` / `terrain.py` の保存互換や world representation に関わる変更
 
 ### 変更禁止（確認必須）
 - `.github/workflows/` CI設定

@@ -7,6 +7,8 @@
 **位置づけ**: 詳細レビューの P0 / P1 指摘を反映し、実装移行・UIモック・具体例まで含めて再構成した vNext 基礎設計書
 
 > **注意**: 実装順・PR 分割・完了条件・現状認識の正本は `docs/implementation_plan.md` に従ってください。本書は中長期の設計目標を定義する文書です。正式な migration chain・ID 規則・location 参照修正方針も `docs/implementation_plan.md` を優先し、本書の §15 migration 例は設計上の参考例として扱います。
+> 現在の main では、月次進行基盤、world memory、terrain/site/route 分離、atlas 観測 UI 初版、
+> schema v7 migration まで実装済みです。本書の As-Is は「この設計書が解決を意図した歴史的な弱点」として読んでください。
 
 ---
 
@@ -89,11 +91,11 @@
 
 ### 3.1 As-Is（現行）
 
-* 年次進行シミュレーター
-* 6属性・種族・職業・好感度・履歴・ソロ冒険
-* ログ中心の観察体験
-* RNG 注入による再現性
-* JSON 保存
+* 月次内部進行を持つ CLI シミュレーター
+* 6属性・種族・職業・関係タグ基盤・パーティ冒険・保留選択
+* event records / 月報 / 年報 / world memory を伴う観察体験
+* terrain/site/route と atlas overview を含む観測 UI 基盤
+* RNG 注入による再現性と schema-versioned JSON 保存
 
 ### 3.2 To-Be（vNext）
 
@@ -200,6 +202,71 @@ AUTO_PAUSE_PRIORITIES = {
 ### 5.1 目的
 
 `Location` を「名前付きセル」から、「状態と記憶を持つ場所」へ引き上げる。
+
+### 5.1.1 基礎世界設定は runtime state から分離する
+
+現行 main では `content/world_data.py` が `WORLD_LORE`, race, job, default location を一体で抱えているが、
+これは「Aethoria の暫定 seed data」がそのまま実装正本になっている状態である。
+基礎世界設定が未確定である以上、vNext では **世界設定そのものを後から差し替え・追加できる** ことを前提にする。
+
+したがって、`World` の runtime state と、世界観・初期定義・命名規則を持つ静的 bundle を分離する。
+
+```python
+@dataclass
+class WorldDefinition:
+    world_key: str
+    display_name: str
+    lore_blocks: list[str]
+    races: list["RaceDef"]
+    jobs: list["JobDef"]
+    default_sites: list["SiteSeed"]
+    naming_rules: dict[str, str]
+```
+
+最低限の方針は次とする。
+
+- `World` は年、地形、event_records、memory、characters などの runtime state を持つ
+- `WorldDefinition` は lore / race / job / location seed / naming などの静的定義を持つ
+- デフォルトの Aethoria は同梱の 1 bundle として扱い、唯一の正史ハードコードとはみなさない
+- 保存データは `world_definition_key` を持ち、対応 bundle が無い場合の fallback を定義する
+- Phase 1 では stdlib のみで扱いやすい **JSON** を正本候補とし、YAML 等は後段の選択肢とする
+
+### 5.1.2 世界観設定整理の authoring パートを明示的に持つ
+
+設定 bundle の loader だけでは、世界観は自動では整理されない。
+現状の課題は「Aethoria の seed data がある」ことではなく、
+**何が確定設定で、何が未確定で、何を生成系へ委ねるかが未整理** なまま simulation を始めていることにある。
+
+そのため vNext では、実装 Phase とは別に、少なくとも 1 本は
+**世界観設定整理と初期 bundle authoring のための作業パート** を持つ。
+
+最低限ここで整理するもの:
+
+- world concept
+- era / historical spine
+- race / job の立ち位置
+- race ごとの lifespan / homeland / culture / naming / inter-group relation
+- geography / culture / naming rule
+- glossary / taboo / symbolic vocabulary
+- default site seed と region role
+
+### 5.1.3 類例に近い歴史的世界変化を扱えるようにする
+
+本作が目指す方向は、少なくとも次の既存ゲーム要素と親和性が高い。
+
+- `Dwarf Fortress`: site の陥落、文明の興亡、地名や歴史的意味の蓄積
+- `Crusader Kings` 系: 戦争、支配交代、文化・時代の推移
+- `Caves of Qud`: 歴史層、固有名、地名や遺物の語り直し
+
+したがって vNext では、次の 5 系統を正式に扱える設計へ寄せる。
+
+1. war / occupation
+2. official renaming / aliases
+3. terrain mutation / route mutation
+4. era transition
+5. civilization drift
+
+これらは event の description ではなく、world state として保持する。
 
 ### 5.2 LocationState — 🔶 基盤実装済、状態量は未導入
 
@@ -1092,6 +1159,56 @@ class NarrativeContext:
     certainty_level: str
     output_length: str
 ```
+
+### 14.2.1 SettingBundle と NarrativeContext の接続
+
+`NarrativeContext` は人物関係や最近イベントだけを見ればよいわけではない。
+どの世界を舞台にしているか、どの文化圏・地理圏に属するかも文章選択に影響する。
+
+そのため将来形では、最低限次を外部設定 bundle から参照できるようにする。
+
+- world title / era name
+- race / job の表示名と tone
+- site type ごとの語彙差
+- naming / epitaph / rumor に使う文化語彙
+- 地域固有の用語や歴史タグ
+
+```python
+@dataclass
+class NarrativeContext:
+    world_definition_key: str
+    region_culture: str | None
+    faith_tag: str | None
+    relation_tags: list[str]
+    memory_tags: list[str]
+```
+
+こうすることで、Aethoria 専用の固定文面を増やすのではなく、
+「後から差し込まれた世界設定 bundle の上で語れる叙述層」として拡張できる。
+
+### 14.2.2 NarrativeContext だけでは世界観設定整理の代替にならない
+
+`NarrativeContext` は「どう語るか」を決める層であり、
+「そもそも何を世界設定として持つか」を整理する層ではない。
+
+したがって実装計画上は、次の 2 段を分ける。
+
+1. `WorldDefinition` / `SettingBundle` を導入し、叙述・UI・初期 world から参照できるようにする
+2. その上で、最初の正式な setting bundle を整理・構築する
+
+この分離により、シミュレーション基盤と設定 authoring を混同せずに進められる。
+
+### 14.2.3 動的世界変化は NarrativeContext の外側で先に成立させる
+
+戦争、改称、地形変化、時代交代、文明変化は、
+まず world state と event record の層で成立していなければならない。
+`NarrativeContext` はそれを語る層であって、変化そのものを作る層ではない。
+
+したがって導入順は次とする。
+
+1. world state に rename / faction / era / terrain mutation の受け皿を入れる
+2. reports / atlas / region / detail に変化結果を出す
+3. その後に `NarrativeContext` で「どう語るか」を強化する
 
 ### 14.3 生成階層
 
