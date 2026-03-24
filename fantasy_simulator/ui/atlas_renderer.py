@@ -248,7 +248,8 @@ def _build_atlas_canvas(  # noqa: C901 — linear but long
         span_y = (max(p[1] for p in cluster) - min(p[1] for p in cluster)) / 2
         rx = span_x + _MARGIN_X + 1
         ry = span_y + _MARGIN_Y + 1
-        # Each cluster gets its own seed offset for distinct coastlines
+        # Offset noise seed per cluster so each land mass has unique coastline.
+        # (coprime multipliers give good decorrelation across clusters.)
         seed_off = int(cx * 7 + cy * 13)
 
         for py in range(h):

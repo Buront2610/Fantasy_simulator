@@ -339,11 +339,11 @@ def render_map_ascii(info: MapRenderInfo) -> str:
 # ------------------------------------------------------------------
 
 #: Overlay marker for danger band
-_DANGER_MARKERS: Dict[str, str] = {"low": " ", "medium": "!", "high": "!"}
+_DANGER_MARKERS: Dict[str, str] = {"low": " ", "medium": ".", "high": "!"}
 #: Overlay marker for traffic band
 _TRAFFIC_MARKERS: Dict[str, str] = {"low": " ", "medium": "o", "high": "O"}
 #: Overlay marker for rumor heat band
-_RUMOR_MARKERS: Dict[str, str] = {"low": " ", "medium": "?", "high": "?"}
+_RUMOR_MARKERS: Dict[str, str] = {"low": " ", "medium": "~", "high": "?"}
 
 
 def _overlay_suffix(cell: MapCellInfo) -> str:
