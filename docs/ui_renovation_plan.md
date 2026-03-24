@@ -342,7 +342,7 @@ UI は最後の view model を描くだけに徹する。
 
 - [ ] 可変サイズ world map の描画テストを追加する
 - [ ] terrain + site overlay の snapshot テストを追加する
-- [ ] `memorial` / `alias` / `recent death site` が地図に反映されることを確認する
+- [ ] map snapshot の `has_memorial` / `has_alias` / `recent_death_site` フラグが地図に反映されることを確認する
 - [ ] 狭幅端末時に `compact` / `minimal` 表示へ落ちることを確認する
 - [ ] seed 固定 terrain preview の再現性テストを追加する
 - [ ] CJK 幅崩れテストを world-scale map 表示にも適用する
