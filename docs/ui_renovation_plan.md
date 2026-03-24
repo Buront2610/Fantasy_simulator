@@ -171,7 +171,7 @@
 - `danger_band`
 - `traffic_band`
 - `rumor_heat_band`
-- `memorial` / `alias` / `recent death site`
+- `has_memorial` / `has_alias` / `recent_death_site`
 
 #### 地域図
 - 周辺導線
