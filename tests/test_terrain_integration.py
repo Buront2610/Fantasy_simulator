@@ -11,7 +11,9 @@ Key invariants verified:
 
 import json
 
-from fantasy_simulator.i18n import set_locale
+import pytest
+
+from fantasy_simulator.i18n import set_locale, get_locale
 from fantasy_simulator.persistence.migrations import (
     CURRENT_VERSION,
     _migrate_v5_to_v6,
@@ -20,7 +22,13 @@ from fantasy_simulator.persistence.migrations import (
 from fantasy_simulator.world import World
 
 
-set_locale("en")
+@pytest.fixture(autouse=True)
+def _ensure_english_locale():
+    """Set locale to English for tests and restore previous locale afterward."""
+    prev = get_locale()
+    set_locale("en")
+    yield
+    set_locale(prev)
 
 
 def _assert_world_bounds_invariants(world: World) -> None:
@@ -427,3 +435,26 @@ class TestMigrationV5ToV6:
         assert len(world.sites) == 3
         assert len(world.routes) >= 2
         _assert_world_bounds_invariants(world)
+
+    def test_migration_skips_out_of_bounds_sites(self):
+        """v5→v6 migration must skip grid locations outside declared bounds."""
+        data = self._make_v5_data()
+        # Add an out-of-bounds location (x=10 in a 3-wide world)
+        data["world"]["grid"].append({
+            "id": "loc_oob", "canonical_name": "OOB Town",
+            "description": "Out of bounds", "region_type": "city",
+            "x": 10, "y": 0,
+            "prosperity": 50, "safety": 50, "mood": 50,
+            "danger": 20, "traffic": 30, "rumor_heat": 10,
+            "road_condition": 60, "visited": False,
+            "controlling_faction_id": None,
+            "recent_event_ids": [], "aliases": [],
+            "memorial_ids": [], "live_traces": [],
+        })
+        result = _migrate_v5_to_v6(data)
+        sites = result["world"]["sites"]
+        site_ids = {s["location_id"] for s in sites}
+        # The OOB location must not appear as a site
+        assert "loc_oob" not in site_ids
+        # Original 3 in-bounds locations remain
+        assert len(sites) == 3

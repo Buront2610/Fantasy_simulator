@@ -336,7 +336,7 @@ class TerrainMap:
 #: Mapping from the existing ``region_type`` to the biome that best
 #: approximates the same terrain feel.  Used when upgrading a legacy
 #: 5×5 world to the new terrain + site model.
-_REGION_TYPE_TO_BIOME: Dict[str, str] = {
+REGION_TYPE_TO_BIOME: Dict[str, str] = {
     "city": "plains",
     "village": "plains",
     "forest": "forest",
@@ -347,7 +347,7 @@ _REGION_TYPE_TO_BIOME: Dict[str, str] = {
 }
 
 #: Importance defaults per site type (higher = more prominent on map).
-_SITE_IMPORTANCE: Dict[str, int] = {
+SITE_IMPORTANCE: Dict[str, int] = {
     "city": 80,
     "village": 40,
     "forest": 20,
@@ -406,8 +406,8 @@ def build_default_terrain(
         loc_id, _name, _desc, region_type, x, y = entry
         if not tmap.in_bounds(x, y):
             continue
-        biome = _REGION_TYPE_TO_BIOME.get(region_type, "plains")
-        importance = _SITE_IMPORTANCE.get(region_type, 50)
+        biome = REGION_TYPE_TO_BIOME.get(region_type, "plains")
+        importance = SITE_IMPORTANCE.get(region_type, 50)
 
         cell = tmap.get(x, y)
         if cell is not None:

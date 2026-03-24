@@ -12,6 +12,7 @@ from ..content.world_data import (
     fallback_location_id,
     get_location_state_defaults,
 )
+from ..terrain import REGION_TYPE_TO_BIOME, SITE_IMPORTANCE
 
 CURRENT_VERSION = 6
 
@@ -203,29 +204,6 @@ def _migrate_v4_to_v5(data: Dict[str, Any]) -> Dict[str, Any]:
     return data
 
 
-#: Mapping from region_type to biome for terrain generation during migration.
-_REGION_TYPE_TO_BIOME: Dict[str, str] = {
-    "city": "plains",
-    "village": "plains",
-    "forest": "forest",
-    "dungeon": "hills",
-    "mountain": "mountain",
-    "plains": "plains",
-    "sea": "ocean",
-}
-
-#: Default importance per site type.
-_SITE_IMPORTANCE: Dict[str, int] = {
-    "city": 80,
-    "village": 40,
-    "forest": 20,
-    "dungeon": 60,
-    "mountain": 30,
-    "plains": 20,
-    "sea": 10,
-}
-
-
 def _migrate_v5_to_v6(data: Dict[str, Any]) -> Dict[str, Any]:
     """Add terrain_map, sites, and routes to the world (PR-G1).
 
@@ -265,8 +243,12 @@ def _migrate_v5_to_v6(data: Dict[str, Any]) -> Dict[str, Any]:
         x = loc_data.get("x", 0)
         y = loc_data.get("y", 0)
 
-        biome = _REGION_TYPE_TO_BIOME.get(region_type, "plains")
-        importance = _SITE_IMPORTANCE.get(region_type, 50)
+        # Skip out-of-bounds locations (same policy as build_default_terrain)
+        if not (0 <= x < width and 0 <= y < height):
+            continue
+
+        biome = REGION_TYPE_TO_BIOME.get(region_type, "plains")
+        importance = SITE_IMPORTANCE.get(region_type, 50)
 
         tc = cell_lookup.get((x, y))
         if tc is not None:
