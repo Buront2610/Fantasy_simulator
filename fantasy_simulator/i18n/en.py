@@ -398,10 +398,18 @@ TEXT_EN: Dict[str, str] = {
     'party_members_label': 'Party',
     'party_policy_label': 'Policy',
     'party_supply_label': 'Supply',
+    'party_marker': 'Party',
+    'party_policy_short': 'policy: {policy}',
     # --- World memory strings (PR-F) ---
     # Live traces
     'live_trace_solo': '{name} passed through {destination} (Year {year}).',
     'live_trace_party': '{party} passed through {destination} (Year {year}).',
+    'live_trace_solo_safe': '{name} returned safely from {destination} (Year {year}).',
+    'live_trace_solo_retreat': '{name} retreated from {destination} (Year {year}).',
+    'live_trace_solo_injury': '{name} staggered back injured from {destination} (Year {year}).',
+    'live_trace_party_safe': '{party} returned safely from {destination} (Year {year}).',
+    'live_trace_party_retreat': '{party} retreated from {destination} (Year {year}).',
+    'live_trace_party_injury': '{party} returned wounded from {destination} (Year {year}).',
     # Memorial epitaphs — minimal NarrativeContext variant selection (design §E-2)
     'memorial_epitaph_warrior': (
         'Here fell {name}, a warrior who met their end at {location} in year {year}.'
@@ -426,6 +434,16 @@ TEXT_EN: Dict[str, str] = {
     'memorial_entry': '[Year {year}] {epitaph}',
     'location_history_menu': 'Location history',
     'enter_location_number': 'Enter location number (or ENTER to cancel): ',
+    'location_memorials_count': '{count} memorial(s)',
+    'location_aliases_count': '{count} alias(es)',
+    'location_traces_count': '{count} trace(s)',
+    'monthly_report_card_header': 'Monthly highlights ({year}-{month})',
+    'monthly_report_card_characters': '  Notable people: {names}',
+    'monthly_report_card_locations': '  Notable places: {names}',
+    'monthly_report_card_adventures': '  Recent adventures: {items}',
+    'monthly_report_card_memory': '  New memories: {items}',
+    'auto_pause_context': 'Cause context: {actor} @ {location}',
+    'auto_pause_supplemental': 'Additional pause reasons: {reasons}',
 }
 
 TERMS_EN: Dict[str, str] = {}

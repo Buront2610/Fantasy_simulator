@@ -201,11 +201,14 @@ class Simulator(
         self._recently_completed_adventures.clear()
         preexisting_reason = self._check_pause_conditions()
         if preexisting_reason is not None:
+            all_reasons = self._collect_pause_conditions()
             return {
                 "months_advanced": 0,
                 "years_advanced": 0,
                 "pause_reason": preexisting_reason,
                 "pause_priority": self.AUTO_PAUSE_PRIORITIES.get(preexisting_reason, 0),
+                "supplemental_reasons": [r for r in all_reasons if r != preexisting_reason],
+                "pause_context": self._pause_context_for_reason(preexisting_reason),
             }
         max_months = max_years * 12
         months_advanced = 0
@@ -220,21 +223,33 @@ class Simulator(
             months_advanced += 1
             reason = self._check_pause_conditions()
             if reason is not None:
+                all_reasons = self._collect_pause_conditions()
                 return {
                     "months_advanced": months_advanced,
                     "years_advanced": months_advanced // 12,
                     "pause_reason": reason,
                     "pause_priority": self.AUTO_PAUSE_PRIORITIES.get(reason, 0),
+                    "supplemental_reasons": [r for r in all_reasons if r != reason],
+                    "pause_context": self._pause_context_for_reason(reason),
                 }
         return {
             "months_advanced": months_advanced,
             "years_advanced": months_advanced // 12,
             "pause_reason": "years_elapsed",
             "pause_priority": self.AUTO_PAUSE_PRIORITIES["years_elapsed"],
+            "supplemental_reasons": [],
+            "pause_context": {},
         }
 
     def _check_pause_conditions(self) -> Optional[str]:
         """Check if any auto-pause condition is met. Returns highest-priority reason."""
+        reasons = self._collect_pause_conditions()
+        if not reasons:
+            return None
+        return reasons[0]
+
+    def _collect_pause_conditions(self) -> List[str]:
+        """Return pause reasons sorted by priority (highest first)."""
         reasons: List[tuple] = []
 
         for char in self.world.characters:
@@ -270,10 +285,23 @@ class Simulator(
                                     self.AUTO_PAUSE_PRIORITIES["party_returned"]))
                     break
 
-        if not reasons:
-            return None
         reasons.sort(key=lambda x: -x[1])
-        return reasons[0][0]
+        return [reason for reason, _ in reasons]
+
+    def _pause_context_for_reason(self, reason: str) -> Dict[str, str]:
+        """Return lightweight context (character/location) for a pause reason."""
+        if reason.startswith("dying"):
+            for char in self.world.characters:
+                if char.alive and char.is_dying:
+                    return {"character": char.name, "location": self.world.location_name(char.location_id)}
+        if reason == "pending_decision":
+            for run in self.world.active_adventures:
+                if run.pending_choice is not None:
+                    return {"character": run.character_name, "location": self.world.location_name(run.destination)}
+        if reason == "party_returned" and self._recently_completed_adventures:
+            run = self._recently_completed_adventures[-1]
+            return {"character": run.character_name, "location": self.world.location_name(run.destination)}
+        return {}
 
     # ------------------------------------------------------------------
     # Serialization

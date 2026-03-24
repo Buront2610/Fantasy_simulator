@@ -12,9 +12,9 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from ..adventure import (
     AdventureRun,
-    RETREAT_ON_SERIOUS,
     SUPPLY_FULL,
     create_adventure_run,
+    default_retreat_rule_for_policy,
     generate_adventure_id,
     select_party_policy,
 )
@@ -90,9 +90,22 @@ class AdventureMixin:
         (player UI hook reserved for future enhancement).
         Design §9.3: policy selection by character status.
         """
+        # Prefer locally co-located parties for world consistency.
+        # Future extension hook: if co-located candidates are insufficient,
+        # allow "gather for one month" travel-to-rally behavior instead of
+        # instant cross-map assembly.
+        leader = self.rng.choice(candidates)
+        same_location = [c for c in candidates if c.location_id == leader.location_id and c.char_id != leader.char_id]
+        other_locations = [c for c in candidates if c.location_id != leader.location_id and c.char_id != leader.char_id]
+
         size = self.rng.choice(range(2, _MAX_PARTY_SIZE + 1))
         size = min(size, len(candidates))
-        members = self.rng.sample(candidates, size)
+        needed_companions = max(0, size - 1)
+        selected_companions = self.rng.sample(same_location, min(needed_companions, len(same_location)))
+        if len(selected_companions) < needed_companions:
+            remaining = needed_companions - len(selected_companions)
+            selected_companions.extend(self.rng.sample(other_locations, min(remaining, len(other_locations))))
+        members = [leader] + selected_companions
         leader = members[0]
 
         # Build adventure on leader
@@ -102,7 +115,7 @@ class AdventureMixin:
         run.member_ids = [m.char_id for m in members]
         run.party_id = generate_adventure_id(self.id_rng)
         run.policy = select_party_policy(members, self.rng)
-        run.retreat_rule = RETREAT_ON_SERIOUS
+        run.retreat_rule = default_retreat_rule_for_policy(run.policy)
         run.supply_state = SUPPLY_FULL
         # danger_level already set in create_adventure_run from destination.danger
 
@@ -187,6 +200,10 @@ class AdventureMixin:
                 if not char.alive:
                     self.event_system.handle_death_side_effects(char, self.world)
                 if run.is_resolved:
+                    if run.outcome == "death":
+                        deceased = self.world.get_character_by_id(run.death_member_id or run.character_id)
+                        if deceased is not None and not deceased.alive:
+                            self.event_system.handle_death_side_effects(deceased, self.world)
                     self._apply_world_memory(run)
                     self._recently_completed_adventures.append(run)
                     self.world.complete_adventure(run.adventure_id)
@@ -239,24 +256,27 @@ class AdventureMixin:
             if not names:
                 names = [run.character_name]
             party_str = self._format_party_names_from_list(names)
-            trace_text = tr(
-                "live_trace_party",
-                party=party_str,
-                destination=dest_name,
-                year=self.world.year,
-            )
+            if run.outcome == "retreat":
+                trace_key = "live_trace_party_retreat"
+            elif run.outcome == "injury":
+                trace_key = "live_trace_party_injury"
+            else:
+                trace_key = "live_trace_party_safe"
+            trace_text = tr(trace_key, party=party_str, destination=dest_name, year=self.world.year)
         else:
-            trace_text = tr(
-                "live_trace_solo",
-                name=run.character_name,
-                destination=dest_name,
-                year=self.world.year,
-            )
+            if run.outcome == "retreat":
+                trace_key = "live_trace_solo_retreat"
+            elif run.outcome == "injury":
+                trace_key = "live_trace_solo_injury"
+            else:
+                trace_key = "live_trace_solo_safe"
+            trace_text = tr(trace_key, name=run.character_name, destination=dest_name, year=self.world.year)
         self.world.add_live_trace(dest, self.world.year, run.character_name, trace_text)
 
         # -- Memorial + alias (death only) --------------------------------
         if run.outcome == "death":
-            char = self.world.get_character_by_id(run.character_id)
+            deceased_id = run.death_member_id or run.character_id
+            char = self.world.get_character_by_id(deceased_id)
             char_name = char.name if char is not None else run.character_name
             epitaph = epitaph_for_character(
                 char_name,
@@ -268,7 +288,7 @@ class AdventureMixin:
             memorial_id = generate_adventure_id(self.id_rng)
             self.world.add_memorial(
                 memorial_id,
-                run.character_id,
+                deceased_id,
                 char_name,
                 dest,
                 self.world.year,

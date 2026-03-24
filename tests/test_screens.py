@@ -11,6 +11,7 @@ from types import SimpleNamespace
 
 from fantasy_simulator.character import Character
 from fantasy_simulator.i18n import set_locale
+from fantasy_simulator.simulator import Simulator
 from fantasy_simulator.world import World
 
 
@@ -175,6 +176,89 @@ class TestMonthlyReportScreen(unittest.TestCase):
         self.assertIn("Year: 1001", text)
         self.assertIn("1 (Winter)", text)
         self.assertIn("REPORT 1001-1", text)
+
+
+class TestAdventureAndLocationViews(unittest.TestCase):
+    def test_adventure_summary_shows_party_marker_and_policy(self) -> None:
+        from fantasy_simulator.adventure import AdventureRun, POLICY_TREASURE
+        from fantasy_simulator.ui.screens import _show_adventure_summaries
+        from fantasy_simulator.ui.ui_context import UIContext
+        from fantasy_simulator.ui.render_backend import PrintRenderBackend
+
+        set_locale("en")
+        world = World()
+        leader = Character("Aldric", 25, "Male", "Human", "Warrior", location_id="loc_aethoria_capital")
+        companion = Character("Lysara", 24, "Female", "Elf", "Mage", location_id="loc_aethoria_capital")
+        world.add_character(leader)
+        world.add_character(companion)
+        sim = Simulator(world, events_per_year=0, adventure_steps_per_year=0, seed=1)
+        run = AdventureRun(
+            character_id=leader.char_id,
+            character_name=leader.name,
+            origin="loc_aethoria_capital",
+            destination="loc_thornwood",
+            year_started=world.year,
+            member_ids=[leader.char_id, companion.char_id],
+            policy=POLICY_TREASURE,
+        )
+        world.add_adventure(run)
+
+        class NoopInputBackend:
+            def read_line(self, prompt: str = "") -> str:
+                return ""
+
+            def read_menu_key(self, pairs, default=None):
+                return pairs[0][0]
+
+            def pause(self, message: str = "") -> None:
+                pass
+
+        ctx = UIContext(inp=NoopInputBackend(), out=PrintRenderBackend())
+        captured = io.StringIO()
+        with redirect_stdout(captured):
+            _show_adventure_summaries(sim, ctx=ctx)
+        text = _ANSI_RE.sub("", captured.getvalue())
+
+        self.assertIn("[Party]", text)
+        self.assertIn("policy: Treasure Hunt", text)
+        self.assertIn("Aldric & Lysara", text)
+
+    def test_location_history_uses_i18n_count_tags(self) -> None:
+        from fantasy_simulator.ui.screens import _show_location_history
+        from fantasy_simulator.ui.ui_context import UIContext
+        from fantasy_simulator.ui.render_backend import PrintRenderBackend
+
+        set_locale("en")
+        world = World()
+        loc = world.get_location_by_id("loc_aethoria_capital")
+        assert loc is not None
+        loc.aliases.append("The Crown City")
+        loc.memorial_ids.append("m1")
+        loc.live_traces.append({"year": 1001, "char_name": "Aldric", "text": "trace"})
+
+        class PickFirstInputBackend:
+            def __init__(self):
+                self.calls = 0
+
+            def read_line(self, prompt: str = "") -> str:
+                self.calls += 1
+                return "1" if self.calls == 1 else ""
+
+            def read_menu_key(self, pairs, default=None):
+                return pairs[0][0]
+
+            def pause(self, message: str = "") -> None:
+                pass
+
+        ctx = UIContext(inp=PickFirstInputBackend(), out=PrintRenderBackend())
+        captured = io.StringIO()
+        with redirect_stdout(captured):
+            _show_location_history(world, ctx=ctx)
+        text = _ANSI_RE.sub("", captured.getvalue())
+
+        self.assertIn("1 memorial(s)", text)
+        self.assertIn("1 alias(es)", text)
+        self.assertIn("1 trace(s)", text)
 
 
 if __name__ == "__main__":

@@ -89,6 +89,16 @@ POLICY_LOOT_MOD: Dict[str, float] = {
     POLICY_ASSAULT: 1.10,
 }
 
+# supply_mod > 1.0 means faster depletion; < 1.0 slower depletion
+POLICY_SUPPLY_MOD: Dict[str, float] = {
+    POLICY_CAUTIOUS: 0.85,
+    POLICY_SWIFT: 0.70,
+    POLICY_TREASURE: 1.05,
+    POLICY_RESCUE: 0.90,
+    POLICY_RELIC: 1.00,
+    POLICY_ASSAULT: 1.25,
+}
+
 # Base injury probability thresholds (design §9.7)
 _BASE_INJURY_CHANCE: float = 0.18
 # _BASE_CRITICAL_RATIO: ratio between critical threshold and injury threshold
@@ -135,6 +145,23 @@ def select_party_policy(members: List["Character"], rng: Any = random) -> str:
         if r <= cumulative:
             return policy
     return top3[0][0]
+
+
+def default_retreat_rule_for_policy(policy: str) -> str:
+    """Return the baseline retreat rule for a selected party policy.
+
+    This is the current extension point for future decision inputs
+    (favorite / spotlighted / playable / vow / relationship context).
+    """
+    mapping = {
+        POLICY_CAUTIOUS: RETREAT_ON_SERIOUS,
+        POLICY_RESCUE: RETREAT_ON_SERIOUS,
+        POLICY_TREASURE: RETREAT_ON_TROPHY,
+        POLICY_RELIC: RETREAT_ON_TROPHY,
+        POLICY_SWIFT: RETREAT_ON_SUPPLY,
+        POLICY_ASSAULT: RETREAT_NEVER,
+    }
+    return mapping.get(policy, RETREAT_ON_SERIOUS)
 
 
 @dataclass
@@ -196,6 +223,8 @@ class AdventureRun:
     summary_log: List[str] = field(default_factory=list)
     detail_log: List[str] = field(default_factory=list)
     resolution_year: Optional[int] = None
+    injury_member_id: Optional[str] = None
+    death_member_id: Optional[str] = None
     # Party fields (PR-E)
     member_ids: List[str] = field(default_factory=list)
     party_id: Optional[str] = None
@@ -264,15 +293,13 @@ class AdventureRun:
         - combat_score: higher score → lower chance  (baseline 50 = 1.0 modifier)
         - danger_level: 0.5 at danger=0, 1.0 at danger=50, 1.5 at danger=100
 
-        Note: policy is deliberately excluded from injury calculation to keep
-        life-or-death thresholds stable and predictable (the critical/death zone
-        anchors at injury_chance * _BASE_CRITICAL_RATIO → 0.24 ceiling).
-        Policy instead shapes loot rewards and choice defaults (design §9.2).
+        - policy: POLICY_INJURY_MOD lookup
         """
         combat = self._combat_score(members)
         ability_mod = _STAT_BASELINE / max(combat, 1.0)
         danger_mod = 0.5 + self.danger_level / 100.0
-        chance = _BASE_INJURY_CHANCE * ability_mod * danger_mod
+        policy_mod = POLICY_INJURY_MOD.get(self.policy, 1.0)
+        chance = _BASE_INJURY_CHANCE * ability_mod * danger_mod * policy_mod
         # Cap at 0.22 so critical_chance (≈ chance * 1.333) stays below 0.30
         return max(0.04, min(0.22, chance))
 
@@ -305,12 +332,42 @@ class AdventureRun:
 
     def _tick_supply(self, rng: Any) -> None:
         """Probabilistically degrade supply_state during exploration."""
+        policy_mod = POLICY_SUPPLY_MOD.get(self.policy, 1.0)
         if self.supply_state == SUPPLY_FULL:
-            if rng.random() < _SUPPLY_DEGRADE_FULL_TO_LOW:
+            if rng.random() < _SUPPLY_DEGRADE_FULL_TO_LOW * policy_mod:
                 self.supply_state = SUPPLY_LOW
         elif self.supply_state == SUPPLY_LOW:
-            if rng.random() < _SUPPLY_DEGRADE_LOW_TO_CRITICAL:
+            if rng.random() < _SUPPLY_DEGRADE_LOW_TO_CRITICAL * policy_mod:
                 self.supply_state = SUPPLY_CRITICAL
+
+    def _default_option_for_context(self, context: str) -> str:
+        """Return policy-aware default option for pending choice contexts.
+
+        Extension point: future decision_context can include vow/personality/
+        relationship and player-control flags.
+        """
+        if context == "approach":
+            approach_defaults = {
+                POLICY_CAUTIOUS: CHOICE_PROCEED_CAUTIOUSLY,
+                POLICY_RESCUE: CHOICE_PROCEED_CAUTIOUSLY,
+                POLICY_TREASURE: CHOICE_PRESS_ON,
+                POLICY_RELIC: CHOICE_PRESS_ON,
+                POLICY_SWIFT: CHOICE_PRESS_ON,
+                POLICY_ASSAULT: CHOICE_PRESS_ON,
+            }
+            return approach_defaults.get(self.policy, CHOICE_PROCEED_CAUTIOUSLY)
+
+        if context == "depth":
+            depth_defaults = {
+                POLICY_CAUTIOUS: CHOICE_WITHDRAW,
+                POLICY_RESCUE: CHOICE_WITHDRAW,
+                POLICY_SWIFT: CHOICE_PRESS_ON,
+                POLICY_TREASURE: CHOICE_PRESS_ON,
+                POLICY_RELIC: CHOICE_PRESS_ON,
+                POLICY_ASSAULT: CHOICE_PRESS_ON,
+            }
+            return depth_defaults.get(self.policy, CHOICE_WITHDRAW)
+        return CHOICE_WITHDRAW
 
     def _clear_member_adventures(self, world: "World") -> None:
         """Clear active_adventure_id for all non-leader party members."""
@@ -343,6 +400,8 @@ class AdventureRun:
             "summary_log": list(self.summary_log),
             "detail_log": list(self.detail_log),
             "resolution_year": self.resolution_year,
+            "injury_member_id": self.injury_member_id,
+            "death_member_id": self.death_member_id,
             # Party fields
             "member_ids": list(self.member_ids),
             "party_id": self.party_id,
@@ -374,6 +433,8 @@ class AdventureRun:
             summary_log=list(data.get("summary_log", [])),
             detail_log=list(data.get("detail_log", [])),
             resolution_year=data.get("resolution_year"),
+            injury_member_id=data.get("injury_member_id"),
+            death_member_id=data.get("death_member_id"),
             # Party fields
             member_ids=list(member_ids),
             party_id=data.get("party_id"),
@@ -410,7 +471,7 @@ class AdventureRun:
                 self.pending_choice = AdventureChoice(
                     prompt=tr("choice_dangerous_approach", name=self.character_name, destination=dest_name),
                     options=[CHOICE_PRESS_ON, CHOICE_PROCEED_CAUTIOUSLY, CHOICE_RETREAT],
-                    default_option=CHOICE_PROCEED_CAUTIOUSLY,
+                    default_option=self._default_option_for_context("approach"),
                     context="approach",
                 )
                 self.state = "waiting_for_choice"
@@ -466,60 +527,72 @@ class AdventureRun:
         critical_chance = min(injury_chance * _BASE_CRITICAL_RATIO, 0.60)
 
         roll = rng.random()
+        injured_member = character
+        if self.is_party and members:
+            injured_member = rng.choice(members)
+
         if roll < injury_chance:
             # Death staging: worsen character injury
-            character.worsen_injury()
-            self.injury_status = character.injury_status
-            summary = tr("summary_adventure_injured", name=self.character_name)
-            detail = tr("detail_adventure_injured", name=self.character_name, destination=dest_name)
+            injured_member.worsen_injury()
+            self.injury_status = injured_member.injury_status
+            self.injury_member_id = injured_member.char_id
+            summary = tr("summary_adventure_injured", name=injured_member.name)
+            detail = tr("detail_adventure_injured", name=injured_member.name, destination=dest_name)
             self._record(summary, detail)
             self.state = "returning"
             return [summary]
 
         if roll < critical_chance:
             # Death staging: if already dying → die; otherwise worsen
-            if character.injury_status == "dying":
+            if injured_member.injury_status == "dying":
                 self.outcome = "death"
                 self.state = "resolved"
                 self.resolution_year = world.year
-                character.alive = False
+                injured_member.alive = False
+                injured_member.active_adventure_id = None
+                self.death_member_id = injured_member.char_id
                 character.active_adventure_id = None
                 self._clear_member_adventures(world)
-                summary = tr("summary_adventure_died", name=self.character_name, destination=dest_name)
+                summary = tr("summary_adventure_died", name=injured_member.name, destination=dest_name)
                 detail = tr(
-                    "detail_adventure_died", name=self.character_name, destination=dest_name
+                    "detail_adventure_died", name=injured_member.name, destination=dest_name
                 )
                 self._record(summary, detail)
-                character.add_history(
+                injured_member.add_history(
                     tr("history_adventure_detail", year=world.year, detail=detail)
                 )
                 return [summary]
             # Not yet dying: worsen injury and return
-            character.worsen_injury()
-            self.injury_status = character.injury_status
-            summary = tr("summary_adventure_injured", name=self.character_name)
-            detail = tr("detail_adventure_injured", name=self.character_name, destination=dest_name)
+            injured_member.worsen_injury()
+            self.injury_status = injured_member.injury_status
+            self.injury_member_id = injured_member.char_id
+            summary = tr("summary_adventure_injured", name=injured_member.name)
+            detail = tr("detail_adventure_injured", name=injured_member.name, destination=dest_name)
             self._record(summary, detail)
             self.state = "returning"
             return [summary]
 
-        # --- Discovery (always occurs when injury checks are passed) ---
-        # loot_chance / lore score shapes future discovery quality (PR-F);
-        # for now a discovery always happens to preserve RNG sequence parity.
-        discovery = rng.choice(ADVENTURE_DISCOVERIES)
-        self.loot_summary.append(discovery)
-        summary = tr("summary_adventure_discovery", name=self.character_name, destination=dest_name)
-        detail = tr(
-            "detail_adventure_discovery",
-            name=self.character_name, discovery=tr_term(discovery), destination=dest_name,
-        )
-        self._record(summary, detail)
+        # --- Discovery (policy and lore dependent) ---
+        loot_chance = self._compute_loot_chance(members)
+        if rng.random() < loot_chance:
+            discovery = rng.choice(ADVENTURE_DISCOVERIES)
+            self.loot_summary.append(discovery)
+            summary = tr("summary_adventure_discovery", name=self.character_name, destination=dest_name)
+            detail = tr(
+                "detail_adventure_discovery",
+                name=self.character_name, discovery=tr_term(discovery), destination=dest_name,
+            )
+            self._record(summary, detail)
+        else:
+            summary = tr("summary_adventure_scouting", name=self.character_name, destination=dest_name)
+            detail = tr("detail_adventure_scouting", name=self.character_name, destination=dest_name)
+            self._record(summary, detail)
 
         if self.pending_choice is None and rng.random() < 0.40:
             self.pending_choice = AdventureChoice(
                 prompt=tr("choice_press_deeper", name=self.character_name, destination=dest_name),
                 options=[CHOICE_PRESS_ON, CHOICE_WITHDRAW],
-                default_option=CHOICE_WITHDRAW,
+                default_option=self._default_option_for_context("depth"),
                 context="depth",
             )
             self.state = "waiting_for_choice"
@@ -539,12 +612,17 @@ class AdventureRun:
         self.steps_taken += 1
         self.state = "resolved"
         self.resolution_year = world.year
+        history_target = character
         if self.outcome != "death":
             if self.injury_status != "none":
                 self.outcome = "injury"
-                character.injury_status = self.injury_status
-                summary = tr("summary_returned_injured", name=self.character_name, destination=dest_name)
-                detail = tr("detail_returned_injured", name=self.character_name, origin=origin_name)
+                injured_member = world.get_character_by_id(self.injury_member_id or self.character_id)
+                if injured_member is None:
+                    injured_member = character
+                injured_member.injury_status = self.injury_status
+                summary = tr("summary_returned_injured", name=injured_member.name, destination=dest_name)
+                detail = tr("detail_returned_injured", name=injured_member.name, origin=origin_name)
+                history_target = injured_member
             elif self.loot_summary:
                 self.outcome = "safe_return"
                 summary = tr(
@@ -564,7 +642,7 @@ class AdventureRun:
             self._record(summary, detail)
         character.active_adventure_id = None
         self._clear_member_adventures(world)
-        character.add_history(tr("history_adventure_detail", year=world.year, detail=self.detail_log[-1]))
+        history_target.add_history(tr("history_adventure_detail", year=world.year, detail=self.detail_log[-1]))
         return [self.summary_log[-1]]
 
     def resolve_choice(

@@ -460,6 +460,42 @@ class TestApplyWorldMemory:
         # Alias generated
         assert len(dest.aliases) == 1
 
+    def test_apply_world_memory_uses_deceased_member_for_memorial(self):
+        """When a companion dies, memorial must reference companion, not leader."""
+        from unittest.mock import MagicMock
+        from fantasy_simulator.adventure import AdventureRun
+        from fantasy_simulator.simulation.adventure_coordinator import AdventureMixin
+        from fantasy_simulator.character import Character
+
+        world = _make_world()
+        world.year = 1010
+        leader = Character(name="Leader", age=30, gender="Male", race="Human", job="Warrior", char_id="cL")
+        leader.location_id = "loc_aethoria_capital"
+        companion = Character(name="Companion", age=28, gender="Female", race="Elf", job="Mage", char_id="cC")
+        companion.location_id = "loc_aethoria_capital"
+        companion.alive = False
+        world.add_character(leader)
+        world.add_character(companion)
+
+        run = MagicMock(spec=AdventureRun)
+        run.destination = "loc_thornwood"
+        run.character_id = "cL"
+        run.character_name = "Leader"
+        run.death_member_id = "cC"
+        run.outcome = "death"
+        run.year_started = 1008
+        run.is_party = True
+        run.member_ids = ["cL", "cC"]
+
+        mixin = object.__new__(AdventureMixin)
+        mixin.world = world
+        mixin.id_rng = random.Random(7)
+
+        mixin._apply_world_memory(run)
+        mem = next(iter(world.memorials.values()))
+        assert mem.character_id == "cC"
+        assert "Companion" in mem.character_name
+
     def test_apply_world_memory_safe_return_no_memorial(self):
         """Safe return → live trace only, no memorial."""
         from unittest.mock import MagicMock
@@ -488,3 +524,43 @@ class TestApplyWorldMemory:
         assert len(dest.live_traces) == 1
         assert len(world.memorials) == 0
         assert len(dest.aliases) == 0
+
+    def test_apply_world_memory_trace_text_reflects_outcome(self):
+        """Trace text should differ between safe_return and retreat outcomes."""
+        from unittest.mock import MagicMock
+        from fantasy_simulator.adventure import AdventureRun
+        from fantasy_simulator.simulation.adventure_coordinator import AdventureMixin
+
+        world = _make_world()
+        world.year = 1010
+
+        safe_run = MagicMock(spec=AdventureRun)
+        safe_run.destination = "loc_thornwood"
+        safe_run.character_id = "c_safe"
+        safe_run.character_name = "Aldric"
+        safe_run.outcome = "safe_return"
+        safe_run.year_started = 1009
+        safe_run.is_party = False
+        safe_run.member_ids = ["c_safe"]
+
+        retreat_run = MagicMock(spec=AdventureRun)
+        retreat_run.destination = "loc_thornwood"
+        retreat_run.character_id = "c_retreat"
+        retreat_run.character_name = "Lysara"
+        retreat_run.outcome = "retreat"
+        retreat_run.year_started = 1009
+        retreat_run.is_party = False
+        retreat_run.member_ids = ["c_retreat"]
+
+        mixin = object.__new__(AdventureMixin)
+        mixin.world = world
+        mixin.id_rng = random.Random(3)
+
+        mixin._apply_world_memory(safe_run)
+        mixin._apply_world_memory(retreat_run)
+
+        dest = world.get_location_by_id("loc_thornwood")
+        assert len(dest.live_traces) >= 2
+        safe_text = dest.live_traces[-2]["text"].lower()
+        retreat_text = dest.live_traces[-1]["text"].lower()
+        assert safe_text != retreat_text
