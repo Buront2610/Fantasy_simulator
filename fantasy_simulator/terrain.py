@@ -162,18 +162,15 @@ class Site:
     atlas_y: int = -1
 
     def to_dict(self) -> Dict[str, Any]:
-        d: Dict[str, Any] = {
+        return {
             "location_id": self.location_id,
             "x": self.x,
             "y": self.y,
             "site_type": self.site_type,
             "importance": self.importance,
+            "atlas_x": self.atlas_x,
+            "atlas_y": self.atlas_y,
         }
-        if self.atlas_x >= 0:
-            d["atlas_x"] = self.atlas_x
-        if self.atlas_y >= 0:
-            d["atlas_y"] = self.atlas_y
-        return d
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Site":

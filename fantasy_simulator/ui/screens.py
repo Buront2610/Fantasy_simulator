@@ -295,6 +295,9 @@ def _region_drill_loop(
     ctx = _default_ctx(ctx)
     out = ctx.out
 
+    # Build location_id → cell lookup once (stable across iterations)
+    cell_by_id = {c.location_id: c for c in info.cells.values()}
+
     while True:
         # Build world memory data for region map enrichment (item 9)
         site_memorials: dict[str, list[str]] = {}
@@ -339,8 +342,6 @@ def _region_drill_loop(
         y_max = min(info.height - 1, center_cell.y + radius)
 
         visible_locs = []
-        # Build location_id → cell lookup for efficient matching
-        cell_by_id = {c.location_id: c for c in info.cells.values()}
         for loc in sorted(world.grid.values(), key=lambda lc: lc.canonical_name):
             cell = cell_by_id.get(loc.id)
             if cell and x_min <= cell.x <= x_max and y_min <= cell.y <= y_max:

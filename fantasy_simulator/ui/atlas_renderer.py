@@ -293,7 +293,9 @@ def _build_atlas_canvas(  # noqa: C901 — linear but long
                 if dist < 1.0 + ang + sp:
                     land[py][px] = True
 
-    # Small scattered islands for visual richness
+    # Small scattered islands for visual richness.
+    # Y margin is tighter (MARGIN-1) so islands can appear closer to
+    # the vertical edges, compensating for the taller canvas aspect.
     for ix in range(_ISLAND_MARGIN, w - _ISLAND_MARGIN, _ISLAND_SPACING_X):
         for iy in range(_ISLAND_MARGIN - 1, h - (_ISLAND_MARGIN - 1), _ISLAND_SPACING_Y):
             noise_val = _coast_noise(ix * 3, iy * 5)
@@ -304,7 +306,9 @@ def _build_atlas_canvas(  # noqa: C901 — linear but long
                         if 0 <= ny < h and 0 <= nx < w:
                             land[ny][nx] = True
 
-    # Force land around every site (radius 3×5).
+    # Force land around every site (radius 3 rows × 5 cols).
+    # Wider horizontal spread compensates for terminal characters
+    # being ~2× taller than wide, keeping land patches visually round.
     for ax, ay in site_atlas.values():
         for dy2 in range(-3, 4):
             for dx2 in range(-5, 6):
@@ -595,7 +599,8 @@ def render_atlas_compact(info: "MapRenderInfo") -> str:
         site_atlas[cell.location_id] = (ax, ay)
         biome_seeds.append((ax, ay, cell.terrain_biome))
 
-    # Simple land mask: radius-2 circle around each site
+    # Simple land mask: 2 rows × 3 cols around each site.
+    # Wider horizontal spread matches terminal character aspect ratio.
     land: List[List[bool]] = [[False] * w for _ in range(h)]
     for ax, ay in site_atlas.values():
         for dy2 in range(-2, 3):
