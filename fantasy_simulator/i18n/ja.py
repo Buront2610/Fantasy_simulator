@@ -440,6 +440,25 @@ TEXT_JA: Dict[str, str] = {
     'monthly_report_card_memory': '  新しい記憶: {items}',
     'auto_pause_context': '停止要因: {actor} @ {location}',
     'auto_pause_supplemental': '補足停止理由: {reasons}',
+    # PR-G: terrain / route / site labels
+    'terrain_biome_ocean': '海洋',
+    'terrain_biome_coast': '海岸',
+    'terrain_biome_plains': '平原',
+    'terrain_biome_forest': '森林',
+    'terrain_biome_hills': '丘陵',
+    'terrain_biome_mountain': '山岳',
+    'terrain_biome_swamp': '湿地',
+    'terrain_biome_desert': '砂漠',
+    'terrain_biome_tundra': 'ツンドラ',
+    'terrain_biome_river': '河川',
+    'route_type_road': '街道',
+    'route_type_trail': '小道',
+    'route_type_sea_lane': '海路',
+    'route_type_mountain_pass': '峠道',
+    'route_type_river_crossing': '渡河路',
+    'map_terrain': '地形',
+    'map_routes': '道路',
+    'route_blocked': '（封鎖中）',
 }
 
 TERMS_JA: Dict[str, str] = {
@@ -519,4 +538,18 @@ TERMS_JA: Dict[str, str] = {
     'a pouch of moon-silver': '月銀の小袋',
     'a fragment of lost lore': '失われし伝承の断片',
     'a cache of monster trophies': '魔物の戦利品の隠し場所',
+    # PR-G: biome terms
+    'ocean': '海洋',
+    'coast': '海岸',
+    'hills': '丘陵',
+    'swamp': '湿地',
+    'desert': '砂漠',
+    'tundra': 'ツンドラ',
+    'river': '河川',
+    # PR-G: route type terms
+    'road': '街道',
+    'trail': '小道',
+    'sea_lane': '海路',
+    'mountain_pass': '峠道',
+    'river_crossing': '渡河路',
 }

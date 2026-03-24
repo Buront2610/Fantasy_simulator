@@ -444,6 +444,40 @@ TEXT_EN: Dict[str, str] = {
     'monthly_report_card_memory': '  New memories: {items}',
     'auto_pause_context': 'Cause context: {actor} @ {location}',
     'auto_pause_supplemental': 'Additional pause reasons: {reasons}',
+    # PR-G: terrain / route / site labels
+    'terrain_biome_ocean': 'Ocean',
+    'terrain_biome_coast': 'Coast',
+    'terrain_biome_plains': 'Plains',
+    'terrain_biome_forest': 'Forest',
+    'terrain_biome_hills': 'Hills',
+    'terrain_biome_mountain': 'Mountain',
+    'terrain_biome_swamp': 'Swamp',
+    'terrain_biome_desert': 'Desert',
+    'terrain_biome_tundra': 'Tundra',
+    'terrain_biome_river': 'River',
+    'route_type_road': 'Road',
+    'route_type_trail': 'Trail',
+    'route_type_sea_lane': 'Sea Lane',
+    'route_type_mountain_pass': 'Mountain Pass',
+    'route_type_river_crossing': 'River Crossing',
+    'map_terrain': 'Terrain',
+    'map_routes': 'Routes',
+    'route_blocked': '(blocked)',
 }
 
-TERMS_EN: Dict[str, str] = {}
+TERMS_EN: Dict[str, str] = {
+    # PR-G: biome terms
+    'ocean': 'Ocean',
+    'coast': 'Coast',
+    'hills': 'Hills',
+    'swamp': 'Swamp',
+    'desert': 'Desert',
+    'tundra': 'Tundra',
+    'river': 'River',
+    # PR-G: route type terms
+    'road': 'Road',
+    'trail': 'Trail',
+    'sea_lane': 'Sea Lane',
+    'mountain_pass': 'Mountain Pass',
+    'river_crossing': 'River Crossing',
+}
