@@ -13,10 +13,10 @@ from ..content.world_data import (
     get_location_state_defaults,
 )
 from ..terrain import (
+    assemble_atlas_layout_inputs,
     REGION_TYPE_TO_BIOME,
     SITE_IMPORTANCE,
     build_default_atlas_layout,
-    project_atlas_coords,
 )
 
 CURRENT_VERSION = 7
@@ -327,55 +327,15 @@ def _migrate_v6_to_v7(data: Dict[str, Any]) -> Dict[str, Any]:
     width = world_data.get("width", 5)
     height = world_data.get("height", 5)
 
-    # Compute atlas coordinates for existing sites.
     sites = world_data.get("sites", [])
-    site_coords = []
-    for site in sites:
-        gx = site.get("x", 0)
-        gy = site.get("y", 0)
-        atlas_x, atlas_y = project_atlas_coords(
-            gx,
-            gy,
-            width=width,
-            height=height,
-        )
-        site["atlas_x"] = atlas_x
-        site["atlas_y"] = atlas_y
-        site_coords.append((atlas_x, atlas_y))
-
-    site_by_id = {
-        site.get("location_id"): site
-        for site in sites
-        if site.get("location_id")
-    }
-    route_coords = []
-    for route in world_data.get("routes", []):
-        from_site = site_by_id.get(route.get("from_site_id"))
-        to_site = site_by_id.get(route.get("to_site_id"))
-        if from_site is None or to_site is None:
-            continue
-        route_coords.append((
-            (from_site["atlas_x"], from_site["atlas_y"]),
-            (to_site["atlas_x"], to_site["atlas_y"]),
-        ))
-
-    mountain_coords = []
-    terrain_map = world_data.get("terrain_map", {})
-    for cell in terrain_map.get("cells", []):
-        if cell.get("biome") != "mountain":
-            continue
-        mountain_coords.append(project_atlas_coords(
-            cell.get("x", 0),
-            cell.get("y", 0),
-            width=width,
-            height=height,
-        ))
-
-    world_data["atlas_layout"] = build_default_atlas_layout(
-        site_coords,
-        route_coords=route_coords,
-        mountain_coords=mountain_coords,
-    ).to_dict()
+    inputs = assemble_atlas_layout_inputs(
+        width=width,
+        height=height,
+        sites=sites,
+        routes=world_data.get("routes", []),
+        terrain_cells=world_data.get("terrain_map", {}).get("cells", []),
+    )
+    world_data["atlas_layout"] = build_default_atlas_layout(inputs).to_dict()
 
     data["schema_version"] = 7
     return data

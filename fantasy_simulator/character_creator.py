@@ -261,19 +261,21 @@ class CharacterCreator:
         ctx = _default_ctx(ctx)
         stat_names = ["strength", "intelligence", "dexterity", "wisdom", "charisma", "constitution"]
         defaults = {s: 10 for s in stat_names}
-        total_points = 60
+        extra_points = 60
 
         raw = ctx.inp.read_line(f"  > {tr('manually_distribute_stats')}: ").strip().lower()
         if raw != "y":
             return defaults
 
-        allocated: Dict[str, int] = {}
-        for i, stat in enumerate(stat_names):
-            left = total_points - sum(allocated.values())
-            remaining_stats = len(stat_names) - i
-            max_allowed = min(40, left - (remaining_stats - 1) * 10)
+        allocated: Dict[str, int] = dict(defaults)
+        for stat in stat_names:
             while True:
-                raw_val = ctx.inp.read_line(f"  > {stat.capitalize():15s} (10-40, {left} pts left): ").strip()
+                spent_extra = sum(value - 10 for value in allocated.values())
+                left_extra = extra_points - spent_extra
+                max_allowed = min(40, 10 + left_extra)
+                raw_val = ctx.inp.read_line(
+                    f"  > {stat.capitalize():15s} (10-{max_allowed}, {left_extra} pts left): "
+                ).strip()
                 if not raw_val:
                     val = 10
                 else:
@@ -284,9 +286,6 @@ class CharacterCreator:
                         continue
                 if val < 10 or val > max_allowed:
                     ctx.out.print_line(f"  {tr('must_be_between', lo=10, hi=max_allowed)}")
-                    continue
-                if left - val < (remaining_stats - 1) * 10:
-                    ctx.out.print_line(f"  {tr('not_enough_points_left', max_allowed=max_allowed)}")
                     continue
                 allocated[stat] = val
                 break

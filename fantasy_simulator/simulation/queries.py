@@ -138,7 +138,8 @@ class QueryMixin:
             lines.append(f"  {tr('no_notable_events')}")
 
         lines.append("")
-        lines.append(char.stat_block())
+        char_name_lookup = {world_char.char_id: world_char.name for world_char in self.world.characters}
+        lines.append(char.stat_block(char_name_lookup=char_name_lookup))
         lines.append("─" * 50)
         return "\n".join(lines)
 

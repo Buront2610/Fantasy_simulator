@@ -495,6 +495,34 @@ class TestBuildAtlasCanvas(unittest.TestCase):
         canvas = _build_atlas_canvas(info)
         self.assertIn(canvas[12][30], "^/\\")
 
+    def test_stored_layout_sea_cells_override_continent_cells(self) -> None:
+        info = MapRenderInfo(world_name="SeaCut", year=1, width=3, height=3)
+        info.cells[(0, 0)] = MapCellInfo(
+            location_id="loc_anchor",
+            canonical_name="Anchor",
+            region_type="city",
+            icon="@",
+            safety_label="ok",
+            danger=10,
+            traffic_indicator="",
+            population=0,
+            x=0,
+            y=0,
+            danger_band="low",
+            atlas_x=5,
+            atlas_y=5,
+        )
+        from fantasy_simulator.terrain import AtlasLayout
+        info.atlas_layout = AtlasLayout(
+            canvas_w=72,
+            canvas_h=30,
+            continents=[{"name": "Main", "cells": [(30, 12)]}],
+            seas=[{"name": "Inner Sea", "cells": [(30, 12)]}],
+            mountain_ranges=[],
+        )
+        canvas = _build_atlas_canvas(info)
+        self.assertEqual(canvas[12][30], "~")
+
 
 class TestAtlasLayoutScaling(unittest.TestCase):
     """Verify wide and compact atlas render the same stored layout."""
@@ -530,6 +558,21 @@ class TestAtlasLayoutScaling(unittest.TestCase):
         compact_x = round(60 * 39 / 71)
         compact_y = round(24 * 15 / 29)
         self.assertNotEqual(compact[compact_y][compact_x], "~")
+
+
+class TestAtlasLayoutBuilder(unittest.TestCase):
+    """Verify generated atlas layouts preserve multiple macro regions."""
+
+    def test_builder_splits_multiple_continents(self) -> None:
+        from fantasy_simulator.terrain import AtlasLayoutInputs, build_default_atlas_layout
+        layout = build_default_atlas_layout(AtlasLayoutInputs(
+            site_coords=[(8, 6), (15, 8), (56, 6), (63, 8), (8, 22), (15, 24), (56, 22), (63, 24)],
+            route_coords=[],
+            mountain_coords=[(8, 6), (56, 22)],
+        ))
+        self.assertGreaterEqual(len(layout.continents), 2)
+        self.assertGreaterEqual(len(layout.seas), 1)
+        self.assertGreaterEqual(len(layout.mountain_ranges), 2)
 
 
 class TestRenderAtlasOverview(unittest.TestCase):
@@ -1093,6 +1136,9 @@ class TestAtlasLayoutOnWorld(unittest.TestCase):
         d = world.to_dict()
         self.assertIn("atlas_layout", d)
         self.assertGreater(len(d["atlas_layout"]["continents"][0]["cells"]), 0)
+        self.assertGreaterEqual(len(d["atlas_layout"]["continents"]), 2)
+        self.assertGreaterEqual(len(d["atlas_layout"]["seas"]), 1)
+        self.assertGreaterEqual(len(d["atlas_layout"]["mountain_ranges"]), 1)
 
     def test_world_to_dict_includes_atlas_layout(self) -> None:
         from fantasy_simulator.terrain import AtlasLayout
@@ -1123,6 +1169,7 @@ class TestAtlasLayoutOnWorld(unittest.TestCase):
         restored = World.from_dict(d)
         self.assertIsNotNone(restored.atlas_layout)
         self.assertGreater(len(restored.atlas_layout.continents[0]["cells"]), 0)
+        self.assertGreaterEqual(len(restored.atlas_layout.continents), 2)
 
 
 class TestMigrationV6toV7(unittest.TestCase):
@@ -1144,8 +1191,37 @@ class TestMigrationV6toV7(unittest.TestCase):
         self.assertEqual(result["schema_version"], 7)
         layout = result["world"]["atlas_layout"]
         self.assertEqual(layout["canvas_w"], 72)
-        self.assertEqual(len(layout["continents"]), 1)
+        self.assertGreaterEqual(len(layout["continents"]), 1)
+        self.assertGreaterEqual(len(layout["seas"]), 1)
         self.assertGreater(len(layout["continents"][0]["cells"]), 0)
+
+    def test_realistic_migration_preserves_multiple_macro_regions(self) -> None:
+        from fantasy_simulator.persistence.migrations import _migrate_v5_to_v6, _migrate_v6_to_v7
+        world = World()
+        data = {
+            "schema_version": 5,
+            "characters": [],
+            "world": {
+                "name": world.name,
+                "lore": world.lore,
+                "width": world.width,
+                "height": world.height,
+                "year": world.year,
+                "grid": [loc.to_dict() for loc in world.grid.values()],
+                "event_log": [],
+                "event_records": [],
+                "rumors": [],
+                "rumor_archive": [],
+                "active_adventures": [],
+                "completed_adventures": [],
+                "memorials": {},
+            },
+        }
+        result = _migrate_v6_to_v7(_migrate_v5_to_v6(data))
+        layout = result["world"]["atlas_layout"]
+        self.assertGreaterEqual(len(layout["continents"]), 2)
+        self.assertGreaterEqual(len(layout["seas"]), 1)
+        self.assertGreaterEqual(len(layout["mountain_ranges"]), 1)
 
     def test_migration_adds_atlas_coords_to_sites(self) -> None:
         from fantasy_simulator.persistence.migrations import _migrate_v6_to_v7

@@ -287,6 +287,20 @@ class TestGetCharacterStory:
         # The stat block is always present
         assert "STR" in story
 
+    def test_story_resolves_relation_names(self):
+        world = World()
+        hero = Character("Hero", 25, "Male", "Human", "Warrior")
+        friend = Character("Friend", 24, "Female", "Elf", "Mage")
+        world.add_character(hero)
+        world.add_character(friend)
+        hero.add_relation_tag(friend.char_id, "friend")
+
+        sim = Simulator(world, events_per_year=0, seed=1)
+        story = sim.get_character_story(hero.char_id)
+
+        assert "Friend" in story
+        assert friend.char_id[:8] not in story
+
     def test_all_stories_no_crash(self, sim_small):
         sim_small.run(years=3)
         all_stories = sim_small.get_all_stories()
