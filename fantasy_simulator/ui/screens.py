@@ -349,8 +349,13 @@ def _show_adventure_summaries(sim: Simulator, ctx: UIContext | None = None) -> N
         )
         origin_name = sim.world.location_name(run.origin)
         dest_name = sim.world.location_name(run.destination)
+        if run.is_party:
+            party_name = _party_display_names(sim.world, run)
+            leader_display = f"{party_name} [{tr('party_marker')}] ({tr('party_policy_short', policy=tr(f'policy_{run.policy}'))})"
+        else:
+            leader_display = run.character_name
         out.print_line(
-            f"  {i:>2}. {run.character_name} | {origin_name} -> {dest_name} "
+            f"  {i:>2}. {leader_display} | {origin_name} -> {dest_name} "
             f"| {status}{injury}{loot}"
         )
     out.print_separator()
@@ -476,13 +481,13 @@ def _show_location_history(world: World, ctx: UIContext | None = None) -> None:
     for i, loc in enumerate(locations, 1):
         tags = []
         if loc.memorial_ids:
-            tags.append(f"{len(loc.memorial_ids)} memorial(s)")
+            tags.append(tr("location_memorials_count", count=len(loc.memorial_ids)))
         if loc.aliases:
-            tags.append(f"{len(loc.aliases)} alias(es)")
+            tags.append(tr("location_aliases_count", count=len(loc.aliases)))
         if loc.live_traces:
-            tags.append(f"{len(loc.live_traces)} trace(s)")
+            tags.append(tr("location_traces_count", count=len(loc.live_traces)))
         tag_str = f"  [{', '.join(tags)}]" if tags else ""
-        out.print_line(f"  {i:>2}. {loc.canonical_name} ({loc.region_type}){tag_str}")
+        out.print_line(f"  {i:>2}. {loc.canonical_name} ({tr_term(loc.region_type)}){tag_str}")
     out.print_line()
 
     idx = _get_numeric_choice(f"  {tr('enter_location_number')}", len(locations), ctx=ctx)
@@ -713,3 +718,18 @@ def screen_world_lore(ctx: UIContext | None = None) -> None:
         out.print_wrapped(jdesc)
         out.print_line()
     ctx.inp.pause()
+
+
+def _party_display_names(world: World, run: Any, max_shown: int = 3) -> str:
+    names = []
+    for mid in run.member_ids:
+        c = world.get_character_by_id(mid)
+        if c is not None:
+            names.append(c.name)
+    if not names:
+        names = [run.character_name]
+    shown = names[:max_shown]
+    label = " & ".join(shown)
+    if len(names) > max_shown:
+        label += f" +{len(names) - max_shown}"
+    return label

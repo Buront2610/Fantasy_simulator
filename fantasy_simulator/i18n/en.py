@@ -398,6 +398,8 @@ TEXT_EN: Dict[str, str] = {
     'party_members_label': 'Party',
     'party_policy_label': 'Policy',
     'party_supply_label': 'Supply',
+    'party_marker': 'Party',
+    'party_policy_short': 'policy: {policy}',
     # --- World memory strings (PR-F) ---
     # Live traces
     'live_trace_solo': '{name} passed through {destination} (Year {year}).',
@@ -426,6 +428,9 @@ TEXT_EN: Dict[str, str] = {
     'memorial_entry': '[Year {year}] {epitaph}',
     'location_history_menu': 'Location history',
     'enter_location_number': 'Enter location number (or ENTER to cancel): ',
+    'location_memorials_count': '{count} memorial(s)',
+    'location_aliases_count': '{count} alias(es)',
+    'location_traces_count': '{count} trace(s)',
 }
 
 TERMS_EN: Dict[str, str] = {}

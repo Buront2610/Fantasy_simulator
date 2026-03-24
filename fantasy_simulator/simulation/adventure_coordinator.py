@@ -12,9 +12,9 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from ..adventure import (
     AdventureRun,
-    RETREAT_ON_SERIOUS,
     SUPPLY_FULL,
     create_adventure_run,
+    default_retreat_rule_for_policy,
     generate_adventure_id,
     select_party_policy,
 )
@@ -90,9 +90,22 @@ class AdventureMixin:
         (player UI hook reserved for future enhancement).
         Design §9.3: policy selection by character status.
         """
+        # Prefer locally co-located parties for world consistency.
+        # Future extension hook: if co-located candidates are insufficient,
+        # allow "gather for one month" travel-to-rally behavior instead of
+        # instant cross-map assembly.
+        leader = self.rng.choice(candidates)
+        same_location = [c for c in candidates if c.location_id == leader.location_id and c.char_id != leader.char_id]
+        other_locations = [c for c in candidates if c.location_id != leader.location_id and c.char_id != leader.char_id]
+
         size = self.rng.choice(range(2, _MAX_PARTY_SIZE + 1))
         size = min(size, len(candidates))
-        members = self.rng.sample(candidates, size)
+        needed_companions = max(0, size - 1)
+        selected_companions = self.rng.sample(same_location, min(needed_companions, len(same_location)))
+        if len(selected_companions) < needed_companions:
+            remaining = needed_companions - len(selected_companions)
+            selected_companions.extend(self.rng.sample(other_locations, min(remaining, len(other_locations))))
+        members = [leader] + selected_companions
         leader = members[0]
 
         # Build adventure on leader
@@ -102,7 +115,7 @@ class AdventureMixin:
         run.member_ids = [m.char_id for m in members]
         run.party_id = generate_adventure_id(self.id_rng)
         run.policy = select_party_policy(members, self.rng)
-        run.retreat_rule = RETREAT_ON_SERIOUS
+        run.retreat_rule = default_retreat_rule_for_policy(run.policy)
         run.supply_state = SUPPLY_FULL
         # danger_level already set in create_adventure_run from destination.danger
 

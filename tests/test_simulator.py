@@ -7,7 +7,14 @@ from collections import Counter
 import pytest
 
 from fantasy_simulator.events import EventResult
-from fantasy_simulator.adventure import AdventureChoice, AdventureRun
+from fantasy_simulator.adventure import (
+    AdventureChoice,
+    AdventureRun,
+    POLICY_SWIFT,
+    POLICY_TREASURE,
+    RETREAT_ON_SUPPLY,
+    RETREAT_ON_TROPHY,
+)
 from fantasy_simulator.character import Character
 from fantasy_simulator.character_creator import CharacterCreator
 from fantasy_simulator.i18n import get_locale, set_locale
@@ -580,6 +587,64 @@ class TestAdventureSafety:
 
         assert "[waiting_for_choice]" not in summaries[0]
         assert "[waiting for choice]" in summaries[0]
+
+    def test_start_party_adventure_sets_retreat_rule_from_policy(self, monkeypatch):
+        world = _make_world(n_chars=4)
+        sim = Simulator(world, events_per_year=0, adventure_steps_per_year=0, seed=7)
+        monkeypatch.setattr(
+            "fantasy_simulator.simulation.adventure_coordinator.select_party_policy",
+            lambda members, rng: POLICY_SWIFT,
+        )
+
+        candidates = [c for c in world.characters if c.alive]
+        sim._start_party_adventure(candidates)
+        run = world.active_adventures[0]
+
+        assert run.policy == POLICY_SWIFT
+        assert run.retreat_rule == RETREAT_ON_SUPPLY
+
+    def test_party_formation_prefers_same_location(self, monkeypatch):
+        world = World()
+        leader = Character("Leader", 25, "Male", "Human", "Warrior", location_id="loc_aethoria_capital")
+        nearby = Character("Nearby", 25, "Female", "Human", "Mage", location_id="loc_aethoria_capital")
+        far = Character("Far", 25, "Female", "Human", "Rogue", location_id="loc_thornwood")
+        world.add_character(leader)
+        world.add_character(nearby)
+        world.add_character(far)
+        sim = Simulator(world, events_per_year=0, adventure_steps_per_year=0, seed=11)
+
+        class FixedPartyRng:
+            def random(self):
+                return 0.0
+
+            def choice(self, options):
+                if leader in options:
+                    return leader
+                if 2 in options:
+                    return 2
+                return options[0]
+
+            def sample(self, population, k):
+                return list(population[:k])
+
+            def choices(self, population, weights=None, k=1):
+                return [population[0]] * k
+
+            def randint(self, lo, hi):
+                return lo
+
+        sim.rng = FixedPartyRng()
+        sim.id_rng = FixedPartyRng()
+        monkeypatch.setattr(
+            "fantasy_simulator.simulation.adventure_coordinator.select_party_policy",
+            lambda members, rng: POLICY_TREASURE,
+        )
+
+        sim._start_party_adventure([leader, nearby, far])
+        run = world.active_adventures[0]
+        assert nearby.char_id in set(run.member_ids)
+        assert far.char_id not in set(run.member_ids)
+        assert run.retreat_rule == RETREAT_ON_TROPHY
 
 
 class TestJapaneseLocaleSummary:

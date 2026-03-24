@@ -394,6 +394,8 @@ TEXT_JA: Dict[str, str] = {
     'party_members_label': 'パーティ',
     'party_policy_label': '方針',
     'party_supply_label': '補給',
+    'party_marker': 'パーティ',
+    'party_policy_short': '方針: {policy}',
     # --- ワールドメモリ文字列 (PR-F) ---
     # 生きた痕跡
     'live_trace_solo': '{name} が {destination} を訪れた（{year}年）。',
@@ -422,6 +424,9 @@ TEXT_JA: Dict[str, str] = {
     'memorial_entry': '【{year}年】{epitaph}',
     'location_history_menu': '地点の歴史',
     'enter_location_number': '地点番号を入力（またはEnterでキャンセル）: ',
+    'location_memorials_count': '記念碑 {count}件',
+    'location_aliases_count': '別称 {count}件',
+    'location_traces_count': '痕跡 {count}件',
 }
 
 TERMS_JA: Dict[str, str] = {

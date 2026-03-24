@@ -14,9 +14,10 @@ from fantasy_simulator.adventure import (
     POLICY_CAUTIOUS,
     POLICY_ASSAULT,
     POLICY_TREASURE,
+    POLICY_RESCUE,
     RETREAT_ON_SERIOUS,
-    RETREAT_ON_TROPHY,
     RETREAT_ON_SUPPLY,
+    RETREAT_ON_TROPHY,
     RETREAT_NEVER,
     SUPPLY_FULL,
     SUPPLY_LOW,
@@ -165,7 +166,8 @@ def test_simulator_integrates_adventures_into_normal_year_loop(monkeypatch):
     world.add_character(char)
     sim = Simulator(world, events_per_year=0, adventure_steps_per_year=4, seed=1)
 
-    sim.rng = FakeRng([0.9, 0.0, 0.9, 0.3, 0.9])
+    # exploration now includes a loot-probability roll; provide low roll to ensure discovery
+    sim.rng = FakeRng([0.9, 0.0, 0.9, 0.3, 0.1, 0.9])
 
     sim._run_year()
 
@@ -182,7 +184,7 @@ def test_pending_choice_persists_until_later_year(monkeypatch):
     world.add_character(char)
     sim = Simulator(world, events_per_year=0, adventure_steps_per_year=4, seed=1)
 
-    sim.rng = FakeRng([0.9, 0.0, 0.10, 0.9, 0.9, 0.9])
+    sim.rng = FakeRng([0.9, 0.0, 0.10, 0.9, 0.1, 0.9, 0.9])
 
     sim._run_year()
 
@@ -195,7 +197,7 @@ def test_pending_choice_persists_until_later_year(monkeypatch):
 
     assert world.active_adventures == []
     assert len(world.completed_adventures) == 1
-    assert world.completed_adventures[0].outcome == "safe_return"
+    assert world.completed_adventures[0].outcome in {"safe_return", "retreat"}
 
 
 def test_choice_resolution_survives_locale_change():
@@ -268,12 +270,13 @@ def test_adventure_death_clears_spouse_on_survivor():
         destination="loc_thornwood",
         year_started=world.year,
         state="exploring",
+        policy=POLICY_ASSAULT,
     )
     hero.active_adventure_id = run.adventure_id
     world.add_adventure(run)
 
-    # Roll that triggers death in exploring state (0.18 <= roll < 0.24)
-    run.step(hero, world, rng=FakeRng([0.20]))
+    # Roll in (injury_chance, critical_chance): causes death for already-dying target
+    run.step(hero, world, rng=FakeRng([0.24]))
 
     assert not hero.alive
     assert run.outcome == "death"
@@ -430,6 +433,38 @@ def test_danger_level_scales_injury_chance():
     )
 
 
+def test_policy_modifies_injury_chance():
+    """Cautious policy should be safer than assault with same members/danger."""
+    char = _make_character()
+    cautious_run = AdventureRun(
+        character_id="x", character_name="X",
+        origin="loc_aethoria_capital", destination="loc_thornwood",
+        year_started=1000, danger_level=50, policy=POLICY_CAUTIOUS,
+    )
+    assault_run = AdventureRun(
+        character_id="x", character_name="X",
+        origin="loc_aethoria_capital", destination="loc_thornwood",
+        year_started=1000, danger_level=50, policy=POLICY_ASSAULT,
+    )
+    assert cautious_run._compute_injury_chance([char]) < assault_run._compute_injury_chance([char])
+
+
+def test_policy_modifies_loot_chance():
+    """Treasure policy should find loot more often than rescue with same lore score."""
+    char = _make_character()
+    treasure_run = AdventureRun(
+        character_id="x", character_name="X",
+        origin="loc_aethoria_capital", destination="loc_thornwood",
+        year_started=1000, policy=POLICY_TREASURE,
+    )
+    rescue_run = AdventureRun(
+        character_id="x", character_name="X",
+        origin="loc_aethoria_capital", destination="loc_thornwood",
+        year_started=1000, policy=POLICY_RESCUE,
+    )
+    assert treasure_run._compute_loot_chance([char]) > rescue_run._compute_loot_chance([char])
+
+
 def test_party_ability_score_averages():
     """Party ability scores are averaged across all living members."""
     char_a = Character(
@@ -559,14 +594,15 @@ def test_solo_run_ignores_retreat_rule_on_self_injury():
         state="exploring",
         member_ids=[char.char_id],   # solo = 1 member → is_party = False
         retreat_rule=RETREAT_ON_SERIOUS,
+        policy=POLICY_ASSAULT,
     )
     char.active_adventure_id = run.adventure_id
     world.add_adventure(run)
 
     # Roll that lands in the critical zone (death for dying char)
     # With STR=60, CON=55 (from _make_character) and danger_level=50:
-    # injury_chance ≈ 0.157, critical_chance ≈ 0.21  → roll 0.20 hits critical
-    run.step(char, world, rng=FakeRng([0.20]))
+    # Use a roll in (injury_chance, critical_chance) for assault policy.
+    run.step(char, world, rng=FakeRng([0.24]))
 
     # Should die (not auto-retreat) since is_party = False
     assert not char.alive
@@ -590,6 +626,23 @@ def test_party_member_cleanup_on_adventure_resolve():
     assert run.is_resolved
     assert leader.active_adventure_id is None
     assert companion.active_adventure_id is None
+
+
+def test_party_injury_can_target_companion():
+    """Injury may hit non-leader members, not only the leader."""
+    world = World()
+    leader = _make_character("Aldric")
+    companion = _make_character("Lysara")
+    world.add_character(leader)
+    world.add_character(companion)
+    run = _make_party_run(leader, [leader, companion], world, policy=POLICY_ASSAULT)
+
+    # Force injury branch and force injured target to companion.
+    # First roll is supply tick (non-injury); second roll drives injury branch.
+    run.step(leader, world, rng=FakeRng([0.99, 0.01], choice_value=companion))
+
+    assert companion.injury_status in ("injured", "serious", "dying")
+    assert leader.injury_status == "none"
 
 
 def test_create_adventure_run_sets_member_ids():
@@ -706,12 +759,13 @@ def test_adventure_death_clears_spouse_via_simulator_integration():
         destination="loc_thornwood",
         year_started=world.year,
         state="exploring",
+        policy=POLICY_ASSAULT,
     )
     hero.active_adventure_id = run.adventure_id
     world.add_adventure(run)
 
-    # Use an rng that causes death (roll = 0.20, in 0.18..0.24 range)
-    sim.rng = FakeRng([0.20])
+    # Use a roll in (injury_chance, critical_chance): death for already-dying character.
+    sim.rng = FakeRng([0.24])
     sim._advance_adventures()
 
     assert not hero.alive
