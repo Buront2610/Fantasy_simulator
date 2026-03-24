@@ -38,20 +38,39 @@ main.py                              → 互換ラッパー（fantasy_simulator.
 fantasy_simulator/
 ├── __main__.py                      → python -m fantasy_simulator エントリーポイント
 ├── main.py                          → CLIメニューループ本体
-├── simulator.py                     → 年次シミュレーション管理
-│   ├── events.py                    → イベント生成・解決
-│   └── adventure.py                 → 複数ステップの冒険進行
-├── world.py                         → ワールドマップ（5x5グリッド）、ロケーション、キャラ管理
+├── simulator.py                     → 後方互換ラッパー（実体は simulation/）
+├── simulation/
+│   ├── engine.py                    → 月次シミュレーション統括
+│   ├── timeline.py                  → 月次進行・季節・状態遷移
+│   ├── notifications.py             → 自動停止判定・通知
+│   ├── event_recorder.py            → event_records 記録
+│   ├── adventure_coordinator.py     → 冒険進行調停
+│   └── queries.py                   → summary / story / report 参照
+├── events.py                        → イベント生成・解決
+├── adventure.py                     → 複数ステップの冒険進行と保留選択
+├── world.py                         → ワールド、LocationState、world memory、terrain連携
+├── terrain.py                       → TerrainMap / Site / RouteEdge / AtlasLayout
 ├── character.py                     → キャラクターモデル（能力値、スキル、関係性）
 ├── character_creator.py             → キャラクター生成（ランダム、テンプレート、対話式）
 ├── reports.py                       → 月報・年報のビュー生成
 ├── rumor.py                         → 噂の生成・ライフサイクル
+├── narrative/
+│   ├── context.py                   → 最小 NarrativeContext
+│   ├── template_history.py          → テンプレート冷却履歴
+│   └── constants.py                 → narrative 用定数
 ├── persistence/
 │   ├── save_load.py                 → JSON形式のセーブ/ロード
-│   └── migrations.py               → セーブデータのスキーマ移行
+│   └── migrations.py               → セーブデータのスキーマ移行（現行 v7）
 ├── ui/
 │   ├── screens.py                   → UI画面（メニュー、セットアップ、結果表示）
-│   └── ui_helpers.py                → 表示ユーティリティ（色付き出力、メニュー選択）
+│   ├── ui_helpers.py                → 表示ユーティリティ
+│   ├── ui_context.py                → UIContext 依存コンテナ
+│   ├── input_backend.py             → 入力抽象
+│   ├── render_backend.py            → 出力抽象
+│   ├── map_renderer.py              → グリッド/地域/地点描画
+│   ├── atlas_renderer.py            → アトラス描画
+│   ├── presenters.py                → 画面向け整形
+│   └── view_models.py               → UI view model
 ├── content/
 │   └── world_data.py                → ゲームコンテンツ定義（種族、職業、スキル、場所）
 └── i18n/
@@ -100,4 +119,5 @@ fantasy_simulator/
 - 冒険はメインシミュレーション内に統合（別ゲームモードにしない）
 - プレイヤーの介入は重要な瞬間に限定（選択的介入）
 - 変更はインクリメンタルかつモジュラーに
+- terrain/site/route と atlas UI は導入済みだが、worldgen PoC は未完了
 - 可読性と実験しやすさを重視（完璧なリアリズムより）

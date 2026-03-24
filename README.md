@@ -4,25 +4,37 @@ A Python CLI world and life simulation set in the fantasy world of Aethoria.
 
 This project is not a separate RPG battle loop. Characters live inside the same
 world simulation, form relationships, travel, age, fight, discover things, and
-can now take part in multi-step adventures that the player can inspect and
-occasionally influence.
+take part in multi-step adventures that the player can inspect and occasionally
+influence.
 
 ## Features
 
-- Yearly time progression in the CLI, with monthly-resolution engine powering all simulation advancement
+- Yearly CLI progression backed by a monthly-resolution simulation engine
 - Character generation with random and template-based creation
 - Event system for meetings, journeys, discoveries, training, battles, aging,
   marriage, and natural death
-- World map and character roster views
-- Character story output and simulation summary output
+- Character roster, story output, simulation summaries, and structured event logs
+- Auto-advance until meaningful pause conditions are met
+- Monthly and yearly reports derived from structured event records
+- World memory features:
+  - live traces
+  - memorials
+  - location aliases
 - Integrated adventure runs with:
   - summary logs
   - detailed logs
   - pending player choices
   - automatic default resolution when choices are left unresolved
+- Terrain/site/route world representation with:
+  - variable world dimensions
+  - ASCII grid rendering
+  - atlas overview rendering
+  - region drill-down
+  - location detail panels
 - Save/load support for simulation snapshots
-- Schema-versioned save migration support for older data
-- Structured world event records with causal impact tracking, rumors, and monthly/yearly reports
+- Schema-versioned save migration support for older data (`schema_version = 7`)
+- Structured world event records with causal impact tracking and rumors
+- UI abstraction through input/render backends plus lightweight presenter/view-model layers
 - CLI localization support for Japanese and English
 
 ## Running
@@ -43,12 +55,12 @@ Or using the legacy entry point:
 python main.py
 ```
 
-The codebase has been migrated to a `fantasy_simulator/` package layout with a
-`simulation/` sub-package for separated concerns (engine, timeline, notifications,
-event recording, adventure coordination, and query/reporting). The UI layer is
-fully abstracted through `InputBackend` / `RenderBackend` protocols and a
-`UIContext` dependency container, making it swappable to Rich, prompt_toolkit,
-or Textual without touching domain code. The current roadmap is maintained in
+The codebase uses a `fantasy_simulator/` package layout with a `simulation/`
+sub-package for separated concerns (engine, timeline, notifications, event
+recording, adventure coordination, and query/reporting). The UI layer is
+abstracted through `InputBackend` / `RenderBackend` protocols, a `UIContext`
+dependency container, renderer modules, and presenter/view-model helpers. The
+current roadmap is maintained in
 [`docs/implementation_plan.md`](docs/implementation_plan.md).
 
 **Compatibility note (PR-A):** CLI launch (`python -m fantasy_simulator` and
@@ -73,7 +85,8 @@ fantasy_simulator/          # Main package
   main.py                   # CLI logic
   character.py              # Core character model
   character_creator.py      # Random, template, and interactive character creation
-  world.py                  # World state, locations, and world serialization
+  world.py                  # World state, locations, memory, terrain hooks, serialization
+  terrain.py                # Terrain / site / route / atlas layout models
   events.py                 # Event generation, EventResult, WorldEventRecord
   adventure.py              # Multi-step adventure progression
   simulator.py              # Backward-compatible import path (delegates to simulation/)
@@ -94,9 +107,15 @@ fantasy_simulator/          # Main package
     screens.py              # CLI screen and menu functions
     ui_helpers.py           # Display formatting and input utilities
     ui_context.py           # UIContext dependency container (InputBackend + RenderBackend)
+    presenters.py           # Screen-friendly formatting helpers
+    view_models.py          # UI-facing view models from canonical data
     map_renderer.py         # Map data extraction (MapCellInfo/MapRenderInfo) and ASCII rendering
+    atlas_renderer.py       # Atlas-scale overview rendering
     input_backend.py        # InputBackend protocol and StdInputBackend
     render_backend.py       # RenderBackend protocol and PrintRenderBackend
+  narrative/
+    context.py              # Minimal NarrativeContext helpers for memorials / aliases
+    template_history.py     # Template cooldown / selection helper
   content/
     world_data.py           # Races, jobs, locations, skills, lore definitions
   i18n/
@@ -111,6 +130,29 @@ docs/
   ui_renovation_plan.md     # UI renovation strategy
 ```
 
+## CLI Flow
+
+Current main menu:
+
+- Start new simulation
+- Create custom simulation
+- Load saved simulation
+- Read world lore
+- Change language
+- Exit
+
+After a simulation starts or is loaded, the post-simulation menu currently
+supports:
+
+- advancing by 1 year / 5 years / auto-pause
+- yearly and monthly reports
+- atlas/world map browsing
+- character roster and stories
+- recent/full event log viewing
+- adventure summaries, detail inspection, and pending-choice resolution
+- save snapshots
+- location history browsing
+
 ## Design Direction
 
 - Adventures remain inside the main simulation instead of becoming a separate
@@ -118,16 +160,31 @@ docs/
 - Player control is selective intervention at important moments.
 - The same adventure supports normal summary viewing, deeper inspection, and
   rare player choice points.
+- The world model is being expanded incrementally through terrain/site/route
+  separation and atlas-scale observation UI.
 - Changes are being kept incremental and modular.
 
 ## Current Limitations
 
 - Some generated event text is still English-first even when the CLI language is
   set to Japanese.
+- Terrain generation is still deterministic scaffolding from the current site
+  grid, not a full worldgen pipeline.
+- NarrativeContext is still minimal and currently focused on memorial / alias
+  text selection.
+- The base world setting is still largely hard-coded in
+  `content/world_data.py`; it is not yet loaded as an external setting bundle.
 - The simulation is tuned for readability and experimentation rather than
   perfect realism.
 
 ## Near-Term Priorities
 
-- Begin party adventure features (PR-E) now that structural foundation (PR-A through PR-D) is complete
-- Maintain documentation source-of-truth alignment as the roadmap evolves
+- Strengthen the region layer of the observation UI so it becomes a readable
+  local decision map (PR-H1)
+- Introduce a thin Rich-based presentation shell to improve layout, emphasis,
+  and input assistance (PR-H2)
+- Treat worldgen PoC work as parallel technical validation, not the next
+  blocking mainline milestone
+
+For the full roadmap (NarrativeContext, SettingBundle, worldbuilding, dynamic
+world changes, etc.), see `docs/implementation_plan.md`.
