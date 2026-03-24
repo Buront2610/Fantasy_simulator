@@ -21,7 +21,9 @@ from .terrain import (
     RouteEdge,
     Site,
     TerrainMap,
+    build_default_atlas_layout,
     build_default_terrain,
+    project_atlas_coords,
 )
 
 if TYPE_CHECKING:
@@ -396,6 +398,43 @@ class World:
         self.sites = sites
         self.routes = routes
         self._rebuild_site_index()
+        self.atlas_layout = self._build_atlas_layout_from_current_state()
+
+    def _build_atlas_layout_from_current_state(self) -> AtlasLayout:
+        """Generate the persistent atlas layout from current terrain/site data."""
+        site_coords = [
+            (site.atlas_x, site.atlas_y)
+            for site in self.sites
+        ]
+        site_by_id = {site.location_id: site for site in self.sites}
+        route_coords: List[Tuple[Tuple[int, int], Tuple[int, int]]] = []
+        for route in self.routes:
+            from_site = site_by_id.get(route.from_site_id)
+            to_site = site_by_id.get(route.to_site_id)
+            if from_site is None or to_site is None:
+                continue
+            route_coords.append((
+                (from_site.atlas_x, from_site.atlas_y),
+                (to_site.atlas_x, to_site.atlas_y),
+            ))
+
+        mountain_coords: List[Tuple[int, int]] = []
+        if self.terrain_map is not None:
+            for (x, y), cell in self.terrain_map.cells.items():
+                if cell.biome != "mountain":
+                    continue
+                mountain_coords.append(project_atlas_coords(
+                    x,
+                    y,
+                    width=self.width,
+                    height=self.height,
+                ))
+
+        return build_default_atlas_layout(
+            site_coords,
+            route_coords=route_coords,
+            mountain_coords=mountain_coords,
+        )
 
     def _rebuild_site_index(self) -> None:
         """Rebuild the site lookup index keyed by location_id."""
@@ -933,9 +972,13 @@ class World:
         else:
             world._build_terrain_from_grid()
 
-        # PR-G2: restore atlas layout if present.
+        # PR-G2: restore atlas layout if present, otherwise backfill it
+        # from the loaded terrain/site data so fresh v7 saves and older
+        # partially-upgraded saves converge on the same state shape.
         if "atlas_layout" in data:
             world.atlas_layout = AtlasLayout.from_dict(data["atlas_layout"])
+        else:
+            world.atlas_layout = world._build_atlas_layout_from_current_state()
 
         world.normalize_after_load()
         return world

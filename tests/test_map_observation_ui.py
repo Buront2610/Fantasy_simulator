@@ -28,6 +28,7 @@ from fantasy_simulator.ui.map_renderer import (
 from fantasy_simulator.ui.atlas_renderer import (
     render_atlas_overview,
     _build_atlas_canvas,
+    _build_atlas_base_canvas,
     _bresenham,
     _terrain_char,
     _cluster_sites,
@@ -438,6 +439,98 @@ class TestBuildAtlasCanvas(unittest.TestCase):
         # All ocean
         self.assertTrue(all(c == "~" for c in flat))
 
+    def test_stored_layout_continent_cells_are_rasterized(self) -> None:
+        info = MapRenderInfo(world_name="Layout", year=1, width=3, height=3)
+        info.cells[(0, 0)] = MapCellInfo(
+            location_id="loc_anchor",
+            canonical_name="Anchor",
+            region_type="city",
+            icon="@",
+            safety_label="ok",
+            danger=10,
+            traffic_indicator="",
+            population=0,
+            x=0,
+            y=0,
+            danger_band="low",
+            atlas_x=5,
+            atlas_y=5,
+        )
+        from fantasy_simulator.terrain import AtlasLayout
+        info.atlas_layout = AtlasLayout(
+            canvas_w=72,
+            canvas_h=30,
+            continents=[{"name": "Far East", "cells": [(60, 24)]}],
+            seas=[{"name": "Great Ocean", "cells": []}],
+            mountain_ranges=[],
+        )
+        canvas = _build_atlas_canvas(info)
+        self.assertNotEqual(canvas[24][60], "~")
+
+    def test_stored_layout_mountain_ranges_override_land_biome(self) -> None:
+        info = MapRenderInfo(world_name="Mountains", year=1, width=3, height=3)
+        info.cells[(0, 0)] = MapCellInfo(
+            location_id="loc_anchor",
+            canonical_name="Anchor",
+            region_type="city",
+            icon="@",
+            safety_label="ok",
+            danger=10,
+            traffic_indicator="",
+            population=0,
+            x=0,
+            y=0,
+            danger_band="low",
+            atlas_x=5,
+            atlas_y=5,
+        )
+        from fantasy_simulator.terrain import AtlasLayout
+        info.atlas_layout = AtlasLayout(
+            canvas_w=72,
+            canvas_h=30,
+            continents=[{"name": "Main", "cells": [(30, 12)]}],
+            seas=[{"name": "Great Ocean", "cells": []}],
+            mountain_ranges=[{"name": "Spine", "cells": [(30, 12)]}],
+        )
+        canvas = _build_atlas_canvas(info)
+        self.assertIn(canvas[12][30], "^/\\")
+
+
+class TestAtlasLayoutScaling(unittest.TestCase):
+    """Verify wide and compact atlas render the same stored layout."""
+
+    def test_compact_scales_same_stored_layout(self) -> None:
+        info = MapRenderInfo(world_name="Scaled", year=1, width=3, height=3)
+        info.cells[(0, 0)] = MapCellInfo(
+            location_id="loc_anchor",
+            canonical_name="Anchor",
+            region_type="city",
+            icon="@",
+            safety_label="ok",
+            danger=10,
+            traffic_indicator="",
+            population=0,
+            x=0,
+            y=0,
+            danger_band="low",
+            atlas_x=5,
+            atlas_y=5,
+        )
+        from fantasy_simulator.terrain import AtlasLayout
+        info.atlas_layout = AtlasLayout(
+            canvas_w=72,
+            canvas_h=30,
+            continents=[{"name": "Far East", "cells": [(60, 24)]}],
+            seas=[{"name": "Great Ocean", "cells": []}],
+            mountain_ranges=[],
+        )
+        wide, _ = _build_atlas_base_canvas(info, 72, 30)
+        compact, _ = _build_atlas_base_canvas(info, 40, 16)
+        self.assertNotEqual(wide[24][60], "~")
+        compact_x = round(60 * 39 / 71)
+        compact_y = round(24 * 15 / 29)
+        self.assertNotEqual(compact[compact_y][compact_x], "~")
+
 
 class TestRenderAtlasOverview(unittest.TestCase):
     """Verify render_atlas_overview produces readable atlas map."""
@@ -633,6 +726,49 @@ class TestLabelCollision(unittest.TestCase):
         canvas = _build_atlas_canvas(info)
         flat = "".join("".join(row) for row in canvas)
         self.assertIn("DarkDungeon", flat)
+
+    def test_later_site_marker_does_not_overwrite_earlier_label(self) -> None:
+        """A later marker must not punch holes into an already-placed label."""
+        info = MapRenderInfo(world_name="Overlap", year=1, width=3, height=3)
+        info.cells[(0, 0)] = MapCellInfo(
+            location_id="loc_capital",
+            canonical_name="CapitalName",
+            region_type="city",
+            icon="@",
+            safety_label="ok",
+            danger=10,
+            traffic_indicator="",
+            population=0,
+            x=0,
+            y=0,
+            danger_band="low",
+            site_importance=80,
+            terrain_biome="plains",
+            terrain_glyph=",",
+            atlas_x=15,
+            atlas_y=10,
+        )
+        info.cells[(1, 0)] = MapCellInfo(
+            location_id="loc_outpost",
+            canonical_name="Outpost",
+            region_type="village",
+            icon="@",
+            safety_label="ok",
+            danger=10,
+            traffic_indicator="",
+            population=0,
+            x=1,
+            y=0,
+            danger_band="low",
+            site_importance=20,
+            terrain_biome="plains",
+            terrain_glyph=",",
+            atlas_x=20,
+            atlas_y=10,
+        )
+        canvas = _build_atlas_canvas(info)
+        flat = "".join("".join(row) for row in canvas)
+        self.assertIn("CapitalName", flat)
 
 
 class TestTrafficAwareSiteMarkers(unittest.TestCase):
@@ -854,6 +990,32 @@ class TestAtlasLabeledSites(unittest.TestCase):
         self.assertEqual(labeled[0][1], "TestTown")
         self.assertEqual(labeled[1][1], "ForestCamp")
 
+    def test_returns_only_sites_with_actual_labels(self) -> None:
+        set_locale("en")
+        info = MapRenderInfo(world_name="Crowded", year=1, width=3, height=3)
+        for idx in range(8):
+            info.cells[(idx % 3, idx // 3)] = MapCellInfo(
+                location_id=f"loc_{idx}",
+                canonical_name=f"Site{idx}",
+                region_type="city",
+                icon="@",
+                safety_label="ok",
+                danger=10,
+                traffic_indicator="",
+                population=0,
+                x=idx % 3,
+                y=idx // 3,
+                danger_band="low",
+                site_importance=80 - idx,
+                terrain_biome="plains",
+                terrain_glyph=",",
+                atlas_x=20,
+                atlas_y=10,
+            )
+        from fantasy_simulator.ui.atlas_renderer import atlas_labeled_sites
+        labeled = atlas_labeled_sites(info)
+        self.assertLess(len(labeled), len(info.cells))
+
 
 class TestAtlasLayoutModel(unittest.TestCase):
     """Verify AtlasLayout data model serialization."""
@@ -920,6 +1082,18 @@ class TestSiteAtlasCoordinates(unittest.TestCase):
 class TestAtlasLayoutOnWorld(unittest.TestCase):
     """Verify atlas_layout is persisted on World."""
 
+    def test_build_map_info_copies_atlas_layout(self) -> None:
+        world = World()
+        info = build_map_info(world)
+        self.assertIsNotNone(info.atlas_layout)
+        self.assertEqual(info.atlas_layout.canvas_w, world.atlas_layout.canvas_w)
+
+    def test_new_world_to_dict_includes_generated_atlas_layout(self) -> None:
+        world = World()
+        d = world.to_dict()
+        self.assertIn("atlas_layout", d)
+        self.assertGreater(len(d["atlas_layout"]["continents"][0]["cells"]), 0)
+
     def test_world_to_dict_includes_atlas_layout(self) -> None:
         from fantasy_simulator.terrain import AtlasLayout
         world = World()
@@ -942,12 +1116,13 @@ class TestAtlasLayoutOnWorld(unittest.TestCase):
         self.assertIsNotNone(restored.atlas_layout)
         self.assertEqual(restored.atlas_layout.continents[0]["name"], "Restored")
 
-    def test_world_without_atlas_layout_is_none(self) -> None:
+    def test_world_without_atlas_layout_is_backfilled(self) -> None:
         world = World()
         d = world.to_dict()
         d.pop("atlas_layout", None)
         restored = World.from_dict(d)
-        self.assertIsNone(restored.atlas_layout)
+        self.assertIsNotNone(restored.atlas_layout)
+        self.assertGreater(len(restored.atlas_layout.continents[0]["cells"]), 0)
 
 
 class TestMigrationV6toV7(unittest.TestCase):
@@ -970,6 +1145,7 @@ class TestMigrationV6toV7(unittest.TestCase):
         layout = result["world"]["atlas_layout"]
         self.assertEqual(layout["canvas_w"], 72)
         self.assertEqual(len(layout["continents"]), 1)
+        self.assertGreater(len(layout["continents"][0]["cells"]), 0)
 
     def test_migration_adds_atlas_coords_to_sites(self) -> None:
         from fantasy_simulator.persistence.migrations import _migrate_v6_to_v7

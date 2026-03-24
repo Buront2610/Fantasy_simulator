@@ -12,7 +12,12 @@ from ..content.world_data import (
     fallback_location_id,
     get_location_state_defaults,
 )
-from ..terrain import REGION_TYPE_TO_BIOME, SITE_IMPORTANCE
+from ..terrain import (
+    REGION_TYPE_TO_BIOME,
+    SITE_IMPORTANCE,
+    build_default_atlas_layout,
+    project_atlas_coords,
+)
 
 CURRENT_VERSION = 7
 
@@ -322,31 +327,55 @@ def _migrate_v6_to_v7(data: Dict[str, Any]) -> Dict[str, Any]:
     width = world_data.get("width", 5)
     height = world_data.get("height", 5)
 
-    atlas_w = 72
-    atlas_h = 30
-    margin_x = 6
-    margin_y = 3
-    avail_w = atlas_w - 2 * margin_x
-    avail_h = atlas_h - 2 * margin_y
-    step_x = avail_w / max(width - 1, 1)
-    step_y = avail_h / max(height - 1, 1)
-
     # Compute atlas coordinates for existing sites.
     sites = world_data.get("sites", [])
+    site_coords = []
     for site in sites:
         gx = site.get("x", 0)
         gy = site.get("y", 0)
-        site["atlas_x"] = int(margin_x + gx * step_x)
-        site["atlas_y"] = int(margin_y + gy * step_y)
+        atlas_x, atlas_y = project_atlas_coords(
+            gx,
+            gy,
+            width=width,
+            height=height,
+        )
+        site["atlas_x"] = atlas_x
+        site["atlas_y"] = atlas_y
+        site_coords.append((atlas_x, atlas_y))
 
-    # Create a default atlas_layout with one continent covering all sites.
-    world_data["atlas_layout"] = {
-        "canvas_w": atlas_w,
-        "canvas_h": atlas_h,
-        "continents": [{"name": "Main Continent", "cells": []}],
-        "seas": [{"name": "Great Ocean", "cells": []}],
-        "mountain_ranges": [],
+    site_by_id = {
+        site.get("location_id"): site
+        for site in sites
+        if site.get("location_id")
     }
+    route_coords = []
+    for route in world_data.get("routes", []):
+        from_site = site_by_id.get(route.get("from_site_id"))
+        to_site = site_by_id.get(route.get("to_site_id"))
+        if from_site is None or to_site is None:
+            continue
+        route_coords.append((
+            (from_site["atlas_x"], from_site["atlas_y"]),
+            (to_site["atlas_x"], to_site["atlas_y"]),
+        ))
+
+    mountain_coords = []
+    terrain_map = world_data.get("terrain_map", {})
+    for cell in terrain_map.get("cells", []):
+        if cell.get("biome") != "mountain":
+            continue
+        mountain_coords.append(project_atlas_coords(
+            cell.get("x", 0),
+            cell.get("y", 0),
+            width=width,
+            height=height,
+        ))
+
+    world_data["atlas_layout"] = build_default_atlas_layout(
+        site_coords,
+        route_coords=route_coords,
+        mountain_coords=mountain_coords,
+    ).to_dict()
 
     data["schema_version"] = 7
     return data

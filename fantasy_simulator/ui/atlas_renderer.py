@@ -219,49 +219,146 @@ def _cluster_sites(
 # Atlas canvas generation
 # ------------------------------------------------------------------
 
-def _build_atlas_canvas(  # noqa: C901 — linear but long
+def _scale_canvas_point(
+    x: int,
+    y: int,
+    *,
+    src_w: int,
+    src_h: int,
+    dst_w: int,
+    dst_h: int,
+) -> Tuple[int, int]:
+    """Scale a canvas coordinate from one atlas size to another."""
+    scaled_x = int(round(x * max(dst_w - 1, 0) / max(src_w - 1, 1)))
+    scaled_y = int(round(y * max(dst_h - 1, 0) / max(src_h - 1, 1)))
+    return (
+        max(0, min(dst_w - 1, scaled_x)),
+        max(0, min(dst_h - 1, scaled_y)),
+    )
+
+
+def _project_grid_to_canvas(
+    gx: int,
+    gy: int,
+    *,
+    grid_w: int,
+    grid_h: int,
+    canvas_w: int,
+    canvas_h: int,
+) -> Tuple[int, int]:
+    """Project grid coordinates via the canonical wide atlas, then scale."""
+    avail_w = _ATLAS_W - 2 * _MARGIN_X
+    avail_h = _ATLAS_H - 2 * _MARGIN_Y
+    step_x = avail_w / max(grid_w - 1, 1)
+    step_y = avail_h / max(grid_h - 1, 1)
+    wide_x = int(_MARGIN_X + gx * step_x)
+    wide_y = int(_MARGIN_Y + gy * step_y)
+    return _scale_canvas_point(
+        wide_x,
+        wide_y,
+        src_w=_ATLAS_W,
+        src_h=_ATLAS_H,
+        dst_w=canvas_w,
+        dst_h=canvas_h,
+    )
+
+
+def _build_site_atlas(
     info: "MapRenderInfo",
-) -> List[List[str]]:
-    """Generate the full atlas canvas from *MapRenderInfo*.
-
-    When cells carry pre-computed ``atlas_x`` / ``atlas_y`` coordinates
-    (≥ 0), those are reused instead of re-projecting from the grid.
-    This ensures the atlas map is stable across renders and matches
-    the coordinates persisted in the save file.
-    """
-    w, h = _ATLAS_W, _ATLAS_H
-    canvas: List[List[str]] = [["~"] * w for _ in range(h)]
-
-    if not info.cells:
-        return canvas
-
-    # --- Map grid positions to atlas coordinates ---
-    avail_w = w - 2 * _MARGIN_X
-    avail_h = h - 2 * _MARGIN_Y
-    step_x = avail_w / max(info.width - 1, 1)
-    step_y = avail_h / max(info.height - 1, 1)
-
+    w: int,
+    h: int,
+) -> Dict[str, Tuple[int, int]]:
+    """Resolve site anchor points for the target canvas size."""
     site_atlas: Dict[str, Tuple[int, int]] = {}
-    biome_seeds: List[Tuple[int, int, str]] = []
+    src_w = info.atlas_layout.canvas_w if info.atlas_layout else _ATLAS_W
+    src_h = info.atlas_layout.canvas_h if info.atlas_layout else _ATLAS_H
 
     for (gx, gy), cell in info.cells.items():
         if cell.atlas_x >= 0 and cell.atlas_y >= 0:
-            ax, ay = cell.atlas_x, cell.atlas_y
+            ax, ay = _scale_canvas_point(
+                cell.atlas_x,
+                cell.atlas_y,
+                src_w=src_w,
+                src_h=src_h,
+                dst_w=w,
+                dst_h=h,
+            )
         else:
-            ax = int(_MARGIN_X + gx * step_x)
-            ay = int(_MARGIN_Y + gy * step_y)
+            ax, ay = _project_grid_to_canvas(
+                gx,
+                gy,
+                grid_w=info.width,
+                grid_h=info.height,
+                canvas_w=w,
+                canvas_h=h,
+            )
         site_atlas[cell.location_id] = (ax, ay)
+    return site_atlas
+
+
+def _build_biome_seeds(
+    info: "MapRenderInfo",
+    site_atlas: Dict[str, Tuple[int, int]],
+    w: int,
+    h: int,
+) -> List[Tuple[int, int, str]]:
+    """Collect biome seed points for atlas terrain painting."""
+    biome_seeds: List[Tuple[int, int, str]] = []
+    for cell in info.cells.values():
+        ax, ay = site_atlas[cell.location_id]
         biome_seeds.append((ax, ay, cell.terrain_biome))
 
-    # Include terrain-only cells as additional biome seeds.
-    site_coords: Set[Tuple[int, int]] = set(site_atlas.values())
+    site_coords = set(site_atlas.values())
     for (gx, gy), tcell in info.terrain_cells.items():
-        ax = int(_MARGIN_X + gx * step_x)
-        ay = int(_MARGIN_Y + gy * step_y)
+        ax, ay = _project_grid_to_canvas(
+            gx,
+            gy,
+            grid_w=info.width,
+            grid_h=info.height,
+            canvas_w=w,
+            canvas_h=h,
+        )
         if (ax, ay) not in site_coords:
             biome_seeds.append((ax, ay, tcell.biome))
+    return biome_seeds
 
-    # --- 1. Multi-continent land mask ---
+
+def _mark_layout_cells(
+    mask: List[List[bool]],
+    cells: List[object],
+    *,
+    src_w: int,
+    src_h: int,
+    dst_w: int,
+    dst_h: int,
+    value: bool,
+) -> None:
+    """Apply stored atlas layout cells onto a boolean mask."""
+    for cell in cells:
+        if not isinstance(cell, (list, tuple)) or len(cell) != 2:
+            continue
+        try:
+            sx = int(cell[0])
+            sy = int(cell[1])
+        except (TypeError, ValueError):
+            continue
+        dx, dy = _scale_canvas_point(
+            sx,
+            sy,
+            src_w=src_w,
+            src_h=src_h,
+            dst_w=dst_w,
+            dst_h=dst_h,
+        )
+        mask[dy][dx] = value
+
+
+def _build_legacy_masks(
+    site_atlas: Dict[str, Tuple[int, int]],
+    w: int,
+    h: int,
+) -> Tuple[List[List[bool]], List[List[bool]]]:
+    """Generate land masks using the legacy site-clustering fallback."""
     land: List[List[bool]] = [[False] * w for _ in range(h)]
     clusters = _cluster_sites(list(site_atlas.values()))
 
@@ -270,10 +367,8 @@ def _build_atlas_canvas(  # noqa: C901 — linear but long
         cy = sum(p[1] for p in cluster) / len(cluster)
         span_x = (max(p[0] for p in cluster) - min(p[0] for p in cluster)) / 2
         span_y = (max(p[1] for p in cluster) - min(p[1] for p in cluster)) / 2
-        rx = span_x + _MARGIN_X + 1
-        ry = span_y + _MARGIN_Y + 1
-        # Offset noise seed per cluster so each land mass has unique coastline.
-        # (coprime multipliers give good decorrelation across clusters.)
+        rx = span_x + max(1, int(round(_MARGIN_X * w / _ATLAS_W))) + 1
+        ry = span_y + max(1, int(round(_MARGIN_Y * h / _ATLAS_H))) + 1
         seed_off = int(cx * 7 + cy * 13)
 
         for py in range(h):
@@ -293,11 +388,12 @@ def _build_atlas_canvas(  # noqa: C901 — linear but long
                 if dist < 1.0 + ang + sp:
                     land[py][px] = True
 
-    # Small scattered islands for visual richness.
-    # Y margin is tighter (MARGIN-1) so islands can appear closer to
-    # the vertical edges, compensating for the taller canvas aspect.
-    for ix in range(_ISLAND_MARGIN, w - _ISLAND_MARGIN, _ISLAND_SPACING_X):
-        for iy in range(_ISLAND_MARGIN - 1, h - (_ISLAND_MARGIN - 1), _ISLAND_SPACING_Y):
+    island_spacing_x = max(5, int(round(_ISLAND_SPACING_X * w / _ATLAS_W)))
+    island_spacing_y = max(4, int(round(_ISLAND_SPACING_Y * h / _ATLAS_H)))
+    island_margin_x = max(2, int(round(_ISLAND_MARGIN * w / _ATLAS_W)))
+    island_margin_y = max(1, int(round((_ISLAND_MARGIN - 1) * h / _ATLAS_H)))
+    for ix in range(island_margin_x, max(w - island_margin_x, island_margin_x + 1), island_spacing_x):
+        for iy in range(island_margin_y, max(h - island_margin_y, island_margin_y + 1), island_spacing_y):
             noise_val = _coast_noise(ix * 3, iy * 5)
             if noise_val > 0.15 and not land[iy][ix]:
                 for dy2 in range(-1, 2):
@@ -306,17 +402,95 @@ def _build_atlas_canvas(  # noqa: C901 — linear but long
                         if 0 <= ny < h and 0 <= nx < w:
                             land[ny][nx] = True
 
-    # Force land around every site (radius 3 rows × 5 cols).
-    # Wider horizontal spread compensates for terminal characters
-    # being ~2× taller than wide, keeping land patches visually round.
+    stamp_x = max(2, int(round(5 * w / _ATLAS_W)))
+    stamp_y = max(1, int(round(3 * h / _ATLAS_H)))
     for ax, ay in site_atlas.values():
-        for dy2 in range(-3, 4):
-            for dx2 in range(-5, 6):
+        for dy2 in range(-stamp_y, stamp_y + 1):
+            for dx2 in range(-stamp_x, stamp_x + 1):
                 ny, nx = ay + dy2, ax + dx2
                 if 0 <= ny < h and 0 <= nx < w:
                     land[ny][nx] = True
 
-    # --- 2. Assign terrain biomes (nearest seed) ---
+    return land, [[False] * w for _ in range(h)]
+
+
+def _build_layout_masks(
+    info: "MapRenderInfo",
+    site_atlas: Dict[str, Tuple[int, int]],
+    w: int,
+    h: int,
+) -> Tuple[List[List[bool]], List[List[bool]]]:
+    """Build land and mountain masks from stored layout or fallback logic."""
+    if info.atlas_layout is None:
+        return _build_legacy_masks(site_atlas, w, h)
+
+    land: List[List[bool]] = [[False] * w for _ in range(h)]
+    mountains: List[List[bool]] = [[False] * w for _ in range(h)]
+    layout = info.atlas_layout
+
+    for continent in layout.continents:
+        _mark_layout_cells(
+            land,
+            continent.get("cells", []),
+            src_w=layout.canvas_w,
+            src_h=layout.canvas_h,
+            dst_w=w,
+            dst_h=h,
+            value=True,
+        )
+    for sea in layout.seas:
+        _mark_layout_cells(
+            land,
+            sea.get("cells", []),
+            src_w=layout.canvas_w,
+            src_h=layout.canvas_h,
+            dst_w=w,
+            dst_h=h,
+            value=False,
+        )
+    for mountain_range in layout.mountain_ranges:
+        cells = mountain_range.get("cells", [])
+        _mark_layout_cells(
+            mountains,
+            cells,
+            src_w=layout.canvas_w,
+            src_h=layout.canvas_h,
+            dst_w=w,
+            dst_h=h,
+            value=True,
+        )
+        _mark_layout_cells(
+            land,
+            cells,
+            src_w=layout.canvas_w,
+            src_h=layout.canvas_h,
+            dst_w=w,
+            dst_h=h,
+            value=True,
+        )
+
+    if not any(any(row) for row in land):
+        return _build_legacy_masks(site_atlas, w, h)
+
+    for ax, ay in site_atlas.values():
+        for dy2 in range(-1, 2):
+            for dx2 in range(-1, 2):
+                ny, nx = ay + dy2, ax + dx2
+                if 0 <= ny < h and 0 <= nx < w:
+                    land[ny][nx] = True
+
+    return land, mountains
+
+
+def _paint_terrain(
+    canvas: List[List[str]],
+    land: List[List[bool]],
+    mountains: List[List[bool]],
+    biome_seeds: List[Tuple[int, int, str]],
+    w: int,
+    h: int,
+) -> None:
+    """Paint terrain onto the atlas canvas from masks and biome seeds."""
     for py in range(h):
         for px in range(w):
             if not land[py][px]:
@@ -333,12 +507,13 @@ def _build_atlas_canvas(  # noqa: C901 — linear but long
 
             if best_biome == "ocean":
                 best_biome = "coast"
+            if mountains[py][px]:
+                best_biome = "mountain"
             canvas[py][px] = _terrain_char(best_biome, px, py)
 
-    # --- 3. Mark coastline cells ---
     for py in range(h):
         for px in range(w):
-            if not land[py][px]:
+            if not land[py][px] or mountains[py][px]:
                 continue
             for dy2, dx2 in ((-1, 0), (1, 0), (0, -1), (0, 1)):
                 ny, nx = py + dy2, px + dx2
@@ -347,12 +522,37 @@ def _build_atlas_canvas(  # noqa: C901 — linear but long
                     canvas[py][px] = _terrain_char("coast", px, py)
                     break
 
-    # --- 4. Draw routes ---
+
+def _build_atlas_base_canvas(
+    info: "MapRenderInfo",
+    w: int,
+    h: int,
+) -> Tuple[List[List[str]], Dict[str, Tuple[int, int]]]:
+    """Build atlas terrain and routes, before labels/markers."""
+    canvas: List[List[str]] = [["~"] * w for _ in range(h)]
+    if not info.cells:
+        return canvas, {}
+
+    site_atlas = _build_site_atlas(info, w, h)
+    biome_seeds = _build_biome_seeds(info, site_atlas, w, h)
+    land, mountains = _build_layout_masks(info, site_atlas, w, h)
+    _paint_terrain(canvas, land, mountains, biome_seeds, w, h)
     _draw_routes(canvas, info, site_atlas, w, h)
+    return canvas, site_atlas
 
-    # --- 5. Place site markers and labels ---
-    _place_labels(canvas, info, site_atlas, w, h)
 
+def _build_atlas_canvas(  # noqa: C901 — linear but long
+    info: "MapRenderInfo",
+) -> List[List[str]]:
+    """Generate the full atlas canvas from *MapRenderInfo*.
+
+    When cells carry pre-computed ``atlas_x`` / ``atlas_y`` coordinates
+    (≥ 0), those are reused instead of re-projecting from the grid.
+    This ensures the atlas map is stable across renders and matches
+    the coordinates persisted in the save file.
+    """
+    canvas, site_atlas = _build_atlas_base_canvas(info, _ATLAS_W, _ATLAS_H)
+    _place_labels(canvas, info, site_atlas, _ATLAS_W, _ATLAS_H)
     return canvas
 
 
@@ -438,14 +638,21 @@ def _place_labels(
     site_atlas: Dict[str, Tuple[int, int]],
     w: int,
     h: int,
-) -> None:
+    *,
+    place_names: bool = True,
+) -> Set[str]:
     """Place site markers and name labels on the canvas.
 
     Site marker glyph varies by traffic band: ``O`` hub (high),
     ``@`` normal (medium), ``o`` quiet (low).  High-rumor sites
     get a ``?`` halo in unoccupied adjacent cells.
     """
-    occupied: Set[Tuple[int, int]] = set()
+    occupied: Set[Tuple[int, int]] = {
+        (ax, ay)
+        for ax, ay in site_atlas.values()
+        if 0 <= ay < h and 0 <= ax < w
+    }
+    labeled_ids: Set[str] = set()
 
     # Higher-importance sites get label priority.
     cells_sorted = sorted(
@@ -463,7 +670,9 @@ def _place_labels(
         marker = _SITE_MARKERS.get(cell.traffic_band, _SITE_MARKER)
         if 0 <= ay < h and 0 <= ax < w:
             canvas[ay][ax] = marker
-            occupied.add((ax, ay))
+
+        if not place_names:
+            continue
 
         # Build label text
         name = cell.canonical_name
@@ -487,6 +696,7 @@ def _place_labels(
             for i, ch in enumerate(label):
                 canvas[ly][lx + i] = ch
                 occupied.add((lx + i, ly))
+            labeled_ids.add(cell.location_id)
             break
 
     # --- Rumor halo: place '?' around high-rumor sites ---
@@ -502,6 +712,8 @@ def _place_labels(
             if 0 <= ny < h and 0 <= nx < w and (nx, ny) not in occupied:
                 canvas[ny][nx] = "?"
                 occupied.add((nx, ny))
+
+    return labeled_ids
 
 
 # ------------------------------------------------------------------
@@ -573,66 +785,8 @@ def render_atlas_compact(info: "MapRenderInfo") -> str:
     markers, and a minimal legend.
     """
     w, h = _COMPACT_W, _COMPACT_H
-    canvas: List[List[str]] = [["~"] * w for _ in range(h)]
-
-    if not info.cells:
-        return "\n".join("  " + "".join(row) for row in canvas)
-
-    avail_w = w - 4
-    avail_h = h - 2
-    step_x = avail_w / max(info.width - 1, 1)
-    step_y = avail_h / max(info.height - 1, 1)
-
-    site_atlas: Dict[str, Tuple[int, int]] = {}
-    biome_seeds: List[Tuple[int, int, str]] = []
-
-    for (gx, gy), cell in info.cells.items():
-        if cell.atlas_x >= 0 and cell.atlas_y >= 0:
-            # Scale pre-computed coords to compact size
-            ax = int(cell.atlas_x * w / _ATLAS_W)
-            ay = int(cell.atlas_y * h / _ATLAS_H)
-        else:
-            ax = int(2 + gx * step_x)
-            ay = int(1 + gy * step_y)
-        ax = max(0, min(w - 1, ax))
-        ay = max(0, min(h - 1, ay))
-        site_atlas[cell.location_id] = (ax, ay)
-        biome_seeds.append((ax, ay, cell.terrain_biome))
-
-    # Simple land mask: 2 rows × 3 cols around each site.
-    # Wider horizontal spread matches terminal character aspect ratio.
-    land: List[List[bool]] = [[False] * w for _ in range(h)]
-    for ax, ay in site_atlas.values():
-        for dy2 in range(-2, 3):
-            for dx2 in range(-3, 4):
-                ny, nx = ay + dy2, ax + dx2
-                if 0 <= ny < h and 0 <= nx < w:
-                    land[ny][nx] = True
-
-    for py in range(h):
-        for px in range(w):
-            if not land[py][px]:
-                canvas[py][px] = _terrain_char("ocean", px, py)
-                continue
-            best_d = float("inf")
-            best_biome = "plains"
-            for sx, sy, biome in biome_seeds:
-                d = (px - sx) ** 2 + (py - sy) ** 2
-                if d < best_d:
-                    best_d = d
-                    best_biome = biome
-            if best_biome == "ocean":
-                best_biome = "coast"
-            canvas[py][px] = _terrain_char(best_biome, px, py)
-
-    # Place markers
-    for cell in sorted(info.cells.values(), key=lambda c: -c.site_importance):
-        pos = site_atlas.get(cell.location_id)
-        if pos:
-            ax, ay = pos
-            if 0 <= ay < h and 0 <= ax < w:
-                marker = _SITE_MARKERS.get(cell.traffic_band, _SITE_MARKER)
-                canvas[ay][ax] = marker
+    canvas, site_atlas = _build_atlas_base_canvas(info, w, h)
+    _place_labels(canvas, info, site_atlas, w, h, place_names=False)
 
     header = f"  {info.world_name} ({tr('map_year')}: {info.year})"
     lines: List[str] = [header, ""]
@@ -687,6 +841,11 @@ def atlas_labeled_sites(info: "MapRenderInfo") -> List[Tuple[str, str]]:
     Sites are returned in importance-descending order, matching the
     label priority used by ``_place_labels``.
     """
+    if not info.cells:
+        return []
+
+    canvas, site_atlas = _build_atlas_base_canvas(info, _ATLAS_W, _ATLAS_H)
+    labeled_ids = _place_labels(canvas, info, site_atlas, _ATLAS_W, _ATLAS_H)
     cells_sorted = sorted(
         info.cells.values(),
         key=lambda c: (-c.site_importance, c.canonical_name),
@@ -694,4 +853,5 @@ def atlas_labeled_sites(info: "MapRenderInfo") -> List[Tuple[str, str]]:
     return [
         (cell.location_id, cell.canonical_name)
         for cell in cells_sorted
+        if cell.location_id in labeled_ids
     ]

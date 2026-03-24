@@ -30,7 +30,7 @@ from ..i18n import tr, tr_term
 from .ui_helpers import fit_display_width
 
 if TYPE_CHECKING:
-    from ..terrain import Site
+    from ..terrain import AtlasLayout, Site
     from ..world import World
 
 
@@ -132,6 +132,7 @@ class MapRenderInfo:
     cells: Dict[Tuple[int, int], MapCellInfo] = field(default_factory=dict)
     terrain_cells: Dict[Tuple[int, int], TerrainCellRenderInfo] = field(default_factory=dict)
     routes: List[RouteRenderInfo] = field(default_factory=list)
+    atlas_layout: Optional["AtlasLayout"] = None
 
 
 # ------------------------------------------------------------------
@@ -147,13 +148,17 @@ def build_map_info(
     This is the *only* function that touches ``World`` / ``LocationState``
     attributes.  Renderers only consume the intermediate representation.
     """
-    from ..terrain import BIOME_GLYPHS
+    from ..terrain import AtlasLayout, BIOME_GLYPHS
 
     info = MapRenderInfo(
         world_name=world.name,
         year=world.year,
         width=world.width,
         height=world.height,
+        atlas_layout=(
+            AtlasLayout.from_dict(world.atlas_layout.to_dict())
+            if world.atlas_layout is not None else None
+        ),
     )
 
     death_site_location_ids = {

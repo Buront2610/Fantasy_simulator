@@ -366,12 +366,25 @@ class AtlasLayout:
     mountain_ranges: List[Dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
+        def _normalize_regions(regions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+            normalized: List[Dict[str, Any]] = []
+            for region in regions:
+                cells = []
+                for cell in region.get("cells", []):
+                    if isinstance(cell, (list, tuple)) and len(cell) == 2:
+                        cells.append([int(cell[0]), int(cell[1])])
+                normalized.append({
+                    "name": region.get("name", ""),
+                    "cells": cells,
+                })
+            return normalized
+
         return {
             "canvas_w": self.canvas_w,
             "canvas_h": self.canvas_h,
-            "continents": self.continents,
-            "seas": self.seas,
-            "mountain_ranges": self.mountain_ranges,
+            "continents": _normalize_regions(self.continents),
+            "seas": _normalize_regions(self.seas),
+            "mountain_ranges": _normalize_regions(self.mountain_ranges),
         }
 
     @classmethod
@@ -383,6 +396,121 @@ class AtlasLayout:
             seas=data.get("seas", []),
             mountain_ranges=data.get("mountain_ranges", []),
         )
+
+
+# ------------------------------------------------------------------
+# Atlas helpers
+# ------------------------------------------------------------------
+
+ATLAS_CANVAS_W = 72
+ATLAS_CANVAS_H = 30
+ATLAS_MARGIN_X = 6
+ATLAS_MARGIN_Y = 3
+
+
+def project_atlas_coords(
+    grid_x: int,
+    grid_y: int,
+    *,
+    width: int,
+    height: int,
+) -> Tuple[int, int]:
+    """Project a grid coordinate onto the persistent atlas canvas."""
+    avail_w = ATLAS_CANVAS_W - 2 * ATLAS_MARGIN_X
+    avail_h = ATLAS_CANVAS_H - 2 * ATLAS_MARGIN_Y
+    step_x = avail_w / max(width - 1, 1)
+    step_y = avail_h / max(height - 1, 1)
+    return (
+        int(ATLAS_MARGIN_X + grid_x * step_x),
+        int(ATLAS_MARGIN_Y + grid_y * step_y),
+    )
+
+
+def _atlas_line_points(
+    x0: int,
+    y0: int,
+    x1: int,
+    y1: int,
+) -> List[Tuple[int, int]]:
+    """Return integer points along a straight line on the atlas canvas."""
+    points: List[Tuple[int, int]] = []
+    dx = abs(x1 - x0)
+    dy = abs(y1 - y0)
+    sx = 1 if x1 > x0 else -1
+    sy = 1 if y1 > y0 else -1
+    err = dx - dy
+    x, y = x0, y0
+    while True:
+        points.append((x, y))
+        if x == x1 and y == y1:
+            break
+        e2 = 2 * err
+        if e2 > -dy:
+            err -= dy
+            x += sx
+        if e2 < dx:
+            err += dx
+            y += sy
+    return points
+
+
+def _stamp_atlas_cells(
+    target: set[Tuple[int, int]],
+    x: int,
+    y: int,
+    *,
+    radius_x: int,
+    radius_y: int,
+) -> None:
+    """Add a rectangular stamp around a canvas coordinate."""
+    for dy in range(-radius_y, radius_y + 1):
+        for dx in range(-radius_x, radius_x + 1):
+            nx = x + dx
+            ny = y + dy
+            if 0 <= nx < ATLAS_CANVAS_W and 0 <= ny < ATLAS_CANVAS_H:
+                target.add((nx, ny))
+
+
+def build_default_atlas_layout(
+    site_coords: Optional[List[Tuple[int, int]]] = None,
+    *,
+    route_coords: Optional[List[Tuple[Tuple[int, int], Tuple[int, int]]]] = None,
+    mountain_coords: Optional[List[Tuple[int, int]]] = None,
+) -> AtlasLayout:
+    """Create the default persistent atlas layout for the current world."""
+    land: set[Tuple[int, int]] = set()
+    for x, y in site_coords or []:
+        if x < 0 or y < 0:
+            continue
+        _stamp_atlas_cells(land, x, y, radius_x=5, radius_y=3)
+
+    for start, end in route_coords or []:
+        for px, py in _atlas_line_points(start[0], start[1], end[0], end[1]):
+            _stamp_atlas_cells(land, px, py, radius_x=2, radius_y=1)
+
+    mountains: set[Tuple[int, int]] = set()
+    for x, y in mountain_coords or []:
+        if x < 0 or y < 0:
+            continue
+        _stamp_atlas_cells(land, x, y, radius_x=3, radius_y=2)
+        _stamp_atlas_cells(mountains, x, y, radius_x=1, radius_y=0)
+
+    seas = sorted(
+        (x, y)
+        for y in range(ATLAS_CANVAS_H)
+        for x in range(ATLAS_CANVAS_W)
+        if (x, y) not in land
+    )
+    return AtlasLayout(
+        canvas_w=ATLAS_CANVAS_W,
+        canvas_h=ATLAS_CANVAS_H,
+        continents=[{"name": "Main Continent", "cells": sorted(land)}],
+        seas=[{"name": "Great Ocean", "cells": seas}],
+        mountain_ranges=(
+            [{"name": "World Spine", "cells": sorted(mountains)}]
+            if mountains else []
+        ),
+    )
 
 
 # ------------------------------------------------------------------
@@ -517,14 +645,12 @@ def build_default_terrain(
     # --- Compute atlas coordinates for each site ---
     # These are deterministic projections from grid coords to atlas canvas
     # and are persisted so the atlas is stable across renders.
-    atlas_w, atlas_h = 72, 30
-    atlas_margin_x, atlas_margin_y = 6, 3
-    atlas_avail_w = atlas_w - 2 * atlas_margin_x
-    atlas_avail_h = atlas_h - 2 * atlas_margin_y
-    atlas_step_x = atlas_avail_w / max(width - 1, 1)
-    atlas_step_y = atlas_avail_h / max(height - 1, 1)
     for site in sites:
-        site.atlas_x = int(atlas_margin_x + site.x * atlas_step_x)
-        site.atlas_y = int(atlas_margin_y + site.y * atlas_step_y)
+        site.atlas_x, site.atlas_y = project_atlas_coords(
+            site.x,
+            site.y,
+            width=width,
+            height=height,
+        )
 
     return tmap, sites, routes
