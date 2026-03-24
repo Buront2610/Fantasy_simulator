@@ -118,3 +118,247 @@
 ## 結論
 
 短期的には **Rich + prompt_toolkit + wcwidth** の組み合わせが最も実用的で、既存 CLI を大きく壊さずに雰囲気と操作性を改善できる。ただし prompt_toolkit と将来の Textual は根本的に異なる入力モデル（同期行入力 vs 非同期ウィジェット）のため、prompt_toolkit 依存コードは入力抽象の背後に隔離する。中長期では、イベント構造化と `location_id` 移行（`docs/implementation_plan.md` 参照）を終えた後に、Phase 2 完了時点で複数ペイン常時表示や非同期更新などの要件が発生した場合に **Textual** を採用候補として評価する。UI は演出のためだけではなく、世界の履歴・因果・人物のドラマをプレイヤーに理解させるための装置として設計するべきである。
+
+## PR-G 拡張方針：可変ワールド対応・地形表現・worldgen PoC
+
+> **補足**: `docs/implementation_plan.md` における PR-G の再定義に合わせ、UI 側でも「AA マップ初版」を単なる装飾強化ではなく、**可変サイズ world / terrain-site 分離 / 観測 UI 強化 / 将来のランダム大陸生成へ繋がる技術実証**として扱う。実装順・完了条件の正本は引き続き `docs/implementation_plan.md` を優先する。
+
+### この追記の目的
+
+現状の UI 計画では、ASCII マップやレポートの導入方針はあるが、まだ「5×5 地点盤面を前提とした見た目強化」に読める余地がある。  
+しかし本作が本来目指しているのは、**土地の広がり・導線・危険偏在・噂の熱・記念碑や死地の履歴が読める観測 UI** である。
+
+そのため UI 側では、次の判断を明確に固定する。
+
+1. **AA は装飾ではなく、世界状態の可視化である**
+2. **1 マス 1 地点の盤面感を残したままでは没入感に限界がある**
+3. **地形そのものを表現し、site はその上に重ねる**
+4. **将来的なランダム大陸生成を見据え、描画器は固定 5×5 前提を捨てる**
+5. **PoC を許容するが、本体統合用 API と実験用スクリプトは分ける**
+
+---
+
+## 追加する UI 設計原則
+
+### 原則 1: 地形と地点を別レイヤとして描く
+
+今後の map renderer は、次の二層を前提に設計する。
+
+- **terrain layer**
+  - 海、海岸、平野、森林、丘陵、山脈、川、湿地、荒野など
+- **site / route overlay layer**
+  - 都市、村、港、砦、遺跡、ダンジョン入口、街道、峠道、海路、季節道など
+
+これにより、「山脈の麓の都市」「森の外縁の街道」「海沿い港町」「冬に死ぬ峠道」などを自然に表現できる。
+
+### 原則 2: 地図は三層表示を維持するが、内部情報量は増やす
+
+既存方針の三層構造は維持する。
+
+1. **ワールド全体図**
+2. **地域図**
+3. **地点詳細図**
+
+ただし、各層で見せる情報は次のように強化する。
+
+#### ワールド全体図
+- 海岸線
+- 山脈
+- 森林帯
+- 平野
+- 主要 site
+- 主要 route
+- `danger_band`
+- `traffic_band`
+- `rumor_heat_band`
+- `memorial` / `alias` / `recent death site`
+
+#### 地域図
+- 周辺導線
+- 峠
+- 河川
+- 門
+- 市場
+- 掲示板
+- 墓碑
+- 事故地点
+- 封鎖道 / 崩落道
+- 先行パーティの痕跡
+
+#### 地点詳細図
+- 都市 / 遺跡 / 野外 / ダンジョン入口などの局所 AA / 準AA
+- 最近の痕跡
+- world memory
+- 現在状態の短い要約
+- その場所で今読むべき情報への導線
+
+### 原則 3: 「綺麗」より「判断できる」を優先する
+
+この UI で重要なのは芸術的な AA の完成度ではない。  
+優先順位は次の通りとする。
+
+1. いまどこが危険か分かる
+2. どこに噂が集中しているか分かる
+3. どこに過去の傷跡や記念が残っているか分かる
+4. どこへ注目すべきか分かる
+5. そのうえで、雰囲気がある
+
+色や豪華な罫線に依存せず、文字だけで意味が読めることを最優先とする。
+
+### 原則 4: 狭幅端末では必ず簡易表示へ落ちる
+
+大きな world 表示を導入すると、端末幅不足で破綻しやすい。  
+したがって map renderer は最低でも次のモードを持つ。
+
+- **full**
+  - 広い端末向け。全体図の詳細版
+- **compact**
+  - 一部情報を省略した簡易版
+- **minimal**
+  - site / route / marker のみを見る最小版
+
+表示幅で自動選択してよいが、ユーザが切替可能にしてもよい。
+
+### 原則 5: PoC の実験描画と本体 UI を分離する
+
+地形生成や大陸図生成の技術実証は行ってよい。  
+ただし、UI 側でも本体と PoC を分ける。
+
+- `fantasy_simulator/ui/`
+  - 本体で使用する renderer / presenter
+- `tools/worldgen_poc/`
+  - 生成結果の ASCII preview / デバッグ出力 / 比較可視化
+
+これにより、PoC 由来の不安定な見た目がそのまま本編 UI に流入しないようにする。
+
+---
+
+## 追加する map renderer の責務
+
+今後の `map_renderer.py` は、単に `LocationState` を ASCII へ変換するだけでなく、**terrain + site overlay を持つ world-scale view model** を扱えるようにする。
+
+### 新たに担う責務
+- terrain のベース glyph 決定
+- route の overlay glyph 決定
+- world memory の marker 付与
+- site importance に応じたラベル簡略化
+- 表示幅に応じた簡易化
+- world-scale / region-scale / site-detail の view model 切替
+
+### 逆に担わない責務
+- game logic の判定
+- state 値そのものの計算
+- site 配置ルールの決定
+- 噂や危険度の更新
+
+UI は最後の view model を描くだけに徹する。
+
+---
+
+## worldgen PoC を前提にした UI 側の受け皿
+
+将来のランダム大陸生成を見据え、UI 側も最初から次を受けられるようにしておく。
+
+- 可変 world width / height
+- site が terrain 座標上に載る構造
+- 海岸線・山脈・河川の長い連続表現
+- seed 固定 terrain の preview 表示
+- generated world を既存 UI で開ける導線
+
+### UI 側で必要な view model 例
+
+- `TerrainCellRenderInfo`
+- `SiteRenderInfo`
+- `RouteRenderInfo`
+- `WorldMapRenderInfo`
+- `RegionMapRenderInfo`
+- `SiteDetailRenderInfo`
+
+現行の `MapRenderInfo` / `MapCellInfo` はその土台としつつ、terrain layer を表現できるよう拡張する。
+
+---
+
+## 検討対象とする外部ライブラリ / 外部ツール（UI 文脈）
+
+以下は現行 UI 計画書に未記載だが、PR-G の PoC 文脈で検討対象とする。
+
+### FastNoiseLite
+**用途**:
+- terrain generation の seed 固定実験
+- height / moisture / temperature 分布の生成
+- UI への ASCII preview 出力の元データ
+
+**位置づけ**:
+- worldgen PoC の第一候補
+- 本体統合も比較的現実的
+
+### WorldEngine
+**用途**:
+- プレート、降雨、侵食を含む外部生成 world の比較
+- 自前地形生成との UI 上の見え方比較
+
+**位置づけ**:
+- 本体依存ではなく比較・参照向け
+
+### Azgaar’s Fantasy Map Generator
+**用途**:
+- 世界観試作
+- 海岸線や国家スケールの広がり比較
+- UI で「何を見せると世界が広く見えるか」の検討材料
+
+**位置づけ**:
+- 設計支援ツール
+- 本体依存対象ではない
+
+### python-tcod
+**用途**:
+- 地点詳細図
+- ダンジョン入口
+- 局所 map の生成や補助
+
+**位置づけ**:
+- continent 表現の本命ではなく、局所詳細用候補
+
+---
+
+## Phase 2 / Phase 3 の追記
+
+### Phase 2：マップとレポート（追記）
+- [ ] `location_id` / `WorldEventRecord` 対応に加え、terrain + site overlay を扱える world-scale map renderer を導入する
+- [ ] ワールド全体図で海岸線、山脈、森林帯、平野、主要 route、world memory を表示できるようにする
+- [ ] 地域図で導線、峠、河川、掲示板、墓碑、事故地点を表示できるようにする
+- [ ] 地点詳細図で局所 AA / 準AA と最近の痕跡を接続する
+- [ ] world サイズが固定 5×5 でなくても描画できるようにする
+- [ ] `compact` / `minimal` 表示モードを導入する
+
+### Phase 3：TUI への拡張（追記）
+- [ ] 可変サイズ world のスクロール / ズーム / フォーカス制御が必要か評価する
+- [ ] world-scale map と region-scale map を同時表示する複数ペイン構成が必要か評価する
+- [ ] generated world preview を TUI 上で扱う要件があるか評価する
+
+---
+
+## テスト戦略への追記
+
+- [ ] 可変サイズ world map の描画テストを追加する
+- [ ] terrain + site overlay の snapshot テストを追加する
+- [ ] `memorial` / `alias` / `recent death site` が地図に反映されることを確認する
+- [ ] 狭幅端末時に `compact` / `minimal` 表示へ落ちることを確認する
+- [ ] seed 固定 terrain preview の再現性テストを追加する
+- [ ] CJK 幅崩れテストを world-scale map 表示にも適用する
+
+---
+
+## UI 計画としての結論（追記）
+
+UI 改造の次段階では、5×5 地点盤面を前提にした見た目改善では不十分である。  
+今後の map UI は、**terrain を持つ world の上に site と route が重なり、さらに world memory が履歴として染み出す観測 UI** として設計する。
+
+このため PR-G は、UI 観点では次の意味を持つ。
+
+- world の広がりを感じさせる
+- 地形が移動・危険・噂・導線に効くことを見せる
+- 履歴が地図に残ることを見せる
+- 将来のランダム大陸生成へ繋がる表示器の基盤を作る
+
+AA はそのための手段であり、目的ではない。
