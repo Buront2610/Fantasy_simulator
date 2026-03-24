@@ -1,13 +1,12 @@
 """Property-based tests for core invariants."""
 
 import pytest
+from fantasy_simulator.persistence.migrations import CURRENT_VERSION, migrate
+from fantasy_simulator.world import LocationState
 
 hypothesis = pytest.importorskip("hypothesis")
 st = hypothesis.strategies
 given = hypothesis.given
-
-from fantasy_simulator.persistence.migrations import CURRENT_VERSION, migrate
-from fantasy_simulator.world import LocationState
 
 
 @given(st.integers(min_value=0, max_value=5))
