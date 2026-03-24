@@ -354,6 +354,13 @@ _DANGER_MARKERS: Dict[str, str] = {"low": " ", "medium": ".", "high": "!"}
 _TRAFFIC_MARKERS: Dict[str, str] = {"low": " ", "medium": "o", "high": "O"}
 #: Overlay marker for rumor heat band
 _RUMOR_MARKERS: Dict[str, str] = {"low": " ", "medium": "~", "high": "?"}
+_MAX_REGION_STANDOUT_ITEMS = 3
+_ROUTE_TYPE_PRIORITY: Dict[str, int] = {
+    "road": 0,
+    "mountain_pass": 1,
+    "river": 2,
+    "trail": 3,
+}
 
 
 def _overlay_suffix(cell: MapCellInfo) -> str:
@@ -382,6 +389,75 @@ def _route_endpoint_name(cells_by_id: Dict[str, MapCellInfo], location_id: str) 
     """Return a human-readable site name for a route endpoint."""
     cell = cells_by_id.get(location_id)
     return cell.canonical_name if cell is not None else location_id
+
+
+def _route_other_endpoint(route: RouteRenderInfo, center_location_id: str) -> str:
+    """Return the endpoint on the far side of a route from the current center."""
+    if route.from_site_id == center_location_id:
+        return route.to_site_id
+    return route.from_site_id
+
+
+def _pick_standout_route(
+    region_routes: List[RouteRenderInfo],
+    center_location_id: str,
+    cells_by_id: Dict[str, MapCellInfo],
+) -> Optional[RouteRenderInfo]:
+    """Pick the single route worth calling out in the compact region summary."""
+    if not region_routes:
+        return None
+    return min(
+        region_routes,
+        key=lambda route: (
+            0 if route.blocked else 1,
+            _ROUTE_TYPE_PRIORITY.get(route.route_type, 99),
+            _route_endpoint_name(cells_by_id, _route_other_endpoint(route, center_location_id)).lower(),
+        ),
+    )
+
+
+def _pick_region_danger_target(
+    visible_cells: List[MapCellInfo],
+    center_location_id: str,
+) -> Optional[MapCellInfo]:
+    """Return one high-danger site for the region summary.
+
+    Only ``high`` danger sites are called out here so the short summary
+    stays focused; medium danger still remains visible in the nearby list.
+    """
+    return next(
+        (cell for cell in visible_cells if cell.location_id != center_location_id and cell.danger_band == "high"),
+        None,
+    )
+
+
+def _has_world_memory(
+    cell: MapCellInfo,
+    memorials_by_site: Dict[str, List[str]],
+    aliases_by_site: Dict[str, List[str]],
+    traces_by_site: Dict[str, List[str]],
+) -> bool:
+    """Return whether a site has explicit world-memory entries to show."""
+    return bool(
+        memorials_by_site.get(cell.location_id)
+        or aliases_by_site.get(cell.location_id)
+        or traces_by_site.get(cell.location_id)
+    )
+
+
+def _cell_has_landmark_indicators(
+    cell: MapCellInfo,
+    memorials_by_site: Dict[str, List[str]],
+    aliases_by_site: Dict[str, List[str]],
+    traces_by_site: Dict[str, List[str]],
+) -> bool:
+    """Return whether a site should be called out as a landmark."""
+    return bool(
+        cell.has_memorial
+        or cell.has_alias
+        or cell.recent_death_site
+        or _has_world_memory(cell, memorials_by_site, aliases_by_site, traces_by_site)
+    )
 
 
 # ------------------------------------------------------------------
@@ -437,6 +513,9 @@ def render_world_overview(info: MapRenderInfo) -> str:
     lines.append("")
     lines.append(f"  {tr('map_overview_sites')}:")
     site_cells = sorted(info.cells.values(), key=lambda c: (c.y, c.x))
+    cells_by_id: Dict[str, MapCellInfo] = {
+        c.location_id: c for c in info.cells.values()
+    }
     for cell in site_cells:
         overlay = _overlay_suffix(cell)
         overlay_str = f" [{overlay}]" if overlay else ""
@@ -452,8 +531,10 @@ def render_world_overview(info: MapRenderInfo) -> str:
         lines.append(f"  {tr('map_overview_routes')}:")
         for r in info.routes:
             blocked = f" {tr('route_blocked')}" if r.blocked else ""
+            from_name = _route_endpoint_name(cells_by_id, r.from_site_id)
+            to_name = _route_endpoint_name(cells_by_id, r.to_site_id)
             lines.append(
-                f"    {r.from_site_id} <-> {r.to_site_id}"
+                f"    {from_name} <-> {to_name}"
                 f" ({tr_term(r.route_type)}){blocked}"
             )
 
@@ -630,15 +711,15 @@ def render_region_map(
         if r.from_site_id == center_location_id or r.to_site_id == center_location_id
     ]
     standout_lines: List[str] = []
-    if region_routes:
-        route = region_routes[0]
-        other_id = route.to_site_id if route.from_site_id == center_location_id else route.from_site_id
+    standout_route = _pick_standout_route(region_routes, center_location_id, cells_by_id)
+    if standout_route is not None:
+        other_id = _route_other_endpoint(standout_route, center_location_id)
         standout_lines.append(
             tr(
                 "map_region_focus_route",
                 destination=_route_endpoint_name(cells_by_id, other_id),
-                route_type=tr_term(route.route_type),
-                blocked=f" {tr('route_blocked')}" if route.blocked else "",
+                route_type=tr_term(standout_route.route_type),
+                blocked=f" {tr('route_blocked')}" if standout_route.blocked else "",
             ).rstrip()
         )
 
@@ -646,10 +727,7 @@ def render_region_map(
         cell for cell in sorted(info.cells.values(), key=lambda c: (c.y, c.x))
         if x_min <= cell.x <= x_max and y_min <= cell.y <= y_max
     ]
-    danger_target = next(
-        (cell for cell in visible_cells if cell.location_id != center_location_id and cell.danger_band == "high"),
-        None,
-    )
+    danger_target = _pick_region_danger_target(visible_cells, center_location_id)
     if danger_target is not None:
         standout_lines.append(tr("map_region_focus_danger", location=danger_target.canonical_name))
 
@@ -660,7 +738,7 @@ def render_region_map(
         (
             cell for cell in visible_cells
             if cell.location_id == center_location_id
-            and (_mem.get(cell.location_id) or _ali.get(cell.location_id) or _tra.get(cell.location_id))
+            and _has_world_memory(cell, _mem, _ali, _tra)
         ),
         None,
     )
@@ -668,12 +746,7 @@ def render_region_map(
         landmark_target = next(
             (
                 cell for cell in visible_cells
-                if cell.has_memorial
-                or cell.has_alias
-                or cell.recent_death_site
-                or _mem.get(cell.location_id)
-                or _ali.get(cell.location_id)
-                or _tra.get(cell.location_id)
+                if _cell_has_landmark_indicators(cell, _mem, _ali, _tra)
             ),
             None,
         )
@@ -682,7 +755,7 @@ def render_region_map(
 
     if standout_lines:
         lines.append(f"  {tr('map_region_focus')}:")
-        for item in standout_lines[:3]:
+        for item in standout_lines[:_MAX_REGION_STANDOUT_ITEMS]:
             lines.append(f"    - {item}")
         lines.append("")
 

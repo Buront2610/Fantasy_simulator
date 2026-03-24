@@ -196,8 +196,8 @@ class TestRenderWorldOverview(unittest.TestCase):
 
     def test_route_listed(self) -> None:
         output = render_world_overview(self.info)
-        self.assertIn("loc_test_town", output)
-        self.assertIn("loc_forest_camp", output)
+        self.assertIn("TestTown <-> ForestCamp", output)
+        self.assertNotIn("loc_test_town <->", output)
 
     def test_terrain_glyph_in_grid(self) -> None:
         """Terrain-only cells should show their biome glyph."""
