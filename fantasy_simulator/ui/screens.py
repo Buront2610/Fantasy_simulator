@@ -207,9 +207,7 @@ def _show_results(sim: Simulator, ctx: UIContext | None = None) -> None:
         elif action == "monthly_report":
             _show_monthly_report(sim, ctx=ctx)
         elif action == "world_map":
-            out.print_line()
-            out.print_line(world.render_map())
-            inp.pause()
+            _show_world_map(sim, ctx=ctx)
         elif action == "character_roster":
             _show_roster(world, ctx=ctx)
         elif action == "event_log_last_30":
@@ -242,6 +240,266 @@ def _show_results(sim: Simulator, ctx: UIContext | None = None) -> None:
             inp.pause()
         elif action == "location_history":
             _show_location_history(world, ctx=ctx)
+        else:
+            break
+
+
+def _show_detail_for_location(
+    world: World,
+    info: Any,
+    loc: Any,
+    ctx: UIContext | None = None,
+) -> None:
+    """Render the detail panel for a single location."""
+    from .map_renderer import render_location_detail
+
+    ctx = _default_ctx(ctx)
+    out = ctx.out
+    inp = ctx.inp
+
+    mem_list: list[str] = []
+    if loc.memorial_ids:
+        mems = world.get_memorials_for_location(loc.id)
+        mem_list = [
+            tr("memorial_entry", year=m.year, epitaph=m.epitaph)
+            for m in mems
+        ]
+    recent_traces = list(reversed(loc.live_traces[-5:]))
+    trace_list = [t.get("text", "") for t in recent_traces]
+    out.print_line()
+    out.print_line(render_location_detail(
+        info, loc.id,
+        memorials=mem_list or None,
+        aliases=list(loc.aliases) or None,
+        live_traces=trace_list or None,
+    ))
+    inp.pause()
+
+
+def _region_drill_loop(
+    world: World,
+    info: Any,
+    center_loc: Any,
+    ctx: UIContext | None = None,
+) -> None:
+    """Region map loop allowing navigation to nearby sites.
+
+    Shows the region centred on *center_loc*, then offers:
+
+    * **detail** — pick any visible site to see its detail panel
+    * **recenter** — pick any visible site and re-centre the region
+    * **back** — return to the atlas overview
+    """
+    from .map_renderer import render_region_map
+
+    ctx = _default_ctx(ctx)
+    out = ctx.out
+
+    # Build location_id → cell lookup once (stable across iterations)
+    cell_by_id = {c.location_id: c for c in info.cells.values()}
+
+    while True:
+        # Build world memory data for region map enrichment (item 9)
+        site_memorials: dict[str, list[str]] = {}
+        site_aliases: dict[str, list[str]] = {}
+        site_traces: dict[str, list[str]] = {}
+        for loc in world.grid.values():
+            if loc.memorial_ids:
+                mems = world.get_memorials_for_location(loc.id)
+                if mems:
+                    site_memorials[loc.id] = [
+                        tr("memorial_entry", year=m.year, epitaph=m.epitaph)
+                        for m in mems[:3]
+                    ]
+            if loc.aliases:
+                site_aliases[loc.id] = list(loc.aliases)[:3]
+            if loc.live_traces:
+                site_traces[loc.id] = [
+                    t.get("text", "") for t in loc.live_traces[-3:]
+                ]
+
+        out.print_line()
+        out.print_line(render_region_map(
+            info, center_loc.id,
+            site_memorials=site_memorials,
+            site_aliases=site_aliases,
+            site_traces=site_traces,
+        ))
+
+        # Build the visible-site list for the current region centre
+        center_cell = None
+        for c in info.cells.values():
+            if c.location_id == center_loc.id:
+                center_cell = c
+                break
+        if center_cell is None:
+            break
+
+        radius = 2
+        x_min = max(0, center_cell.x - radius)
+        x_max = min(info.width - 1, center_cell.x + radius)
+        y_min = max(0, center_cell.y - radius)
+        y_max = min(info.height - 1, center_cell.y + radius)
+
+        visible_locs = []
+        for loc in sorted(world.grid.values(), key=lambda lc: lc.canonical_name):
+            cell = cell_by_id.get(loc.id)
+            if cell and x_min <= cell.x <= x_max and y_min <= cell.y <= y_max:
+                visible_locs.append(loc)
+
+        out.print_line()
+        for i, vloc in enumerate(visible_locs, 1):
+            marker = "@" if vloc.id == center_loc.id else " "
+            out.print_line(f"  {marker}{i}. {vloc.canonical_name} ({tr_term(vloc.region_type)})")
+
+        sub = ctx.choose_key(
+            tr("map_nav_prompt"),
+            [
+                ("detail", tr("map_nav_detail")),
+                ("recenter", tr("map_nav_recenter")),
+                ("back", tr("back_to_main")),
+            ],
+        )
+
+        if sub == "detail":
+            idx = _get_numeric_choice(
+                f"  {tr('enter_location_number')}", len(visible_locs), ctx=ctx,
+            )
+            if idx is not None:
+                _show_detail_for_location(world, info, visible_locs[idx], ctx=ctx)
+
+        elif sub == "recenter":
+            idx = _get_numeric_choice(
+                f"  {tr('enter_location_number')}", len(visible_locs), ctx=ctx,
+            )
+            if idx is not None:
+                center_loc = visible_locs[idx]
+        else:
+            break
+
+
+def _show_world_map(sim: Simulator, ctx: UIContext | None = None) -> None:
+    """Three-layer map navigation: overview -> region -> detail.
+
+    PR-G2: Atlas-based world map.  The overview renders a continent-
+    scale terrain canvas where locations are anchor points -- not a
+    direct visualization of the 5x5 grid.
+
+    Supports three display modes:
+    * **wide** — full 72-column atlas canvas with legend
+    * **compact** — 40-column atlas canvas (narrow terminals)
+    * **minimal** — text-only site list (screen readers, tiny terminals)
+
+    The atlas renders a direct-selection shortlist of labeled sites
+    so the user can jump to region/detail without a separate menu.
+    """
+    from .map_renderer import build_map_info
+    from .atlas_renderer import (
+        render_atlas_overview,
+        render_atlas_compact,
+        render_atlas_minimal,
+        atlas_labeled_sites,
+    )
+
+    ctx = _default_ctx(ctx)
+    out = ctx.out
+    inp = ctx.inp
+    world = sim.world
+    info = build_map_info(world)
+    atlas_mode = "wide"  # default mode
+
+    while True:
+        out.print_line()
+        if atlas_mode == "compact":
+            out.print_line(render_atlas_compact(info))
+        elif atlas_mode == "minimal":
+            out.print_line(render_atlas_minimal(info))
+        else:
+            out.print_line(render_atlas_overview(info))
+
+        # --- Direct selection shortlist (item 11) ---
+        labeled = atlas_labeled_sites(info)
+        out.print_line()
+        out.print_line(f"  {tr('atlas_site_list')}:")
+        for i, (loc_id, name) in enumerate(labeled, 1):
+            cell = None
+            for c in info.cells.values():
+                if c.location_id == loc_id:
+                    cell = c
+                    break
+            overlay = ""
+            if cell:
+                from .atlas_renderer import _overlay_suffix
+                ov = _overlay_suffix(cell)
+                overlay = f" [{ov}]" if ov else ""
+            out.print_line(f"    {i:>2}. {name}{overlay}")
+        out.print_line()
+
+        action = ctx.choose_key(
+            tr("map_nav_prompt"),
+            [
+                ("select", tr("map_nav_select")),
+                ("region", tr("map_nav_region")),
+                ("detail", tr("map_nav_detail")),
+                ("mode", tr("map_nav_mode")),
+                ("legacy", tr("map_nav_legacy")),
+                ("back", tr("back_to_main")),
+            ],
+        )
+
+        if action == "select":
+            idx = _get_numeric_choice(
+                f"  {tr('enter_location_number')}", len(labeled), ctx=ctx,
+            )
+            if idx is not None:
+                loc_id, _ = labeled[idx]
+                loc = world._location_id_index.get(loc_id)
+                if loc is not None:
+                    _region_drill_loop(
+                        world, info, loc, ctx=ctx,
+                    )
+
+        elif action == "region":
+            locations = sorted(world.grid.values(), key=lambda loc: loc.canonical_name)
+            out.print_line()
+            for i, loc in enumerate(locations, 1):
+                out.print_line(f"  {i}. {loc.canonical_name} ({tr_term(loc.region_type)})")
+            idx = _get_numeric_choice(
+                f"  {tr('enter_location_number')}", len(locations), ctx=ctx,
+            )
+            if idx is not None:
+                center_loc = locations[idx]
+                _region_drill_loop(world, info, center_loc, ctx=ctx)
+
+        elif action == "detail":
+            locations = sorted(world.grid.values(), key=lambda loc: loc.canonical_name)
+            out.print_line()
+            for i, loc in enumerate(locations, 1):
+                out.print_line(f"  {i}. {loc.canonical_name} ({tr_term(loc.region_type)})")
+            idx = _get_numeric_choice(
+                f"  {tr('enter_location_number')}", len(locations), ctx=ctx,
+            )
+            if idx is not None:
+                loc = locations[idx]
+                _show_detail_for_location(world, info, loc, ctx=ctx)
+
+        elif action == "mode":
+            new_mode = ctx.choose_key(
+                tr("atlas_mode_prompt"),
+                [
+                    ("wide", tr("atlas_mode_wide")),
+                    ("compact", tr("atlas_mode_compact")),
+                    ("minimal", tr("atlas_mode_minimal")),
+                ],
+            )
+            atlas_mode = new_mode
+
+        elif action == "legacy":
+            out.print_line()
+            from .map_renderer import render_map_ascii
+            out.print_line(render_map_ascii(info))
+            inp.pause()
+
         else:
             break
 

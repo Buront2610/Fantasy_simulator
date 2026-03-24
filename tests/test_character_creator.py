@@ -3,6 +3,7 @@ tests/test_character_creator.py - Unit tests for CharacterCreator.
 """
 
 import random
+from types import SimpleNamespace
 
 from fantasy_simulator.character_creator import CharacterCreator
 
@@ -65,3 +66,32 @@ class TestCreateFromTemplateReproducibility:
         assert c1.age == c2.age
         assert c1.strength == c2.strength
         assert c1.intelligence == c2.intelligence
+
+
+class TestInteractiveStatAllocation:
+    def test_manual_distribution_allows_values_above_ten(self):
+        creator = CharacterCreator()
+
+        class ScriptedInput:
+            def __init__(self, responses):
+                self._responses = iter(responses)
+
+            def read_line(self, prompt: str = "") -> str:
+                return next(self._responses)
+
+        class BufferOut:
+            def __init__(self):
+                self.lines = []
+
+            def print_line(self, text: str = "") -> None:
+                self.lines.append(text)
+
+        ctx = SimpleNamespace(
+            inp=ScriptedInput(["y", "20", "10", "10", "10", "10", "10"]),
+            out=BufferOut(),
+        )
+
+        stats = creator._allocate_stats(ctx=ctx)
+
+        assert stats["strength"] == 20
+        assert sum(stats.values()) == 70
