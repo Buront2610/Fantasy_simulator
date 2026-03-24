@@ -7,6 +7,7 @@ from __future__ import annotations
 from typing import Any, Callable, Dict
 
 from ..content.world_data import (
+    DEFAULT_LOCATIONS,
     NAME_TO_LOCATION_ID,
     fallback_location_id,
     get_location_state_defaults,
@@ -74,9 +75,47 @@ def _migrate_v1_to_v2(data: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _migrate_v2_to_v3(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Populate LocationState fields and Character spotlight flags."""
+    """Populate LocationState fields, Character spotlight flags, and fill missing default locations.
+
+    Legacy saves may contain only a subset of the default world
+    locations.  This migration fills in any missing default locations
+    so that ``World.from_dict()`` (which no longer creates default
+    map entries) receives a complete grid.
+    """
     world_data = data.setdefault("world", {})
     grid = world_data.setdefault("grid", [])
+
+    # Fill in missing default locations for partial legacy saves
+    width = world_data.get("width", 5)
+    height = world_data.get("height", 5)
+    existing_ids = {
+        loc_data.get("id") or NAME_TO_LOCATION_ID.get(
+            loc_data.get("canonical_name") or loc_data.get("name", ""), ""
+        )
+        for loc_data in grid
+    }
+    for loc_id, name, desc, region_type, x, y in DEFAULT_LOCATIONS:
+        if loc_id in existing_ids:
+            continue
+        if not (0 <= x < width and 0 <= y < height):
+            continue
+        defaults = get_location_state_defaults(loc_id, region_type)
+        grid.append({
+            "id": loc_id,
+            "canonical_name": name,
+            "name": name,
+            "description": desc,
+            "region_type": region_type,
+            "x": x,
+            "y": y,
+            **defaults,
+            "visited": False,
+            "controlling_faction_id": None,
+            "recent_event_ids": [],
+            "aliases": [],
+            "memorial_ids": [],
+        })
+
     valid_location_ids = set()
 
     for loc_data in grid:

@@ -285,7 +285,16 @@ class TerrainMap:
         return self.cells.get((x, y))
 
     def set_cell(self, cell: TerrainCell) -> None:
-        """Place or replace a cell in the grid."""
+        """Place or replace a cell in the grid.
+
+        Raises ``ValueError`` if the cell's coordinates are outside
+        the declared ``width x height`` bounds.
+        """
+        if not self.in_bounds(cell.x, cell.y):
+            raise ValueError(
+                f"TerrainCell ({cell.x}, {cell.y}) is outside "
+                f"terrain bounds ({self.width}x{self.height})"
+            )
         self.cells[(cell.x, cell.y)] = cell
 
     def in_bounds(self, x: int, y: int) -> bool:
@@ -354,13 +363,26 @@ def build_default_terrain(
     height: int = 5,
     locations: Optional[List] = None,
 ) -> Tuple[TerrainMap, List[Site], List[RouteEdge]]:
-    """Generate the default terrain, sites, and routes for a legacy world.
+    """Generate terrain, sites, and routes from a location list.
 
-    When ``locations`` is provided (list of ``(id, name, desc, region_type, x, y)``
-    tuples), each location is mapped to a ``Site`` and the terrain cell at its
-    coordinate receives the biome inferred from the region type.
+    Only locations whose ``(x, y)`` fall within ``0 <= x < width`` and
+    ``0 <= y < height`` are included.  Out-of-bounds entries are
+    silently skipped.
 
-    Adjacent sites (4-directional) are connected by auto-generated routes.
+    When ``locations`` is *None*, ``DEFAULT_LOCATIONS`` is used, but
+    the bounds filter still applies — so a 3×3 world with the default
+    25-entry list will only contain the locations that fit.
+
+    Adjacent sites (4-directional) are connected by auto-generated
+    provisional routes (see *PR-G note* below).
+
+    .. note:: PR-G provisional routes
+
+       Routes generated here are **provisional legacy bridges** derived
+       from 4-directional grid adjacency.  They do not represent a
+       canonical world topology.  Future PRs should replace them with
+       explicit route definitions when worldgen or custom map editing
+       is introduced.
 
     Returns:
         (terrain_map, sites, routes)
@@ -372,24 +394,24 @@ def build_default_terrain(
 
     tmap = TerrainMap(width=width, height=height)
 
-    # Initialise all cells with plains
+    # Initialise all in-bounds cells with plains
     for y in range(height):
         for x in range(width):
             tmap.set_cell(TerrainCell(x=x, y=y, biome="plains"))
 
-    # Build sites and set terrain biomes from location region_type
+    # Build sites and set terrain biomes — skip out-of-bounds locations
     sites: List[Site] = []
     site_coords: Dict[Tuple[int, int], str] = {}
     for entry in locations:
         loc_id, _name, _desc, region_type, x, y = entry
+        if not tmap.in_bounds(x, y):
+            continue
         biome = _REGION_TYPE_TO_BIOME.get(region_type, "plains")
         importance = _SITE_IMPORTANCE.get(region_type, 50)
 
         cell = tmap.get(x, y)
         if cell is not None:
             cell.biome = biome
-        else:
-            tmap.set_cell(TerrainCell(x=x, y=y, biome=biome))
 
         sites.append(Site(
             location_id=loc_id,
@@ -400,7 +422,8 @@ def build_default_terrain(
         ))
         site_coords[(x, y)] = loc_id
 
-    # Auto-generate routes between adjacent sites
+    # Auto-generate provisional routes between adjacent sites.
+    # These are legacy bridges based on grid adjacency; see docstring.
     routes: List[RouteEdge] = []
     seen_pairs: set = set()
     route_counter = 0

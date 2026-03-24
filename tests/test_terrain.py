@@ -221,3 +221,45 @@ class TestBuildDefaultTerrain:
         _, _, routes = build_default_terrain(width=2, height=1, locations=locations)
         assert len(routes) == 1
         assert routes[0].route_type == "mountain_pass"
+
+    def test_out_of_bounds_locations_skipped(self):
+        """Locations outside the declared dimensions are silently dropped."""
+        locations = [
+            ("loc_a", "A", "A", "city", 0, 0),
+            ("loc_b", "B", "B", "village", 5, 5),  # out of bounds for 3x3
+            ("loc_c", "C", "C", "forest", 2, 2),
+        ]
+        tmap, sites, routes = build_default_terrain(width=3, height=3, locations=locations)
+        assert len(sites) == 2
+        site_ids = {s.location_id for s in sites}
+        assert "loc_a" in site_ids
+        assert "loc_c" in site_ids
+        assert "loc_b" not in site_ids
+
+    def test_default_locations_filtered_by_size(self):
+        """Using DEFAULT_LOCATIONS with a small grid drops out-of-bounds entries."""
+        tmap, sites, _ = build_default_terrain(width=3, height=3)
+        for site in sites:
+            assert 0 <= site.x < 3, f"Site {site.location_id} x={site.x} out of bounds"
+            assert 0 <= site.y < 3, f"Site {site.location_id} y={site.y} out of bounds"
+        for (x, y) in tmap.cells:
+            assert 0 <= x < 3, f"Terrain cell x={x} out of bounds"
+            assert 0 <= y < 3, f"Terrain cell y={y} out of bounds"
+        # 3x3 grid = 9 terrain cells
+        assert len(tmap.cells) == 9
+        # Fewer than 25 sites since most DEFAULT_LOCATIONS are outside 3x3
+        assert len(sites) < 25
+
+
+class TestTerrainMapBoundsEnforcement:
+    def test_set_cell_rejects_out_of_bounds(self):
+        import pytest
+        tmap = TerrainMap(width=3, height=3)
+        with pytest.raises(ValueError, match="outside terrain bounds"):
+            tmap.set_cell(TerrainCell(x=5, y=0))
+
+    def test_set_cell_rejects_negative(self):
+        import pytest
+        tmap = TerrainMap(width=3, height=3)
+        with pytest.raises(ValueError, match="outside terrain bounds"):
+            tmap.set_cell(TerrainCell(x=-1, y=0))

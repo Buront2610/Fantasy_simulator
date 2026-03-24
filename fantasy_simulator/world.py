@@ -311,6 +311,8 @@ class World:
         width: int = 5,
         height: int = 5,
         year: int = 1000,
+        *,
+        _skip_defaults: bool = False,
     ) -> None:
         self.name: str = name
         self.lore: str = lore
@@ -339,7 +341,8 @@ class World:
         self.sites: List[Site] = []
         self.routes: List[RouteEdge] = []
         self._site_index: Dict[str, Site] = {}
-        self._build_default_map()
+        if not _skip_defaults:
+            self._build_default_map()
 
     def _register_location(self, loc: LocationState) -> None:
         existing_at_coord = self.grid.get((loc.x, loc.y))
@@ -357,16 +360,34 @@ class World:
         self._location_id_index[loc.id] = loc
 
     def _build_default_map(self) -> None:
-        for entry in DEFAULT_LOCATIONS:
-            self._register_location(LocationState.from_default_entry(entry))
-        self._build_default_terrain()
+        """Populate the world with default Aethoria locations and terrain.
 
-    def _build_default_terrain(self) -> None:
-        """Generate the default terrain, sites, and routes from existing locations."""
+        Only locations whose ``(x, y)`` fall within ``self.width x
+        self.height`` are registered.  This means ``World(width=3,
+        height=3)`` will contain only the locations that fit.
+        """
+        for entry in DEFAULT_LOCATIONS:
+            _loc_id, _name, _desc, _rtype, x, y = entry
+            if 0 <= x < self.width and 0 <= y < self.height:
+                self._register_location(LocationState.from_default_entry(entry))
+        self._build_terrain_from_grid()
+
+    def _build_terrain_from_grid(self) -> None:
+        """Generate terrain, sites, and routes from the current grid.
+
+        Derives terrain biome from each ``LocationState.region_type``
+        and creates provisional routes between adjacent sites.
+        """
+        # Collect current grid as pseudo-location tuples for the builder
+        location_tuples = [
+            (loc.id, loc.canonical_name, loc.description,
+             loc.region_type, loc.x, loc.y)
+            for loc in self.grid.values()
+        ]
         tmap, sites, routes = build_default_terrain(
             width=self.width,
             height=self.height,
-            locations=DEFAULT_LOCATIONS,
+            locations=location_tuples,
         )
         self.terrain_map = tmap
         self.sites = sites
@@ -847,6 +868,21 @@ class World:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "World":
+        """Restore a World from a serialised dict.
+
+        Uses ``_skip_defaults=True`` so that no default Aethoria map
+        is generated.  The world is populated entirely from the saved
+        data, avoiding contamination from the default 5×5 locations.
+
+        If the saved grid has fewer locations than the declared
+        ``width × height`` (e.g. a partial legacy save), missing
+        default locations are *not* injected — the data migration
+        chain (``persistence.migrations``) is responsible for filling
+        in any missing structure before this method is called.
+
+        If no terrain data is present in *data*, terrain/site/routes
+        are derived from the loaded grid via ``_build_terrain_from_grid()``.
+        """
         from .adventure import AdventureRun
         from .events import WorldEventRecord
         from .rumor import Rumor
@@ -857,6 +893,7 @@ class World:
             width=data.get("width", 5),
             height=data.get("height", 5),
             year=data.get("year", 1000),
+            _skip_defaults=True,
         )
         for loc_data in data.get("grid", []):
             world._register_location(LocationState.from_dict(loc_data))
@@ -880,14 +917,15 @@ class World:
             k: MemorialRecord.from_dict(v) for k, v in data.get("memorials", {}).items()
         }
 
-        # PR-G: restore terrain/site/route layers if present
+        # PR-G: restore terrain/site/route layers if present;
+        # otherwise derive from loaded grid.
         if "terrain_map" in data:
             world.terrain_map = TerrainMap.from_dict(data["terrain_map"])
-        if "sites" in data:
-            world.sites = [Site.from_dict(s) for s in data["sites"]]
-        if "routes" in data:
-            world.routes = [RouteEdge.from_dict(r) for r in data["routes"]]
-        world._rebuild_site_index()
+            world.sites = [Site.from_dict(s) for s in data.get("sites", [])]
+            world.routes = [RouteEdge.from_dict(r) for r in data.get("routes", [])]
+            world._rebuild_site_index()
+        else:
+            world._build_terrain_from_grid()
 
         world.normalize_after_load()
         return world
