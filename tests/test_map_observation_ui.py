@@ -232,7 +232,23 @@ class TestRenderRegionMap(unittest.TestCase):
 
     def test_routes_from_center(self) -> None:
         output = render_region_map(self.info, "loc_test_town", radius=2)
-        self.assertIn("loc_forest_camp", output)
+        self.assertIn("ForestCamp", output)
+        self.assertNotIn("loc_forest_camp <->", output)
+
+    def test_focus_summary_calls_out_notable_route_and_danger(self) -> None:
+        output = render_region_map(self.info, "loc_test_town", radius=2)
+        self.assertIn("What stands out here", output)
+        self.assertIn("Route: ForestCamp via Road", output)
+        self.assertIn("Danger: ForestCamp is a high-risk site", output)
+
+    def test_focus_summary_calls_out_landmark_memory(self) -> None:
+        output = render_region_map(
+            self.info,
+            "loc_test_town",
+            radius=2,
+            site_traces={"loc_test_town": ["Adventurer passed through"]},
+        )
+        self.assertIn("Landmark: TestTown carries local memory", output)
 
     def test_not_found_location(self) -> None:
         output = render_region_map(self.info, "nonexistent")
@@ -350,6 +366,19 @@ class TestCJKWidth(unittest.TestCase):
         self.assertIn("Aethoria", output)
         # Should contain Japanese legend title
         self.assertIn("凡例", output)
+        set_locale("en")
+
+    def test_japanese_locale_region_summary(self) -> None:
+        set_locale("ja")
+        info = _make_simple_info()
+        output = render_region_map(
+            info,
+            "loc_test_town",
+            site_traces={"loc_test_town": ["冒険者が通過した"]},
+        )
+        self.assertIn("この地域で注目すべきこと", output)
+        self.assertIn("経路: ForestCamp へ 街道", output)
+        self.assertIn("ランドマーク: TestTown には土地の記憶が残る", output)
         set_locale("en")
 
 

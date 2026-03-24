@@ -378,6 +378,12 @@ def _overlay_suffix(cell: MapCellInfo) -> str:
     return "".join(parts)
 
 
+def _route_endpoint_name(cells_by_id: Dict[str, MapCellInfo], location_id: str) -> str:
+    """Return a human-readable site name for a route endpoint."""
+    cell = cells_by_id.get(location_id)
+    return cell.canonical_name if cell is not None else location_id
+
+
 # ------------------------------------------------------------------
 # PR-G2 Layer 1: World Overview
 # ------------------------------------------------------------------
@@ -525,6 +531,9 @@ def render_region_map(
     cell_pos: Dict[str, Tuple[int, int]] = {
         c.location_id: (c.x, c.y) for c in info.cells.values()
     }
+    cells_by_id: Dict[str, MapCellInfo] = {
+        c.location_id: c for c in info.cells.values()
+    }
     for route in info.routes:
         fp = cell_pos.get(route.from_site_id)
         tp = cell_pos.get(route.to_site_id)
@@ -620,20 +629,75 @@ def render_region_map(
         r for r in info.routes
         if r.from_site_id == center_location_id or r.to_site_id == center_location_id
     ]
+    standout_lines: List[str] = []
     if region_routes:
+        route = region_routes[0]
+        other_id = route.to_site_id if route.from_site_id == center_location_id else route.from_site_id
+        standout_lines.append(
+            tr(
+                "map_region_focus_route",
+                destination=_route_endpoint_name(cells_by_id, other_id),
+                route_type=tr_term(route.route_type),
+                blocked=f" {tr('route_blocked')}" if route.blocked else "",
+            ).rstrip()
+        )
+
+    visible_cells = [
+        cell for cell in sorted(info.cells.values(), key=lambda c: (c.y, c.x))
+        if x_min <= cell.x <= x_max and y_min <= cell.y <= y_max
+    ]
+    danger_target = next(
+        (cell for cell in visible_cells if cell.location_id != center_location_id and cell.danger_band == "high"),
+        None,
+    )
+    if danger_target is not None:
+        standout_lines.append(tr("map_region_focus_danger", location=danger_target.canonical_name))
+
+    _mem = site_memorials or {}
+    _ali = site_aliases or {}
+    _tra = site_traces or {}
+    landmark_target = next(
+        (
+            cell for cell in visible_cells
+            if cell.location_id == center_location_id
+            and (_mem.get(cell.location_id) or _ali.get(cell.location_id) or _tra.get(cell.location_id))
+        ),
+        None,
+    )
+    if landmark_target is None:
+        landmark_target = next(
+            (
+                cell for cell in visible_cells
+                if cell.has_memorial
+                or cell.has_alias
+                or cell.recent_death_site
+                or _mem.get(cell.location_id)
+                or _ali.get(cell.location_id)
+                or _tra.get(cell.location_id)
+            ),
+            None,
+        )
+    if landmark_target is not None:
+        standout_lines.append(tr("map_region_focus_landmark", location=landmark_target.canonical_name))
+
+    if standout_lines:
+        lines.append(f"  {tr('map_region_focus')}:")
+        for item in standout_lines[:3]:
+            lines.append(f"    - {item}")
         lines.append("")
+
+    if region_routes:
         lines.append(f"  {tr('map_region_routes')}:")
         for r in region_routes:
             blocked = f" {tr('route_blocked')}" if r.blocked else ""
+            from_name = _route_endpoint_name(cells_by_id, r.from_site_id)
+            to_name = _route_endpoint_name(cells_by_id, r.to_site_id)
             lines.append(
-                f"    {r.from_site_id} <-> {r.to_site_id}"
+                f"    {from_name} <-> {to_name}"
                 f" ({tr_term(r.route_type)}){blocked}"
             )
 
     # --- World memory: landmarks (memorials, aliases, traces) ---
-    _mem = site_memorials or {}
-    _ali = site_aliases or {}
-    _tra = site_traces or {}
     has_memory = False
     for cell in sorted(info.cells.values(), key=lambda c: (c.y, c.x)):
         if not (x_min <= cell.x <= x_max and y_min <= cell.y <= y_max):
