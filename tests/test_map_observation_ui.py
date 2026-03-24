@@ -426,7 +426,9 @@ class TestBuildAtlasCanvas(unittest.TestCase):
     def test_canvas_has_site_markers(self) -> None:
         canvas = _build_atlas_canvas(self.info)
         flat = "".join("".join(row) for row in canvas)
-        self.assertIn("@", flat)
+        # Site markers vary by traffic: O (high), @ (medium), o (low)
+        has_marker = any(m in flat for m in ("O", "@", "o"))
+        self.assertTrue(has_marker, "Canvas should contain at least one site marker")
 
     def test_empty_info_returns_ocean(self) -> None:
         empty = MapRenderInfo(world_name="Empty", year=1, width=3, height=3)
@@ -524,6 +526,24 @@ class TestClusterSites(unittest.TestCase):
         clusters = _cluster_sites(sites, max_clusters=4)
         self.assertEqual(len(clusters), 1)
 
+    def test_order_independent(self) -> None:
+        """Shuffled input should produce the same clusters."""
+        sites = [
+            (5, 5), (6, 5), (7, 5), (5, 6), (6, 6),
+            (50, 5), (51, 5), (52, 5), (50, 6), (51, 6),
+        ]
+        import random
+        rng = random.Random(42)
+        shuffled = list(sites)
+        rng.shuffle(shuffled)
+        c1 = _cluster_sites(sites, max_clusters=4)
+        c2 = _cluster_sites(shuffled, max_clusters=4)
+        # Same number of clusters and same total assignments
+        self.assertEqual(len(c1), len(c2))
+        s1 = [sorted(cl) for cl in c1]
+        s2 = [sorted(cl) for cl in c2]
+        self.assertEqual(sorted(s1), sorted(s2))
+
 
 class TestLocationDetailI18n(unittest.TestCase):
     """Verify location detail uses localized labels."""
@@ -542,6 +562,214 @@ class TestLocationDetailI18n(unittest.TestCase):
         output = render_location_detail(info, "loc_test_town")
         self.assertIn("標高:", output)
         set_locale("en")
+
+
+class TestLabelCollision(unittest.TestCase):
+    """Verify that high-importance labels survive collision."""
+
+    def setUp(self) -> None:
+        set_locale("en")
+
+    def test_capital_label_always_present(self) -> None:
+        """Capital (importance 80) label must appear even when crowded."""
+        info = MapRenderInfo(
+            world_name="Crowded", year=1, width=5, height=5,
+        )
+        # Create many sites packed in 5×5 grid — capital at centre
+        names = [
+            "Alpha", "Beta", "Capital City", "Delta", "Echo",
+            "Foxtrot", "Golf", "Hotel", "India", "Juliet",
+            "Kilo", "Lima", "Mike", "November", "Oscar",
+            "Papa", "Quebec", "Romeo", "Sierra", "Tango",
+            "Uniform", "Victor", "Whiskey", "Xray", "Yankee",
+        ]
+        for y in range(5):
+            for x in range(5):
+                idx = y * 5 + x
+                name = names[idx]
+                importance = 80 if name == "Capital City" else 20
+                info.cells[(x, y)] = MapCellInfo(
+                    location_id=f"loc_{name.lower().replace(' ', '_')}",
+                    canonical_name=name,
+                    region_type="city" if importance == 80 else "village",
+                    icon="@", safety_label="ok", danger=10,
+                    traffic_indicator="", population=0,
+                    x=x, y=y, danger_band="low",
+                    site_importance=importance,
+                    terrain_biome="plains", terrain_glyph=",",
+                )
+        canvas = _build_atlas_canvas(info)
+        flat = "".join("".join(row) for row in canvas)
+        # The capital label must survive collision
+        self.assertIn("Capital", flat)
+
+    def test_dungeon_label_survives(self) -> None:
+        """Dungeon (importance 60) label should survive over villages (40)."""
+        info = MapRenderInfo(
+            world_name="DungeonTest", year=1, width=3, height=3,
+        )
+        # Dungeon at (1,1) with two villages nearby
+        info.cells[(0, 1)] = MapCellInfo(
+            location_id="loc_village_a", canonical_name="VillageA",
+            region_type="village", icon="@", safety_label="ok",
+            danger=10, traffic_indicator="", population=0,
+            x=0, y=1, danger_band="low", site_importance=40,
+            terrain_biome="plains", terrain_glyph=",",
+        )
+        info.cells[(1, 1)] = MapCellInfo(
+            location_id="loc_dark_dungeon", canonical_name="DarkDungeon",
+            region_type="dungeon", icon="@", safety_label="ok",
+            danger=80, traffic_indicator="", population=0,
+            x=1, y=1, danger_band="high", site_importance=60,
+            terrain_biome="hills", terrain_glyph="n",
+        )
+        info.cells[(2, 1)] = MapCellInfo(
+            location_id="loc_village_b", canonical_name="VillageB",
+            region_type="village", icon="@", safety_label="ok",
+            danger=10, traffic_indicator="", population=0,
+            x=2, y=1, danger_band="low", site_importance=40,
+            terrain_biome="plains", terrain_glyph=",",
+        )
+        canvas = _build_atlas_canvas(info)
+        flat = "".join("".join(row) for row in canvas)
+        self.assertIn("DarkDungeon", flat)
+
+
+class TestTrafficAwareSiteMarkers(unittest.TestCase):
+    """Verify site markers vary by traffic band on atlas."""
+
+    def setUp(self) -> None:
+        set_locale("en")
+
+    def test_high_traffic_uses_O(self) -> None:
+        info = _make_simple_info()
+        canvas = _build_atlas_canvas(info)
+        flat = "".join("".join(row) for row in canvas)
+        # TestTown has traffic_band="high" → should be 'O' marker
+        self.assertIn("O", flat)
+
+    def test_low_traffic_uses_o(self) -> None:
+        info = _make_simple_info()
+        canvas = _build_atlas_canvas(info)
+        flat = "".join("".join(row) for row in canvas)
+        # ForestCamp has traffic_band="low" → should be 'o' marker
+        self.assertIn("o", flat)
+
+
+class TestRumorHalo(unittest.TestCase):
+    """Verify rumor halo appears around high-rumor sites."""
+
+    def test_rumor_halo_places_question_marks(self) -> None:
+        set_locale("en")
+        info = MapRenderInfo(
+            world_name="RumorTest", year=1, width=3, height=3,
+        )
+        info.cells[(1, 1)] = MapCellInfo(
+            location_id="loc_rumor_town",
+            canonical_name="RumorTown",
+            region_type="city", icon="@", safety_label="ok",
+            danger=10, traffic_indicator="", population=0,
+            x=1, y=1, danger_band="low",
+            rumor_heat_band="high",
+            terrain_biome="plains", terrain_glyph=",",
+        )
+        canvas = _build_atlas_canvas(info)
+        # At least one adjacent cell should have '?' from the rumor halo
+        ax, ay = None, None
+        for py in range(len(canvas)):
+            for px in range(len(canvas[0])):
+                if canvas[py][px] in ("O", "@", "o"):
+                    ax, ay = px, py
+                    break
+        self.assertIsNotNone(ax, "Site marker not found on canvas")
+        adjacent_chars = []
+        for dy2, dx2 in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            ny2, nx2 = ay + dy2, ax + dx2
+            if 0 <= ny2 < len(canvas) and 0 <= nx2 < len(canvas[0]):
+                adjacent_chars.append(canvas[ny2][nx2])
+        self.assertIn("?", adjacent_chars, "Rumor halo '?' not found adjacent to site")
+
+
+class TestRegionRouteTypes(unittest.TestCase):
+    """Verify region map uses route-type-specific line chars."""
+
+    def test_mountain_pass_uses_caret(self) -> None:
+        set_locale("en")
+        info = MapRenderInfo(
+            world_name="PassTest", year=1, width=5, height=5,
+        )
+        for y in range(5):
+            for x in range(5):
+                info.terrain_cells[(x, y)] = TerrainCellRenderInfo(
+                    x=x, y=y, biome="mountain", glyph="^",
+                )
+        info.cells[(0, 2)] = MapCellInfo(
+            location_id="loc_a", canonical_name="Alpha", region_type="mountain",
+            icon="@", safety_label="ok", danger=10, traffic_indicator="",
+            population=0, x=0, y=2, danger_band="low",
+        )
+        info.cells[(4, 2)] = MapCellInfo(
+            location_id="loc_b", canonical_name="Beta", region_type="mountain",
+            icon="@", safety_label="ok", danger=10, traffic_indicator="",
+            population=0, x=4, y=2, danger_band="low",
+        )
+        info.routes.append(RouteRenderInfo(
+            route_id="r1", from_site_id="loc_a", to_site_id="loc_b",
+            route_type="mountain_pass",
+        ))
+        output = render_region_map(info, "loc_a", radius=4)
+        # Mountain pass horizontal line should use '^'
+        grid_lines = [ln for ln in output.split("\n") if "|" in ln and not ln.strip().startswith("+")]
+        grid_content = "".join(grid_lines)
+        # The mountain pass route should draw '^' chars between sites
+        self.assertIn("^", grid_content)
+
+    def test_trail_uses_dot(self) -> None:
+        set_locale("en")
+        info = MapRenderInfo(
+            world_name="TrailTest", year=1, width=5, height=5,
+        )
+        for y in range(5):
+            for x in range(5):
+                info.terrain_cells[(x, y)] = TerrainCellRenderInfo(
+                    x=x, y=y, biome="plains", glyph=",",
+                )
+        info.cells[(0, 2)] = MapCellInfo(
+            location_id="loc_a", canonical_name="Alpha", region_type="village",
+            icon="@", safety_label="ok", danger=10, traffic_indicator="",
+            population=0, x=0, y=2, danger_band="low",
+        )
+        info.cells[(4, 2)] = MapCellInfo(
+            location_id="loc_b", canonical_name="Beta", region_type="village",
+            icon="@", safety_label="ok", danger=10, traffic_indicator="",
+            population=0, x=4, y=2, danger_band="low",
+        )
+        info.routes.append(RouteRenderInfo(
+            route_id="r1", from_site_id="loc_a", to_site_id="loc_b",
+            route_type="trail",
+        ))
+        output = render_region_map(info, "loc_a", radius=4)
+        # Trail horizontal line should use '.'
+        grid_lines = [ln for ln in output.split("\n") if "|" in ln and not ln.strip().startswith("+")]
+        grid_content = "".join(grid_lines)
+        self.assertIn(".", grid_content)
+
+
+class TestAtlasLegendOcean(unittest.TestCase):
+    """Verify atlas legend includes ocean."""
+
+    def test_ocean_in_legend(self) -> None:
+        set_locale("en")
+        info = _make_simple_info()
+        output = render_atlas_overview(info)
+        self.assertIn("~=", output)  # ocean first char is '~'
+
+    def test_site_hub_in_legend(self) -> None:
+        set_locale("en")
+        info = _make_simple_info()
+        output = render_atlas_overview(info)
+        self.assertIn("O=", output)  # Hub marker in legend
+        self.assertIn("o=", output)  # Quiet marker in legend
 
 
 if __name__ == "__main__":

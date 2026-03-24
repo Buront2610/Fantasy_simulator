@@ -244,6 +244,118 @@ def _show_results(sim: Simulator, ctx: UIContext | None = None) -> None:
             break
 
 
+def _show_detail_for_location(
+    world: World,
+    info: Any,
+    loc: Any,
+    ctx: UIContext | None = None,
+) -> None:
+    """Render the detail panel for a single location."""
+    from .map_renderer import render_location_detail
+
+    ctx = _default_ctx(ctx)
+    out = ctx.out
+    inp = ctx.inp
+
+    mem_list: list[str] = []
+    if loc.memorial_ids:
+        mems = world.get_memorials_for_location(loc.id)
+        mem_list = [
+            tr("memorial_entry", year=m.year, epitaph=m.epitaph)
+            for m in mems
+        ]
+    recent_traces = list(reversed(loc.live_traces[-5:]))
+    trace_list = [t.get("text", "") for t in recent_traces]
+    out.print_line()
+    out.print_line(render_location_detail(
+        info, loc.id,
+        memorials=mem_list or None,
+        aliases=list(loc.aliases) or None,
+        live_traces=trace_list or None,
+    ))
+    inp.pause()
+
+
+def _region_drill_loop(
+    world: World,
+    info: Any,
+    center_loc: Any,
+    ctx: UIContext | None = None,
+) -> None:
+    """Region map loop allowing navigation to nearby sites.
+
+    Shows the region centred on *center_loc*, then offers:
+
+    * **detail** — pick any visible site to see its detail panel
+    * **recenter** — pick any visible site and re-centre the region
+    * **back** — return to the atlas overview
+    """
+    from .map_renderer import render_region_map
+
+    ctx = _default_ctx(ctx)
+    out = ctx.out
+
+    while True:
+        out.print_line()
+        out.print_line(render_region_map(info, center_loc.id))
+
+        # Build the visible-site list for the current region centre
+        center_cell = None
+        for c in info.cells.values():
+            if c.location_id == center_loc.id:
+                center_cell = c
+                break
+        if center_cell is None:
+            break
+
+        radius = 2
+        x_min = max(0, center_cell.x - radius)
+        x_max = min(info.width - 1, center_cell.x + radius)
+        y_min = max(0, center_cell.y - radius)
+        y_max = min(info.height - 1, center_cell.y + radius)
+
+        visible_locs = []
+        for loc in sorted(world.grid.values(), key=lambda lc: lc.canonical_name):
+            cell = info.cells.get((loc.x, loc.y)) if hasattr(loc, 'x') else None
+            if cell is None:
+                for c in info.cells.values():
+                    if c.location_id == loc.id:
+                        cell = c
+                        break
+            if cell and x_min <= cell.x <= x_max and y_min <= cell.y <= y_max:
+                visible_locs.append(loc)
+
+        out.print_line()
+        for i, vloc in enumerate(visible_locs, 1):
+            marker = "@" if vloc.id == center_loc.id else " "
+            out.print_line(f"  {marker}{i}. {vloc.canonical_name} ({tr_term(vloc.region_type)})")
+
+        sub = ctx.choose_key(
+            tr("map_nav_prompt"),
+            [
+                ("detail", tr("map_nav_detail")),
+                ("recenter", tr("map_nav_recenter")),
+                ("back", tr("back_to_main")),
+            ],
+        )
+
+        if sub == "detail":
+            idx = _get_numeric_choice(
+                f"  {tr('enter_location_number')}", len(visible_locs), ctx=ctx,
+            )
+            if idx is not None:
+                _show_detail_for_location(world, info, visible_locs[idx], ctx=ctx)
+
+        elif sub == "recenter":
+            idx = _get_numeric_choice(
+                f"  {tr('enter_location_number')}", len(visible_locs), ctx=ctx,
+            )
+            if idx is not None:
+                center_loc = visible_locs[idx]
+        else:
+            break
+
+
 def _show_world_map(sim: Simulator, ctx: UIContext | None = None) -> None:
     """Three-layer map navigation: overview -> region -> detail.
 
@@ -251,7 +363,7 @@ def _show_world_map(sim: Simulator, ctx: UIContext | None = None) -> None:
     scale terrain canvas where locations are anchor points -- not a
     direct visualization of the 5x5 grid.
     """
-    from .map_renderer import build_map_info, render_region_map, render_location_detail
+    from .map_renderer import build_map_info
     from .atlas_renderer import render_atlas_overview
 
     ctx = _default_ctx(ctx)
@@ -284,36 +396,8 @@ def _show_world_map(sim: Simulator, ctx: UIContext | None = None) -> None:
                 f"  {tr('enter_location_number')}", len(locations), ctx=ctx,
             )
             if idx is not None:
-                loc = locations[idx]
-                out.print_line()
-                out.print_line(render_region_map(info, loc.id))
-
-                # Offer to drill down into detail from the region view
-                sub = ctx.choose_key(
-                    tr("map_nav_prompt"),
-                    [
-                        ("detail", tr("map_nav_detail")),
-                        ("back", tr("back_to_main")),
-                    ],
-                )
-                if sub == "detail":
-                    mem_list: list[str] = []
-                    if loc.memorial_ids:
-                        mems = world.get_memorials_for_location(loc.id)
-                        mem_list = [
-                            tr("memorial_entry", year=m.year, epitaph=m.epitaph)
-                            for m in mems
-                        ]
-                    recent_traces = list(reversed(loc.live_traces[-5:]))
-                    trace_list = [t.get("text", "") for t in recent_traces]
-                    out.print_line()
-                    out.print_line(render_location_detail(
-                        info, loc.id,
-                        memorials=mem_list or None,
-                        aliases=list(loc.aliases) or None,
-                        live_traces=trace_list or None,
-                    ))
-                    inp.pause()
+                center_loc = locations[idx]
+                _region_drill_loop(world, info, center_loc, ctx=ctx)
 
         elif action == "detail":
             locations = sorted(world.grid.values(), key=lambda loc: loc.canonical_name)
@@ -325,23 +409,7 @@ def _show_world_map(sim: Simulator, ctx: UIContext | None = None) -> None:
             )
             if idx is not None:
                 loc = locations[idx]
-                mem_list = []
-                if loc.memorial_ids:
-                    mems = world.get_memorials_for_location(loc.id)
-                    mem_list = [
-                        tr("memorial_entry", year=m.year, epitaph=m.epitaph)
-                        for m in mems
-                    ]
-                recent_traces = list(reversed(loc.live_traces[-5:]))
-                trace_list = [t.get("text", "") for t in recent_traces]
-                out.print_line()
-                out.print_line(render_location_detail(
-                    info, loc.id,
-                    memorials=mem_list or None,
-                    aliases=list(loc.aliases) or None,
-                    live_traces=trace_list or None,
-                ))
-                inp.pause()
+                _show_detail_for_location(world, info, loc, ctx=ctx)
 
         elif action == "legacy":
             out.print_line()

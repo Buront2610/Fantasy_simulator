@@ -506,6 +506,7 @@ def render_region_map(
         if x_min <= cell.x <= x_max and y_min <= cell.y <= y_max:
             site_positions.add((cell.x - x_min, cell.y - y_min))
 
+    from .atlas_renderer import _bresenham, _ROUTE_LINE
     for route in info.routes:
         fp = tp = None
         for c in info.cells.values():
@@ -520,12 +521,33 @@ def render_region_map(
             continue
         if not (x_min <= tp[0] <= x_max and y_min <= tp[1] <= y_max):
             continue
-        from .atlas_renderer import _bresenham
         path = _bresenham(fp[0] - x_min, fp[1] - y_min, tp[0] - x_min, tp[1] - y_min)
-        ch = "x" if route.blocked else "-"
-        for px, py in path:
-            if (px, py) not in site_positions and 0 <= px < rw and 0 <= py < rh:
-                route_layer[(px, py)] = ch
+        # Route-type specific chars with direction awareness
+        rtype = route.route_type
+        chars = _ROUTE_LINE.get(rtype, ("-", "|", "/", "\\"))
+        if route.blocked:
+            chars = ("x", "x", "x", "x")
+        for i, (px, py) in enumerate(path):
+            if (px, py) in site_positions or not (0 <= px < rw and 0 <= py < rh):
+                continue
+            # Direction from previous point
+            if i > 0:
+                ddx = px - path[i - 1][0]
+                ddy = py - path[i - 1][1]
+            elif i < len(path) - 1:
+                ddx = path[i + 1][0] - px
+                ddy = path[i + 1][1] - py
+            else:
+                ddx, ddy = 1, 0
+            if ddy == 0:
+                ch = chars[0]
+            elif ddx == 0:
+                ch = chars[1]
+            elif (ddx > 0) != (ddy > 0):
+                ch = chars[2]
+            else:
+                ch = chars[3]
+            route_layer[(px, py)] = ch
 
     # Column header
     col_nums = "".join(f"{x % 10}" for x in range(x_min, x_max + 1))

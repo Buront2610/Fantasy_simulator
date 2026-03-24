@@ -58,6 +58,9 @@ _ROUTE_LINE: Dict[str, Tuple[str, str, str, str]] = {
     "river_crossing": ("=", "|", "/", "\\"),
 }
 
+# Site marker varies by traffic band:
+#   high traffic = 'O' (hub), medium = '@', low = 'o'.
+_SITE_MARKERS: Dict[str, str] = {"high": "O", "medium": "@", "low": "o"}
 _SITE_MARKER = "@"
 
 # Characters that a route line may overwrite.
@@ -145,6 +148,10 @@ def _cluster_sites(
     When sites are few (≤3) or tightly packed, a single cluster is
     returned.  Otherwise up to *max_clusters* groups are created so
     that the atlas renderer can draw separate land masses.
+
+    Initial centroids are picked from a spatially-sorted order
+    (sorted by x then y) so the result is stable regardless of the
+    input order.
     """
     if len(sites) <= 3:
         return [sites]
@@ -153,13 +160,16 @@ def _cluster_sites(
     xs = [p[0] for p in sites]
     ys = [p[1] for p in sites]
     spread = max(max(xs) - min(xs), max(ys) - min(ys))
-    k = min(max_clusters, max(2, len(sites) // 5))
     if spread < 20:
         return [sites]
 
-    # Deterministic initial centroids: evenly spaced along the site list
-    step = max(1, len(sites) // k)
-    centroids = [sites[i * step % len(sites)] for i in range(k)]
+    k = min(max_clusters, max(2, len(sites) // 5))
+
+    # Deterministic initial centroids: pick evenly spaced from
+    # spatially-sorted sites so the result is order-independent.
+    sorted_sites = sorted(sites)
+    step = max(1, len(sorted_sites) // k)
+    centroids = [sorted_sites[i * step % len(sorted_sites)] for i in range(k)]
     # Remove duplicate centroids
     seen: Set[Tuple[int, int]] = set()
     unique: List[Tuple[int, int]] = []
@@ -339,8 +349,18 @@ def _draw_routes(
     w: int,
     h: int,
 ) -> None:
-    """Draw route lines between connected sites."""
+    """Draw route lines between connected sites.
+
+    High-traffic route endpoints use doubled line chars (``==`` for
+    road instead of ``--``) to visually distinguish busy corridors.
+    """
     protected: Set[Tuple[int, int]] = set(site_atlas.values())
+
+    # Build a lookup of traffic bands for sites so we can detect
+    # "high-traffic corridor" routes.
+    site_traffic: Dict[str, str] = {
+        c.location_id: c.traffic_band for c in info.cells.values()
+    }
 
     for route in info.routes:
         fp = site_atlas.get(route.from_site_id)
@@ -352,6 +372,12 @@ def _draw_routes(
         chars = _ROUTE_LINE.get(rtype, ("-", "|", "/", "\\"))
         if route.blocked:
             chars = ("x", "x", "x", "x")
+        else:
+            # High-traffic corridors: both endpoints high → uppercase
+            ft = site_traffic.get(route.from_site_id, "low")
+            tt = site_traffic.get(route.to_site_id, "low")
+            if ft == "high" and tt == "high" and rtype == "road":
+                chars = ("=", "H", "/", "\\")
 
         path = _bresenham(fp[0], fp[1], tp[0], tp[1])
         for i, (px, py) in enumerate(path):
@@ -395,7 +421,12 @@ def _place_labels(
     w: int,
     h: int,
 ) -> None:
-    """Place site markers (@) and name labels on the canvas."""
+    """Place site markers and name labels on the canvas.
+
+    Site marker glyph varies by traffic band: ``O`` hub (high),
+    ``@`` normal (medium), ``o`` quiet (low).  High-rumor sites
+    get a ``?`` halo in unoccupied adjacent cells.
+    """
     occupied: Set[Tuple[int, int]] = set()
 
     # Higher-importance sites get label priority.
@@ -410,9 +441,10 @@ def _place_labels(
             continue
         ax, ay = pos
 
-        # Site marker
+        # Site marker — traffic-aware glyph
+        marker = _SITE_MARKERS.get(cell.traffic_band, _SITE_MARKER)
         if 0 <= ay < h and 0 <= ax < w:
-            canvas[ay][ax] = _SITE_MARKER
+            canvas[ay][ax] = marker
             occupied.add((ax, ay))
 
         # Build label text
@@ -438,6 +470,20 @@ def _place_labels(
                 canvas[ly][lx + i] = ch
                 occupied.add((lx + i, ly))
             break
+
+    # --- Rumor halo: place '?' around high-rumor sites ---
+    for cell in info.cells.values():
+        if cell.rumor_heat_band != "high":
+            continue
+        pos = site_atlas.get(cell.location_id)
+        if not pos:
+            continue
+        ax, ay = pos
+        for dy2, dx2 in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            nx, ny = ax + dx2, ay + dy2
+            if 0 <= ny < h and 0 <= nx < w and (nx, ny) not in occupied:
+                canvas[ny][nx] = "?"
+                occupied.add((nx, ny))
 
 
 # ------------------------------------------------------------------
@@ -468,7 +514,6 @@ def render_atlas_overview(info: "MapRenderInfo") -> str:
     # Atlas-specific terrain chars (first char of each palette entry)
     t_items = " ".join(
         f"{chars[0]}={tr_term(b)}" for b, chars in _BIOME_CHARS.items()
-        if b != "ocean"
     )
     lines.append(f"    {tr('map_legend_terrain')}: {t_items}")
 
@@ -478,13 +523,15 @@ def render_atlas_overview(info: "MapRenderInfo") -> str:
     lines.append(f"    {tr('map_legend_routes')}: {r_items}")
 
     ov_parts = [
+        f"O={tr('map_legend_site_hub')}",
+        f"@={tr('map_legend_site_marker')}",
+        f"o={tr('map_legend_site_quiet')}",
         f"!={tr('map_legend_danger_high')}",
         f"$={tr('map_legend_traffic_high')}",
         f"?={tr('map_legend_rumor_high')}",
         f"m={tr('map_legend_memorial')}",
         f"a={tr('map_legend_alias')}",
         f"+={tr('map_legend_recent_death')}",
-        f"@={tr('map_legend_site_marker')}",
     ]
     lines.append(
         f"    {tr('map_legend_overlays')}: {' '.join(ov_parts)}"

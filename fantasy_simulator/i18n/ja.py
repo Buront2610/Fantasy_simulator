@@ -486,9 +486,12 @@ TEXT_JA: Dict[str, str] = {
     'map_nav_prompt': 'マップ表示',
     'map_nav_region': '地域図（周辺を拡大）',
     'map_nav_detail': '地点詳細',
+    'map_nav_recenter': '別の地点を中心に地域図を再表示',
     'map_nav_legacy': 'クラシック表示',
     'map_legend_routes': '道路記号',
     'map_legend_site_marker': '地点',
+    'map_legend_site_hub': '拠点（高交通量）',
+    'map_legend_site_quiet': '静かな地点（低交通量）',
     'map_legend_traffic_high': '高交通量',
     'map_legend_rumor_high': '高い噂の熱量',
 }

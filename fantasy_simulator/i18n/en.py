@@ -490,9 +490,12 @@ TEXT_EN: Dict[str, str] = {
     'map_nav_prompt': 'Map view',
     'map_nav_region': 'Region map (zoom into area)',
     'map_nav_detail': 'Location detail',
+    'map_nav_recenter': 'Re-center region on another site',
     'map_nav_legacy': 'Classic grid view',
     'map_legend_routes': 'Route lines',
     'map_legend_site_marker': 'Location',
+    'map_legend_site_hub': 'Hub (high traffic)',
+    'map_legend_site_quiet': 'Quiet (low traffic)',
     'map_legend_traffic_high': 'High traffic',
     'map_legend_rumor_high': 'High rumor heat',
 }
