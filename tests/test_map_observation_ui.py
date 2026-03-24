@@ -240,6 +240,9 @@ class TestRenderRegionMap(unittest.TestCase):
         self.assertIn("What stands out here", output)
         self.assertIn("Route: ForestCamp via Road", output)
         self.assertIn("Danger: ForestCamp is a high-risk site", output)
+        focus_section = output.split("What stands out here:", 1)[1].split("Nearby sites:", 1)[0]
+        self.assertIn("Route: ForestCamp via Road", focus_section)
+        self.assertIn("Danger: ForestCamp is a high-risk site", focus_section)
 
     def test_focus_summary_calls_out_landmark_memory(self) -> None:
         output = render_region_map(
@@ -248,7 +251,116 @@ class TestRenderRegionMap(unittest.TestCase):
             radius=2,
             site_traces={"loc_test_town": ["Adventurer passed through"]},
         )
-        self.assertIn("Landmark: TestTown carries local memory", output)
+        self.assertIn("Trace: TestTown shows recent movement", output)
+
+    def test_focus_summary_comes_before_nearby_list(self) -> None:
+        output = render_region_map(self.info, "loc_test_town", radius=2)
+        self.assertLess(output.index("What stands out here"), output.index("Nearby sites"))
+
+    def test_blocked_route_is_marked_in_nearby_list_and_summary(self) -> None:
+        info = _make_simple_info()
+        info.routes[0].blocked = True
+        output = render_region_map(info, "loc_test_town", radius=2)
+        self.assertIn("x-> ForestCamp", output)
+        self.assertIn("Closure: route toward ForestCamp is blocked", output)
+        self.assertNotIn("Route: ForestCamp via Road", output)
+
+    def test_summary_prefers_open_over_blocked_routes(self) -> None:
+        info = _make_simple_info()
+        info.routes.append(RouteRenderInfo(
+            route_id="r2",
+            from_site_id="loc_test_town",
+            to_site_id="loc_ruins",
+            route_type="trail",
+            blocked=True,
+        ))
+        info.cells[(2, 1)] = MapCellInfo(
+            location_id="loc_ruins",
+            canonical_name="Ruins",
+            region_type="dungeon",
+            icon="D",
+            safety_label="dangerous",
+            danger=85,
+            traffic_indicator="quiet",
+            population=0,
+            x=2,
+            y=1,
+            danger_band="high",
+            traffic_band="low",
+            rumor_heat_band="medium",
+            terrain_biome="mountain",
+            terrain_glyph="^",
+        )
+        output = render_region_map(info, "loc_test_town", radius=2)
+        self.assertIn("Route: ForestCamp via Road", output)
+        self.assertIn("Closure: route toward Ruins is blocked", output)
+
+    def test_danger_summary_prefers_reachable_dangers(self) -> None:
+        info = MapRenderInfo(world_name="DangerPriority", year=1, width=5, height=5)
+        for y in range(5):
+            for x in range(5):
+                info.terrain_cells[(x, y)] = TerrainCellRenderInfo(x=x, y=y, biome="plains", glyph=",")
+        info.cells[(2, 2)] = MapCellInfo(
+            location_id="loc_center",
+            canonical_name="Center",
+            region_type="city",
+            icon="@",
+            safety_label="calm",
+            danger=10,
+            traffic_indicator="busy",
+            population=10,
+            x=2,
+            y=2,
+            danger_band="low",
+            traffic_band="high",
+            rumor_heat_band="low",
+        )
+        info.cells[(3, 2)] = MapCellInfo(
+            location_id="loc_open_risk",
+            canonical_name="OpenRisk",
+            region_type="dungeon",
+            icon="D",
+            safety_label="dangerous",
+            danger=70,
+            traffic_indicator="busy",
+            population=0,
+            x=3,
+            y=2,
+            danger_band="high",
+            traffic_band="medium",
+            rumor_heat_band="medium",
+        )
+        info.cells[(2, 1)] = MapCellInfo(
+            location_id="loc_blocked_risk",
+            canonical_name="BlockedRisk",
+            region_type="dungeon",
+            icon="D",
+            safety_label="dangerous",
+            danger=95,
+            traffic_indicator="quiet",
+            population=0,
+            x=2,
+            y=1,
+            danger_band="high",
+            traffic_band="low",
+            rumor_heat_band="medium",
+        )
+        info.routes.append(RouteRenderInfo(
+            route_id="open",
+            from_site_id="loc_center",
+            to_site_id="loc_open_risk",
+            route_type="road",
+        ))
+        info.routes.append(RouteRenderInfo(
+            route_id="blocked",
+            from_site_id="loc_center",
+            to_site_id="loc_blocked_risk",
+            route_type="road",
+            blocked=True,
+        ))
+        output = render_region_map(info, "loc_center", radius=2)
+        self.assertIn("Danger: OpenRisk is a high-risk site", output)
+        self.assertNotIn("Danger: BlockedRisk is a high-risk site", output)
 
     def test_not_found_location(self) -> None:
         output = render_region_map(self.info, "nonexistent")
@@ -378,7 +490,7 @@ class TestCJKWidth(unittest.TestCase):
         )
         self.assertIn("この地域で注目すべきこと", output)
         self.assertIn("経路: ForestCamp へ 街道", output)
-        self.assertIn("ランドマーク: TestTown には土地の記憶が残る", output)
+        self.assertIn("痕跡: TestTown には最近の往来が残る", output)
         set_locale("en")
 
 
