@@ -2,10 +2,10 @@
 
 Covers:
 - render_world_overview: compact terrain glyph grid + overlay markers + legend
-- render_region_map: zoomed view around a selected site
+- render_region_map: zoomed view around a selected site with route lines
 - render_location_detail: single-site AA panel with world-memory data
-- _overlay_suffix: overlay marker logic
-- Navigation integration via _show_world_map
+- _overlay_suffix: overlay marker logic (danger, traffic, rumor, memorial, alias, death)
+- atlas_renderer: continent canvas, terrain, Bresenham lines, labels
 """
 
 from __future__ import annotations
@@ -29,6 +29,7 @@ from fantasy_simulator.ui.atlas_renderer import (
     _build_atlas_canvas,
     _bresenham,
     _terrain_char,
+    _cluster_sites,
     _overlay_suffix as _atlas_overlay_suffix,
 )
 from fantasy_simulator.world import World
@@ -132,9 +133,28 @@ class TestOverlaySuffix(unittest.TestCase):
             location_id="x", canonical_name="X", region_type="city",
             icon="@", safety_label="ok", danger=80, traffic_indicator="",
             population=0, x=0, y=0, danger_band="high",
+            traffic_band="high", rumor_heat_band="high",
             has_memorial=True, has_alias=True, recent_death_site=True,
         )
-        self.assertEqual(_overlay_suffix(cell), "!ma+")
+        self.assertEqual(_overlay_suffix(cell), "!$?ma+")
+
+    def test_traffic_high_only(self) -> None:
+        cell = MapCellInfo(
+            location_id="x", canonical_name="X", region_type="city",
+            icon="@", safety_label="ok", danger=10, traffic_indicator="",
+            population=0, x=0, y=0, danger_band="low",
+            traffic_band="high",
+        )
+        self.assertEqual(_overlay_suffix(cell), "$")
+
+    def test_rumor_high_only(self) -> None:
+        cell = MapCellInfo(
+            location_id="x", canonical_name="X", region_type="city",
+            icon="@", safety_label="ok", danger=10, traffic_indicator="",
+            population=0, x=0, y=0, danger_band="low",
+            rumor_heat_band="high",
+        )
+        self.assertEqual(_overlay_suffix(cell), "?")
 
 
 class TestRenderWorldOverview(unittest.TestCase):
@@ -159,6 +179,8 @@ class TestRenderWorldOverview(unittest.TestCase):
         self.assertIn("Legend", output)
         self.assertIn("~ =", output)  # ocean glyph in legend
         self.assertIn("High danger", output)
+        self.assertIn("High traffic", output)
+        self.assertIn("High rumor heat", output)
 
     def test_overlay_marker_appears_in_grid(self) -> None:
         """ForestCamp has high danger → overlay '!' should appear at (0,0)."""
@@ -230,6 +252,37 @@ class TestRenderRegionMap(unittest.TestCase):
         loc_id = list(world.grid.values())[0].id
         output = render_region_map(info, loc_id)
         self.assertIn("@", output)
+
+    def test_route_lines_drawn_on_grid(self) -> None:
+        """Route lines are drawn between sites when path has intermediate cells."""
+        # Create a wider grid so route has intermediate cells
+        info = MapRenderInfo(
+            world_name="RouteTest", year=1, width=5, height=5,
+        )
+        for y in range(5):
+            for x in range(5):
+                info.terrain_cells[(x, y)] = TerrainCellRenderInfo(
+                    x=x, y=y, biome="plains", glyph=",",
+                )
+        info.cells[(0, 2)] = MapCellInfo(
+            location_id="loc_a", canonical_name="Alpha", region_type="city",
+            icon="@", safety_label="ok", danger=10, traffic_indicator="",
+            population=0, x=0, y=2, danger_band="low",
+        )
+        info.cells[(4, 2)] = MapCellInfo(
+            location_id="loc_b", canonical_name="Beta", region_type="city",
+            icon="@", safety_label="ok", danger=10, traffic_indicator="",
+            population=0, x=4, y=2, danger_band="low",
+        )
+        info.routes.append(RouteRenderInfo(
+            route_id="r1", from_site_id="loc_a", to_site_id="loc_b",
+            route_type="road",
+        ))
+        output = render_region_map(info, "loc_a", radius=4)
+        grid_lines = [ln for ln in output.split("\n") if "|" in ln and not ln.strip().startswith("+")]
+        grid_content = "".join(grid_lines)
+        # Route should draw '-' between the two sites on row y=2
+        self.assertIn("-", grid_content)
 
 
 class TestRenderLocationDetail(unittest.TestCase):
@@ -347,9 +400,10 @@ class TestAtlasOverlaySuffix(unittest.TestCase):
             location_id="x", canonical_name="X", region_type="city",
             icon="@", safety_label="ok", danger=80, traffic_indicator="",
             population=0, x=0, y=0, danger_band="high",
+            traffic_band="high", rumor_heat_band="high",
             has_memorial=True, has_alias=True, recent_death_site=True,
         )
-        self.assertEqual(_atlas_overlay_suffix(cell), "!ma+")
+        self.assertEqual(_atlas_overlay_suffix(cell), "!$?ma+")
 
 
 class TestBuildAtlasCanvas(unittest.TestCase):
@@ -403,6 +457,19 @@ class TestRenderAtlasOverview(unittest.TestCase):
         output = render_atlas_overview(self.info)
         self.assertIn("Legend", output)
 
+    def test_atlas_legend_uses_biome_chars(self) -> None:
+        """Legend should match atlas _BIOME_CHARS, not legacy BIOME_GLYPHS."""
+        output = render_atlas_overview(self.info)
+        # Atlas forest first char is 'T' from "TtYf"
+        self.assertIn("T=", output)
+        # Atlas plains first char is '.' from ".,\',',"
+        self.assertIn(".=", output)
+
+    def test_atlas_legend_includes_traffic_rumor(self) -> None:
+        output = render_atlas_overview(self.info)
+        self.assertIn("$=", output)
+        self.assertIn("?=", output)
+
     def test_contains_terrain_chars(self) -> None:
         output = render_atlas_overview(self.info)
         # Should contain varied terrain characters, not just ~
@@ -427,6 +494,53 @@ class TestRenderAtlasOverview(unittest.TestCase):
         output = render_atlas_overview(info)
         self.assertIn("Aethoria", output)
         self.assertIn("凡例", output)
+        set_locale("en")
+
+
+class TestClusterSites(unittest.TestCase):
+    """Verify _cluster_sites partitions sites for multi-continent generation."""
+
+    def test_few_sites_single_cluster(self) -> None:
+        sites = [(10, 10), (12, 12)]
+        clusters = _cluster_sites(sites)
+        self.assertEqual(len(clusters), 1)
+
+    def test_spread_sites_multiple_clusters(self) -> None:
+        """Well-separated site groups should produce multiple clusters."""
+        sites = [
+            (5, 5), (6, 5), (7, 5), (5, 6), (6, 6),
+            (50, 5), (51, 5), (52, 5), (50, 6), (51, 6),
+            (5, 25), (6, 25), (7, 25), (5, 26), (6, 26),
+        ]
+        clusters = _cluster_sites(sites, max_clusters=4)
+        self.assertGreaterEqual(len(clusters), 2)
+        # All sites should be assigned
+        total = sum(len(c) for c in clusters)
+        self.assertEqual(total, len(sites))
+
+    def test_tight_sites_single_cluster(self) -> None:
+        """Sites clustered in a small area should stay as one cluster."""
+        sites = [(30 + i, 15 + j) for i in range(5) for j in range(5)]
+        clusters = _cluster_sites(sites, max_clusters=4)
+        self.assertEqual(len(clusters), 1)
+
+
+class TestLocationDetailI18n(unittest.TestCase):
+    """Verify location detail uses localized labels."""
+
+    def test_elevation_label_localized(self) -> None:
+        set_locale("en")
+        info = _make_simple_info()
+        output = render_location_detail(info, "loc_test_town")
+        self.assertIn("Elev:", output)
+        self.assertIn("Moist:", output)
+        self.assertIn("Temp:", output)
+
+    def test_japanese_elevation_label(self) -> None:
+        set_locale("ja")
+        info = _make_simple_info()
+        output = render_location_detail(info, "loc_test_town")
+        self.assertIn("標高:", output)
         set_locale("en")
 
 

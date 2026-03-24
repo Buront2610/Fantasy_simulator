@@ -287,7 +287,33 @@ def _show_world_map(sim: Simulator, ctx: UIContext | None = None) -> None:
                 loc = locations[idx]
                 out.print_line()
                 out.print_line(render_region_map(info, loc.id))
-                inp.pause()
+
+                # Offer to drill down into detail from the region view
+                sub = ctx.choose_key(
+                    tr("map_nav_prompt"),
+                    [
+                        ("detail", tr("map_nav_detail")),
+                        ("back", tr("back_to_main")),
+                    ],
+                )
+                if sub == "detail":
+                    mem_list: list[str] = []
+                    if loc.memorial_ids:
+                        mems = world.get_memorials_for_location(loc.id)
+                        mem_list = [
+                            tr("memorial_entry", year=m.year, epitaph=m.epitaph)
+                            for m in mems
+                        ]
+                    recent_traces = list(reversed(loc.live_traces[-5:]))
+                    trace_list = [t.get("text", "") for t in recent_traces]
+                    out.print_line()
+                    out.print_line(render_location_detail(
+                        info, loc.id,
+                        memorials=mem_list or None,
+                        aliases=list(loc.aliases) or None,
+                        live_traces=trace_list or None,
+                    ))
+                    inp.pause()
 
         elif action == "detail":
             locations = sorted(world.grid.values(), key=lambda loc: loc.canonical_name)
@@ -300,14 +326,14 @@ def _show_world_map(sim: Simulator, ctx: UIContext | None = None) -> None:
             if idx is not None:
                 loc = locations[idx]
                 mem_list = []
-                for mid in loc.memorial_ids:
+                if loc.memorial_ids:
                     mems = world.get_memorials_for_location(loc.id)
                     mem_list = [
                         tr("memorial_entry", year=m.year, epitaph=m.epitaph)
                         for m in mems
                     ]
-                    break
-                trace_list = [t.get("text", "") for t in loc.live_traces[-5:]]
+                recent_traces = list(reversed(loc.live_traces[-5:]))
+                trace_list = [t.get("text", "") for t in recent_traces]
                 out.print_line()
                 out.print_line(render_location_detail(
                     info, loc.id,

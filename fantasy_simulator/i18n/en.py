@@ -484,12 +484,17 @@ TEXT_EN: Dict[str, str] = {
     'map_detail_mood': 'Mood',
     'map_detail_rumor_heat': 'Rumor heat',
     'map_detail_markers': 'Markers',
+    'map_detail_elevation': 'Elev',
+    'map_detail_moisture': 'Moist',
+    'map_detail_temperature': 'Temp',
     'map_nav_prompt': 'Map view',
     'map_nav_region': 'Region map (zoom into area)',
     'map_nav_detail': 'Location detail',
     'map_nav_legacy': 'Classic grid view',
     'map_legend_routes': 'Route lines',
     'map_legend_site_marker': 'Location',
+    'map_legend_traffic_high': 'High traffic',
+    'map_legend_rumor_high': 'High rumor heat',
 }
 
 TERMS_EN: Dict[str, str] = {

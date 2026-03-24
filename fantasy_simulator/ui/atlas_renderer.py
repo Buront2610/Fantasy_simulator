@@ -111,10 +111,18 @@ def _bresenham(
 
 
 def _overlay_suffix(cell: "MapCellInfo") -> str:
-    """Compact overlay markers for a site cell."""
+    """Compact overlay markers for a site cell.
+
+    Markers: ``!`` high danger, ``$`` high traffic, ``?`` high rumor,
+    ``m`` memorial, ``a`` alias, ``+`` recent death.
+    """
     parts: List[str] = []
     if cell.danger_band == "high":
         parts.append("!")
+    if cell.traffic_band == "high":
+        parts.append("$")
+    if cell.rumor_heat_band == "high":
+        parts.append("?")
     if cell.has_memorial:
         parts.append("m")
     if cell.has_alias:
@@ -122,6 +130,74 @@ def _overlay_suffix(cell: "MapCellInfo") -> str:
     if cell.recent_death_site:
         parts.append("+")
     return "".join(parts)
+
+
+# ------------------------------------------------------------------
+# Site clustering for multi-continent generation
+# ------------------------------------------------------------------
+
+def _cluster_sites(
+    sites: List[Tuple[int, int]],
+    max_clusters: int = 4,
+) -> List[List[Tuple[int, int]]]:
+    """Partition *sites* into spatial clusters (simple k-means).
+
+    When sites are few (≤3) or tightly packed, a single cluster is
+    returned.  Otherwise up to *max_clusters* groups are created so
+    that the atlas renderer can draw separate land masses.
+    """
+    if len(sites) <= 3:
+        return [sites]
+
+    # Determine number of clusters from spread
+    xs = [p[0] for p in sites]
+    ys = [p[1] for p in sites]
+    spread = max(max(xs) - min(xs), max(ys) - min(ys))
+    k = min(max_clusters, max(2, len(sites) // 5))
+    if spread < 20:
+        return [sites]
+
+    # Deterministic initial centroids: evenly spaced along the site list
+    step = max(1, len(sites) // k)
+    centroids = [sites[i * step % len(sites)] for i in range(k)]
+    # Remove duplicate centroids
+    seen: Set[Tuple[int, int]] = set()
+    unique: List[Tuple[int, int]] = []
+    for c in centroids:
+        if c not in seen:
+            seen.add(c)
+            unique.append(c)
+    centroids = unique
+    k = len(centroids)
+    if k < 2:
+        return [sites]
+
+    for _ in range(10):
+        clusters: List[List[Tuple[int, int]]] = [[] for _ in range(k)]
+        for pt in sites:
+            best_i = 0
+            best_d = float("inf")
+            for ci, c in enumerate(centroids):
+                d = (pt[0] - c[0]) ** 2 + (pt[1] - c[1]) ** 2
+                if d < best_d:
+                    best_d = d
+                    best_i = ci
+            clusters[best_i].append(pt)
+
+        new_centroids: List[Tuple[int, int]] = []
+        for cl in clusters:
+            if cl:
+                new_centroids.append((
+                    int(sum(p[0] for p in cl) / len(cl)),
+                    int(sum(p[1] for p in cl) / len(cl)),
+                ))
+            else:
+                new_centroids.append(centroids[len(new_centroids)])
+        if new_centroids == centroids:
+            break
+        centroids = new_centroids
+
+    return [cl for cl in clusters if cl]
 
 
 # ------------------------------------------------------------------
@@ -161,38 +237,49 @@ def _build_atlas_canvas(  # noqa: C901 — linear but long
         if (ax, ay) not in site_coords:
             biome_seeds.append((ax, ay, tcell.biome))
 
-    # --- Continent centre and radii ---
-    all_x = [p[0] for p in site_atlas.values()]
-    all_y = [p[1] for p in site_atlas.values()]
-    center_x = sum(all_x) / len(all_x)
-    center_y = sum(all_y) / len(all_y)
-    span_x = (max(all_x) - min(all_x)) / 2
-    span_y = (max(all_y) - min(all_y)) / 2
-    # Radii slightly larger than the location span.
-    rx = span_x + _MARGIN_X + 2
-    ry = span_y + _MARGIN_Y + 2
-
-    # --- 1. Continent shape (land mask) ---
+    # --- 1. Multi-continent land mask ---
     land: List[List[bool]] = [[False] * w for _ in range(h)]
+    clusters = _cluster_sites(list(site_atlas.values()))
 
-    for py in range(h):
-        for px in range(w):
-            dx = (px - center_x) / max(rx, 1)
-            dy = (py - center_y) / max(ry, 1)
-            dist = math.sqrt(dx * dx + dy * dy)
+    for cluster in clusters:
+        cx = sum(p[0] for p in cluster) / len(cluster)
+        cy = sum(p[1] for p in cluster) / len(cluster)
+        span_x = (max(p[0] for p in cluster) - min(p[0] for p in cluster)) / 2
+        span_y = (max(p[1] for p in cluster) - min(p[1] for p in cluster)) / 2
+        rx = span_x + _MARGIN_X + 1
+        ry = span_y + _MARGIN_Y + 1
+        # Each cluster gets its own seed offset for distinct coastlines
+        seed_off = int(cx * 7 + cy * 13)
 
-            angle = math.atan2(dy, dx)
-            ang = (
-                0.15 * math.sin(angle * 3 + 1.0)
-                + 0.10 * math.sin(angle * 7 + 2.0)
-                + 0.06 * math.sin(angle * 13 + 3.0)
-            )
-            sp = _coast_noise(px, py)
+        for py in range(h):
+            for px in range(w):
+                dx = (px - cx) / max(rx, 1)
+                dy = (py - cy) / max(ry, 1)
+                dist = math.sqrt(dx * dx + dy * dy)
 
-            if dist < 1.0 + ang + sp:
-                land[py][px] = True
+                angle = math.atan2(dy, dx)
+                ang = (
+                    0.15 * math.sin(angle * 3 + 1.0 + seed_off)
+                    + 0.10 * math.sin(angle * 7 + 2.0 + seed_off)
+                    + 0.06 * math.sin(angle * 13 + 3.0 + seed_off)
+                )
+                sp = _coast_noise(px + seed_off, py + seed_off)
 
-    # Force land around every site (radius 4).
+                if dist < 1.0 + ang + sp:
+                    land[py][px] = True
+
+    # Small scattered islands for visual richness
+    for ix in range(3, w - 3, 11):
+        for iy in range(2, h - 2, 9):
+            noise_val = _coast_noise(ix * 3, iy * 5)
+            if noise_val > 0.15 and not land[iy][ix]:
+                for dy2 in range(-1, 2):
+                    for dx2 in range(-1, 2):
+                        ny, nx = iy + dy2, ix + dx2
+                        if 0 <= ny < h and 0 <= nx < w:
+                            land[ny][nx] = True
+
+    # Force land around every site (radius 3×5).
     for ax, ay in site_atlas.values():
         for dy2 in range(-3, 4):
             for dx2 in range(-5, 6):
@@ -377,9 +464,10 @@ def render_atlas_overview(info: "MapRenderInfo") -> str:
     lines.append("")
     lines.append(f"  {tr('map_legend_title')}:")
 
-    from ..terrain import BIOME_GLYPHS
+    # Atlas-specific terrain chars (first char of each palette entry)
     t_items = " ".join(
-        f"{g}={tr_term(b)}" for b, g in BIOME_GLYPHS.items()
+        f"{chars[0]}={tr_term(b)}" for b, chars in _BIOME_CHARS.items()
+        if b != "ocean"
     )
     lines.append(f"    {tr('map_legend_terrain')}: {t_items}")
 
@@ -390,6 +478,8 @@ def render_atlas_overview(info: "MapRenderInfo") -> str:
 
     ov_parts = [
         f"!={tr('map_legend_danger_high')}",
+        f"$={tr('map_legend_traffic_high')}",
+        f"?={tr('map_legend_rumor_high')}",
         f"m={tr('map_legend_memorial')}",
         f"a={tr('map_legend_alias')}",
         f"+={tr('map_legend_recent_death')}",
