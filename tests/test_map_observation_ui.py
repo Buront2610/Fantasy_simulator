@@ -13,7 +13,7 @@ from __future__ import annotations
 import random
 import unittest
 
-from fantasy_simulator.i18n import set_locale
+from fantasy_simulator.i18n import set_locale, tr
 from fantasy_simulator.ui.map_renderer import (
     MapCellInfo,
     MapRenderInfo,
@@ -101,6 +101,11 @@ def _make_simple_info() -> MapRenderInfo:
         route_type="road",
     ))
     return info
+
+
+def _focus_section(output: str) -> str:
+    """Return the focus-summary slice from a rendered region map."""
+    return output.split(f"{tr('map_region_focus')}:", 1)[1].split(f"{tr('map_region_nearby')}:", 1)[0]
 
 
 class TestOverlaySuffix(unittest.TestCase):
@@ -198,7 +203,10 @@ class TestRenderWorldOverview(unittest.TestCase):
     def test_route_listed(self) -> None:
         output = render_world_overview(self.info)
         self.assertIn("TestTown <-> ForestCamp", output)
-        self.assertNotIn("loc_test_town <->", output)
+        self.assertIn("Routes:", output)
+        route_section = output.split("Routes:", 1)[1]
+        self.assertNotIn("loc_test_town", route_section)
+        self.assertNotIn("loc_forest_camp", route_section)
 
     def test_terrain_glyph_in_grid(self) -> None:
         """Terrain-only cells should show their biome glyph."""
@@ -239,9 +247,7 @@ class TestRenderRegionMap(unittest.TestCase):
     def test_focus_summary_calls_out_notable_route_and_danger(self) -> None:
         output = render_region_map(self.info, "loc_test_town", radius=2)
         self.assertIn("What stands out here", output)
-        self.assertIn("Route: ForestCamp via Road", output)
-        self.assertIn("Danger: ForestCamp is a high-risk site", output)
-        focus_section = output.split("What stands out here:", 1)[1].split("Nearby sites:", 1)[0]
+        focus_section = _focus_section(output)
         self.assertIn("Route: ForestCamp via Road", focus_section)
         self.assertIn("Danger: ForestCamp is a high-risk site", focus_section)
 
@@ -260,8 +266,10 @@ class TestRenderRegionMap(unittest.TestCase):
         rumor_cell.rumor_heat = 90
         rumor_cell.rumor_heat_band = "high"
         output = render_region_map(info, "loc_test_town", radius=2)
-        focus_section = output.split("What stands out here:", 1)[1].split("Nearby sites:", 1)[0]
+        focus_section = _focus_section(output)
         self.assertIn("Rumor: ForestCamp is buzzing with talk", focus_section)
+        nearby_section = output.split("Nearby sites:", 1)[1]
+        self.assertNotIn("Rumor: ForestCamp is buzzing with talk", nearby_section)
 
     def test_focus_summary_comes_before_nearby_list(self) -> None:
         output = render_region_map(self.info, "loc_test_town", radius=2)

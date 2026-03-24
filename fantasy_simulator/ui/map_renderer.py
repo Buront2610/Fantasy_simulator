@@ -358,6 +358,9 @@ _MAX_REGION_STANDOUT_ITEMS = 4
 _OPEN_ROUTE_MARKER = "<->"
 _BLOCKED_ROUTE_MARKER = "x->"
 _UNKNOWN_ROUTE_TYPE_PRIORITY = 99
+_REACHABILITY_OPEN = 0
+_REACHABILITY_VISIBLE = 1
+_REACHABILITY_BLOCKED = 2
 _ROUTE_TYPE_PRIORITY: Dict[str, int] = {
     "road": 0,
     "mountain_pass": 1,
@@ -452,16 +455,12 @@ def _pick_region_danger_target(
         return None
 
     def priority(cell: MapCellInfo) -> Tuple[int, int, int, str]:
-        """Rank candidates by (reachability, danger desc, distance, name)."""
-        if cell.location_id in connected_open_ids:
-            # 0 = directly reachable by an open route from the current center.
-            reachability = 0
-        elif cell.location_id not in connected_blocked_ids:
-            # 1 = visible in the region, but not directly route-linked from center.
-            reachability = 1
-        else:
-            # 2 = route-linked from center, but only through a blocked route.
-            reachability = 2
+        """Rank candidates by (reachability, negative cell.danger, distance, name)."""
+        reachability = _region_reachability_tier(
+            cell.location_id,
+            connected_open_ids,
+            connected_blocked_ids,
+        )
         distance = abs(cell.x - center_cell.x) + abs(cell.y - center_cell.y)
         return (
             reachability,
@@ -485,12 +484,12 @@ def _pick_region_rumor_target(
         return None
 
     def priority(cell: MapCellInfo) -> Tuple[int, int, int, str]:
-        if cell.location_id in connected_open_ids:
-            reachability = 0
-        elif cell.location_id not in connected_blocked_ids:
-            reachability = 1
-        else:
-            reachability = 2
+        """Rank candidates by (reachability, negative cell.rumor_heat, distance, name)."""
+        reachability = _region_reachability_tier(
+            cell.location_id,
+            connected_open_ids,
+            connected_blocked_ids,
+        )
         distance = abs(cell.x - center_cell.x) + abs(cell.y - center_cell.y)
         return (
             reachability,
@@ -500,6 +499,22 @@ def _pick_region_rumor_target(
         )
 
     return min(rumor_candidates, key=priority)
+
+
+def _region_reachability_tier(
+    location_id: str,
+    connected_open_ids: Set[str],
+    connected_blocked_ids: Set[str],
+) -> int:
+    """Return region summary reachability tier for a visible site."""
+    if location_id in connected_open_ids:
+        # 0 = directly reachable by an open route from the current center.
+        return _REACHABILITY_OPEN
+    if location_id not in connected_blocked_ids:
+        # 1 = visible in the region, but not directly route-linked from center.
+        return _REACHABILITY_VISIBLE
+    # 2 = route-linked from center, but only through a blocked route.
+    return _REACHABILITY_BLOCKED
 
 
 def _has_world_memory(
