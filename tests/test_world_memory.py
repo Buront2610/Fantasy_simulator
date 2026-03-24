@@ -460,6 +460,42 @@ class TestApplyWorldMemory:
         # Alias generated
         assert len(dest.aliases) == 1
 
+    def test_apply_world_memory_uses_deceased_member_for_memorial(self):
+        """When a companion dies, memorial must reference companion, not leader."""
+        from unittest.mock import MagicMock
+        from fantasy_simulator.adventure import AdventureRun
+        from fantasy_simulator.simulation.adventure_coordinator import AdventureMixin
+        from fantasy_simulator.character import Character
+
+        world = _make_world()
+        world.year = 1010
+        leader = Character(name="Leader", age=30, gender="Male", race="Human", job="Warrior", char_id="cL")
+        leader.location_id = "loc_aethoria_capital"
+        companion = Character(name="Companion", age=28, gender="Female", race="Elf", job="Mage", char_id="cC")
+        companion.location_id = "loc_aethoria_capital"
+        companion.alive = False
+        world.add_character(leader)
+        world.add_character(companion)
+
+        run = MagicMock(spec=AdventureRun)
+        run.destination = "loc_thornwood"
+        run.character_id = "cL"
+        run.character_name = "Leader"
+        run.death_member_id = "cC"
+        run.outcome = "death"
+        run.year_started = 1008
+        run.is_party = True
+        run.member_ids = ["cL", "cC"]
+
+        mixin = object.__new__(AdventureMixin)
+        mixin.world = world
+        mixin.id_rng = random.Random(7)
+
+        mixin._apply_world_memory(run)
+        mem = next(iter(world.memorials.values()))
+        assert mem.character_id == "cC"
+        assert "Companion" in mem.character_name
+
     def test_apply_world_memory_safe_return_no_memorial(self):
         """Safe return → live trace only, no memorial."""
         from unittest.mock import MagicMock

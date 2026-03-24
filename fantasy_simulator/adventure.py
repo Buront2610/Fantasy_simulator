@@ -223,6 +223,8 @@ class AdventureRun:
     summary_log: List[str] = field(default_factory=list)
     detail_log: List[str] = field(default_factory=list)
     resolution_year: Optional[int] = None
+    injury_member_id: Optional[str] = None
+    death_member_id: Optional[str] = None
     # Party fields (PR-E)
     member_ids: List[str] = field(default_factory=list)
     party_id: Optional[str] = None
@@ -398,6 +400,8 @@ class AdventureRun:
             "summary_log": list(self.summary_log),
             "detail_log": list(self.detail_log),
             "resolution_year": self.resolution_year,
+            "injury_member_id": self.injury_member_id,
+            "death_member_id": self.death_member_id,
             # Party fields
             "member_ids": list(self.member_ids),
             "party_id": self.party_id,
@@ -429,6 +433,8 @@ class AdventureRun:
             summary_log=list(data.get("summary_log", [])),
             detail_log=list(data.get("detail_log", [])),
             resolution_year=data.get("resolution_year"),
+            injury_member_id=data.get("injury_member_id"),
+            death_member_id=data.get("death_member_id"),
             # Party fields
             member_ids=list(member_ids),
             party_id=data.get("party_id"),
@@ -529,6 +535,7 @@ class AdventureRun:
             # Death staging: worsen character injury
             injured_member.worsen_injury()
             self.injury_status = injured_member.injury_status
+            self.injury_member_id = injured_member.char_id
             summary = tr("summary_adventure_injured", name=injured_member.name)
             detail = tr("detail_adventure_injured", name=injured_member.name, destination=dest_name)
             self._record(summary, detail)
@@ -543,6 +550,7 @@ class AdventureRun:
                 self.resolution_year = world.year
                 injured_member.alive = False
                 injured_member.active_adventure_id = None
+                self.death_member_id = injured_member.char_id
                 character.active_adventure_id = None
                 self._clear_member_adventures(world)
                 summary = tr("summary_adventure_died", name=injured_member.name, destination=dest_name)
@@ -557,6 +565,7 @@ class AdventureRun:
             # Not yet dying: worsen injury and return
             injured_member.worsen_injury()
             self.injury_status = injured_member.injury_status
+            self.injury_member_id = injured_member.char_id
             summary = tr("summary_adventure_injured", name=injured_member.name)
             detail = tr("detail_adventure_injured", name=injured_member.name, destination=dest_name)
             self._record(summary, detail)
@@ -603,12 +612,17 @@ class AdventureRun:
         self.steps_taken += 1
         self.state = "resolved"
         self.resolution_year = world.year
+        history_target = character
         if self.outcome != "death":
             if self.injury_status != "none":
                 self.outcome = "injury"
-                character.injury_status = self.injury_status
-                summary = tr("summary_returned_injured", name=self.character_name, destination=dest_name)
-                detail = tr("detail_returned_injured", name=self.character_name, origin=origin_name)
+                injured_member = world.get_character_by_id(self.injury_member_id or self.character_id)
+                if injured_member is None:
+                    injured_member = character
+                injured_member.injury_status = self.injury_status
+                summary = tr("summary_returned_injured", name=injured_member.name, destination=dest_name)
+                detail = tr("detail_returned_injured", name=injured_member.name, origin=origin_name)
+                history_target = injured_member
             elif self.loot_summary:
                 self.outcome = "safe_return"
                 summary = tr(
@@ -628,7 +642,7 @@ class AdventureRun:
             self._record(summary, detail)
         character.active_adventure_id = None
         self._clear_member_adventures(world)
-        character.add_history(tr("history_adventure_detail", year=world.year, detail=self.detail_log[-1]))
+        history_target.add_history(tr("history_adventure_detail", year=world.year, detail=self.detail_log[-1]))
         return [self.summary_log[-1]]
 
     def resolve_choice(

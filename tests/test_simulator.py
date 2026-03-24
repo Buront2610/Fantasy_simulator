@@ -12,6 +12,7 @@ from fantasy_simulator.adventure import (
     AdventureRun,
     POLICY_SWIFT,
     POLICY_TREASURE,
+    RETREAT_NEVER,
     RETREAT_ON_SUPPLY,
     RETREAT_ON_TROPHY,
 )
@@ -645,6 +646,55 @@ class TestAdventureSafety:
         assert nearby.char_id in set(run.member_ids)
         assert far.char_id not in set(run.member_ids)
         assert run.retreat_rule == RETREAT_ON_TROPHY
+
+    def test_companion_death_triggers_death_side_effects_for_companion(self):
+        world = World()
+        leader = Character("Leader", 25, "Male", "Human", "Warrior", location_id="loc_aethoria_capital")
+        companion = Character("Companion", 25, "Female", "Human", "Mage", location_id="loc_aethoria_capital")
+        companion.injury_status = "dying"
+        world.add_character(leader)
+        world.add_character(companion)
+        sim = Simulator(world, events_per_year=0, adventure_steps_per_year=1, seed=1)
+
+        run = AdventureRun(
+            character_id=leader.char_id,
+            character_name=leader.name,
+            origin=leader.location_id,
+            destination="loc_thornwood",
+            year_started=world.year,
+            state="exploring",
+            member_ids=[leader.char_id, companion.char_id],
+            policy="assault",
+            retreat_rule=RETREAT_NEVER,
+        )
+        run._compute_injury_chance = lambda members: 0.1
+        leader.active_adventure_id = run.adventure_id
+        companion.active_adventure_id = run.adventure_id
+        world.add_adventure(run)
+
+        class FixedRng:
+            def __init__(self):
+                self.values = iter([0.99, 0.12])
+
+            def random(self):
+                return next(self.values, 0.99)
+
+            def choice(self, options):
+                return companion if companion in options else options[0]
+
+            def sample(self, population, k):
+                return list(population[:k])
+
+        seen = []
+
+        def _record_death_effects(char, _world):
+            seen.append(char.char_id)
+
+        sim.rng = FixedRng()
+        sim.event_system.handle_death_side_effects = _record_death_effects
+        sim._advance_adventures()
+
+        assert companion.char_id in seen
 
 
 class TestJapaneseLocaleSummary:

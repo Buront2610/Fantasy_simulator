@@ -200,6 +200,10 @@ class AdventureMixin:
                 if not char.alive:
                     self.event_system.handle_death_side_effects(char, self.world)
                 if run.is_resolved:
+                    if run.outcome == "death":
+                        deceased = self.world.get_character_by_id(run.death_member_id or run.character_id)
+                        if deceased is not None and not deceased.alive:
+                            self.event_system.handle_death_side_effects(deceased, self.world)
                     self._apply_world_memory(run)
                     self._recently_completed_adventures.append(run)
                     self.world.complete_adventure(run.adventure_id)
@@ -271,7 +275,8 @@ class AdventureMixin:
 
         # -- Memorial + alias (death only) --------------------------------
         if run.outcome == "death":
-            char = self.world.get_character_by_id(run.character_id)
+            deceased_id = run.death_member_id or run.character_id
+            char = self.world.get_character_by_id(deceased_id)
             char_name = char.name if char is not None else run.character_name
             epitaph = epitaph_for_character(
                 char_name,
@@ -283,7 +288,7 @@ class AdventureMixin:
             memorial_id = generate_adventure_id(self.id_rng)
             self.world.add_memorial(
                 memorial_id,
-                run.character_id,
+                deceased_id,
                 char_name,
                 dest,
                 self.world.year,

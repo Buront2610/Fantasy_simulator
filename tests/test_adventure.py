@@ -710,6 +710,24 @@ def test_party_injury_can_target_companion():
     assert leader.injury_status == "none"
 
 
+def test_party_returning_applies_injury_to_actual_injured_member():
+    """Companion injury must not be transferred to leader on return."""
+    world = World()
+    leader = _make_character("Aldric")
+    companion = _make_character("Lysara")
+    world.add_character(leader)
+    world.add_character(companion)
+
+    run = _make_party_run(leader, [leader, companion], world, policy=POLICY_ASSAULT)
+    run.injury_status = "injured"
+    run.injury_member_id = companion.char_id
+    run.state = "returning"
+    run.step(leader, world, rng=FakeRng([0.99]))
+
+    assert companion.injury_status == "injured"
+    assert leader.injury_status == "none"
+
+
 def test_create_adventure_run_sets_member_ids():
     """create_adventure_run initialises member_ids to [char_id] for solo run."""
     world = World()
