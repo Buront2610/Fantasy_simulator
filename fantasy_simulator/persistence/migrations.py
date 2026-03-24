@@ -12,7 +12,7 @@ from ..content.world_data import (
     get_location_state_defaults,
 )
 
-CURRENT_VERSION = 5
+CURRENT_VERSION = 6
 
 
 def migrate(data: Dict[str, Any]) -> Dict[str, Any]:
@@ -30,6 +30,7 @@ def migrate(data: Dict[str, Any]) -> Dict[str, Any]:
         3: _migrate_v2_to_v3,
         4: _migrate_v3_to_v4,
         5: _migrate_v4_to_v5,
+        6: _migrate_v5_to_v6,
     }
     for target_version in range(version + 1, CURRENT_VERSION + 1):
         data = migrations[target_version](data)
@@ -160,4 +161,129 @@ def _migrate_v4_to_v5(data: Dict[str, Any]) -> Dict[str, Any]:
         loc_data.setdefault("live_traces", [])
     world_data.setdefault("memorials", {})
     data["schema_version"] = 5
+    return data
+
+
+#: Mapping from region_type to biome for terrain generation during migration.
+_REGION_TYPE_TO_BIOME: Dict[str, str] = {
+    "city": "plains",
+    "village": "plains",
+    "forest": "forest",
+    "dungeon": "hills",
+    "mountain": "mountain",
+    "plains": "plains",
+    "sea": "ocean",
+}
+
+#: Default importance per site type.
+_SITE_IMPORTANCE: Dict[str, int] = {
+    "city": 80,
+    "village": 40,
+    "forest": 20,
+    "dungeon": 60,
+    "mountain": 30,
+    "plains": 20,
+    "sea": 10,
+}
+
+
+def _migrate_v5_to_v6(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Add terrain_map, sites, and routes to the world (PR-G1).
+
+    Pre-PR-G saves have no terrain layer.  This migration generates
+    terrain cells from existing location region_types, creates Site
+    records linking locations to terrain coordinates, and auto-generates
+    route edges between adjacent sites.
+    """
+    world_data = data.setdefault("world", {})
+    grid = world_data.get("grid", [])
+    width = world_data.get("width", 5)
+    height = world_data.get("height", 5)
+
+    # Build terrain cells for every grid coordinate
+    terrain_cells = []
+    for y in range(height):
+        for x in range(width):
+            terrain_cells.append({
+                "x": x, "y": y,
+                "biome": "plains",
+                "elevation": 128,
+                "moisture": 128,
+                "temperature": 128,
+            })
+
+    # Map (x, y) -> terrain cell dict for biome overwriting
+    cell_lookup: Dict[tuple, Dict[str, Any]] = {}
+    for tc in terrain_cells:
+        cell_lookup[(tc["x"], tc["y"])] = tc
+
+    # Build sites from existing grid locations and set biomes
+    sites = []
+    site_coords: Dict[tuple, str] = {}
+    for loc_data in grid:
+        loc_id = loc_data.get("id", "")
+        region_type = loc_data.get("region_type", "city")
+        x = loc_data.get("x", 0)
+        y = loc_data.get("y", 0)
+
+        biome = _REGION_TYPE_TO_BIOME.get(region_type, "plains")
+        importance = _SITE_IMPORTANCE.get(region_type, 50)
+
+        tc = cell_lookup.get((x, y))
+        if tc is not None:
+            tc["biome"] = biome
+
+        sites.append({
+            "location_id": loc_id,
+            "x": x,
+            "y": y,
+            "site_type": region_type,
+            "importance": importance,
+        })
+        site_coords[(x, y)] = loc_id
+
+    # Auto-generate routes between adjacent sites
+    routes = []
+    seen_pairs: set = set()
+    route_counter = 0
+    for (x, y), loc_id in site_coords.items():
+        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            nx, ny = x + dx, y + dy
+            neighbor_id = site_coords.get((nx, ny))
+            if neighbor_id is None:
+                continue
+            pair = tuple(sorted([loc_id, neighbor_id]))
+            if pair in seen_pairs:
+                continue
+            seen_pairs.add(pair)
+            route_counter += 1
+
+            from_biome = cell_lookup.get((x, y), {}).get("biome", "plains")
+            to_biome = cell_lookup.get((nx, ny), {}).get("biome", "plains")
+            if "mountain" in (from_biome, to_biome):
+                route_type = "mountain_pass"
+            elif "ocean" in (from_biome, to_biome):
+                route_type = "sea_lane"
+            elif "swamp" in (from_biome, to_biome):
+                route_type = "trail"
+            else:
+                route_type = "road"
+
+            routes.append({
+                "route_id": f"route_{route_counter:03d}",
+                "from_site_id": loc_id,
+                "to_site_id": neighbor_id,
+                "route_type": route_type,
+                "distance": 1,
+                "blocked": False,
+            })
+
+    world_data["terrain_map"] = {
+        "width": width,
+        "height": height,
+        "cells": terrain_cells,
+    }
+    world_data["sites"] = sites
+    world_data["routes"] = routes
+    data["schema_version"] = 6
     return data

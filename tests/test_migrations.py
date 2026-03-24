@@ -246,7 +246,7 @@ class TestMigrations:
         # v3→v4 migration adds party fields to adventures (none here, so grid stays intact)
 
     def test_current_version_constant(self):
-        assert CURRENT_VERSION == 5
+        assert CURRENT_VERSION == 6
 
     def test_v3_to_v4_adds_party_fields_to_adventures(self):
         """PR-E migration adds party fields to existing AdventureRun data."""

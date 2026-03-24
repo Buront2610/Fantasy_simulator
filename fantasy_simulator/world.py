@@ -16,6 +16,12 @@ from .content.world_data import (
     fallback_location_id,
     get_location_state_defaults,
 )
+from .terrain import (
+    RouteEdge,
+    Site,
+    TerrainMap,
+    build_default_terrain,
+)
 
 if TYPE_CHECKING:
     from .adventure import AdventureRun
@@ -328,6 +334,11 @@ class World:
         self.completed_adventures: List[AdventureRun] = []
         # PR-F: keyed by memorial_id
         self.memorials: Dict[str, MemorialRecord] = {}
+        # PR-G: terrain / site / route layers
+        self.terrain_map: Optional[TerrainMap] = None
+        self.sites: List[Site] = []
+        self.routes: List[RouteEdge] = []
+        self._site_index: Dict[str, Site] = {}
         self._build_default_map()
 
     def _register_location(self, loc: LocationState) -> None:
@@ -348,6 +359,40 @@ class World:
     def _build_default_map(self) -> None:
         for entry in DEFAULT_LOCATIONS:
             self._register_location(LocationState.from_default_entry(entry))
+        self._build_default_terrain()
+
+    def _build_default_terrain(self) -> None:
+        """Generate the default terrain, sites, and routes from existing locations."""
+        tmap, sites, routes = build_default_terrain(
+            width=self.width,
+            height=self.height,
+            locations=DEFAULT_LOCATIONS,
+        )
+        self.terrain_map = tmap
+        self.sites = sites
+        self.routes = routes
+        self._rebuild_site_index()
+
+    def _rebuild_site_index(self) -> None:
+        """Rebuild the site lookup index keyed by location_id."""
+        self._site_index = {s.location_id: s for s in self.sites}
+
+    def get_site_by_id(self, location_id: str) -> Optional[Site]:
+        """Return the Site record for a location, or None."""
+        return self._site_index.get(location_id)
+
+    def get_routes_for_site(self, location_id: str) -> List[RouteEdge]:
+        """Return all routes connected to a site."""
+        return [r for r in self.routes if r.connects(location_id)]
+
+    def get_connected_site_ids(self, location_id: str) -> List[str]:
+        """Return location_ids of sites reachable via routes from a site."""
+        result: List[str] = []
+        for route in self.routes:
+            other = route.other_end(location_id)
+            if other is not None and not route.blocked:
+                result.append(other)
+        return result
 
     def _default_resident_location_id(self) -> str:
         if "loc_aethoria_capital" in self._location_id_index:
@@ -776,7 +821,7 @@ class World:
         return render_map_ascii(info)
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        result: Dict[str, Any] = {
             "name": self.name,
             "lore": self.lore,
             "width": self.width,
@@ -791,6 +836,14 @@ class World:
             "completed_adventures": [run.to_dict() for run in self.completed_adventures],
             "memorials": {k: v.to_dict() for k, v in self.memorials.items()},
         }
+        # PR-G: persist terrain/site/route layers
+        if self.terrain_map is not None:
+            result["terrain_map"] = self.terrain_map.to_dict()
+        if self.sites:
+            result["sites"] = [s.to_dict() for s in self.sites]
+        if self.routes:
+            result["routes"] = [r.to_dict() for r in self.routes]
+        return result
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "World":
@@ -826,6 +879,16 @@ class World:
         world.memorials = {
             k: MemorialRecord.from_dict(v) for k, v in data.get("memorials", {}).items()
         }
+
+        # PR-G: restore terrain/site/route layers if present
+        if "terrain_map" in data:
+            world.terrain_map = TerrainMap.from_dict(data["terrain_map"])
+        if "sites" in data:
+            world.sites = [Site.from_dict(s) for s in data["sites"]]
+        if "routes" in data:
+            world.routes = [RouteEdge.from_dict(r) for r in data["routes"]]
+        world._rebuild_site_index()
+
         world.normalize_after_load()
         return world
 

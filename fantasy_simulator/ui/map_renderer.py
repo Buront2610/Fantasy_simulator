@@ -19,6 +19,7 @@ from ..i18n import tr, tr_term
 from .ui_helpers import fit_display_width
 
 if TYPE_CHECKING:
+    from ..terrain import Site
     from ..world import World
 
 
@@ -67,13 +68,47 @@ class MapCellInfo:
     has_memorial: bool = False
     has_alias: bool = False
     recent_death_site: bool = False
+    # PR-G: terrain overlay fields
+    terrain_biome: str = "plains"
+    terrain_glyph: str = ","
+    terrain_elevation: int = 128
+    terrain_moisture: int = 128
+    terrain_temperature: int = 128
+    has_site: bool = True
+    site_type: str = ""
+    site_importance: int = 50
+
+
+@dataclass
+class RouteRenderInfo:
+    """Renderer-agnostic snapshot of a route between two sites."""
+    route_id: str
+    from_site_id: str
+    to_site_id: str
+    route_type: str
+    blocked: bool = False
+
+
+@dataclass
+class TerrainCellRenderInfo:
+    """Renderer-agnostic snapshot of a pure terrain cell (no site)."""
+    x: int
+    y: int
+    biome: str
+    glyph: str
+    elevation: int = 128
+    moisture: int = 128
+    temperature: int = 128
 
 
 @dataclass
 class MapRenderInfo:
     """Everything a renderer needs to draw the world map.
 
-    ``cells`` is keyed by ``(x, y)`` grid coordinates.
+    ``cells`` is keyed by ``(x, y)`` grid coordinates and includes
+    both site cells and terrain-only cells.
+    ``terrain_cells`` holds render info for every terrain coordinate.
+    ``routes`` holds route overlay data.
     """
 
     world_name: str
@@ -81,6 +116,8 @@ class MapRenderInfo:
     width: int
     height: int
     cells: Dict[Tuple[int, int], MapCellInfo] = field(default_factory=dict)
+    terrain_cells: Dict[Tuple[int, int], TerrainCellRenderInfo] = field(default_factory=dict)
+    routes: List[RouteRenderInfo] = field(default_factory=list)
 
 
 # ------------------------------------------------------------------
@@ -96,6 +133,8 @@ def build_map_info(
     This is the *only* function that touches ``World`` / ``LocationState``
     attributes.  Renderers only consume the intermediate representation.
     """
+    from ..terrain import BIOME_GLYPHS
+
     info = MapRenderInfo(
         world_name=world.name,
         year=world.year,
@@ -108,6 +147,34 @@ def build_map_info(
         if rec.kind in ("death", "battle_fatal", "adventure_death") and rec.location_id
     }
 
+    # Build site coordinate lookup
+    site_at: Dict[Tuple[int, int], "Site"] = {}
+    if world.sites:
+        for site in world.sites:
+            site_at[(site.x, site.y)] = site
+
+    # Populate terrain cell render info for every terrain coordinate
+    if world.terrain_map is not None:
+        for (tx, ty), tcell in world.terrain_map.cells.items():
+            info.terrain_cells[(tx, ty)] = TerrainCellRenderInfo(
+                x=tx, y=ty,
+                biome=tcell.biome,
+                glyph=tcell.glyph,
+                elevation=tcell.elevation,
+                moisture=tcell.moisture,
+                temperature=tcell.temperature,
+            )
+
+    # Populate route render info
+    for route in world.routes:
+        info.routes.append(RouteRenderInfo(
+            route_id=route.route_id,
+            from_site_id=route.from_site_id,
+            to_site_id=route.to_site_id,
+            route_type=route.route_type,
+            blocked=route.blocked,
+        ))
+
     for (x, y), loc in world.grid.items():
         is_highlight = (
             highlight_location is not None
@@ -117,6 +184,27 @@ def build_map_info(
         danger_band = "low" if loc.danger < 34 else "high" if loc.danger >= 67 else "medium"
         traffic_band = "low" if loc.traffic < 34 else "high" if loc.traffic >= 67 else "medium"
         rumor_heat_band = "low" if loc.rumor_heat < 34 else "high" if loc.rumor_heat >= 67 else "medium"
+
+        # Terrain overlay fields
+        terrain_biome = "plains"
+        terrain_glyph = ","
+        terrain_elevation = 128
+        terrain_moisture = 128
+        terrain_temperature = 128
+        if world.terrain_map is not None:
+            tcell = world.terrain_map.get(x, y)
+            if tcell is not None:
+                terrain_biome = tcell.biome
+                terrain_glyph = BIOME_GLYPHS.get(tcell.biome, "?")
+                terrain_elevation = tcell.elevation
+                terrain_moisture = tcell.moisture
+                terrain_temperature = tcell.temperature
+
+        site = site_at.get((x, y))
+        has_site = site is not None
+        site_type = site.site_type if site else loc.region_type
+        site_importance = site.importance if site else 50
+
         info.cells[(x, y)] = MapCellInfo(
             location_id=loc.id,
             canonical_name=loc.canonical_name,
@@ -141,6 +229,14 @@ def build_map_info(
             has_memorial=bool(loc.memorial_ids),
             has_alias=bool(loc.aliases),
             recent_death_site=loc.id in death_site_location_ids,
+            terrain_biome=terrain_biome,
+            terrain_glyph=terrain_glyph,
+            terrain_elevation=terrain_elevation,
+            terrain_moisture=terrain_moisture,
+            terrain_temperature=terrain_temperature,
+            has_site=has_site,
+            site_type=site_type,
+            site_importance=site_importance,
         )
     return info
 
