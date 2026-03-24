@@ -163,11 +163,6 @@ class AdventureMixin:
             result += f" +{len(members) - max_shown}"
         return result
 
-    def _location_danger_level(self, location_id: str) -> int:
-        """Return the danger level (0-100) of a location, defaulting to 50."""
-        loc = self.world.grid.get(location_id)
-        return getattr(loc, "danger", 50) if loc is not None else 50
-
     def _advance_adventures(self) -> None:
         """Advance active adventures by multiple internal steps per year."""
         paused_until_next_year = set()
