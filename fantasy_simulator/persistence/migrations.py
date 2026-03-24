@@ -12,9 +12,14 @@ from ..content.world_data import (
     fallback_location_id,
     get_location_state_defaults,
 )
-from ..terrain import REGION_TYPE_TO_BIOME, SITE_IMPORTANCE
+from ..terrain import (
+    assemble_atlas_layout_inputs,
+    REGION_TYPE_TO_BIOME,
+    SITE_IMPORTANCE,
+    build_default_atlas_layout,
+)
 
-CURRENT_VERSION = 6
+CURRENT_VERSION = 7
 
 
 def migrate(data: Dict[str, Any]) -> Dict[str, Any]:
@@ -33,6 +38,7 @@ def migrate(data: Dict[str, Any]) -> Dict[str, Any]:
         4: _migrate_v3_to_v4,
         5: _migrate_v4_to_v5,
         6: _migrate_v5_to_v6,
+        7: _migrate_v6_to_v7,
     }
     for target_version in range(version + 1, CURRENT_VERSION + 1):
         data = migrations[target_version](data)
@@ -307,4 +313,29 @@ def _migrate_v5_to_v6(data: Dict[str, Any]) -> Dict[str, Any]:
     world_data["sites"] = sites
     world_data["routes"] = routes
     data["schema_version"] = 6
+    return data
+
+
+def _migrate_v6_to_v7(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Add atlas_layout and per-site atlas coordinates (PR-G2 items 7-8).
+
+    Computes atlas_x / atlas_y for each site from the grid coordinates
+    and creates a minimal atlas_layout structure.  Pre-v7 saves have
+    no atlas geometry — this migration generates it deterministically.
+    """
+    world_data = data.setdefault("world", {})
+    width = world_data.get("width", 5)
+    height = world_data.get("height", 5)
+
+    sites = world_data.get("sites", [])
+    inputs = assemble_atlas_layout_inputs(
+        width=width,
+        height=height,
+        sites=sites,
+        routes=world_data.get("routes", []),
+        terrain_cells=world_data.get("terrain_map", {}).get("cells", []),
+    )
+    world_data["atlas_layout"] = build_default_atlas_layout(inputs).to_dict()
+
+    data["schema_version"] = 7
     return data

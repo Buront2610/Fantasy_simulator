@@ -24,13 +24,13 @@ The legacy ``render_map_ascii`` is preserved for backward compatibility.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Dict, List, Optional, Set, Tuple, TYPE_CHECKING
 
 from ..i18n import tr, tr_term
 from .ui_helpers import fit_display_width
 
 if TYPE_CHECKING:
-    from ..terrain import Site
+    from ..terrain import AtlasLayout, Site
     from ..world import World
 
 
@@ -88,6 +88,9 @@ class MapCellInfo:
     has_site: bool = True
     site_type: str = ""
     site_importance: int = 50
+    # PR-G2: pre-computed atlas coordinates (-1 = compute on the fly)
+    atlas_x: int = -1
+    atlas_y: int = -1
 
 
 @dataclass
@@ -129,6 +132,7 @@ class MapRenderInfo:
     cells: Dict[Tuple[int, int], MapCellInfo] = field(default_factory=dict)
     terrain_cells: Dict[Tuple[int, int], TerrainCellRenderInfo] = field(default_factory=dict)
     routes: List[RouteRenderInfo] = field(default_factory=list)
+    atlas_layout: Optional["AtlasLayout"] = None
 
 
 # ------------------------------------------------------------------
@@ -144,13 +148,17 @@ def build_map_info(
     This is the *only* function that touches ``World`` / ``LocationState``
     attributes.  Renderers only consume the intermediate representation.
     """
-    from ..terrain import BIOME_GLYPHS
+    from ..terrain import AtlasLayout, BIOME_GLYPHS
 
     info = MapRenderInfo(
         world_name=world.name,
         year=world.year,
         width=world.width,
         height=world.height,
+        atlas_layout=(
+            AtlasLayout.from_dict(world.atlas_layout.to_dict())
+            if world.atlas_layout is not None else None
+        ),
     )
 
     death_site_location_ids = {
@@ -248,6 +256,8 @@ def build_map_info(
             has_site=has_site,
             site_type=site_type,
             site_importance=site_importance,
+            atlas_x=site.atlas_x if site else -1,
+            atlas_y=site.atlas_y if site else -1,
         )
     return info
 
@@ -339,22 +349,26 @@ def render_map_ascii(info: MapRenderInfo) -> str:
 # ------------------------------------------------------------------
 
 #: Overlay marker for danger band
-_DANGER_MARKERS: Dict[str, str] = {"low": " ", "medium": "!", "high": "X"}
+_DANGER_MARKERS: Dict[str, str] = {"low": " ", "medium": ".", "high": "!"}
 #: Overlay marker for traffic band
 _TRAFFIC_MARKERS: Dict[str, str] = {"low": " ", "medium": "o", "high": "O"}
 #: Overlay marker for rumor heat band
-_RUMOR_MARKERS: Dict[str, str] = {"low": " ", "medium": "?", "high": "!"}
+_RUMOR_MARKERS: Dict[str, str] = {"low": " ", "medium": "~", "high": "?"}
 
 
 def _overlay_suffix(cell: MapCellInfo) -> str:
     """Build a compact overlay suffix string for a site cell.
 
-    The suffix encodes danger / memorial / alias / death in 1-4 chars
-    so a colourless terminal can still convey meaning.
+    The suffix encodes danger / traffic / rumor / memorial / alias /
+    death in 1-6 chars so a colourless terminal can still convey meaning.
     """
     parts: List[str] = []
     if cell.danger_band == "high":
         parts.append("!")
+    if cell.traffic_band == "high":
+        parts.append("$")
+    if cell.rumor_heat_band == "high":
+        parts.append("?")
     if cell.has_memorial:
         parts.append("m")
     if cell.has_alias:
@@ -372,8 +386,10 @@ def render_world_overview(info: MapRenderInfo) -> str:
     """Render a compact terrain-glyph world map with overlay markers.
 
     Each terrain cell is shown as its biome glyph (1 char).  Cells
-    that contain a site replace the glyph with the site's first
-    letter in uppercase, plus optional overlay markers.
+    that contain a site are normally shown using the site's first
+    letter in uppercase; when overlays are present, the site's glyph
+    is replaced by the first overlay marker.  Highlighted cells always
+    show ``*`` regardless of overlays.
 
     A legend is appended so the map is self-documenting.
     """
@@ -392,13 +408,13 @@ def render_world_overview(info: MapRenderInfo) -> str:
         for x in range(info.width):
             cell = info.cells.get((x, y))
             if cell is not None:
-                # Site cell: first letter uppercase + overlay
+                # Site cell: highlight always wins, then overlay, then first letter
                 overlay = _overlay_suffix(cell)
-                if overlay:
+                if cell.highlighted:
+                    row_chars.append("*")
+                elif overlay:
                     # Show first overlay marker as the cell char
                     row_chars.append(overlay[0])
-                elif cell.highlighted:
-                    row_chars.append("*")
                 else:
                     row_chars.append(cell.canonical_name[0].upper() if cell.canonical_name else "@")
             else:
@@ -444,6 +460,8 @@ def render_world_overview(info: MapRenderInfo) -> str:
         lines.append(f"      {glyph} = {tr_term(biome)}")
     lines.append(f"    {tr('map_legend_overlays')}:")
     lines.append(f"      ! = {tr('map_legend_danger_high')}")
+    lines.append(f"      $ = {tr('map_legend_traffic_high')}")
+    lines.append(f"      ? = {tr('map_legend_rumor_high')}")
     lines.append(f"      m = {tr('map_legend_memorial')}")
     lines.append(f"      a = {tr('map_legend_alias')}")
     lines.append(f"      + = {tr('map_legend_recent_death')}")
@@ -460,6 +478,10 @@ def render_region_map(
     info: MapRenderInfo,
     center_location_id: str,
     radius: int = 2,
+    *,
+    site_memorials: Optional[Dict[str, List[str]]] = None,
+    site_aliases: Optional[Dict[str, List[str]]] = None,
+    site_traces: Optional[Dict[str, List[str]]] = None,
 ) -> str:
     """Render a zoomed region map around a selected site.
 
@@ -489,6 +511,58 @@ def render_region_map(
     y_min = max(0, cy - radius)
     y_max = min(info.height - 1, cy + radius)
 
+    # Build a mini-canvas for route lines
+    rw = x_max - x_min + 1
+    rh = y_max - y_min + 1
+    route_layer: Dict[Tuple[int, int], str] = {}
+    site_positions: Set[Tuple[int, int]] = set()
+    for cell in info.cells.values():
+        if x_min <= cell.x <= x_max and y_min <= cell.y <= y_max:
+            site_positions.add((cell.x - x_min, cell.y - y_min))
+
+    from .atlas_renderer import _bresenham, _ROUTE_LINE
+    # Build location_id → position lookup for efficient route resolution
+    cell_pos: Dict[str, Tuple[int, int]] = {
+        c.location_id: (c.x, c.y) for c in info.cells.values()
+    }
+    for route in info.routes:
+        fp = cell_pos.get(route.from_site_id)
+        tp = cell_pos.get(route.to_site_id)
+        if not fp or not tp:
+            continue
+        # Both endpoints must be in the visible region
+        if not (x_min <= fp[0] <= x_max and y_min <= fp[1] <= y_max):
+            continue
+        if not (x_min <= tp[0] <= x_max and y_min <= tp[1] <= y_max):
+            continue
+        path = _bresenham(fp[0] - x_min, fp[1] - y_min, tp[0] - x_min, tp[1] - y_min)
+        # Route-type specific chars with direction awareness
+        rtype = route.route_type
+        chars = _ROUTE_LINE.get(rtype, ("-", "|", "/", "\\"))
+        if route.blocked:
+            chars = ("x", "x", "x", "x")
+        for i, (px, py) in enumerate(path):
+            if (px, py) in site_positions or not (0 <= px < rw and 0 <= py < rh):
+                continue
+            # Direction from previous point
+            if i > 0:
+                ddx = px - path[i - 1][0]
+                ddy = py - path[i - 1][1]
+            elif i < len(path) - 1:
+                ddx = path[i + 1][0] - px
+                ddy = path[i + 1][1] - py
+            else:
+                ddx, ddy = 1, 0
+            if ddy == 0:
+                ch = chars[0]
+            elif ddx == 0:
+                ch = chars[1]
+            elif (ddx > 0) != (ddy > 0):
+                ch = chars[2]
+            else:
+                ch = chars[3]
+            route_layer[(px, py)] = ch
+
     # Column header
     col_nums = "".join(f"{x % 10}" for x in range(x_min, x_max + 1))
     lines.append(f"      {col_nums}")
@@ -504,6 +578,8 @@ def render_region_map(
                     row_chars.append("@")
                 else:
                     row_chars.append(cell.canonical_name[0].upper() if cell.canonical_name else "o")
+            elif (x - x_min, y - y_min) in route_layer:
+                row_chars.append(route_layer[(x - x_min, y - y_min)])
             else:
                 tcell = info.terrain_cells.get((x, y))
                 row_chars.append(tcell.glyph if tcell else " ")
@@ -554,6 +630,32 @@ def render_region_map(
                 f" ({tr_term(r.route_type)}){blocked}"
             )
 
+    # --- World memory: landmarks (memorials, aliases, traces) ---
+    _mem = site_memorials or {}
+    _ali = site_aliases or {}
+    _tra = site_traces or {}
+    has_memory = False
+    for cell in sorted(info.cells.values(), key=lambda c: (c.y, c.x)):
+        if not (x_min <= cell.x <= x_max and y_min <= cell.y <= y_max):
+            continue
+        loc_id = cell.location_id
+        mem_items = _mem.get(loc_id, [])
+        ali_items = _ali.get(loc_id, [])
+        tra_items = _tra.get(loc_id, [])
+        if not mem_items and not ali_items and not tra_items:
+            continue
+        if not has_memory:
+            lines.append("")
+            lines.append(f"  {tr('map_region_landmarks')}:")
+            has_memory = True
+        lines.append(f"    {cell.canonical_name}:")
+        if ali_items:
+            lines.append(f"      {tr('map_landmark_alias')}: {', '.join(ali_items[:3])}")
+        for mem in mem_items[:2]:
+            lines.append(f"      {tr('map_landmark_memorial')}: {mem}")
+        for tra in tra_items[:2]:
+            lines.append(f"      {tr('map_landmark_trace')}: {tra}")
+
     return "\n".join(lines)
 
 
@@ -594,7 +696,14 @@ def render_location_detail(
     terrain_label = tr('map_terrain')
     biome_name = tr_term(cell.terrain_biome)
     lines.append(f"  |{_fit(f' {terrain_label}: {biome_name} ({cell.terrain_glyph})', w)}|")
-    elev_line = f" Elev:{cell.terrain_elevation} Moist:{cell.terrain_moisture} Temp:{cell.terrain_temperature}"
+    elev_label = tr('map_detail_elevation')
+    moist_label = tr('map_detail_moisture')
+    temp_label = tr('map_detail_temperature')
+    elev_line = (
+        f" {elev_label}:{cell.terrain_elevation}"
+        f" {moist_label}:{cell.terrain_moisture}"
+        f" {temp_label}:{cell.terrain_temperature}"
+    )
     lines.append(f"  |{_fit(elev_line, w)}|")
     lines.append(border)
 

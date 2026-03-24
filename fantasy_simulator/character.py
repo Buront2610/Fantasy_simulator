@@ -266,7 +266,7 @@ class Character:
             f"job={self.job!r}, age={self.age}, status={status})"
         )
 
-    def stat_block(self) -> str:
+    def stat_block(self, char_name_lookup: Optional[Dict[str, str]] = None) -> str:
         lines = [
             f"  {tr('name_label'):<10}: {self.name}",
             f"  {tr('race_job_label'):<10}: {tr_term(self.race)} {tr_term(self.job)}",
@@ -296,7 +296,10 @@ class Character:
             lines.append(f"  {tr('relations_label')}")
             for other_id, tags in list(self.relation_tags.items())[:5]:
                 tag_str = ", ".join(tr(f"relation_tag_{t}") for t in tags)
-                lines.append(f"    {other_id[:8]}: {tag_str}")
+                display_name = other_id[:8]
+                if char_name_lookup is not None:
+                    display_name = char_name_lookup.get(other_id, display_name)
+                lines.append(f"    {display_name}: {tag_str}")
         return "\n".join(lines)
 
 

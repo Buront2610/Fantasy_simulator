@@ -233,6 +233,15 @@ class TestApplyStatDelta:
         hero.apply_stat_delta({"luck": 10, "mana": 5})
 
 
+class TestStatBlockRelations:
+    def test_stat_block_resolves_relation_names_when_lookup_provided(self, hero, mage):
+        hero.add_relation_tag(mage.char_id, "friend")
+        block = hero.stat_block(char_name_lookup={mage.char_id: mage.name})
+
+        assert mage.name in block
+        assert mage.char_id[:8] not in block
+
+
 # ---------------------------------------------------------------------------
 # Serialisation
 # ---------------------------------------------------------------------------

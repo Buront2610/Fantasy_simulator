@@ -17,9 +17,12 @@ from .content.world_data import (
     get_location_state_defaults,
 )
 from .terrain import (
+    AtlasLayout,
     RouteEdge,
     Site,
     TerrainMap,
+    assemble_atlas_layout_inputs,
+    build_default_atlas_layout,
     build_default_terrain,
 )
 
@@ -341,6 +344,8 @@ class World:
         self.sites: List[Site] = []
         self.routes: List[RouteEdge] = []
         self._site_index: Dict[str, Site] = {}
+        # PR-G2: persistent macro geography layer
+        self.atlas_layout: Optional[AtlasLayout] = None
         if not _skip_defaults:
             self._build_default_map()
 
@@ -393,6 +398,18 @@ class World:
         self.sites = sites
         self.routes = routes
         self._rebuild_site_index()
+        self.atlas_layout = self._build_atlas_layout_from_current_state()
+
+    def _build_atlas_layout_from_current_state(self) -> AtlasLayout:
+        """Generate the persistent atlas layout from current terrain/site data."""
+        inputs = assemble_atlas_layout_inputs(
+            width=self.width,
+            height=self.height,
+            sites=self.sites,
+            routes=self.routes,
+            terrain_cells=list(self.terrain_map.cells.values()) if self.terrain_map is not None else [],
+        )
+        return build_default_atlas_layout(inputs)
 
     def _rebuild_site_index(self) -> None:
         """Rebuild the site lookup index keyed by location_id."""
@@ -864,6 +881,9 @@ class World:
             result["sites"] = [s.to_dict() for s in self.sites]
         if self.routes:
             result["routes"] = [r.to_dict() for r in self.routes]
+        # PR-G2: persist atlas layout
+        if self.atlas_layout is not None:
+            result["atlas_layout"] = self.atlas_layout.to_dict()
         return result
 
     @classmethod
@@ -926,6 +946,14 @@ class World:
             world._rebuild_site_index()
         else:
             world._build_terrain_from_grid()
+
+        # PR-G2: restore atlas layout if present, otherwise backfill it
+        # from the loaded terrain/site data so fresh v7 saves and older
+        # partially-upgraded saves converge on the same state shape.
+        if "atlas_layout" in data:
+            world.atlas_layout = AtlasLayout.from_dict(data["atlas_layout"])
+        else:
+            world.atlas_layout = world._build_atlas_layout_from_current_state()
 
         world.normalize_after_load()
         return world

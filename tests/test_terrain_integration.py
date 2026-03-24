@@ -361,8 +361,8 @@ class TestMigrationV5ToV6:
             },
         }
 
-    def test_current_version_is_6(self):
-        assert CURRENT_VERSION == 6
+    def test_current_version_is_7(self):
+        assert CURRENT_VERSION == 7
 
     def test_migration_adds_terrain(self):
         data = self._make_v5_data()
@@ -420,10 +420,10 @@ class TestMigrationV5ToV6:
         assert mountain_routes[0]["route_type"] == "mountain_pass"
 
     def test_full_migration_chain(self):
-        """A v5 save should migrate to v6 through the full chain."""
+        """A v5 save should migrate to v7 through the full chain."""
         data = self._make_v5_data()
         result = migrate(data)
-        assert result["schema_version"] == 6
+        assert result["schema_version"] == 7
         assert "terrain_map" in result["world"]
 
     def test_migrated_data_loads_as_world(self):
