@@ -63,6 +63,11 @@ _ROUTE_LINE: Dict[str, Tuple[str, str, str, str]] = {
 _SITE_MARKERS: Dict[str, str] = {"high": "O", "medium": "@", "low": "o"}
 _SITE_MARKER = "@"
 
+# Island generation parameters
+_ISLAND_SPACING_X = 11
+_ISLAND_SPACING_Y = 9
+_ISLAND_MARGIN = 3
+
 # Characters that a route line may overwrite.
 _TERRAIN_OVERWRITABLE = set("~.,'.TtYfnNnh^^/\\%w:.;:*=`")
 
@@ -280,8 +285,8 @@ def _build_atlas_canvas(  # noqa: C901 — linear but long
                     land[py][px] = True
 
     # Small scattered islands for visual richness
-    for ix in range(3, w - 3, 11):
-        for iy in range(2, h - 2, 9):
+    for ix in range(_ISLAND_MARGIN, w - _ISLAND_MARGIN, _ISLAND_SPACING_X):
+        for iy in range(_ISLAND_MARGIN - 1, h - (_ISLAND_MARGIN - 1), _ISLAND_SPACING_Y):
             noise_val = _coast_noise(ix * 3, iy * 5)
             if noise_val > 0.15 and not land[iy][ix]:
                 for dy2 in range(-1, 2):

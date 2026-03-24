@@ -507,13 +507,13 @@ def render_region_map(
             site_positions.add((cell.x - x_min, cell.y - y_min))
 
     from .atlas_renderer import _bresenham, _ROUTE_LINE
+    # Build location_id → position lookup for efficient route resolution
+    cell_pos: Dict[str, Tuple[int, int]] = {
+        c.location_id: (c.x, c.y) for c in info.cells.values()
+    }
     for route in info.routes:
-        fp = tp = None
-        for c in info.cells.values():
-            if c.location_id == route.from_site_id:
-                fp = (c.x, c.y)
-            if c.location_id == route.to_site_id:
-                tp = (c.x, c.y)
+        fp = cell_pos.get(route.from_site_id)
+        tp = cell_pos.get(route.to_site_id)
         if not fp or not tp:
             continue
         # Both endpoints must be in the visible region

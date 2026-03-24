@@ -315,13 +315,10 @@ def _region_drill_loop(
         y_max = min(info.height - 1, center_cell.y + radius)
 
         visible_locs = []
+        # Build location_id → cell lookup for efficient matching
+        cell_by_id = {c.location_id: c for c in info.cells.values()}
         for loc in sorted(world.grid.values(), key=lambda lc: lc.canonical_name):
-            cell = info.cells.get((loc.x, loc.y)) if hasattr(loc, 'x') else None
-            if cell is None:
-                for c in info.cells.values():
-                    if c.location_id == loc.id:
-                        cell = c
-                        break
+            cell = cell_by_id.get(loc.id)
             if cell and x_min <= cell.x <= x_max and y_min <= cell.y <= y_max:
                 visible_locs.append(loc)
 

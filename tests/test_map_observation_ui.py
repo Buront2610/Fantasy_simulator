@@ -10,6 +10,7 @@ Covers:
 
 from __future__ import annotations
 
+import random
 import unittest
 
 from fantasy_simulator.i18n import set_locale
@@ -532,7 +533,6 @@ class TestClusterSites(unittest.TestCase):
             (5, 5), (6, 5), (7, 5), (5, 6), (6, 6),
             (50, 5), (51, 5), (52, 5), (50, 6), (51, 6),
         ]
-        import random
         rng = random.Random(42)
         shuffled = list(sites)
         rng.shuffle(shuffled)
