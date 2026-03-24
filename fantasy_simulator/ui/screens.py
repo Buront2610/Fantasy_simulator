@@ -207,9 +207,7 @@ def _show_results(sim: Simulator, ctx: UIContext | None = None) -> None:
         elif action == "monthly_report":
             _show_monthly_report(sim, ctx=ctx)
         elif action == "world_map":
-            out.print_line()
-            out.print_line(world.render_map())
-            inp.pause()
+            _show_world_map(sim, ctx=ctx)
         elif action == "character_roster":
             _show_roster(world, ctx=ctx)
         elif action == "event_log_last_30":
@@ -242,6 +240,87 @@ def _show_results(sim: Simulator, ctx: UIContext | None = None) -> None:
             inp.pause()
         elif action == "location_history":
             _show_location_history(world, ctx=ctx)
+        else:
+            break
+
+
+def _show_world_map(sim: Simulator, ctx: UIContext | None = None) -> None:
+    """Three-layer map navigation: overview -> region -> detail.
+
+    PR-G2: Allows the player to view the world at three zoom levels,
+    reading danger, traffic, rumor, memorials, and aliases from the map.
+    """
+    from .map_renderer import build_map_info, render_world_overview, render_region_map, render_location_detail
+
+    ctx = _default_ctx(ctx)
+    out = ctx.out
+    inp = ctx.inp
+    world = sim.world
+    info = build_map_info(world)
+
+    while True:
+        out.print_line()
+        out.print_line(render_world_overview(info))
+        out.print_line()
+
+        action = ctx.choose_key(
+            tr("map_nav_prompt"),
+            [
+                ("region", tr("map_nav_region")),
+                ("detail", tr("map_nav_detail")),
+                ("legacy", tr("map_nav_legacy")),
+                ("back", tr("back_to_main")),
+            ],
+        )
+
+        if action == "region":
+            locations = sorted(world.grid.values(), key=lambda loc: loc.canonical_name)
+            out.print_line()
+            for i, loc in enumerate(locations, 1):
+                out.print_line(f"  {i}. {loc.canonical_name} ({tr_term(loc.region_type)})")
+            idx = _get_numeric_choice(
+                f"  {tr('enter_location_number')}", len(locations), ctx=ctx,
+            )
+            if idx is not None:
+                loc = locations[idx]
+                out.print_line()
+                out.print_line(render_region_map(info, loc.id))
+                inp.pause()
+
+        elif action == "detail":
+            locations = sorted(world.grid.values(), key=lambda loc: loc.canonical_name)
+            out.print_line()
+            for i, loc in enumerate(locations, 1):
+                out.print_line(f"  {i}. {loc.canonical_name} ({tr_term(loc.region_type)})")
+            idx = _get_numeric_choice(
+                f"  {tr('enter_location_number')}", len(locations), ctx=ctx,
+            )
+            if idx is not None:
+                loc = locations[idx]
+                mem_list = []
+                for mid in loc.memorial_ids:
+                    mems = world.get_memorials_for_location(loc.id)
+                    mem_list = [
+                        tr("memorial_entry", year=m.year, epitaph=m.epitaph)
+                        for m in mems
+                    ]
+                    break
+                trace_list = [t.get("text", "") for t in loc.live_traces[-5:]]
+                out.print_line()
+                out.print_line(render_location_detail(
+                    info, loc.id,
+                    memorials=mem_list or None,
+                    aliases=list(loc.aliases) or None,
+                    live_traces=trace_list or None,
+                ))
+                inp.pause()
+
+        elif action == "legacy":
+            out.print_line()
+            from .map_renderer import render_map_ascii
+            out.print_line(render_map_ascii(info))
+            inp.pause()
+
         else:
             break
 
