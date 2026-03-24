@@ -433,6 +433,13 @@ TEXT_JA: Dict[str, str] = {
     'location_memorials_count': '記念碑 {count}件',
     'location_aliases_count': '別称 {count}件',
     'location_traces_count': '痕跡 {count}件',
+    'monthly_report_card_header': '月間ハイライト（{year}年{month}月）',
+    'monthly_report_card_characters': '  注目人物: {names}',
+    'monthly_report_card_locations': '  注目地点: {names}',
+    'monthly_report_card_adventures': '  最近の冒険: {items}',
+    'monthly_report_card_memory': '  新しい記憶: {items}',
+    'auto_pause_context': '停止要因: {actor} @ {location}',
+    'auto_pause_supplemental': '補足停止理由: {reasons}',
 }
 
 TERMS_JA: Dict[str, str] = {

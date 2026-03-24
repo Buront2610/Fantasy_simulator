@@ -437,6 +437,13 @@ TEXT_EN: Dict[str, str] = {
     'location_memorials_count': '{count} memorial(s)',
     'location_aliases_count': '{count} alias(es)',
     'location_traces_count': '{count} trace(s)',
+    'monthly_report_card_header': 'Monthly highlights ({year}-{month})',
+    'monthly_report_card_characters': '  Notable people: {names}',
+    'monthly_report_card_locations': '  Notable places: {names}',
+    'monthly_report_card_adventures': '  Recent adventures: {items}',
+    'monthly_report_card_memory': '  New memories: {items}',
+    'auto_pause_context': 'Cause context: {actor} @ {location}',
+    'auto_pause_supplemental': 'Additional pause reasons: {reasons}',
 }
 
 TERMS_EN: Dict[str, str] = {}

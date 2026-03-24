@@ -23,6 +23,8 @@ from ..simulator import Simulator
 from .ui_helpers import fit_display_width
 from ..world import World
 from ..content.world_data import JOBS, RACES, WORLD_LORE
+from .presenters import AdventurePresenter, LocationPresenter, ReportPresenter
+from .view_models import AdventureSummaryView, LocationHistoryView, build_monthly_report_card_view
 
 from .ui_context import UIContext, _default_ctx
 
@@ -134,6 +136,8 @@ def _advance_auto(sim: Simulator, ctx: UIContext | None = None) -> None:
     )
     reason_key = f"auto_pause_{reason}"
     reason_text = tr(reason_key)
+    supplemental = result.get("supplemental_reasons", [])
+    pause_context = result.get("pause_context", {})
     years = months // 12
     remainder_months = months % 12
     if remainder_months == 0:
@@ -142,6 +146,13 @@ def _advance_auto(sim: Simulator, ctx: UIContext | None = None) -> None:
         out.print_warning(
             f"  {tr('auto_paused_after_months', years=years, months=remainder_months)}: {reason_text}"
         )
+    if pause_context:
+        actor = pause_context.get("character", "-")
+        location = pause_context.get("location", "-")
+        out.print_dim(f"  {tr('auto_pause_context', actor=actor, location=location)}")
+    if supplemental:
+        extras = ", ".join(tr(f"auto_pause_{r}") for r in supplemental[:3])
+        out.print_dim(f"  {tr('auto_pause_supplemental', reasons=extras)}")
 
 
 # ---------------------------------------------------------------------------
@@ -255,6 +266,10 @@ def _show_monthly_report(sim: Simulator, ctx: UIContext | None = None) -> None:
         return
     month = month_idx + 1
     out.print_line()
+    card = build_monthly_report_card_view(sim.world, year, month)
+    for line in ReportPresenter.render_monthly_card(card):
+        out.print_line(f"  {line}")
+    out.print_line()
     out.print_line(sim.get_monthly_report(year, month))
     ctx.inp.pause()
 
@@ -339,25 +354,25 @@ def _show_adventure_summaries(sim: Simulator, ctx: UIContext | None = None) -> N
     out.print_separator()
     for i, run in enumerate(runs, 1):
         status = tr(f"outcome_{run.outcome}") if run.outcome else tr(f"state_{run.state}")
-        loot = (
-            f" | {tr('loot_label')}: {', '.join(tr_term(item) for item in run.loot_summary)}"
-            if run.loot_summary else ""
-        )
-        injury = (
-            f" | {tr('injury_label')}: {tr(f'injury_status_{run.injury_status}')}"
-            if run.injury_status != "none" else ""
-        )
         origin_name = sim.world.location_name(run.origin)
         dest_name = sim.world.location_name(run.destination)
         if run.is_party:
             party_name = _party_display_names(sim.world, run)
-            leader_display = f"{party_name} [{tr('party_marker')}] ({tr('party_policy_short', policy=tr(f'policy_{run.policy}'))})"
+            leader_display = party_name
+            policy_label = tr(f"policy_{run.policy}")
         else:
             leader_display = run.character_name
-        out.print_line(
-            f"  {i:>2}. {leader_display} | {origin_name} -> {dest_name} "
-            f"| {status}{injury}{loot}"
+            policy_label = ""
+        view = AdventureSummaryView(
+            title=leader_display,
+            status=status,
+            origin=origin_name,
+            destination=dest_name,
+            policy=policy_label,
+            loot=[tr_term(item) for item in run.loot_summary],
+            injury=tr(f'injury_status_{run.injury_status}') if run.injury_status != "none" else "none",
         )
+        out.print_line(AdventurePresenter.render_summary_row(i, view))
     out.print_separator()
     ctx.inp.pause()
 
@@ -479,15 +494,15 @@ def _show_location_history(world: World, ctx: UIContext | None = None) -> None:
     locations = sorted(world.grid.values(), key=lambda loc: loc.canonical_name)
     out.print_line()
     for i, loc in enumerate(locations, 1):
-        tags = []
-        if loc.memorial_ids:
-            tags.append(tr("location_memorials_count", count=len(loc.memorial_ids)))
-        if loc.aliases:
-            tags.append(tr("location_aliases_count", count=len(loc.aliases)))
-        if loc.live_traces:
-            tags.append(tr("location_traces_count", count=len(loc.live_traces)))
-        tag_str = f"  [{', '.join(tags)}]" if tags else ""
-        out.print_line(f"  {i:>2}. {loc.canonical_name} ({tr_term(loc.region_type)}){tag_str}")
+        view = LocationHistoryView(
+            location_name=loc.canonical_name,
+            region_type=tr_term(loc.region_type),
+            aliases=list(loc.aliases),
+            memorials=list(loc.memorial_ids),
+            traces=[t.get("text", "") for t in loc.live_traces],
+            recent_event_count=len(loc.recent_event_ids),
+        )
+        out.print_line(LocationPresenter.render_location_row(i, view))
     out.print_line()
 
     idx = _get_numeric_choice(f"  {tr('enter_location_number')}", len(locations), ctx=ctx)
