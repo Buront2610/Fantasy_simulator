@@ -252,19 +252,21 @@ class AdventureMixin:
             if not names:
                 names = [run.character_name]
             party_str = self._format_party_names_from_list(names)
-            trace_text = tr(
-                "live_trace_party",
-                party=party_str,
-                destination=dest_name,
-                year=self.world.year,
-            )
+            if run.outcome == "retreat":
+                trace_key = "live_trace_party_retreat"
+            elif run.outcome == "injury":
+                trace_key = "live_trace_party_injury"
+            else:
+                trace_key = "live_trace_party_safe"
+            trace_text = tr(trace_key, party=party_str, destination=dest_name, year=self.world.year)
         else:
-            trace_text = tr(
-                "live_trace_solo",
-                name=run.character_name,
-                destination=dest_name,
-                year=self.world.year,
-            )
+            if run.outcome == "retreat":
+                trace_key = "live_trace_solo_retreat"
+            elif run.outcome == "injury":
+                trace_key = "live_trace_solo_injury"
+            else:
+                trace_key = "live_trace_solo_safe"
+            trace_text = tr(trace_key, name=run.character_name, destination=dest_name, year=self.world.year)
         self.world.add_live_trace(dest, self.world.year, run.character_name, trace_text)
 
         # -- Memorial + alias (death only) --------------------------------

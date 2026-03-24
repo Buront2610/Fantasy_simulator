@@ -400,6 +400,12 @@ TEXT_JA: Dict[str, str] = {
     # 生きた痕跡
     'live_trace_solo': '{name} が {destination} を訪れた（{year}年）。',
     'live_trace_party': '{party} が {destination} を訪れた（{year}年）。',
+    'live_trace_solo_safe': '{name} は {destination} から無事に帰還した（{year}年）。',
+    'live_trace_solo_retreat': '{name} は {destination} から撤退した（{year}年）。',
+    'live_trace_solo_injury': '{name} は {destination} から負傷して戻った（{year}年）。',
+    'live_trace_party_safe': '{party} は {destination} から無事に帰還した（{year}年）。',
+    'live_trace_party_retreat': '{party} は {destination} から撤退した（{year}年）。',
+    'live_trace_party_injury': '{party} は {destination} から負傷して戻った（{year}年）。',
     # 記念碑の碑文 — 最小 NarrativeContext ― 職業カテゴリ別 (design §E-2)
     'memorial_epitaph_warrior': (
         'ここに {name} 眠る。{year}年、{location} にて討たれた戦士。'

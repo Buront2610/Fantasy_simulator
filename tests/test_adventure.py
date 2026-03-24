@@ -13,6 +13,7 @@ from fantasy_simulator.adventure import (
     CHOICE_WITHDRAW,
     POLICY_CAUTIOUS,
     POLICY_ASSAULT,
+    POLICY_SWIFT,
     POLICY_TREASURE,
     POLICY_RESCUE,
     RETREAT_ON_SERIOUS,
@@ -463,6 +464,70 @@ def test_policy_modifies_loot_chance():
         year_started=1000, policy=POLICY_RESCUE,
     )
     assert treasure_run._compute_loot_chance([char]) > rescue_run._compute_loot_chance([char])
+
+
+def test_policy_modifies_supply_degradation_rate():
+    """Assault should deplete supply faster than swift under same random roll."""
+    assault_run = AdventureRun(
+        character_id="x",
+        character_name="X",
+        origin="loc_aethoria_capital",
+        destination="loc_thornwood",
+        year_started=1000,
+        policy=POLICY_ASSAULT,
+        supply_state=SUPPLY_FULL,
+    )
+    swift_run = AdventureRun(
+        character_id="x",
+        character_name="X",
+        origin="loc_aethoria_capital",
+        destination="loc_thornwood",
+        year_started=1000,
+        policy=POLICY_SWIFT,
+        supply_state=SUPPLY_FULL,
+    )
+    # Roll 0.16: assault threshold = 0.1875 (degrades), swift threshold = 0.105 (stays full)
+    assault_run._tick_supply(FakeRng([0.16]))
+    swift_run._tick_supply(FakeRng([0.16]))
+
+    assert assault_run.supply_state == SUPPLY_LOW
+    assert swift_run.supply_state == SUPPLY_FULL
+
+
+def test_policy_changes_pending_choice_defaults():
+    """Choice defaults should vary by policy and context."""
+    world = World()
+    char = _make_character()
+    world.add_character(char)
+
+    cautious_run = create_adventure_run(char, world, rng=FakeRng([0.99]))
+    cautious_run.policy = POLICY_CAUTIOUS
+    cautious_run.state = "traveling"
+    cautious_run.step(char, world, rng=FakeRng([0.10]))
+    assert cautious_run.pending_choice is not None
+    assert cautious_run.pending_choice.default_option == CHOICE_PROCEED_CAUTIOUSLY
+
+    assault_run = create_adventure_run(char, world, rng=FakeRng([0.99]))
+    assault_run.policy = POLICY_ASSAULT
+    assault_run.state = "traveling"
+    assault_run.step(char, world, rng=FakeRng([0.10]))
+    assert assault_run.pending_choice is not None
+    assert assault_run.pending_choice.default_option == CHOICE_PRESS_ON
+
+    # depth context defaults
+    cautious_run.pending_choice = None
+    cautious_run.state = "exploring"
+    cautious_run.step(char, world, rng=FakeRng([0.99, 0.01, 0.10]))
+    assert cautious_run.pending_choice is not None
+    assert cautious_run.pending_choice.context == "depth"
+    assert cautious_run.pending_choice.default_option == CHOICE_WITHDRAW
+
+    assault_run.pending_choice = None
+    assault_run.state = "exploring"
+    assault_run.step(char, world, rng=FakeRng([0.99, 0.01, 0.10]))
+    assert assault_run.pending_choice is not None
+    assert assault_run.pending_choice.context == "depth"
+    assert assault_run.pending_choice.default_option == CHOICE_PRESS_ON
 
 
 def test_party_ability_score_averages():

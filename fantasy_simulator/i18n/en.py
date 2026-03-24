@@ -404,6 +404,12 @@ TEXT_EN: Dict[str, str] = {
     # Live traces
     'live_trace_solo': '{name} passed through {destination} (Year {year}).',
     'live_trace_party': '{party} passed through {destination} (Year {year}).',
+    'live_trace_solo_safe': '{name} returned safely from {destination} (Year {year}).',
+    'live_trace_solo_retreat': '{name} retreated from {destination} (Year {year}).',
+    'live_trace_solo_injury': '{name} staggered back injured from {destination} (Year {year}).',
+    'live_trace_party_safe': '{party} returned safely from {destination} (Year {year}).',
+    'live_trace_party_retreat': '{party} retreated from {destination} (Year {year}).',
+    'live_trace_party_injury': '{party} returned wounded from {destination} (Year {year}).',
     # Memorial epitaphs — minimal NarrativeContext variant selection (design §E-2)
     'memorial_epitaph_warrior': (
         'Here fell {name}, a warrior who met their end at {location} in year {year}.'

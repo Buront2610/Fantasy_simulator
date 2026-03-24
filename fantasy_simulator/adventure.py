@@ -89,6 +89,16 @@ POLICY_LOOT_MOD: Dict[str, float] = {
     POLICY_ASSAULT: 1.10,
 }
 
+# supply_mod > 1.0 means faster depletion; < 1.0 slower depletion
+POLICY_SUPPLY_MOD: Dict[str, float] = {
+    POLICY_CAUTIOUS: 0.85,
+    POLICY_SWIFT: 0.70,
+    POLICY_TREASURE: 1.05,
+    POLICY_RESCUE: 0.90,
+    POLICY_RELIC: 1.00,
+    POLICY_ASSAULT: 1.25,
+}
+
 # Base injury probability thresholds (design §9.7)
 _BASE_INJURY_CHANCE: float = 0.18
 # _BASE_CRITICAL_RATIO: ratio between critical threshold and injury threshold
@@ -320,12 +330,42 @@ class AdventureRun:
 
     def _tick_supply(self, rng: Any) -> None:
         """Probabilistically degrade supply_state during exploration."""
+        policy_mod = POLICY_SUPPLY_MOD.get(self.policy, 1.0)
         if self.supply_state == SUPPLY_FULL:
-            if rng.random() < _SUPPLY_DEGRADE_FULL_TO_LOW:
+            if rng.random() < _SUPPLY_DEGRADE_FULL_TO_LOW * policy_mod:
                 self.supply_state = SUPPLY_LOW
         elif self.supply_state == SUPPLY_LOW:
-            if rng.random() < _SUPPLY_DEGRADE_LOW_TO_CRITICAL:
+            if rng.random() < _SUPPLY_DEGRADE_LOW_TO_CRITICAL * policy_mod:
                 self.supply_state = SUPPLY_CRITICAL
+
+    def _default_option_for_context(self, context: str) -> str:
+        """Return policy-aware default option for pending choice contexts.
+
+        Extension point: future decision_context can include vow/personality/
+        relationship and player-control flags.
+        """
+        if context == "approach":
+            approach_defaults = {
+                POLICY_CAUTIOUS: CHOICE_PROCEED_CAUTIOUSLY,
+                POLICY_RESCUE: CHOICE_PROCEED_CAUTIOUSLY,
+                POLICY_TREASURE: CHOICE_PRESS_ON,
+                POLICY_RELIC: CHOICE_PRESS_ON,
+                POLICY_SWIFT: CHOICE_PRESS_ON,
+                POLICY_ASSAULT: CHOICE_PRESS_ON,
+            }
+            return approach_defaults.get(self.policy, CHOICE_PROCEED_CAUTIOUSLY)
+
+        if context == "depth":
+            depth_defaults = {
+                POLICY_CAUTIOUS: CHOICE_WITHDRAW,
+                POLICY_RESCUE: CHOICE_WITHDRAW,
+                POLICY_SWIFT: CHOICE_PRESS_ON,
+                POLICY_TREASURE: CHOICE_PRESS_ON,
+                POLICY_RELIC: CHOICE_PRESS_ON,
+                POLICY_ASSAULT: CHOICE_PRESS_ON,
+            }
+            return depth_defaults.get(self.policy, CHOICE_WITHDRAW)
+        return CHOICE_WITHDRAW
 
     def _clear_member_adventures(self, world: "World") -> None:
         """Clear active_adventure_id for all non-leader party members."""
@@ -425,7 +465,7 @@ class AdventureRun:
                 self.pending_choice = AdventureChoice(
                     prompt=tr("choice_dangerous_approach", name=self.character_name, destination=dest_name),
                     options=[CHOICE_PRESS_ON, CHOICE_PROCEED_CAUTIOUSLY, CHOICE_RETREAT],
-                    default_option=CHOICE_PROCEED_CAUTIOUSLY,
+                    default_option=self._default_option_for_context("approach"),
                     context="approach",
                 )
                 self.state = "waiting_for_choice"
@@ -543,7 +583,7 @@ class AdventureRun:
             self.pending_choice = AdventureChoice(
                 prompt=tr("choice_press_deeper", name=self.character_name, destination=dest_name),
                 options=[CHOICE_PRESS_ON, CHOICE_WITHDRAW],
-                default_option=CHOICE_WITHDRAW,
+                default_option=self._default_option_for_context("depth"),
                 context="depth",
             )
             self.state = "waiting_for_choice"

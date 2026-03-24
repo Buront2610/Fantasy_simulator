@@ -488,3 +488,43 @@ class TestApplyWorldMemory:
         assert len(dest.live_traces) == 1
         assert len(world.memorials) == 0
         assert len(dest.aliases) == 0
+
+    def test_apply_world_memory_trace_text_reflects_outcome(self):
+        """Trace text should differ between safe_return and retreat outcomes."""
+        from unittest.mock import MagicMock
+        from fantasy_simulator.adventure import AdventureRun
+        from fantasy_simulator.simulation.adventure_coordinator import AdventureMixin
+
+        world = _make_world()
+        world.year = 1010
+
+        safe_run = MagicMock(spec=AdventureRun)
+        safe_run.destination = "loc_thornwood"
+        safe_run.character_id = "c_safe"
+        safe_run.character_name = "Aldric"
+        safe_run.outcome = "safe_return"
+        safe_run.year_started = 1009
+        safe_run.is_party = False
+        safe_run.member_ids = ["c_safe"]
+
+        retreat_run = MagicMock(spec=AdventureRun)
+        retreat_run.destination = "loc_thornwood"
+        retreat_run.character_id = "c_retreat"
+        retreat_run.character_name = "Lysara"
+        retreat_run.outcome = "retreat"
+        retreat_run.year_started = 1009
+        retreat_run.is_party = False
+        retreat_run.member_ids = ["c_retreat"]
+
+        mixin = object.__new__(AdventureMixin)
+        mixin.world = world
+        mixin.id_rng = random.Random(3)
+
+        mixin._apply_world_memory(safe_run)
+        mixin._apply_world_memory(retreat_run)
+
+        dest = world.get_location_by_id("loc_thornwood")
+        assert len(dest.live_traces) >= 2
+        safe_text = dest.live_traces[-2]["text"].lower()
+        retreat_text = dest.live_traces[-1]["text"].lower()
+        assert safe_text != retreat_text
