@@ -28,6 +28,47 @@ def _clamp_state(value: int) -> int:
     return max(0, min(100, int(value)))
 
 
+@dataclass
+class MemorialRecord:
+    """A permanent memorial created when a character dies at a location.
+
+    PR-F: world memory.  Memorial IDs are stored in
+    ``LocationState.memorial_ids``; full records live in
+    ``World.memorials`` keyed by ``memorial_id``.
+    """
+
+    memorial_id: str
+    character_id: str
+    character_name: str
+    location_id: str
+    year: int
+    cause: str    # e.g. "adventure_death", "battle_fatal"
+    epitaph: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "memorial_id": self.memorial_id,
+            "character_id": self.character_id,
+            "character_name": self.character_name,
+            "location_id": self.location_id,
+            "year": self.year,
+            "cause": self.cause,
+            "epitaph": self.epitaph,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "MemorialRecord":
+        return cls(
+            memorial_id=data["memorial_id"],
+            character_id=data["character_id"],
+            character_name=data["character_name"],
+            location_id=data["location_id"],
+            year=data["year"],
+            cause=data["cause"],
+            epitaph=data["epitaph"],
+        )
+
+
 # ------------------------------------------------------------------
 # Propagation rules (design doc §5.6)
 # ------------------------------------------------------------------
@@ -133,6 +174,7 @@ class LocationState:
     recent_event_ids: List[str] = field(default_factory=list)
     aliases: List[str] = field(default_factory=list)
     memorial_ids: List[str] = field(default_factory=list)
+    live_traces: List[Dict[str, Any]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         for field_name in (
@@ -204,6 +246,7 @@ class LocationState:
             "recent_event_ids": list(self.recent_event_ids),
             "aliases": list(self.aliases),
             "memorial_ids": list(self.memorial_ids),
+            "live_traces": list(self.live_traces),
         }
 
     @classmethod
@@ -248,6 +291,7 @@ class LocationState:
             recent_event_ids=list(data.get("recent_event_ids", [])),
             aliases=list(data.get("aliases", [])),
             memorial_ids=list(data.get("memorial_ids", [])),
+            live_traces=list(data.get("live_traces", [])),
         )
 
 
@@ -282,6 +326,8 @@ class World:
         self.rumor_archive: List[Rumor] = []
         self.active_adventures: List[AdventureRun] = []
         self.completed_adventures: List[AdventureRun] = []
+        # PR-F: keyed by memorial_id
+        self.memorials: Dict[str, MemorialRecord] = {}
         self._build_default_map()
 
     def _register_location(self, loc: LocationState) -> None:
@@ -412,6 +458,86 @@ class World:
             else:
                 remaining.append(run)
         self.active_adventures = remaining
+
+    # ------------------------------------------------------------------
+    # PR-F: World memory helpers
+    # ------------------------------------------------------------------
+
+    #: Maximum live traces kept per location (rolling window)
+    MAX_LIVE_TRACES = 10
+    #: Maximum aliases allowed per location
+    MAX_ALIASES = 3
+
+    def add_live_trace(
+        self,
+        location_id: str,
+        year: int,
+        char_name: str,
+        text: str,
+    ) -> None:
+        """Record a visitor trace at a location (design §E-2).
+
+        Traces are ephemeral footprints capped at ``MAX_LIVE_TRACES``
+        per location.  Oldest entries are dropped when the cap is reached.
+        """
+        loc = self._location_id_index.get(location_id)
+        if loc is None:
+            return
+        loc.live_traces.append({"year": year, "char_name": char_name, "text": text})
+        if len(loc.live_traces) > self.MAX_LIVE_TRACES:
+            loc.live_traces = loc.live_traces[-self.MAX_LIVE_TRACES:]
+
+    def add_memorial(
+        self,
+        memorial_id: str,
+        character_id: str,
+        character_name: str,
+        location_id: str,
+        year: int,
+        cause: str,
+        epitaph: str,
+    ) -> None:
+        """Create a permanent memorial at a location (design §E-2).
+
+        The memorial is stored in ``self.memorials`` and its ID is appended
+        to ``LocationState.memorial_ids`` for quick lookup.
+        """
+        record = MemorialRecord(
+            memorial_id=memorial_id,
+            character_id=character_id,
+            character_name=character_name,
+            location_id=location_id,
+            year=year,
+            cause=cause,
+            epitaph=epitaph,
+        )
+        self.memorials[memorial_id] = record
+        loc = self._location_id_index.get(location_id)
+        if loc is not None and memorial_id not in loc.memorial_ids:
+            loc.memorial_ids.append(memorial_id)
+
+    def add_alias(self, location_id: str, alias: str) -> None:
+        """Append an alias to a location if not already present (design §E-2).
+
+        Capped at ``MAX_ALIASES`` per location; duplicate strings are
+        silently ignored.
+        """
+        loc = self._location_id_index.get(location_id)
+        if loc is None:
+            return
+        if alias not in loc.aliases and len(loc.aliases) < self.MAX_ALIASES:
+            loc.aliases.append(alias)
+
+    def get_memorials_for_location(self, location_id: str) -> List[MemorialRecord]:
+        """Return all ``MemorialRecord`` objects associated with a location."""
+        loc = self._location_id_index.get(location_id)
+        if loc is None:
+            return []
+        return [
+            self.memorials[mid]
+            for mid in loc.memorial_ids
+            if mid in self.memorials
+        ]
 
     @property
     def location_names(self) -> List[str]:
@@ -663,6 +789,7 @@ class World:
             "rumor_archive": [r.to_dict() for r in self.rumor_archive],
             "active_adventures": [run.to_dict() for run in self.active_adventures],
             "completed_adventures": [run.to_dict() for run in self.completed_adventures],
+            "memorials": {k: v.to_dict() for k, v in self.memorials.items()},
         }
 
     @classmethod
@@ -696,6 +823,9 @@ class World:
         world.completed_adventures = [
             AdventureRun.from_dict(run) for run in data.get("completed_adventures", [])
         ]
+        world.memorials = {
+            k: MemorialRecord.from_dict(v) for k, v in data.get("memorials", {}).items()
+        }
         world.normalize_after_load()
         return world
 

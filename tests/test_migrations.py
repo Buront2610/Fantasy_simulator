@@ -6,6 +6,7 @@ from fantasy_simulator.persistence.migrations import (
     CURRENT_VERSION,
     _migrate_v1_to_v2,
     _migrate_v2_to_v3,
+    _migrate_v4_to_v5,
     migrate,
 )
 from fantasy_simulator.content.world_data import NAME_TO_LOCATION_ID
@@ -238,12 +239,85 @@ class TestMigrations:
             },
         }
         result = migrate(data)
-        assert result["schema_version"] == 3
+        # v3 data is migrated forward to CURRENT_VERSION (now 4 after PR-E)
+        assert result["schema_version"] == CURRENT_VERSION
         assert result["characters"][0]["favorite"] is True
         assert result["world"]["grid"][0]["canonical_name"] == "Aethoria Capital"
+        # v3→v4 migration adds party fields to adventures (none here, so grid stays intact)
 
     def test_current_version_constant(self):
-        assert CURRENT_VERSION == 3
+        assert CURRENT_VERSION == 5
+
+    def test_v3_to_v4_adds_party_fields_to_adventures(self):
+        """PR-E migration adds party fields to existing AdventureRun data."""
+        data = {
+            "schema_version": 3,
+            "characters": [],
+            "world": {
+                "grid": [],
+                "event_records": [],
+                "active_adventures": [
+                    {
+                        "character_id": "hero1",
+                        "character_name": "Aldric",
+                        "adventure_id": "abc123",
+                        "origin": "loc_aethoria_capital",
+                        "destination": "loc_thornwood",
+                        "year_started": 1000,
+                        "state": "exploring",
+                        "injury_status": "none",
+                        "steps_taken": 1,
+                        "outcome": None,
+                        "loot_summary": [],
+                        "summary_log": [],
+                        "detail_log": [],
+                        "pending_choice": None,
+                        "resolution_year": None,
+                    }
+                ],
+                "completed_adventures": [],
+            },
+        }
+        result = migrate(data)
+        assert result["schema_version"] == CURRENT_VERSION  # migrates to latest (v4→v5 also applied)
+
+        adv = result["world"]["active_adventures"][0]
+        # member_ids should default to [character_id] for solo legacy runs
+        assert adv["member_ids"] == ["hero1"]
+        assert adv["party_id"] is None
+        assert adv["policy"] == "cautious"
+        assert adv["retreat_rule"] == "on_serious"
+        assert adv["supply_state"] == "full"
+        assert adv["danger_level"] == 50
+
+    def test_v3_to_v4_already_has_member_ids_respected(self):
+        """If member_ids already exists (partial pre-migration), it is preserved."""
+        data = {
+            "schema_version": 3,
+            "characters": [],
+            "world": {
+                "grid": [],
+                "event_records": [],
+                "active_adventures": [
+                    {
+                        "character_id": "c1",
+                        "character_name": "A",
+                        "adventure_id": "xyz",
+                        "origin": "loc_aethoria_capital",
+                        "destination": "loc_thornwood",
+                        "year_started": 1000,
+                        "state": "traveling",
+                        "member_ids": ["c1", "c2"],   # already set
+                        "policy": "assault",
+                    }
+                ],
+                "completed_adventures": [],
+            },
+        }
+        result = migrate(data)
+        adv = result["world"]["active_adventures"][0]
+        assert adv["member_ids"] == ["c1", "c2"]
+        assert adv["policy"] == "assault"
 
     def test_future_version_raises_error(self):
         import pytest
@@ -255,3 +329,78 @@ class TestMigrations:
         }
         with pytest.raises(ValueError, match="schema_version 999"):
             migrate(data)
+
+    def test_v4_to_v5_adds_live_traces_and_memorials(self):
+        """PR-F migration adds live_traces to locations and memorials dict to world."""
+        data = {
+            "schema_version": 4,
+            "characters": [],
+            "world": {
+                "grid": [
+                    {
+                        "id": "loc_aethoria_capital",
+                        "canonical_name": "Aethoria Capital",
+                        "name": "Aethoria Capital",
+                        "description": "The capital.",
+                        "region_type": "city",
+                        "x": 2,
+                        "y": 2,
+                    },
+                    {
+                        "id": "loc_thornwood",
+                        "canonical_name": "Thornwood",
+                        "name": "Thornwood",
+                        "description": "Forest.",
+                        "region_type": "forest",
+                        "x": 0,
+                        "y": 1,
+                    },
+                ],
+                "event_records": [],
+                "active_adventures": [],
+                "completed_adventures": [],
+            },
+        }
+        result = _migrate_v4_to_v5(data)
+        assert result["schema_version"] == 5
+
+        # Every location gets live_traces
+        for loc_data in result["world"]["grid"]:
+            assert "live_traces" in loc_data
+            assert loc_data["live_traces"] == []
+
+        # World gets memorials dict
+        assert "memorials" in result["world"]
+        assert result["world"]["memorials"] == {}
+
+    def test_v4_to_v5_existing_live_traces_not_overwritten(self):
+        """If live_traces already present, migration leaves them alone."""
+        data = {
+            "schema_version": 4,
+            "characters": [],
+            "world": {
+                "grid": [
+                    {
+                        "id": "loc_aethoria_capital",
+                        "name": "Aethoria Capital",
+                        "description": "...",
+                        "region_type": "city",
+                        "x": 2, "y": 2,
+                        "live_traces": [{"year": 1001, "char_name": "X", "text": "X was here."}],
+                    },
+                ],
+                "event_records": [],
+                "active_adventures": [],
+                "completed_adventures": [],
+            },
+        }
+        result = _migrate_v4_to_v5(data)
+        loc = result["world"]["grid"][0]
+        assert len(loc["live_traces"]) == 1
+        assert loc["live_traces"][0]["char_name"] == "X"
+
+    def test_full_migration_from_v0_reaches_v5(self):
+        """A bare-minimum v0 save file migrates all the way to CURRENT_VERSION (5)."""
+        data = {"characters": [], "world": {"grid": []}}
+        result = migrate(data)
+        assert result["schema_version"] == CURRENT_VERSION

@@ -369,6 +369,81 @@ TEXT_EN: Dict[str, str] = {
     'season_unknown': 'Unknown',
     'monthly_report': 'Monthly report',
     'yearly_report': 'Yearly report',
+    # --- Party adventure strings (PR-E) ---
+    # Policy names (design §9.2)
+    'policy_cautious': 'Cautious Exploration',
+    'policy_swift': 'Swift Strike',
+    'policy_treasure': 'Treasure Hunt',
+    'policy_rescue': 'Rescue Priority',
+    'policy_relic': 'Relic Recovery',
+    'policy_assault': 'All-Out Assault',
+    # Supply states (design §9.1)
+    'supply_full': 'Full',
+    'supply_low': 'Low',
+    'supply_critical': 'Critical',
+    # Party formation / summary
+    'summary_party_set_out': '{party} set out from {origin} toward {destination}.',
+    'detail_party_set_out': '{party} began a joint expedition from {origin} toward {destination}.',
+    # Auto-retreat (design §9.5)
+    'summary_party_retreated_auto': "{name}'s party retreated from {destination}.",
+    'detail_party_retreated_auto': (
+        "{name}'s party pulled back from {destination} and began the return journey."
+    ),
+    # Scouting (no-discovery exploring step)
+    'summary_adventure_scouting': '{name} scouted the area around {destination}.',
+    'detail_adventure_scouting': (
+        '{name} carefully surveyed the surroundings of {destination} but found nothing of note.'
+    ),
+    # UI labels
+    'party_members_label': 'Party',
+    'party_policy_label': 'Policy',
+    'party_supply_label': 'Supply',
+    'party_marker': 'Party',
+    'party_policy_short': 'policy: {policy}',
+    # --- World memory strings (PR-F) ---
+    # Live traces
+    'live_trace_solo': '{name} passed through {destination} (Year {year}).',
+    'live_trace_party': '{party} passed through {destination} (Year {year}).',
+    'live_trace_solo_safe': '{name} returned safely from {destination} (Year {year}).',
+    'live_trace_solo_retreat': '{name} retreated from {destination} (Year {year}).',
+    'live_trace_solo_injury': '{name} staggered back injured from {destination} (Year {year}).',
+    'live_trace_party_safe': '{party} returned safely from {destination} (Year {year}).',
+    'live_trace_party_retreat': '{party} retreated from {destination} (Year {year}).',
+    'live_trace_party_injury': '{party} returned wounded from {destination} (Year {year}).',
+    # Memorial epitaphs — minimal NarrativeContext variant selection (design §E-2)
+    'memorial_epitaph_warrior': (
+        'Here fell {name}, a warrior who met their end at {location} in year {year}.'
+    ),
+    'memorial_epitaph_mage': (
+        'In memory of {name}, a seeker of knowledge lost at {location} in year {year}.'
+    ),
+    'memorial_epitaph_adventurer': (
+        'Here rests the spirit of {name}, an adventurer who perished at {location} in year {year}.'
+    ),
+    'memorial_epitaph_default': 'In memory of {name}, who fell at {location} in year {year}.',
+    # Location aliases generated from significant events
+    'alias_death_site': "Site of {name}'s Demise",
+    'alias_notable_site': "{name}'s Discovery",
+    # Location detail view UI labels
+    'location_detail_header': 'LOCATION DETAIL - {name}',
+    'location_aliases_label': 'Known as',
+    'location_live_traces_label': 'Recent visitors',
+    'location_memorials_label': 'Memorials',
+    'no_live_traces': 'No recent visitors recorded.',
+    'no_memorials': 'No memorials at this location.',
+    'memorial_entry': '[Year {year}] {epitaph}',
+    'location_history_menu': 'Location history',
+    'enter_location_number': 'Enter location number (or ENTER to cancel): ',
+    'location_memorials_count': '{count} memorial(s)',
+    'location_aliases_count': '{count} alias(es)',
+    'location_traces_count': '{count} trace(s)',
+    'monthly_report_card_header': 'Monthly highlights ({year}-{month})',
+    'monthly_report_card_characters': '  Notable people: {names}',
+    'monthly_report_card_locations': '  Notable places: {names}',
+    'monthly_report_card_adventures': '  Recent adventures: {items}',
+    'monthly_report_card_memory': '  New memories: {items}',
+    'auto_pause_context': 'Cause context: {actor} @ {location}',
+    'auto_pause_supplemental': 'Additional pause reasons: {reasons}',
 }
 
 TERMS_EN: Dict[str, str] = {}

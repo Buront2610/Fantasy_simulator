@@ -1,0 +1,100 @@
+"""UI view models derived from canonical WorldEventRecord data.
+
+This module is intentionally small and additive: it provides stable
+data shapes for screen rendering without exposing domain internals.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Dict, List, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..events import WorldEventRecord
+    from ..world import World
+
+
+@dataclass
+class AdventureSummaryView:
+    title: str
+    status: str
+    origin: str
+    destination: str
+    policy: str = ""
+    loot: List[str] = field(default_factory=list)
+    injury: str = "none"
+
+
+@dataclass
+class LocationHistoryView:
+    location_name: str
+    region_type: str
+    aliases: List[str] = field(default_factory=list)
+    memorials: List[str] = field(default_factory=list)
+    traces: List[str] = field(default_factory=list)
+    recent_event_count: int = 0
+
+
+@dataclass
+class MonthlyReportCardView:
+    year: int
+    month: int
+    highlighted_characters: List[str] = field(default_factory=list)
+    highlighted_locations: List[str] = field(default_factory=list)
+    completed_adventures: List[str] = field(default_factory=list)
+    new_memory_items: List[str] = field(default_factory=list)
+
+
+@dataclass
+class NotificationItemView:
+    year: int
+    month: int
+    text: str
+    kind: str
+    location_id: str | None
+
+
+def build_notification_views(records: List["WorldEventRecord"]) -> List[NotificationItemView]:
+    return [
+        NotificationItemView(
+            year=r.year,
+            month=r.month,
+            text=r.description,
+            kind=r.kind,
+            location_id=r.location_id,
+        )
+        for r in records
+    ]
+
+
+def build_monthly_report_card_view(world: "World", year: int, month: int) -> MonthlyReportCardView:
+    event_records = getattr(world, "event_records", [])
+    records = [r for r in event_records if r.year == year and r.month == month]
+    chars: Dict[str, int] = {}
+    locs: Dict[str, int] = {}
+    completed_adventures: List[str] = []
+    new_memory: List[str] = []
+    for r in records:
+        if r.primary_actor_id:
+            chars[r.primary_actor_id] = chars.get(r.primary_actor_id, 0) + 1
+        if r.location_id:
+            locs[r.location_id] = locs.get(r.location_id, 0) + 1
+        if r.kind in ("adventure_resolved", "adventure_choice"):
+            completed_adventures.append(r.description)
+        if r.kind in ("death", "adventure_death", "adventure_discovery"):
+            new_memory.append(r.description)
+
+    char_lookup = {c.char_id: c.name for c in getattr(world, "characters", [])}
+    highlights = [char_lookup.get(cid, cid) for cid, _ in sorted(chars.items(), key=lambda x: -x[1])[:3]]
+    if hasattr(world, "location_name"):
+        location_highlights = [world.location_name(lid) for lid, _ in sorted(locs.items(), key=lambda x: -x[1])[:3]]
+    else:
+        location_highlights = [lid for lid, _ in sorted(locs.items(), key=lambda x: -x[1])[:3]]
+    return MonthlyReportCardView(
+        year=year,
+        month=month,
+        highlighted_characters=highlights,
+        highlighted_locations=location_highlights,
+        completed_adventures=completed_adventures[:3],
+        new_memory_items=new_memory[:3],
+    )

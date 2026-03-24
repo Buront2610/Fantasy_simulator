@@ -60,6 +60,13 @@ class MapCellInfo:
     mood_label: str = ""
     rumor_heat: int = 0
     road_condition: int = 50
+    # vNext render hints (banded/boolean overlay fields)
+    danger_band: str = "medium"
+    traffic_band: str = "medium"
+    rumor_heat_band: str = "low"
+    has_memorial: bool = False
+    has_alias: bool = False
+    recent_death_site: bool = False
 
 
 @dataclass
@@ -96,12 +103,20 @@ def build_map_info(
         height=world.height,
     )
 
+    death_site_location_ids = {
+        rec.location_id for rec in world.event_records[-120:]
+        if rec.kind in ("death", "battle_fatal", "adventure_death") and rec.location_id
+    }
+
     for (x, y), loc in world.grid.items():
         is_highlight = (
             highlight_location is not None
             and (loc.id == highlight_location or loc.canonical_name == highlight_location)
         )
         population = len(world.get_characters_at_location(loc.id))
+        danger_band = "low" if loc.danger < 34 else "high" if loc.danger >= 67 else "medium"
+        traffic_band = "low" if loc.traffic < 34 else "high" if loc.traffic >= 67 else "medium"
+        rumor_heat_band = "low" if loc.rumor_heat < 34 else "high" if loc.rumor_heat >= 67 else "medium"
         info.cells[(x, y)] = MapCellInfo(
             location_id=loc.id,
             canonical_name=loc.canonical_name,
@@ -120,6 +135,12 @@ def build_map_info(
             mood_label=loc.mood_label,
             rumor_heat=loc.rumor_heat,
             road_condition=loc.road_condition,
+            danger_band=danger_band,
+            traffic_band=traffic_band,
+            rumor_heat_band=rumor_heat_band,
+            has_memorial=bool(loc.memorial_ids),
+            has_alias=bool(loc.aliases),
+            recent_death_site=loc.id in death_site_location_ids,
         )
     return info
 

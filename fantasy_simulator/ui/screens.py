@@ -23,6 +23,8 @@ from ..simulator import Simulator
 from .ui_helpers import fit_display_width
 from ..world import World
 from ..content.world_data import JOBS, RACES, WORLD_LORE
+from .presenters import AdventurePresenter, LocationPresenter, ReportPresenter
+from .view_models import AdventureSummaryView, LocationHistoryView, build_monthly_report_card_view
 
 from .ui_context import UIContext, _default_ctx
 
@@ -134,6 +136,8 @@ def _advance_auto(sim: Simulator, ctx: UIContext | None = None) -> None:
     )
     reason_key = f"auto_pause_{reason}"
     reason_text = tr(reason_key)
+    supplemental = result.get("supplemental_reasons", [])
+    pause_context = result.get("pause_context", {})
     years = months // 12
     remainder_months = months % 12
     if remainder_months == 0:
@@ -142,6 +146,13 @@ def _advance_auto(sim: Simulator, ctx: UIContext | None = None) -> None:
         out.print_warning(
             f"  {tr('auto_paused_after_months', years=years, months=remainder_months)}: {reason_text}"
         )
+    if pause_context:
+        actor = pause_context.get("character", "-")
+        location = pause_context.get("location", "-")
+        out.print_dim(f"  {tr('auto_pause_context', actor=actor, location=location)}")
+    if supplemental:
+        extras = ", ".join(tr(f"auto_pause_{r}") for r in supplemental[:3])
+        out.print_dim(f"  {tr('auto_pause_supplemental', reasons=extras)}")
 
 
 # ---------------------------------------------------------------------------
@@ -178,6 +189,7 @@ def _show_results(sim: Simulator, ctx: UIContext | None = None) -> None:
                 ("character_story", tr("character_story")),
                 ("all_character_stories", tr("all_character_stories")),
                 ("simulation_summary", tr("simulation_summary")),
+                ("location_history", tr("location_history_menu")),
                 ("back_to_main", tr("back_to_main")),
             ],
         )
@@ -228,6 +240,8 @@ def _show_results(sim: Simulator, ctx: UIContext | None = None) -> None:
             out.print_line()
             out.print_line(sim.get_summary())
             inp.pause()
+        elif action == "location_history":
+            _show_location_history(world, ctx=ctx)
         else:
             break
 
@@ -251,6 +265,10 @@ def _show_monthly_report(sim: Simulator, ctx: UIContext | None = None) -> None:
     if month_idx is None:
         return
     month = month_idx + 1
+    out.print_line()
+    card = build_monthly_report_card_view(sim.world, year, month)
+    for line in ReportPresenter.render_monthly_card(card):
+        out.print_line(f"  {line}")
     out.print_line()
     out.print_line(sim.get_monthly_report(year, month))
     ctx.inp.pause()
@@ -336,20 +354,25 @@ def _show_adventure_summaries(sim: Simulator, ctx: UIContext | None = None) -> N
     out.print_separator()
     for i, run in enumerate(runs, 1):
         status = tr(f"outcome_{run.outcome}") if run.outcome else tr(f"state_{run.state}")
-        loot = (
-            f" | {tr('loot_label')}: {', '.join(tr_term(item) for item in run.loot_summary)}"
-            if run.loot_summary else ""
-        )
-        injury = (
-            f" | {tr('injury_label')}: {tr(f'injury_status_{run.injury_status}')}"
-            if run.injury_status != "none" else ""
-        )
         origin_name = sim.world.location_name(run.origin)
         dest_name = sim.world.location_name(run.destination)
-        out.print_line(
-            f"  {i:>2}. {run.character_name} | {origin_name} -> {dest_name} "
-            f"| {status}{injury}{loot}"
+        if run.is_party:
+            party_name = _party_display_names(sim.world, run)
+            leader_display = party_name
+            policy_label = tr(f"policy_{run.policy}")
+        else:
+            leader_display = run.character_name
+            policy_label = ""
+        view = AdventureSummaryView(
+            title=leader_display,
+            status=status,
+            origin=origin_name,
+            destination=dest_name,
+            policy=policy_label,
+            loot=[tr_term(item) for item in run.loot_summary],
+            injury=tr(f'injury_status_{run.injury_status}') if run.injury_status != "none" else "none",
         )
+        out.print_line(AdventurePresenter.render_summary_row(i, view))
     out.print_separator()
     ctx.inp.pause()
 
@@ -384,6 +407,18 @@ def _show_adventure_details(sim: Simulator, ctx: UIContext | None = None) -> Non
         f"  {tr('route'):<11}: {sim.world.location_name(run.origin)} -> "
         f"{sim.world.location_name(run.destination)}"
     )
+    # Show party members for multi-member adventures
+    if run.is_party:
+        member_names = []
+        for mid in run.member_ids:
+            c = sim.world.get_character_by_id(mid)
+            if c is not None:
+                member_names.append(c.name)
+        if not member_names:
+            member_names = [run.character_name]
+        out.print_line(f"  {tr('party_members_label'):<11}: {', '.join(member_names)}")
+        out.print_line(f"  {tr('party_policy_label'):<11}: {tr(f'policy_{run.policy}')}")
+        out.print_line(f"  {tr('party_supply_label'):<11}: {tr(f'supply_{run.supply_state}')}")
     out.print_line(f"  {tr('state'):<11}: {tr(f'state_{run.state}')}")
     out.print_line(
         f"  {tr('outcome'):<11}: {tr(f'outcome_{run.outcome}') if run.outcome else tr('unresolved')}"
@@ -439,6 +474,70 @@ def _resolve_pending_adventure_choice(sim: Simulator, ctx: UIContext | None = No
         out.print_success(f"  {tr('choice_resolved')}")
     else:
         out.print_error(f"  {tr('choice_resolve_failed')}")
+    ctx.inp.pause()
+
+
+# ---------------------------------------------------------------------------
+# Location history (PR-F: world memory)
+# ---------------------------------------------------------------------------
+
+def _show_location_history(world: World, ctx: UIContext | None = None) -> None:
+    """Show live traces, memorials, and aliases for a selected location.
+
+    PR-F (design §E-2): Surfaces world memory data — who visited, who
+    died there, and any aliases the location has gained — so the player
+    can observe how the world has been shaped over time.
+    """
+    ctx = _default_ctx(ctx)
+    out = ctx.out
+
+    locations = sorted(world.grid.values(), key=lambda loc: loc.canonical_name)
+    out.print_line()
+    for i, loc in enumerate(locations, 1):
+        view = LocationHistoryView(
+            location_name=loc.canonical_name,
+            region_type=tr_term(loc.region_type),
+            aliases=list(loc.aliases),
+            memorials=list(loc.memorial_ids),
+            traces=[t.get("text", "") for t in loc.live_traces],
+            recent_event_count=len(loc.recent_event_ids),
+        )
+        out.print_line(LocationPresenter.render_location_row(i, view))
+    out.print_line()
+
+    idx = _get_numeric_choice(f"  {tr('enter_location_number')}", len(locations), ctx=ctx)
+    if idx is None:
+        return
+
+    loc = locations[idx]
+    out.print_line()
+    out.print_separator()
+    out.print_heading(f"  {tr('location_detail_header', name=loc.canonical_name)}")
+    out.print_separator()
+
+    # Aliases
+    if loc.aliases:
+        out.print_line(f"  {tr('location_aliases_label')}: {', '.join(loc.aliases)}")
+        out.print_line()
+
+    # Memorials
+    out.print_line(f"  {tr('location_memorials_label')}:")
+    memorials = world.get_memorials_for_location(loc.id)
+    if memorials:
+        for mem in memorials:
+            out.print_line(f"    {tr('memorial_entry', year=mem.year, epitaph=mem.epitaph)}")
+    else:
+        out.print_dim(f"    {tr('no_memorials')}")
+
+    # Live traces (most recent first, up to 5)
+    out.print_line()
+    out.print_line(f"  {tr('location_live_traces_label')}:")
+    if loc.live_traces:
+        for trace in reversed(loc.live_traces[-5:]):
+            out.print_line(f"    - {trace['text']}")
+    else:
+        out.print_dim(f"    {tr('no_live_traces')}")
+
     ctx.inp.pause()
 
 
@@ -634,3 +733,18 @@ def screen_world_lore(ctx: UIContext | None = None) -> None:
         out.print_wrapped(jdesc)
         out.print_line()
     ctx.inp.pause()
+
+
+def _party_display_names(world: World, run: Any, max_shown: int = 3) -> str:
+    names = []
+    for mid in run.member_ids:
+        c = world.get_character_by_id(mid)
+        if c is not None:
+            names.append(c.name)
+    if not names:
+        names = [run.character_name]
+    shown = names[:max_shown]
+    label = " & ".join(shown)
+    if len(names) > max_shown:
+        label += f" +{len(names) - max_shown}"
+    return label
