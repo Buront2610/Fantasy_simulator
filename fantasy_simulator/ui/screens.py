@@ -13,6 +13,7 @@ prompt_toolkit, or Textual in future phases.
 
 from __future__ import annotations
 
+import shutil
 from typing import Any, List, Optional
 
 from ..character import Character
@@ -406,13 +407,32 @@ def _show_world_map(sim: Simulator, ctx: UIContext | None = None) -> None:
     inp = ctx.inp
     world = sim.world
     info = build_map_info(world)
-    atlas_mode = "wide"  # default mode
+    atlas_mode = "auto"  # default mode
+
+    def _resolved_mode() -> str:
+        if atlas_mode != "auto":
+            return atlas_mode
+        width = 80
+        getter = getattr(out, "get_terminal_width", None)
+        if callable(getter):
+            try:
+                width = int(getter())
+            except Exception:
+                width = 80
+        else:
+            width = shutil.get_terminal_size(fallback=(80, 24)).columns
+        if width < 40:
+            return "minimal"
+        if width < 68:
+            return "compact"
+        return "wide"
 
     while True:
         out.print_line()
-        if atlas_mode == "compact":
+        render_mode = _resolved_mode()
+        if render_mode == "compact":
             out.print_line(render_atlas_compact(info))
-        elif atlas_mode == "minimal":
+        elif render_mode == "minimal":
             out.print_line(render_atlas_minimal(info))
         else:
             out.print_line(render_atlas_overview(info))
@@ -487,6 +507,7 @@ def _show_world_map(sim: Simulator, ctx: UIContext | None = None) -> None:
             new_mode = ctx.choose_key(
                 tr("atlas_mode_prompt"),
                 [
+                    ("auto", tr("atlas_mode_auto")),
                     ("wide", tr("atlas_mode_wide")),
                     ("compact", tr("atlas_mode_compact")),
                     ("minimal", tr("atlas_mode_minimal")),

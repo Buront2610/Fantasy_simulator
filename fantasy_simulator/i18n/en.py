@@ -513,6 +513,7 @@ TEXT_EN: Dict[str, str] = {
     'map_nav_select': 'Jump to site (direct selection)',
     'map_nav_mode': 'Switch atlas display mode',
     'atlas_mode_prompt': 'Display mode',
+    'atlas_mode_auto': 'Auto (fit terminal width)',
     'atlas_mode_wide': 'Wide atlas (full)',
     'atlas_mode_compact': 'Compact atlas (narrow)',
     'atlas_mode_minimal': 'Minimal (text only)',

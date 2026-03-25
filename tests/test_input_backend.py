@@ -14,7 +14,12 @@ import unittest
 from unittest.mock import patch, MagicMock
 
 from fantasy_simulator.i18n import set_locale
-from fantasy_simulator.ui.input_backend import InputBackend, StdInputBackend
+from fantasy_simulator.ui.input_backend import (
+    InputBackend,
+    PromptToolkitInputBackend,
+    StdInputBackend,
+    create_default_input_backend,
+)
 
 
 class TestStdInputBackendReadLine(unittest.TestCase):
@@ -125,6 +130,33 @@ class TestCustomInputBackend(unittest.TestCase):
         )
         backend.pause("done")
         self.assertEqual(len(backend.calls), 3)
+
+
+class TestPromptToolkitDefaultFactory(unittest.TestCase):
+    """Default input backend factory should degrade gracefully."""
+
+    def test_factory_falls_back_to_std_when_prompt_toolkit_unavailable(self) -> None:
+        with patch(
+            "fantasy_simulator.ui.input_backend.PromptToolkitInputBackend",
+            side_effect=ImportError("no prompt_toolkit"),
+        ):
+            backend = create_default_input_backend()
+        self.assertIsInstance(backend, StdInputBackend)
+
+    def test_factory_prefers_prompt_toolkit_when_available(self) -> None:
+        fake = object()
+        with patch(
+            "fantasy_simulator.ui.input_backend.PromptToolkitInputBackend",
+            return_value=fake,
+        ):
+            backend = create_default_input_backend()
+        self.assertIs(backend, fake)
+
+    def test_prompt_toolkit_menu_key_uses_default(self) -> None:
+        backend = PromptToolkitInputBackend.__new__(PromptToolkitInputBackend)
+        backend._prompt = lambda _p: ""
+        key = backend.read_menu_key([("a", "A"), ("b", "B")], default="2")
+        self.assertEqual(key, "b")
 
 
 if __name__ == "__main__":

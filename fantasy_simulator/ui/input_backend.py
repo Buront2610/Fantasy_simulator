@@ -54,3 +54,42 @@ class StdInputBackend:
     def pause(self, message: str = "") -> None:
         from .ui_helpers import _pause
         _pause(message)
+
+
+class PromptToolkitInputBackend(StdInputBackend):
+    """Input backend that uses prompt_toolkit when available."""
+
+    def __init__(self) -> None:
+        from prompt_toolkit import prompt
+
+        self._prompt = prompt
+
+    def read_line(self, prompt: str = "") -> str:
+        return self._prompt(prompt)
+
+    def read_menu_key(
+        self,
+        key_label_pairs: List[Tuple[str, str]],
+        default: Optional[str] = None,
+    ) -> str:
+        while True:
+            raw = self.read_line("  > ").strip()
+            if not raw and default is not None and default.isdigit():
+                idx = int(default) - 1
+                if 0 <= idx < len(key_label_pairs):
+                    return key_label_pairs[idx][0]
+            if raw.isdigit():
+                idx = int(raw) - 1
+                if 0 <= idx < len(key_label_pairs):
+                    return key_label_pairs[idx][0]
+
+    def pause(self, message: str = "") -> None:
+        self.read_line(message or "")
+
+
+def create_default_input_backend() -> InputBackend:
+    """Return prompt_toolkit backend when available; otherwise stdin input."""
+    try:
+        return PromptToolkitInputBackend()
+    except Exception:
+        return StdInputBackend()

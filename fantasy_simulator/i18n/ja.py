@@ -509,6 +509,7 @@ TEXT_JA: Dict[str, str] = {
     'map_nav_select': '地点へジャンプ（直接選択）',
     'map_nav_mode': 'アトラス表示モード切替',
     'atlas_mode_prompt': '表示モード',
+    'atlas_mode_auto': '自動（端末幅に合わせる）',
     'atlas_mode_wide': 'ワイドアトラス（全幅）',
     'atlas_mode_compact': 'コンパクトアトラス（狭幅）',
     'atlas_mode_minimal': 'ミニマル（テキストのみ）',

@@ -137,3 +137,78 @@ class PrintRenderBackend:
     def format_status(self, text: str, positive: bool) -> str:
         from .ui_helpers import green, red
         return green(text) if positive else red(text)
+
+    def get_terminal_width(self) -> int:
+        """Best-effort terminal width for responsive rendering."""
+        import shutil
+
+        return shutil.get_terminal_size(fallback=(80, 24)).columns
+
+
+class RichRenderBackend(PrintRenderBackend):
+    """Thin Rich-based shell with graceful fallback to ANSI/plain rendering."""
+
+    def __init__(self) -> None:
+        from rich.console import Console
+
+        self._console = Console()
+        self._force_plain = not self._console.color_system
+
+    def print_line(self, text: str = "") -> None:
+        self._console.print(text)
+
+    def print_heading(self, text: str) -> None:
+        self._console.print(f"[bold]{text}[/bold]")
+
+    def print_separator(self, char: str = "=", width: int = 62) -> None:
+        from rich.rule import Rule
+
+        self._console.print(Rule(characters=char, style="dim"))
+
+    def print_error(self, text: str) -> None:
+        self._console.print(text, style="bold red")
+
+    def print_success(self, text: str) -> None:
+        self._console.print(text, style="bold green")
+
+    def print_warning(self, text: str) -> None:
+        self._console.print(text, style="bold yellow")
+
+    def print_dim(self, text: str) -> None:
+        self._console.print(text, style="dim")
+
+    def print_highlighted(self, text: str) -> None:
+        self._console.print(text, style="bold cyan")
+
+    def print_menu(
+        self,
+        prompt: str,
+        key_label_pairs: List[Tuple[str, str]],
+        default: Optional[str] = None,
+    ) -> None:
+        from rich.panel import Panel
+        from rich.table import Table
+
+        table = Table(show_header=True, header_style="bold magenta")
+        table.add_column("#", justify="right", style="bold")
+        table.add_column("Option")
+        for i, (_, label) in enumerate(key_label_pairs, 1):
+            mark = " [dim](default)[/dim]" if default == str(i) else ""
+            table.add_row(str(i), f"{label}{mark}")
+        self._console.print(Panel(table, title=prompt, border_style="cyan"))
+
+    def format_status(self, text: str, positive: bool) -> str:
+        if self._force_plain:
+            return text
+        return f"[green]{text}[/green]" if positive else f"[red]{text}[/red]"
+
+    def get_terminal_width(self) -> int:
+        return self._console.size.width
+
+
+def create_default_render_backend() -> RenderBackend:
+    """Return Rich backend when available; otherwise ANSI print backend."""
+    try:
+        return RichRenderBackend()
+    except Exception:
+        return PrintRenderBackend()

@@ -179,10 +179,10 @@ supports:
 
 ## Near-Term Priorities
 
-- Strengthen the region layer of the observation UI so it becomes a readable
-  local decision map (PR-H1)
-- Introduce a thin Rich-based presentation shell to improve layout, emphasis,
-  and input assistance (PR-H2)
+- Expand `NarrativeContext` so relation tags, rumors, memorials, and reports
+  can drive context-aware text selection (PR-I)
+- Continue world setting externalization work toward the first formal
+  `SettingBundle` authoring pass (PR-J)
 - Treat worldgen PoC work as parallel technical validation, not the next
   blocking mainline milestone
 

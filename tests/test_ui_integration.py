@@ -9,10 +9,12 @@ swappable.
 from __future__ import annotations
 
 import io
+import os
 import re
 import unittest
 from contextlib import redirect_stdout
 from typing import List, Optional, Tuple
+from unittest.mock import patch
 
 from fantasy_simulator.character import Character
 from fantasy_simulator.i18n import set_locale
@@ -70,7 +72,7 @@ class RecordingRenderBackend:
     @property
     def text(self) -> str:
         """Concatenate all printed text for simple substring checks."""
-        return "\n".join(t for (_, *rest) in self.calls for t in rest)
+        return "\n".join(str(t) for (_, *rest) in self.calls for t in rest)
 
 
 class ScriptedInputBackend:
@@ -187,6 +189,52 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         # Backend must have captured output (even if event log happens to be empty,
         # the separator/heading calls prove the route goes through backends)
         self.assertTrue(len(out.calls) > 3, "Too few backend calls captured")
+
+    def test_world_map_auto_mode_uses_compact_on_narrow_terminal(self) -> None:
+        from fantasy_simulator.ui.screens import _show_results, _build_default_world
+
+        world = _build_default_world(num_characters=4, seed=42)
+        from fantasy_simulator.simulator import Simulator
+        sim = Simulator(world, events_per_year=2)
+        sim.advance_years(1)
+
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(menu_keys=["world_map", "back_to_main", "back_to_main"])
+        ctx = UIContext(inp=inp, out=out)
+
+        with (
+            patch("shutil.get_terminal_size", return_value=os.terminal_size((50, 24))),
+            patch("fantasy_simulator.ui.atlas_renderer.render_atlas_overview", return_value="WIDE"),
+            patch("fantasy_simulator.ui.atlas_renderer.render_atlas_compact", return_value="COMPACT"),
+            patch("fantasy_simulator.ui.atlas_renderer.render_atlas_minimal", return_value="MINIMAL"),
+        ):
+            _show_results(sim, ctx=ctx)
+
+        self.assertIn("COMPACT", out.text)
+        self.assertNotIn("WIDE", out.text)
+
+    def test_world_map_auto_mode_uses_minimal_on_tiny_terminal(self) -> None:
+        from fantasy_simulator.ui.screens import _show_results, _build_default_world
+
+        world = _build_default_world(num_characters=4, seed=42)
+        from fantasy_simulator.simulator import Simulator
+        sim = Simulator(world, events_per_year=2)
+        sim.advance_years(1)
+
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(menu_keys=["world_map", "back_to_main", "back_to_main"])
+        ctx = UIContext(inp=inp, out=out)
+
+        with (
+            patch("shutil.get_terminal_size", return_value=os.terminal_size((30, 24))),
+            patch("fantasy_simulator.ui.atlas_renderer.render_atlas_overview", return_value="WIDE"),
+            patch("fantasy_simulator.ui.atlas_renderer.render_atlas_compact", return_value="COMPACT"),
+            patch("fantasy_simulator.ui.atlas_renderer.render_atlas_minimal", return_value="MINIMAL"),
+        ):
+            _show_results(sim, ctx=ctx)
+
+        self.assertIn("MINIMAL", out.text)
+        self.assertNotIn("WIDE", out.text)
 
 
 class TestShowRosterUsesBackends(unittest.TestCase):

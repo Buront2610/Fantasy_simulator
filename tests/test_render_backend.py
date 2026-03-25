@@ -18,7 +18,11 @@ import unittest
 from contextlib import redirect_stdout
 from unittest.mock import patch
 
-from fantasy_simulator.ui.render_backend import PrintRenderBackend, RenderBackend
+from fantasy_simulator.ui.render_backend import (
+    PrintRenderBackend,
+    RenderBackend,
+    create_default_render_backend,
+)
 
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
@@ -249,6 +253,18 @@ class TestCustomRenderBackend(unittest.TestCase):
         self.assertEqual(backend.lines[6], ("wrapped", "long text"))
         self.assertEqual(backend.lines[7], ("dim", "faint"))
         self.assertEqual(backend.lines[8], ("highlighted", "accent"))
+
+
+class TestRenderBackendFactory(unittest.TestCase):
+    """Default renderer factory should degrade gracefully."""
+
+    def test_factory_falls_back_to_print_backend(self) -> None:
+        with patch(
+            "fantasy_simulator.ui.render_backend.RichRenderBackend",
+            side_effect=ImportError("no rich"),
+        ):
+            backend = create_default_render_backend()
+        self.assertIsInstance(backend, PrintRenderBackend)
 
 
 if __name__ == "__main__":

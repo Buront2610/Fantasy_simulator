@@ -22,8 +22,8 @@ from __future__ import annotations
 
 from typing import List, Optional, Tuple
 
-from .input_backend import InputBackend, StdInputBackend
-from .render_backend import RenderBackend, PrintRenderBackend
+from .input_backend import InputBackend, create_default_input_backend
+from .render_backend import RenderBackend, create_default_render_backend
 
 
 class UIContext:
@@ -45,8 +45,8 @@ class UIContext:
         inp: InputBackend | None = None,
         out: RenderBackend | None = None,
     ) -> None:
-        self.inp: InputBackend = inp or StdInputBackend()
-        self.out: RenderBackend = out or PrintRenderBackend()
+        self.inp: InputBackend = inp or create_default_input_backend()
+        self.out: RenderBackend = out or create_default_render_backend()
 
     def choose_key(
         self,
