@@ -164,6 +164,28 @@ class TestPromptToolkitDefaultFactory(unittest.TestCase):
         key = backend.read_menu_key([("alpha", "A"), ("beta", "B")], default="1")
         self.assertEqual(key, "beta")
 
+    def test_prompt_toolkit_invalid_then_valid_string(self) -> None:
+        backend = PromptToolkitInputBackend.__new__(PromptToolkitInputBackend)
+        replies = iter(["invalid", "2"])
+        backend._session = type("S", (), {"prompt": staticmethod(lambda *_a, **_k: next(replies))})()
+        key = backend.read_menu_key([("alpha", "A"), ("beta", "B")], default="1")
+        self.assertEqual(key, "beta")
+
+    def test_prompt_toolkit_out_of_range_then_valid(self) -> None:
+        backend = PromptToolkitInputBackend.__new__(PromptToolkitInputBackend)
+        replies = iter(["99", "1"])
+        backend._session = type("S", (), {"prompt": staticmethod(lambda *_a, **_k: next(replies))})()
+        key = backend.read_menu_key([("alpha", "A"), ("beta", "B")], default=None)
+        self.assertEqual(key, "alpha")
+
+    def test_factory_does_not_swallow_runtime_error(self) -> None:
+        with patch(
+            "fantasy_simulator.ui.input_backend.PromptToolkitInputBackend",
+            side_effect=RuntimeError("boom"),
+        ):
+            with self.assertRaises(RuntimeError):
+                create_default_input_backend()
+
 
 if __name__ == "__main__":
     unittest.main()

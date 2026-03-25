@@ -162,10 +162,10 @@ class RichRenderBackend(PrintRenderBackend):
         self._force_plain = not self._console.color_system
 
     def print_line(self, text: str = "") -> None:
-        self._console.print(text)
+        self._console.print(text, markup=False)
 
     def print_heading(self, text: str) -> None:
-        self._console.print(f"[bold]{text}[/bold]")
+        self._console.print(text, style="bold", markup=False)
 
     def print_separator(self, char: str = "=", width: int = 62) -> None:
         from rich.rule import Rule
@@ -210,9 +210,7 @@ class RichRenderBackend(PrintRenderBackend):
         self._console.print(Panel(text, title=title, border_style="blue"))
 
     def format_status(self, text: str, positive: bool) -> str:
-        if self._force_plain:
-            return text
-        return f"[green]{text}[/green]" if positive else f"[red]{text}[/red]"
+        return text
 
     def get_terminal_width(self) -> int:
         return self._console.size.width
@@ -222,5 +220,5 @@ def create_default_render_backend() -> RenderBackend:
     """Return Rich backend when available; otherwise ANSI print backend."""
     try:
         return RichRenderBackend()
-    except Exception:
+    except (ImportError, ModuleNotFoundError):
         return PrintRenderBackend()

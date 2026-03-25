@@ -69,6 +69,9 @@ class RecordingRenderBackend:
     def print_menu(self, prompt: str, key_label_pairs, default=None) -> None:
         self.calls.append(("print_menu", prompt, len(key_label_pairs)))
 
+    def print_panel(self, title: str, text: str) -> None:
+        self.calls.append(("print_panel", title, text))
+
     @property
     def text(self) -> str:
         """Concatenate all printed text for simple substring checks."""
@@ -250,6 +253,22 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         _show_results(sim, ctx=ctx)
         self.assertIn("Semantic legend", out.text)
         self.assertIn("Keys:", out.text)
+
+    def test_world_map_uses_panel_when_backend_supports_it(self) -> None:
+        from fantasy_simulator.ui.screens import _show_results, _build_default_world
+
+        world = _build_default_world(num_characters=4, seed=42)
+        from fantasy_simulator.simulator import Simulator
+        sim = Simulator(world, events_per_year=2)
+        sim.advance_years(1)
+
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(menu_keys=["world_map", "back_to_main", "back_to_main"])
+        ctx = UIContext(inp=inp, out=out)
+        _show_results(sim, ctx=ctx)
+
+        panel_calls = [c for c in out.calls if c[0] == "print_panel"]
+        self.assertGreaterEqual(len(panel_calls), 1)
 
 
 class TestShowRosterUsesBackends(unittest.TestCase):

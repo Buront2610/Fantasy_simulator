@@ -276,6 +276,45 @@ class TestRenderBackendFactory(unittest.TestCase):
         self.assertIn("line1", text)
         self.assertIn("line2", text)
 
+    def test_factory_does_not_swallow_runtime_error(self) -> None:
+        with patch(
+            "fantasy_simulator.ui.render_backend.RichRenderBackend",
+            side_effect=RuntimeError("boom"),
+        ):
+            with self.assertRaises(RuntimeError):
+                create_default_render_backend()
+
+
+class TestRichRenderBackendSafety(unittest.TestCase):
+    """Rich backend should avoid implicit markup interpolation hazards."""
+
+    def test_print_line_disables_markup(self) -> None:
+        from fantasy_simulator.ui.render_backend import RichRenderBackend
+
+        backend = RichRenderBackend.__new__(RichRenderBackend)
+        backend._console = unittest.mock.Mock()
+        backend._force_plain = False
+        backend.print_line("[danger]")
+        backend._console.print.assert_called_once_with("[danger]", markup=False)
+
+    def test_print_heading_disables_markup_and_uses_style(self) -> None:
+        from fantasy_simulator.ui.render_backend import RichRenderBackend
+
+        backend = RichRenderBackend.__new__(RichRenderBackend)
+        backend._console = unittest.mock.Mock()
+        backend._force_plain = False
+        backend.print_heading("[Heading]")
+        backend._console.print.assert_called_once_with("[Heading]", style="bold", markup=False)
+
+    def test_format_status_returns_plain_text(self) -> None:
+        from fantasy_simulator.ui.render_backend import RichRenderBackend
+
+        backend = RichRenderBackend.__new__(RichRenderBackend)
+        backend._console = unittest.mock.Mock()
+        backend._force_plain = False
+        status = backend.format_status("[alive]", True)
+        self.assertEqual(status, "[alive]")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -76,15 +76,18 @@ class PromptToolkitInputBackend(StdInputBackend):
         from ..i18n import tr
         try:
             from prompt_toolkit.completion import WordCompleter
+            from prompt_toolkit.validation import Validator
         except Exception:
             WordCompleter = None  # type: ignore[assignment]
+            Validator = None  # type: ignore[assignment]
 
         labels = [str(i) for i in range(1, len(key_label_pairs) + 1)]
         keys = [k for (k, _label) in key_label_pairs]
         completer = WordCompleter(labels + keys, ignore_case=True) if WordCompleter else None
         prompt = f"  {tr('your_choice')}: "
-        while True:
-            raw = self._session.prompt(prompt, completer=completer).strip()
+
+        def _resolve(raw_text: str) -> Optional[str]:
+            raw = raw_text.strip()
             for key in keys:
                 if raw.lower() == key.lower():
                     return key
@@ -96,6 +99,26 @@ class PromptToolkitInputBackend(StdInputBackend):
                 idx = int(raw) - 1
                 if 0 <= idx < len(key_label_pairs):
                     return key_label_pairs[idx][0]
+            return None
+
+        validator = None
+        if Validator is not None:
+            validator = Validator.from_callable(
+                lambda text: _resolve(text) is not None,
+                error_message=tr("invalid_choice"),
+                move_cursor_to_end=True,
+            )
+
+        while True:
+            raw = self._session.prompt(
+                prompt,
+                completer=completer,
+                validator=validator,
+                validate_while_typing=False,
+            )
+            resolved = _resolve(raw)
+            if resolved is not None:
+                return resolved
 
     def pause(self, message: str = "") -> None:
         self.read_line(message or "")
@@ -105,5 +128,5 @@ def create_default_input_backend() -> InputBackend:
     """Return prompt_toolkit backend when available; otherwise stdin input."""
     try:
         return PromptToolkitInputBackend()
-    except Exception:
+    except (ImportError, ModuleNotFoundError):
         return StdInputBackend()
