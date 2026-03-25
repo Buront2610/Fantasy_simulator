@@ -1,14 +1,14 @@
 # UI改造計画書
 
-**最終更新**: 2026-03-24（PR-G 再定義反映）
+**最終更新**: 2026-03-25（PR-H1 は完了　次の公式着手対象は PR-H2）
 
 この文書は、`Fantasy_simulator` のユーザインタフェース（UI）を現状の簡素な CLI から、物語生成ゲームにふさわしい魅力的な体験へ進化させるための計画書である。前半では現状の問題と目標を整理し、後半では5つの専門領域（世界シミュレーション、運営型シム、インタラクティブ叙述、4X設計、ソフトウェアアーキテクチャ）の視点から提案された改善策をまとめる。最後に採用するライブラリや段階的な実行計画を提示する。
 
 > **関連文書**: 本計画は `docs/implementation_plan.md`（公式な実装順・PR 分割・完了条件の正本）の `location_id` 移行・`WorldEventRecord` 導入・UI 連携規約、および `docs/next_version_plan.md` の `NarrativeContext` / `MapRenderInfo` 設計を前提としている。UI 改造の実装順や着手条件が他文書と衝突する場合は `docs/implementation_plan.md` を優先する。データモデルや migration の詳細はそれぞれの文書を参照のこと。
 >
-> **現時点の前提**: `docs/implementation_plan.md` 上では PR-0 から PR-G2 までが main に反映済みであり、
-> terrain/site/route 分離と atlas 観測 UI 初版は導入済みである。次の公式着手対象は
-> **PR-H（region map 強化本体 + 軽量 Rich シェル）**、その後 **PR-I** とする。本書もこの前提で読む。
+> **現時点の前提**: `docs/implementation_plan.md` 上では PR-0 から PR-H1 までが main に反映済みであり、
+> region mapの意味化は導入済みである。次の公式着手対象は
+> **PR-H2（軽量 Rich シェル）**、その後 **PR-I** とする。本書もこの前提で読む。
 
 ---
 
@@ -210,15 +210,20 @@ map renderer は最低でも次のモードを持つ。
 - [x] 月報カードなど一部表示を `WorldEventRecord` 起点の view model へ切り替える
 - [ ] `wcwidth` による幅計算ユーティリティを整理する
 
-### Phase 1：薄いリッチ化
+### Phase 1：薄いリッチ化　
+> 注: PR-H1 完了により region map の意味論強化は先行完了、以後この Phase では固定レイアウト / 見出し / 余白 / 強調 / 操作導線の整理を主対象とする
 - [ ] Rich を導入し、観測画面のレイアウト、見出し、余白、強調を整理する
 - [ ] タイトルや章見出しに Rich の `Panel` / `Text` / `Rule` を用いた軽量装飾を適用する
 - [ ] prompt_toolkit によりメニュー選択やコマンド入力を段階的に改善する
 
 ### Phase 2：PR-G（可変ワールド対応・地形表現・観測 UI 初版）
+> 注: region map の読解性強化は後続の PR-H1 で補強済み
 - [x] `terrain + site overlay` を扱える world-scale map renderer を導入する
 - [x] ワールド全体図で海岸線、山脈、森林帯、平野、主要 route、world memory を表示できるようにする
 - [ ] 地域図で導線、峠、河川、門、市場、掲示板、墓碑、事故地点、封鎖道、痕跡を判断可能な形で読めるようにする
+  - [x]  PR-G2 で region 基盤は導入済み
+  - [x]  PR-H1 で summary / closure / danger / rumor / world memory の読解性を強化済み
+  - [ ]  門 / 市場 / 掲示板 / 河川などの richer local semantics の拡張
 - [x] 地点詳細図で局所 AA / 準AA と最近の痕跡を接続する
 - [x] world サイズが固定 5×5 でなくても描画できるようにする
 - [x] `wide` / `compact` / `minimal` 表示モードを導入する
@@ -245,18 +250,24 @@ map renderer は最低でも次のモードを持つ。
 
 - [x] 既存の `test_screens.py`, `test_ui_helpers.py` を移行中も維持し、旧 entry point と helper の互換性を確認する
 - [x] `test_ui_integration.py` で `RecordingRenderBackend` / `ScriptedInputBackend` を用いた統合テストを追加し、UI 基盤が差し替え可能であることを証明する（ゼロ stdout 漏洩テスト含む）
-- [ ] 日本語英語混在時のセンタリング、表幅、AA 罫線が崩れないことを確認する幅崩れテストを追加する
-- [ ] メインメニュー、ワールドマップ、月報、キャラクター一覧など主要画面の文字出力スナップショット比較テストを追加する
+- [x] 可変サイズ world map の描画テストを追加する
+- [x] terrain + site overlay の観測 UI テストを追加する
+- [x] `has_memorial` / `has_alias` / `recent_death_site` フラグが地図に反映されることを確認する
+- [x] region map の summary / closure / danger / rumor / world memory の focused テストを追加する
+- [x] region / atlas の一部画面について snapshot-style テストを追加する
+- [x] `compact` / `minimal` 表示について EN / JA の表示幅 budget 検証を追加する
+- [ ] 日本語英語混在時のセンタリング、表幅、AA 罫線が崩れないことを確認する包括的な幅崩れテストを拡張する
+- [ ] メインメニュー、ワールドマップ、月報、キャラクター一覧など主要画面全体の文字出力スナップショット比較テストを追加する
 - [ ] `WorldEventRecord` から期待するパネル・レポート・通知カードが生成されることを確認するイベント表示テストを追加する
-- [ ] 可変サイズ world map の描画テストを追加する
-- [ ] terrain + site overlay の snapshot テストを追加する
-- [ ] `has_memorial` / `has_alias` / `recent_death_site` フラグが地図に反映されることを確認する
-- [ ] 狭幅端末時に `compact` / `minimal` 表示へ落ちることを確認する
-- [ ] seed 固定 terrain preview の再現性テストを追加する
+- [ ] 端末幅に応じて `compact` / `minimal` 表示へ自動的に切り替える統合テストは PR-H2 で追加する
+- [ ] seed 固定 terrain preview / worldgen PoC の再現性テストは PR-G3 以降で追加する
 
 ## 結論
 
-短期的には **Rich + prompt_toolkit + wcwidth** の組み合わせが最も実用的で、既存 CLI を大きく壊さずに観測体験を改善できる。ただし順序は Rich 先行ではなく、**region map の意味論強化を主線、薄い Rich 化を補助線** とする。prompt_toolkit と将来の Textual は根本的に異なる入力モデルであるため、prompt_toolkit 依存コードは入力抽象の背後に隔離する。
+短期的には **Rich + prompt_toolkit + wcwidth** の組み合わせが最も実用的で、既存 CLI を大きく壊さずに観測体験を改善できる。ただし順序は Rich 先行ではなく、**region map の意味論強化を主線、薄い Rich 化を補助線** とする。
+region map の意味論強化は PR-H1 で完了
+次段では PR-H2 として、薄い Rich 化を本線として進める
+prompt_toolkit と将来の Textual は根本的に異なる入力モデルであるため、prompt_toolkit 依存コードは入力抽象の背後に隔離する。
 
 そのうえで、次段階の map UI は「5×5 地点盤面の豪華化」ではなく、**terrain を持つ world の上に site と route が重なり、さらに world memory が履歴として染み出す観測 UI** として設計する。  
 main の現状では、このうち PR-G1 / PR-G2 に相当する基盤はすでに導入済みである。以後の UI 課題は、
