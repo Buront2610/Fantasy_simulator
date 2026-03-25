@@ -413,13 +413,9 @@ def _show_world_map(sim: Simulator, ctx: UIContext | None = None) -> None:
         if atlas_mode != "auto":
             return atlas_mode
         width = 80
-        getter = getattr(out, "get_terminal_width", None)
-        if callable(getter):
-            try:
-                width = int(getter())
-            except Exception:
-                width = 80
-        else:
+        try:
+            width = int(out.get_terminal_width())
+        except Exception:
             width = shutil.get_terminal_size(fallback=(80, 24)).columns
         if width < 40:
             return "minimal"
@@ -438,12 +434,7 @@ def _show_world_map(sim: Simulator, ctx: UIContext | None = None) -> None:
             atlas_text = render_atlas_overview(info)
 
         panel_title = f"{tr('world_map')} ({tr('atlas_mode_' + render_mode)})"
-        panel_renderer = getattr(out, "print_panel", None)
-        if callable(panel_renderer):
-            panel_renderer(panel_title, atlas_text)
-        else:
-            out.print_heading(f"  {panel_title}")
-            out.print_line(atlas_text)
+        out.print_panel(panel_title, atlas_text)
 
         # --- Direct selection shortlist (item 11) ---
         labeled = atlas_labeled_sites(info)

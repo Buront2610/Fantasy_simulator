@@ -72,6 +72,11 @@ class RecordingRenderBackend:
     def print_panel(self, title: str, text: str) -> None:
         self.calls.append(("print_panel", title, text))
 
+    def get_terminal_width(self) -> int:
+        import shutil
+
+        return shutil.get_terminal_size(fallback=(80, 24)).columns
+
     @property
     def text(self) -> str:
         """Concatenate all printed text for simple substring checks."""

@@ -8,6 +8,8 @@ from typing import Dict
 TEXT_JA: Dict[str, str] = {
     'press_enter': '[ENTERで続行]',
     'your_choice': '選択',
+    'menu_option_column': '項目',
+    'menu_default_short': '既定',
     'year_label': '年',
     'age_short_label': '年齢',
     'gender_label': '性別',

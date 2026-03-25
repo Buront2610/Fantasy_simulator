@@ -8,6 +8,7 @@ touching presentation or domain code.
 
 from __future__ import annotations
 
+import os
 from typing import List, Optional, Protocol, Tuple, runtime_checkable
 
 
@@ -82,15 +83,11 @@ class PromptToolkitInputBackend(StdInputBackend):
             Validator = None  # type: ignore[assignment]
 
         labels = [str(i) for i in range(1, len(key_label_pairs) + 1)]
-        keys = [k for (k, _label) in key_label_pairs]
-        completer = WordCompleter(labels + keys, ignore_case=True) if WordCompleter else None
+        completer = WordCompleter(labels, ignore_case=False) if WordCompleter else None
         prompt = f"  {tr('your_choice')}: "
 
         def _resolve(raw_text: str) -> Optional[str]:
             raw = raw_text.strip()
-            for key in keys:
-                if raw.lower() == key.lower():
-                    return key
             if not raw and default is not None and default.isdigit():
                 idx = int(default) - 1
                 if 0 <= idx < len(key_label_pairs):
@@ -125,7 +122,16 @@ class PromptToolkitInputBackend(StdInputBackend):
 
 
 def create_default_input_backend() -> InputBackend:
-    """Return prompt_toolkit backend when available; otherwise stdin input."""
+    """Return default input backend.
+
+    Default is ``StdInputBackend`` for reproducibility.  Set
+    ``FANTASY_SIMULATOR_INPUT_BACKEND=prompt_toolkit`` to opt in.
+    """
+    selected = os.getenv("FANTASY_SIMULATOR_INPUT_BACKEND", "").strip().lower()
+    if selected in {"", "std", "stdin"}:
+        return StdInputBackend()
+    if selected not in {"prompt_toolkit", "prompt"}:
+        return StdInputBackend()
     try:
         return PromptToolkitInputBackend()
     except (ImportError, ModuleNotFoundError):

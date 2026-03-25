@@ -3,9 +3,9 @@ ui_context.py - Dependency container for the UI layer.
 
 ``UIContext`` bundles an ``InputBackend`` and ``RenderBackend`` together
 so that all screen functions receive a single injection point.  When no
-context is supplied, factory defaults are used (prompt_toolkit / Rich when
-available, otherwise ``StdInputBackend`` + ``PrintRenderBackend``), so
-existing callers keep working while richer backends are auto-selected.
+context is supplied, factory defaults are used (``StdInputBackend`` +
+``PrintRenderBackend``).  Rich/prompt_toolkit are opt-in via environment
+variables, so default behavior remains reproducible.
 
 Example (production)::
 

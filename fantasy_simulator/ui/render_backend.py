@@ -8,6 +8,7 @@ touching input or domain code.
 
 from __future__ import annotations
 
+import os
 import textwrap
 from typing import List, Optional, Protocol, Tuple, runtime_checkable
 
@@ -74,6 +75,14 @@ class RenderBackend(Protocol):
         row or a progress line with an inline alive-count.
         Plain / test backends may return *text* unchanged.
         """
+        ...  # pragma: no cover
+
+    def print_panel(self, title: str, text: str) -> None:
+        """Print a titled panel block."""
+        ...  # pragma: no cover
+
+    def get_terminal_width(self) -> int:
+        """Return best-effort terminal width in columns."""
         ...  # pragma: no cover
 
 
@@ -159,7 +168,6 @@ class RichRenderBackend(PrintRenderBackend):
         from rich.console import Console
 
         self._console = Console()
-        self._force_plain = not self._console.color_system
 
     def print_line(self, text: str = "") -> None:
         self._console.print(text, markup=False)
@@ -168,9 +176,7 @@ class RichRenderBackend(PrintRenderBackend):
         self._console.print(text, style="bold", markup=False)
 
     def print_separator(self, char: str = "=", width: int = 62) -> None:
-        from rich.rule import Rule
-
-        self._console.print(Rule(characters=char, style="dim"))
+        self._console.print("  " + (char * width), style="dim", markup=False)
 
     def print_error(self, text: str) -> None:
         self._console.print(text, style="bold red")
@@ -193,15 +199,19 @@ class RichRenderBackend(PrintRenderBackend):
         key_label_pairs: List[Tuple[str, str]],
         default: Optional[str] = None,
     ) -> None:
+        from ..i18n import tr
         from rich.panel import Panel
         from rich.table import Table
+        from rich.text import Text
 
         table = Table(show_header=True, header_style="bold magenta")
         table.add_column("#", justify="right", style="bold")
-        table.add_column("Option")
+        table.add_column(tr("menu_option_column"))
         for i, (_, label) in enumerate(key_label_pairs, 1):
-            mark = " [dim](default)[/dim]" if default == str(i) else ""
-            table.add_row(str(i), f"{label}{mark}")
+            label_text = Text(label)
+            if default == str(i):
+                label_text.append(f" ({tr('menu_default_short')})", style="dim")
+            table.add_row(str(i), label_text)
         self._console.print(Panel(table, title=prompt, border_style="cyan"))
 
     def print_panel(self, title: str, text: str) -> None:
@@ -217,7 +227,16 @@ class RichRenderBackend(PrintRenderBackend):
 
 
 def create_default_render_backend() -> RenderBackend:
-    """Return Rich backend when available; otherwise ANSI print backend."""
+    """Return default render backend.
+
+    Default is ``PrintRenderBackend`` for reproducibility.  Set
+    ``FANTASY_SIMULATOR_UI_BACKEND=rich`` to opt in to Rich.
+    """
+    selected = os.getenv("FANTASY_SIMULATOR_UI_BACKEND", "").strip().lower()
+    if selected in {"", "plain", "print"}:
+        return PrintRenderBackend()
+    if selected not in {"rich"}:
+        return PrintRenderBackend()
     try:
         return RichRenderBackend()
     except (ImportError, ModuleNotFoundError):

@@ -13,6 +13,7 @@ These tests verify:
 from __future__ import annotations
 
 import io
+from os import environ
 import re
 import unittest
 from contextlib import redirect_stdout
@@ -230,6 +231,12 @@ class TestCustomRenderBackend(unittest.TestCase):
             def print_menu(self, prompt, key_label_pairs, default=None) -> None:
                 self.lines.append(("menu", prompt, len(key_label_pairs)))
 
+            def print_panel(self, title: str, text: str) -> None:
+                self.lines.append(("panel", title, text))
+
+            def get_terminal_width(self) -> int:
+                return 80
+
         backend = BufferRenderBackend()
         self.assertIsInstance(backend, RenderBackend)
 
@@ -259,10 +266,18 @@ class TestRenderBackendFactory(unittest.TestCase):
     """Default renderer factory should degrade gracefully."""
 
     def test_factory_falls_back_to_print_backend(self) -> None:
-        with patch(
-            "fantasy_simulator.ui.render_backend.RichRenderBackend",
-            side_effect=ImportError("no rich"),
+        with (
+            patch.dict(environ, {"FANTASY_SIMULATOR_UI_BACKEND": "rich"}, clear=False),
+            patch(
+                "fantasy_simulator.ui.render_backend.RichRenderBackend",
+                side_effect=ImportError("no rich"),
+            ),
         ):
+            backend = create_default_render_backend()
+        self.assertIsInstance(backend, PrintRenderBackend)
+
+    def test_factory_defaults_to_print_without_opt_in(self) -> None:
+        with patch.dict(environ, {"FANTASY_SIMULATOR_UI_BACKEND": ""}, clear=False):
             backend = create_default_render_backend()
         self.assertIsInstance(backend, PrintRenderBackend)
 
@@ -277,9 +292,12 @@ class TestRenderBackendFactory(unittest.TestCase):
         self.assertIn("line2", text)
 
     def test_factory_does_not_swallow_runtime_error(self) -> None:
-        with patch(
-            "fantasy_simulator.ui.render_backend.RichRenderBackend",
-            side_effect=RuntimeError("boom"),
+        with (
+            patch.dict(environ, {"FANTASY_SIMULATOR_UI_BACKEND": "rich"}, clear=False),
+            patch(
+                "fantasy_simulator.ui.render_backend.RichRenderBackend",
+                side_effect=RuntimeError("boom"),
+            ),
         ):
             with self.assertRaises(RuntimeError):
                 create_default_render_backend()
@@ -311,9 +329,45 @@ class TestRichRenderBackendSafety(unittest.TestCase):
 
         backend = RichRenderBackend.__new__(RichRenderBackend)
         backend._console = unittest.mock.Mock()
-        backend._force_plain = False
         status = backend.format_status("[alive]", True)
         self.assertEqual(status, "[alive]")
+
+    def test_print_menu_uses_i18n_and_no_markup_strings(self) -> None:
+        try:
+            import rich  # noqa: F401
+        except ImportError:
+            self.skipTest("rich is not installed")
+
+        from fantasy_simulator.i18n import set_locale
+        from fantasy_simulator.ui.render_backend import RichRenderBackend
+
+        set_locale("ja")
+        backend = RichRenderBackend.__new__(RichRenderBackend)
+        backend._console = unittest.mock.Mock()
+
+        class FakeTable:
+            def __init__(self, *args, **kwargs) -> None:
+                self.columns = []
+                self.rows = []
+
+            def add_column(self, name, **_kwargs) -> None:
+                self.columns.append(name)
+
+            def add_row(self, idx, label) -> None:
+                self.rows.append((idx, label))
+
+        fake_table = FakeTable()
+        fake_panel = object()
+        with (
+            patch("rich.table.Table", return_value=fake_table),
+            patch("rich.panel.Panel", return_value=fake_panel),
+        ):
+            backend.print_menu("Prompt", [("k1", "項目A"), ("k2", "項目B")], default="1")
+
+        self.assertIn("項目", fake_table.columns)
+        row_label = fake_table.rows[0][1]
+        self.assertFalse(isinstance(row_label, str))
+        backend._console.print.assert_called_once_with(fake_panel)
 
 
 if __name__ == "__main__":

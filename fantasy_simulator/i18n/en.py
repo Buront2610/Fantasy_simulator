@@ -8,6 +8,8 @@ from typing import Dict
 TEXT_EN: Dict[str, str] = {
     'press_enter': '[Press ENTER to continue]',
     'your_choice': 'Your choice',
+    'menu_option_column': 'Option',
+    'menu_default_short': 'default',
     'year_label': 'Year',
     'age_short_label': 'age',
     'gender_label': 'Gender',
