@@ -13,7 +13,7 @@ from __future__ import annotations
 import random
 import unittest
 
-from fantasy_simulator.i18n import set_locale
+from fantasy_simulator.i18n import set_locale, tr
 from fantasy_simulator.ui.map_renderer import (
     MapCellInfo,
     MapRenderInfo,
@@ -34,6 +34,7 @@ from fantasy_simulator.ui.atlas_renderer import (
     _cluster_sites,
     _overlay_suffix as _atlas_overlay_suffix,
 )
+from fantasy_simulator.ui.ui_helpers import display_width
 from fantasy_simulator.world import World
 
 
@@ -100,6 +101,11 @@ def _make_simple_info() -> MapRenderInfo:
         route_type="road",
     ))
     return info
+
+
+def _focus_section(output: str) -> str:
+    """Return the focus-summary slice from a rendered region map."""
+    return output.split(f"{tr('map_region_focus')}:", 1)[1].split(f"{tr('map_region_nearby')}:", 1)[0]
 
 
 class TestOverlaySuffix(unittest.TestCase):
@@ -196,8 +202,11 @@ class TestRenderWorldOverview(unittest.TestCase):
 
     def test_route_listed(self) -> None:
         output = render_world_overview(self.info)
-        self.assertIn("loc_test_town", output)
-        self.assertIn("loc_forest_camp", output)
+        self.assertIn("TestTown <-> ForestCamp", output)
+        self.assertIn("Routes:", output)
+        route_section = output.split("Routes:", 1)[1]
+        self.assertNotIn("loc_test_town", route_section)
+        self.assertNotIn("loc_forest_camp", route_section)
 
     def test_terrain_glyph_in_grid(self) -> None:
         """Terrain-only cells should show their biome glyph."""
@@ -232,7 +241,214 @@ class TestRenderRegionMap(unittest.TestCase):
 
     def test_routes_from_center(self) -> None:
         output = render_region_map(self.info, "loc_test_town", radius=2)
-        self.assertIn("loc_forest_camp", output)
+        self.assertIn("ForestCamp", output)
+        self.assertNotIn("loc_forest_camp <->", output)
+
+    def test_focus_summary_calls_out_notable_route_and_danger(self) -> None:
+        output = render_region_map(self.info, "loc_test_town", radius=2)
+        self.assertIn("What stands out here", output)
+        focus_section = _focus_section(output)
+        self.assertIn("Route: ForestCamp via Road", focus_section)
+        self.assertIn("Danger: ForestCamp is a high-risk site", focus_section)
+
+    def test_focus_summary_calls_out_landmark_memory(self) -> None:
+        output = render_region_map(
+            self.info,
+            "loc_test_town",
+            radius=2,
+            site_traces={"loc_test_town": ["Adventurer passed through"]},
+        )
+        self.assertIn("Trace: TestTown shows recent movement", output)
+
+    def test_focus_summary_calls_out_rumor_hotspot(self) -> None:
+        info = _make_simple_info()
+        rumor_cell = info.cells[(0, 0)]
+        rumor_cell.rumor_heat = 90
+        rumor_cell.rumor_heat_band = "high"
+        output = render_region_map(info, "loc_test_town", radius=2)
+        focus_section = _focus_section(output)
+        self.assertIn("Rumor: ForestCamp is buzzing with talk", focus_section)
+        nearby_section = output.split("Nearby sites:", 1)[1]
+        self.assertNotIn("Rumor: ForestCamp is buzzing with talk", nearby_section)
+
+    def test_focus_summary_comes_before_nearby_list(self) -> None:
+        output = render_region_map(self.info, "loc_test_town", radius=2)
+        self.assertLess(output.index("What stands out here"), output.index("Nearby sites"))
+
+    def test_blocked_route_is_marked_in_nearby_list_and_summary(self) -> None:
+        info = _make_simple_info()
+        info.routes[0].blocked = True
+        output = render_region_map(info, "loc_test_town", radius=2)
+        self.assertIn("x-> ForestCamp", output)
+        self.assertIn("Closure: route toward ForestCamp is blocked", output)
+        self.assertNotIn("Route: ForestCamp via Road", output)
+
+    def test_summary_prefers_open_over_blocked_routes(self) -> None:
+        info = _make_simple_info()
+        info.routes.append(RouteRenderInfo(
+            route_id="r2",
+            from_site_id="loc_test_town",
+            to_site_id="loc_ruins",
+            route_type="trail",
+            blocked=True,
+        ))
+        info.cells[(2, 1)] = MapCellInfo(
+            location_id="loc_ruins",
+            canonical_name="Ruins",
+            region_type="dungeon",
+            icon="D",
+            safety_label="dangerous",
+            danger=85,
+            traffic_indicator="quiet",
+            population=0,
+            x=2,
+            y=1,
+            danger_band="high",
+            traffic_band="low",
+            rumor_heat_band="medium",
+            terrain_biome="mountain",
+            terrain_glyph="^",
+        )
+        output = render_region_map(info, "loc_test_town", radius=2)
+        self.assertIn("Route: ForestCamp via Road", output)
+        self.assertIn("Closure: route toward Ruins is blocked", output)
+
+    def test_danger_summary_prefers_reachable_dangers(self) -> None:
+        info = MapRenderInfo(world_name="DangerPriority", year=1, width=5, height=5)
+        for y in range(5):
+            for x in range(5):
+                info.terrain_cells[(x, y)] = TerrainCellRenderInfo(x=x, y=y, biome="plains", glyph=",")
+        info.cells[(2, 2)] = MapCellInfo(
+            location_id="loc_center",
+            canonical_name="Center",
+            region_type="city",
+            icon="@",
+            safety_label="calm",
+            danger=10,
+            traffic_indicator="busy",
+            population=10,
+            x=2,
+            y=2,
+            danger_band="low",
+            traffic_band="high",
+            rumor_heat_band="low",
+        )
+        info.cells[(3, 2)] = MapCellInfo(
+            location_id="loc_open_risk",
+            canonical_name="OpenRisk",
+            region_type="dungeon",
+            icon="D",
+            safety_label="dangerous",
+            danger=70,
+            traffic_indicator="busy",
+            population=0,
+            x=3,
+            y=2,
+            danger_band="high",
+            traffic_band="medium",
+            rumor_heat_band="medium",
+        )
+        info.cells[(2, 1)] = MapCellInfo(
+            location_id="loc_blocked_risk",
+            canonical_name="BlockedRisk",
+            region_type="dungeon",
+            icon="D",
+            safety_label="dangerous",
+            danger=95,
+            traffic_indicator="quiet",
+            population=0,
+            x=2,
+            y=1,
+            danger_band="high",
+            traffic_band="low",
+            rumor_heat_band="medium",
+        )
+        info.routes.append(RouteRenderInfo(
+            route_id="open",
+            from_site_id="loc_center",
+            to_site_id="loc_open_risk",
+            route_type="road",
+        ))
+        info.routes.append(RouteRenderInfo(
+            route_id="blocked",
+            from_site_id="loc_center",
+            to_site_id="loc_blocked_risk",
+            route_type="road",
+            blocked=True,
+        ))
+        output = render_region_map(info, "loc_center", radius=2)
+        self.assertIn("Danger: OpenRisk is a high-risk site", output)
+        self.assertNotIn("Danger: BlockedRisk is a high-risk site", output)
+
+    def test_rumor_summary_prefers_reachable_hotspots(self) -> None:
+        info = MapRenderInfo(world_name="RumorPriority", year=1, width=5, height=5)
+        for y in range(5):
+            for x in range(5):
+                info.terrain_cells[(x, y)] = TerrainCellRenderInfo(x=x, y=y, biome="plains", glyph=",")
+        info.cells[(2, 2)] = MapCellInfo(
+            location_id="loc_center",
+            canonical_name="Center",
+            region_type="city",
+            icon="@",
+            safety_label="calm",
+            danger=10,
+            traffic_indicator="busy",
+            population=10,
+            x=2,
+            y=2,
+            danger_band="low",
+            traffic_band="high",
+            rumor_heat=10,
+            rumor_heat_band="low",
+        )
+        info.cells[(3, 2)] = MapCellInfo(
+            location_id="loc_open_rumor",
+            canonical_name="OpenRumor",
+            region_type="village",
+            icon="V",
+            safety_label="watchful",
+            danger=20,
+            traffic_indicator="busy",
+            population=0,
+            x=3,
+            y=2,
+            danger_band="medium",
+            traffic_band="medium",
+            rumor_heat=72,
+            rumor_heat_band="high",
+        )
+        info.cells[(2, 1)] = MapCellInfo(
+            location_id="loc_blocked_rumor",
+            canonical_name="BlockedRumor",
+            region_type="village",
+            icon="V",
+            safety_label="watchful",
+            danger=20,
+            traffic_indicator="quiet",
+            population=0,
+            x=2,
+            y=1,
+            danger_band="medium",
+            traffic_band="low",
+            rumor_heat=95,
+            rumor_heat_band="high",
+        )
+        info.routes.append(RouteRenderInfo(
+            route_id="open",
+            from_site_id="loc_center",
+            to_site_id="loc_open_rumor",
+            route_type="road",
+        ))
+        info.routes.append(RouteRenderInfo(
+            route_id="blocked",
+            from_site_id="loc_center",
+            to_site_id="loc_blocked_rumor",
+            route_type="road",
+            blocked=True,
+        ))
+        output = render_region_map(info, "loc_center", radius=2)
+        self.assertIn("Rumor: OpenRumor is buzzing with talk", output)
+        self.assertNotIn("Rumor: BlockedRumor is buzzing with talk", output)
 
     def test_not_found_location(self) -> None:
         output = render_region_map(self.info, "nonexistent")
@@ -350,6 +566,23 @@ class TestCJKWidth(unittest.TestCase):
         self.assertIn("Aethoria", output)
         # Should contain Japanese legend title
         self.assertIn("凡例", output)
+        set_locale("en")
+
+    def test_japanese_locale_region_summary(self) -> None:
+        set_locale("ja")
+        info = _make_simple_info()
+        rumor_cell = info.cells[(0, 0)]
+        rumor_cell.rumor_heat = 90
+        rumor_cell.rumor_heat_band = "high"
+        output = render_region_map(
+            info,
+            "loc_test_town",
+            site_traces={"loc_test_town": ["冒険者が通過した"]},
+        )
+        self.assertIn("この地域で注目すべきこと", output)
+        self.assertIn("経路: ForestCamp へ 街道", output)
+        self.assertIn("噂: ForestCamp では話題が熱い", output)
+        self.assertIn("痕跡: TestTown には最近の往来が残る", output)
         set_locale("en")
 
 
@@ -978,6 +1211,18 @@ class TestAtlasCompact(unittest.TestCase):
         wide = render_atlas_overview(info)
         self.assertLess(len(compact), len(wide))
 
+    def test_compact_lines_fit_narrow_terminal_budget(self) -> None:
+        from fantasy_simulator.ui.atlas_renderer import render_atlas_compact
+        for locale in ("en", "ja"):
+            set_locale(locale)
+            info = _make_simple_info()
+            output = render_atlas_compact(info)
+            self.assertLessEqual(
+                max(display_width(line) for line in output.splitlines()),
+                42,
+            )
+        set_locale("en")
+
 
 class TestAtlasMinimal(unittest.TestCase):
     """Verify minimal atlas renderer produces text-only summary."""
@@ -1006,6 +1251,72 @@ class TestAtlasMinimal(unittest.TestCase):
         lines = output.strip().split("\n")
         for line in lines:
             self.assertNotIn("~~~~", line)
+
+    def test_minimal_lines_fit_tiny_terminal_budget(self) -> None:
+        from fantasy_simulator.ui.atlas_renderer import render_atlas_minimal
+        for locale in ("en", "ja"):
+            set_locale(locale)
+            info = _make_simple_info()
+            output = render_atlas_minimal(info)
+            self.assertLessEqual(
+                max(display_width(line) for line in output.splitlines()),
+                40,
+            )
+        set_locale("en")
+
+
+class TestObservationSnapshots(unittest.TestCase):
+    """Snapshot-style tests for key observation views."""
+
+    def test_region_map_snapshot_with_rumor_focus_en(self) -> None:
+        set_locale("en")
+        info = _make_simple_info()
+        info.cells[(0, 0)].rumor_heat = 90
+        info.cells[(0, 0)].rumor_heat_band = "high"
+        output = render_region_map(
+            info,
+            "loc_test_town",
+            radius=2,
+            site_traces={"loc_test_town": ["Adventurer passed through"]},
+        )
+        expected = (
+            "  === REGION MAP: TestTown ===\n\n"
+            "      012\n"
+            "     +---+\n"
+            "    0|F,^|\n"
+            "    1|,@T|\n"
+            "    2|n,.|\n"
+            "     +---+\n\n"
+            "  What stands out here:\n"
+            "    - Route: ForestCamp via Road\n"
+            "    - Danger: ForestCamp is a high-risk site\n"
+            "    - Rumor: ForestCamp is buzzing with talk\n"
+            "    - Trace: TestTown shows recent movement\n\n"
+            "  Nearby sites:\n"
+            "     <-> ForestCamp (village) D:! T:  R:? [!?m+]\n"
+            "   @     TestTown (city) D:  T:O R:  [$]\n"
+            "  Routes from here:\n"
+            "    TestTown <-> ForestCamp (Road)\n\n"
+            "  Landmarks & World Memory:\n"
+            "    TestTown:\n"
+            "      Recent: Adventurer passed through"
+        )
+        self.assertEqual(output, expected)
+
+    def test_atlas_minimal_snapshot_ja(self) -> None:
+        set_locale("ja")
+        info = _make_simple_info()
+        from fantasy_simulator.ui.atlas_renderer import render_atlas_minimal
+
+        output = render_atlas_minimal(info)
+        expected = (
+            "  世界全体図: TestWorld (Year: 10)\n\n"
+            "   1. ForestCamp (村) [!m+]\n"
+            "   2. TestTown (都市) [$]\n\n"
+            "  道路一覧: 1"
+        )
+        self.assertEqual(output, expected)
+        set_locale("en")
 
 
 class TestAtlasLabeledSites(unittest.TestCase):

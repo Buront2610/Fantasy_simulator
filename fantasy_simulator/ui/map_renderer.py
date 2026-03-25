@@ -354,6 +354,19 @@ _DANGER_MARKERS: Dict[str, str] = {"low": " ", "medium": ".", "high": "!"}
 _TRAFFIC_MARKERS: Dict[str, str] = {"low": " ", "medium": "o", "high": "O"}
 #: Overlay marker for rumor heat band
 _RUMOR_MARKERS: Dict[str, str] = {"low": " ", "medium": "~", "high": "?"}
+_MAX_REGION_STANDOUT_ITEMS = 4
+_OPEN_ROUTE_MARKER = "<->"
+_BLOCKED_ROUTE_MARKER = "x->"
+_UNKNOWN_ROUTE_TYPE_PRIORITY = 99
+_REACHABILITY_OPEN = 0
+_REACHABILITY_VISIBLE = 1
+_REACHABILITY_BLOCKED = 2
+_ROUTE_TYPE_PRIORITY: Dict[str, int] = {
+    "road": 0,
+    "mountain_pass": 1,
+    "river": 2,
+    "trail": 3,
+}
 
 
 def _overlay_suffix(cell: MapCellInfo) -> str:
@@ -376,6 +389,209 @@ def _overlay_suffix(cell: MapCellInfo) -> str:
     if cell.recent_death_site:
         parts.append("+")
     return "".join(parts)
+
+
+def _route_endpoint_name(cells_by_id: Dict[str, MapCellInfo], location_id: str) -> str:
+    """Return a human-readable site name for a route endpoint."""
+    cell = cells_by_id.get(location_id)
+    return cell.canonical_name if cell is not None else location_id
+
+
+def _route_other_endpoint(route: RouteRenderInfo, center_location_id: str) -> str:
+    """Return the endpoint on the far side of a route from the current center."""
+    if route.from_site_id == center_location_id:
+        return route.to_site_id
+    return route.from_site_id
+
+
+def _pick_standout_route(
+    region_routes: List[RouteRenderInfo],
+    center_location_id: str,
+    cells_by_id: Dict[str, MapCellInfo],
+) -> Optional[RouteRenderInfo]:
+    """Pick the single route worth calling out in the compact region summary."""
+    open_routes = [route for route in region_routes if not route.blocked]
+    if not open_routes:
+        return None
+    return min(
+        open_routes,
+        key=lambda route: (
+            _ROUTE_TYPE_PRIORITY.get(route.route_type, _UNKNOWN_ROUTE_TYPE_PRIORITY),
+            _route_endpoint_name(cells_by_id, _route_other_endpoint(route, center_location_id)).lower(),
+        ),
+    )
+
+
+def _pick_blocked_route_notice(
+    region_routes: List[RouteRenderInfo],
+    center_location_id: str,
+    cells_by_id: Dict[str, MapCellInfo],
+) -> Optional[RouteRenderInfo]:
+    """Pick one blocked route to surface separately in the region summary."""
+    blocked_routes = [route for route in region_routes if route.blocked]
+    if not blocked_routes:
+        return None
+    return min(
+        blocked_routes,
+        key=lambda route: (
+            _ROUTE_TYPE_PRIORITY.get(route.route_type, _UNKNOWN_ROUTE_TYPE_PRIORITY),
+            _route_endpoint_name(cells_by_id, _route_other_endpoint(route, center_location_id)).lower(),
+        ),
+    )
+
+
+def _pick_region_danger_target(
+    visible_cells: List[MapCellInfo],
+    center_cell: MapCellInfo,
+    connected_open_ids: Set[str],
+    connected_blocked_ids: Set[str],
+) -> Optional[MapCellInfo]:
+    """Return one danger target using decision-oriented region priorities."""
+    danger_candidates = [
+        cell for cell in visible_cells
+        if cell.location_id != center_cell.location_id and cell.danger_band == "high"
+    ]
+    if not danger_candidates:
+        return None
+
+    def priority(cell: MapCellInfo) -> Tuple[int, int, int, str]:
+        """Rank candidates by (reachability, negative cell.danger, distance, name)."""
+        reachability = _region_reachability_tier(
+            cell.location_id,
+            connected_open_ids,
+            connected_blocked_ids,
+        )
+        distance = abs(cell.x - center_cell.x) + abs(cell.y - center_cell.y)
+        return (
+            reachability,
+            -cell.danger,
+            distance,
+            cell.canonical_name.lower(),
+        )
+
+    return min(danger_candidates, key=priority)
+
+
+def _pick_region_rumor_target(
+    visible_cells: List[MapCellInfo],
+    center_cell: MapCellInfo,
+    connected_open_ids: Set[str],
+    connected_blocked_ids: Set[str],
+) -> Optional[MapCellInfo]:
+    """Return one rumor hotspot using the same local-decision priorities."""
+    rumor_candidates = [cell for cell in visible_cells if cell.rumor_heat_band == "high"]
+    if not rumor_candidates:
+        return None
+
+    def priority(cell: MapCellInfo) -> Tuple[int, int, int, str]:
+        """Rank candidates by (reachability, negative cell.rumor_heat, distance, name)."""
+        reachability = _region_reachability_tier(
+            cell.location_id,
+            connected_open_ids,
+            connected_blocked_ids,
+        )
+        distance = abs(cell.x - center_cell.x) + abs(cell.y - center_cell.y)
+        return (
+            reachability,
+            -cell.rumor_heat,
+            distance,
+            cell.canonical_name.lower(),
+        )
+
+    return min(rumor_candidates, key=priority)
+
+
+def _region_reachability_tier(
+    location_id: str,
+    connected_open_ids: Set[str],
+    connected_blocked_ids: Set[str],
+) -> int:
+    """Return region summary reachability tier for a visible site."""
+    if location_id in connected_open_ids:
+        # 0 = directly reachable by an open route from the current center.
+        return _REACHABILITY_OPEN
+    if location_id not in connected_blocked_ids:
+        # 1 = visible in the region, but not directly route-linked from center.
+        return _REACHABILITY_VISIBLE
+    # 2 = route-linked from center, but only through a blocked route.
+    return _REACHABILITY_BLOCKED
+
+
+def _has_world_memory(
+    cell: MapCellInfo,
+    memorials_by_site: Dict[str, List[str]],
+    aliases_by_site: Dict[str, List[str]],
+    traces_by_site: Dict[str, List[str]],
+) -> bool:
+    """Return whether a site has explicit world-memory entries to show."""
+    return bool(
+        memorials_by_site.get(cell.location_id)
+        or aliases_by_site.get(cell.location_id)
+        or traces_by_site.get(cell.location_id)
+    )
+
+
+def _cell_has_landmark_indicators(
+    cell: MapCellInfo,
+    memorials_by_site: Dict[str, List[str]],
+    aliases_by_site: Dict[str, List[str]],
+    traces_by_site: Dict[str, List[str]],
+) -> bool:
+    """Return whether a site should be called out as a landmark."""
+    return bool(
+        cell.has_memorial
+        or cell.has_alias
+        or cell.recent_death_site
+        or _has_world_memory(cell, memorials_by_site, aliases_by_site, traces_by_site)
+    )
+
+
+def _landmark_focus_text(
+    cell: MapCellInfo,
+    memorials_by_site: Dict[str, List[str]],
+    aliases_by_site: Dict[str, List[str]],
+    traces_by_site: Dict[str, List[str]],
+) -> Optional[str]:
+    """Build a typed landmark summary line for one site."""
+    # Memorials / aliases may come from explicit detail payloads or from the
+    # cell's baked overlay flags. Live traces only exist in explicit world-memory
+    # payloads, while recent death is an event-derived overlay on the cell.
+    if memorials_by_site.get(cell.location_id) or cell.has_memorial:
+        return tr("map_region_focus_landmark_memorial", location=cell.canonical_name)
+    if aliases_by_site.get(cell.location_id) or cell.has_alias:
+        return tr("map_region_focus_landmark_alias", location=cell.canonical_name)
+    if traces_by_site.get(cell.location_id):
+        return tr("map_region_focus_landmark_trace", location=cell.canonical_name)
+    if cell.recent_death_site:
+        return tr("map_region_focus_landmark_death", location=cell.canonical_name)
+    return None
+
+
+def _pick_landmark_target(
+    visible_cells: List[MapCellInfo],
+    center_location_id: str,
+    memorials_by_site: Dict[str, List[str]],
+    aliases_by_site: Dict[str, List[str]],
+    traces_by_site: Dict[str, List[str]],
+) -> Optional[MapCellInfo]:
+    """Prefer explicit memory on the center site, then any landmark signal nearby."""
+    center_memory_target = next(
+        (
+            cell for cell in visible_cells
+            if cell.location_id == center_location_id
+            and _has_world_memory(cell, memorials_by_site, aliases_by_site, traces_by_site)
+        ),
+        None,
+    )
+    if center_memory_target is not None:
+        return center_memory_target
+    return next(
+        (
+            cell for cell in visible_cells
+            if _cell_has_landmark_indicators(cell, memorials_by_site, aliases_by_site, traces_by_site)
+        ),
+        None,
+    )
 
 
 # ------------------------------------------------------------------
@@ -431,6 +647,9 @@ def render_world_overview(info: MapRenderInfo) -> str:
     lines.append("")
     lines.append(f"  {tr('map_overview_sites')}:")
     site_cells = sorted(info.cells.values(), key=lambda c: (c.y, c.x))
+    cells_by_id: Dict[str, MapCellInfo] = {
+        c.location_id: c for c in info.cells.values()
+    }
     for cell in site_cells:
         overlay = _overlay_suffix(cell)
         overlay_str = f" [{overlay}]" if overlay else ""
@@ -446,8 +665,10 @@ def render_world_overview(info: MapRenderInfo) -> str:
         lines.append(f"  {tr('map_overview_routes')}:")
         for r in info.routes:
             blocked = f" {tr('route_blocked')}" if r.blocked else ""
+            from_name = _route_endpoint_name(cells_by_id, r.from_site_id)
+            to_name = _route_endpoint_name(cells_by_id, r.to_site_id)
             lines.append(
-                f"    {r.from_site_id} <-> {r.to_site_id}"
+                f"    {from_name} <-> {to_name}"
                 f" ({tr_term(r.route_type)}){blocked}"
             )
 
@@ -525,6 +746,9 @@ def render_region_map(
     cell_pos: Dict[str, Tuple[int, int]] = {
         c.location_id: (c.x, c.y) for c in info.cells.values()
     }
+    cells_by_id: Dict[str, MapCellInfo] = {
+        c.location_id: c for c in info.cells.values()
+    }
     for route in info.routes:
         fp = cell_pos.get(route.from_site_id)
         tp = cell_pos.get(route.to_site_id)
@@ -587,23 +811,102 @@ def render_region_map(
 
     lines.append(region_border)
 
-    # --- Nearby sites detail ---
-    lines.append("")
-    lines.append(f"  {tr('map_region_nearby')}:")
-
     # Collect routes from centre
-    connected_ids = set()
+    connected_open_ids: Set[str] = set()
+    connected_blocked_ids: Set[str] = set()
     for route in info.routes:
         if route.from_site_id == center_location_id:
-            connected_ids.add(route.to_site_id)
+            if route.blocked:
+                connected_blocked_ids.add(route.to_site_id)
+            else:
+                connected_open_ids.add(route.to_site_id)
         elif route.to_site_id == center_location_id:
-            connected_ids.add(route.from_site_id)
+            if route.blocked:
+                connected_blocked_ids.add(route.from_site_id)
+            else:
+                connected_open_ids.add(route.from_site_id)
 
-    for cell in sorted(info.cells.values(), key=lambda c: (c.y, c.x)):
-        if not (x_min <= cell.x <= x_max and y_min <= cell.y <= y_max):
-            continue
+    # --- Routes in this region ---
+    region_routes = [
+        r for r in info.routes
+        if r.from_site_id == center_location_id or r.to_site_id == center_location_id
+    ]
+    standout_lines: List[str] = []
+    standout_route = _pick_standout_route(region_routes, center_location_id, cells_by_id)
+    if standout_route is not None:
+        other_id = _route_other_endpoint(standout_route, center_location_id)
+        standout_lines.append(
+            tr(
+                "map_region_focus_route",
+                destination=_route_endpoint_name(cells_by_id, other_id),
+                route_type=tr_term(standout_route.route_type),
+                blocked=f" {tr('route_blocked')}" if standout_route.blocked else "",
+            ).rstrip()
+        )
+
+    visible_cells = [
+        cell for cell in sorted(info.cells.values(), key=lambda c: (c.y, c.x))
+        if x_min <= cell.x <= x_max and y_min <= cell.y <= y_max
+    ]
+    danger_target = _pick_region_danger_target(
+        visible_cells,
+        center_cell,
+        connected_open_ids,
+        connected_blocked_ids,
+    )
+    rumor_target = _pick_region_rumor_target(
+        visible_cells,
+        center_cell,
+        connected_open_ids,
+        connected_blocked_ids,
+    )
+    blocked_notice = _pick_blocked_route_notice(region_routes, center_location_id, cells_by_id)
+    if blocked_notice is not None:
+        blocked_destination = _route_endpoint_name(
+            cells_by_id,
+            _route_other_endpoint(blocked_notice, center_location_id),
+        )
+        standout_lines.append(tr("map_region_focus_blocked", destination=blocked_destination))
+
+    if danger_target is not None:
+        standout_lines.append(tr("map_region_focus_danger", location=danger_target.canonical_name))
+
+    if rumor_target is not None:
+        standout_lines.append(tr("map_region_focus_rumor", location=rumor_target.canonical_name))
+
+    memorials = site_memorials or {}
+    aliases = site_aliases or {}
+    traces = site_traces or {}
+    landmark_target = _pick_landmark_target(
+        visible_cells,
+        center_location_id,
+        memorials,
+        aliases,
+        traces,
+    )
+    if landmark_target is not None:
+        landmark_text = _landmark_focus_text(landmark_target, memorials, aliases, traces)
+        if landmark_text:
+            standout_lines.append(landmark_text)
+
+    if standout_lines:
+        lines.append("")
+        lines.append(f"  {tr('map_region_focus')}:")
+        for item in standout_lines[:_MAX_REGION_STANDOUT_ITEMS]:
+            lines.append(f"    - {item}")
+        lines.append("")
+
+    # --- Nearby sites detail ---
+    lines.append(f"  {tr('map_region_nearby')}:")
+
+    for cell in visible_cells:
         marker = "@" if cell.location_id == center_location_id else " "
-        conn = "<->" if cell.location_id in connected_ids else "   "
+        if cell.location_id in connected_open_ids:
+            conn = _OPEN_ROUTE_MARKER
+        elif cell.location_id in connected_blocked_ids:
+            conn = _BLOCKED_ROUTE_MARKER
+        else:
+            conn = "   "
         overlay = _overlay_suffix(cell)
         overlay_str = f" [{overlay}]" if overlay else ""
         danger_str = _DANGER_MARKERS.get(cell.danger_band, " ")
@@ -615,33 +918,26 @@ def render_region_map(
             f" D:{danger_str} T:{traffic_str} R:{rumor_str}{overlay_str}"
         )
 
-    # --- Routes in this region ---
-    region_routes = [
-        r for r in info.routes
-        if r.from_site_id == center_location_id or r.to_site_id == center_location_id
-    ]
     if region_routes:
-        lines.append("")
         lines.append(f"  {tr('map_region_routes')}:")
         for r in region_routes:
             blocked = f" {tr('route_blocked')}" if r.blocked else ""
+            from_name = _route_endpoint_name(cells_by_id, r.from_site_id)
+            to_name = _route_endpoint_name(cells_by_id, r.to_site_id)
             lines.append(
-                f"    {r.from_site_id} <-> {r.to_site_id}"
+                f"    {from_name} <-> {to_name}"
                 f" ({tr_term(r.route_type)}){blocked}"
             )
 
     # --- World memory: landmarks (memorials, aliases, traces) ---
-    _mem = site_memorials or {}
-    _ali = site_aliases or {}
-    _tra = site_traces or {}
     has_memory = False
     for cell in sorted(info.cells.values(), key=lambda c: (c.y, c.x)):
         if not (x_min <= cell.x <= x_max and y_min <= cell.y <= y_max):
             continue
         loc_id = cell.location_id
-        mem_items = _mem.get(loc_id, [])
-        ali_items = _ali.get(loc_id, [])
-        tra_items = _tra.get(loc_id, [])
+        mem_items = memorials.get(loc_id, [])
+        ali_items = aliases.get(loc_id, [])
+        tra_items = traces.get(loc_id, [])
         if not mem_items and not ali_items and not tra_items:
             continue
         if not has_memory:
