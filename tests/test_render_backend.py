@@ -266,6 +266,16 @@ class TestRenderBackendFactory(unittest.TestCase):
             backend = create_default_render_backend()
         self.assertIsInstance(backend, PrintRenderBackend)
 
+    def test_print_backend_panel_outputs_title_and_body(self) -> None:
+        backend = PrintRenderBackend()
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            backend.print_panel("PanelTitle", "line1\nline2")
+        text = _ANSI_RE.sub("", buf.getvalue())
+        self.assertIn("PanelTitle", text)
+        self.assertIn("line1", text)
+        self.assertIn("line2", text)
+
 
 if __name__ == "__main__":
     unittest.main()

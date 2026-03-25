@@ -154,9 +154,15 @@ class TestPromptToolkitDefaultFactory(unittest.TestCase):
 
     def test_prompt_toolkit_menu_key_uses_default(self) -> None:
         backend = PromptToolkitInputBackend.__new__(PromptToolkitInputBackend)
-        backend._prompt = lambda _p: ""
+        backend._session = type("S", (), {"prompt": staticmethod(lambda *_a, **_k: "")})()
         key = backend.read_menu_key([("a", "A"), ("b", "B")], default="2")
         self.assertEqual(key, "b")
+
+    def test_prompt_toolkit_menu_key_accepts_key_name(self) -> None:
+        backend = PromptToolkitInputBackend.__new__(PromptToolkitInputBackend)
+        backend._session = type("S", (), {"prompt": staticmethod(lambda *_a, **_k: "beta")})()
+        key = backend.read_menu_key([("alpha", "A"), ("beta", "B")], default="1")
+        self.assertEqual(key, "beta")
 
 
 if __name__ == "__main__":

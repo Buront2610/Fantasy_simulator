@@ -138,6 +138,13 @@ class PrintRenderBackend:
         from .ui_helpers import green, red
         return green(text) if positive else red(text)
 
+    def print_panel(self, title: str, text: str) -> None:
+        self.print_separator("-")
+        self.print_heading(f"  {title}")
+        for line in text.splitlines():
+            self.print_line(line)
+        self.print_separator("-")
+
     def get_terminal_width(self) -> int:
         """Best-effort terminal width for responsive rendering."""
         import shutil
@@ -196,6 +203,11 @@ class RichRenderBackend(PrintRenderBackend):
             mark = " [dim](default)[/dim]" if default == str(i) else ""
             table.add_row(str(i), f"{label}{mark}")
         self._console.print(Panel(table, title=prompt, border_style="cyan"))
+
+    def print_panel(self, title: str, text: str) -> None:
+        from rich.panel import Panel
+
+        self._console.print(Panel(text, title=title, border_style="blue"))
 
     def format_status(self, text: str, positive: bool) -> str:
         if self._force_plain:

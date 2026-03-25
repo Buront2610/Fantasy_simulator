@@ -431,16 +431,24 @@ def _show_world_map(sim: Simulator, ctx: UIContext | None = None) -> None:
         out.print_line()
         render_mode = _resolved_mode()
         if render_mode == "compact":
-            out.print_line(render_atlas_compact(info))
+            atlas_text = render_atlas_compact(info)
         elif render_mode == "minimal":
-            out.print_line(render_atlas_minimal(info))
+            atlas_text = render_atlas_minimal(info)
         else:
-            out.print_line(render_atlas_overview(info))
+            atlas_text = render_atlas_overview(info)
+
+        panel_title = f"{tr('world_map')} ({tr('atlas_mode_' + render_mode)})"
+        panel_renderer = getattr(out, "print_panel", None)
+        if callable(panel_renderer):
+            panel_renderer(panel_title, atlas_text)
+        else:
+            out.print_heading(f"  {panel_title}")
+            out.print_line(atlas_text)
 
         # --- Direct selection shortlist (item 11) ---
         labeled = atlas_labeled_sites(info)
         out.print_line()
-        out.print_line(f"  {tr('atlas_site_list')}:")
+        out.print_heading(f"  {tr('atlas_site_list')}:")
         for i, (loc_id, name) in enumerate(labeled, 1):
             cell = None
             for c in info.cells.values():
@@ -453,6 +461,13 @@ def _show_world_map(sim: Simulator, ctx: UIContext | None = None) -> None:
                 ov = _overlay_suffix(cell)
                 overlay = f" [{ov}]" if ov else ""
             out.print_line(f"    {i:>2}. {name}{overlay}")
+        out.print_line()
+        out.print_heading(f"  {tr('map_semantic_legend_title')}")
+        out.print_error(f"    !  {tr('map_legend_danger_high')}")
+        out.print_warning(f"    $  {tr('map_legend_traffic_high')}")
+        out.print_highlighted(f"    ?  {tr('map_legend_rumor_high')}")
+        out.print_dim(f"    m  {tr('map_legend_memorial')} / a  {tr('map_legend_alias')}")
+        out.print_dim(f"  {tr('map_nav_keys_hint')}")
         out.print_line()
 
         action = ctx.choose_key(

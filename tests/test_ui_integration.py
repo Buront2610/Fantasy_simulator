@@ -236,6 +236,21 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         self.assertIn("MINIMAL", out.text)
         self.assertNotIn("WIDE", out.text)
 
+    def test_world_map_prints_semantic_legend_and_keys_hint(self) -> None:
+        from fantasy_simulator.ui.screens import _show_results, _build_default_world
+
+        world = _build_default_world(num_characters=4, seed=42)
+        from fantasy_simulator.simulator import Simulator
+        sim = Simulator(world, events_per_year=2)
+        sim.advance_years(1)
+
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(menu_keys=["world_map", "back_to_main", "back_to_main"])
+        ctx = UIContext(inp=inp, out=out)
+        _show_results(sim, ctx=ctx)
+        self.assertIn("Semantic legend", out.text)
+        self.assertIn("Keys:", out.text)
+
 
 class TestShowRosterUsesBackends(unittest.TestCase):
     """_show_roster routes through UIContext."""

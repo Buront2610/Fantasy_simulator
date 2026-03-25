@@ -60,20 +60,34 @@ class PromptToolkitInputBackend(StdInputBackend):
     """Input backend that uses prompt_toolkit when available."""
 
     def __init__(self) -> None:
-        from prompt_toolkit import prompt
+        from prompt_toolkit import PromptSession
+        from prompt_toolkit.history import InMemoryHistory
 
-        self._prompt = prompt
+        self._session = PromptSession(history=InMemoryHistory())
 
     def read_line(self, prompt: str = "") -> str:
-        return self._prompt(prompt)
+        return self._session.prompt(prompt)
 
     def read_menu_key(
         self,
         key_label_pairs: List[Tuple[str, str]],
         default: Optional[str] = None,
     ) -> str:
+        from ..i18n import tr
+        try:
+            from prompt_toolkit.completion import WordCompleter
+        except Exception:
+            WordCompleter = None  # type: ignore[assignment]
+
+        labels = [str(i) for i in range(1, len(key_label_pairs) + 1)]
+        keys = [k for (k, _label) in key_label_pairs]
+        completer = WordCompleter(labels + keys, ignore_case=True) if WordCompleter else None
+        prompt = f"  {tr('your_choice')}: "
         while True:
-            raw = self.read_line("  > ").strip()
+            raw = self._session.prompt(prompt, completer=completer).strip()
+            for key in keys:
+                if raw.lower() == key.lower():
+                    return key
             if not raw and default is not None and default.isdigit():
                 idx = int(default) - 1
                 if 0 <= idx < len(key_label_pairs):
