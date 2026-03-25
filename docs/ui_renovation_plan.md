@@ -266,7 +266,7 @@ map renderer は最低でも次のモードを持つ。
 
 短期的には **Rich + prompt_toolkit + wcwidth** の組み合わせが最も実用的で、既存 CLI を大きく壊さずに観測体験を改善できる。ただし順序は Rich 先行ではなく、**region map の意味論強化を主線、薄い Rich 化を補助線** とする。
 region map の意味論強化は PR-H1 で完了
-次段では PR-H2 として、薄い Rich 化を本線として進める
+PR-H2 で薄い Rich 化は完了しており、次段は PR-I で叙述文脈の強化を進める
 prompt_toolkit と将来の Textual は根本的に異なる入力モデルであるため、prompt_toolkit 依存コードは入力抽象の背後に隔離する。
 
 そのうえで、次段階の map UI は「5×5 地点盤面の豪華化」ではなく、**terrain を持つ world の上に site と route が重なり、さらに world memory が履歴として染み出す観測 UI** として設計する。  
