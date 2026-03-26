@@ -25,6 +25,12 @@ from fantasy_simulator.ui.render_backend import (
     create_default_render_backend,
 )
 
+try:
+    import rich  # noqa: F401
+    _RICH_AVAILABLE = True
+except ImportError:
+    _RICH_AVAILABLE = False
+
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
@@ -303,26 +309,42 @@ class TestRenderBackendFactory(unittest.TestCase):
                 create_default_render_backend()
 
 
+@unittest.skipUnless(_RICH_AVAILABLE, "rich is not installed")
 class TestRichRenderBackendSafety(unittest.TestCase):
     """Rich backend should avoid implicit markup interpolation hazards."""
 
     def test_print_line_disables_markup(self) -> None:
         from fantasy_simulator.ui.render_backend import RichRenderBackend
+        from rich.text import Text
 
         backend = RichRenderBackend.__new__(RichRenderBackend)
         backend._console = unittest.mock.Mock()
-        backend._force_plain = False
         backend.print_line("[danger]")
-        backend._console.print.assert_called_once_with("[danger]", markup=False)
+        (arg,), _kwargs = backend._console.print.call_args
+        self.assertIsInstance(arg, Text)
+        self.assertEqual(arg.plain, "[danger]")
 
     def test_print_heading_disables_markup_and_uses_style(self) -> None:
         from fantasy_simulator.ui.render_backend import RichRenderBackend
+        from rich.text import Text
 
         backend = RichRenderBackend.__new__(RichRenderBackend)
         backend._console = unittest.mock.Mock()
-        backend._force_plain = False
         backend.print_heading("[Heading]")
-        backend._console.print.assert_called_once_with("[Heading]", style="bold", markup=False)
+        (arg,), _kwargs = backend._console.print.call_args
+        self.assertIsInstance(arg, Text)
+        self.assertEqual(arg.plain, "[Heading]")
+
+    def test_print_error_uses_text_renderable(self) -> None:
+        from fantasy_simulator.ui.render_backend import RichRenderBackend
+        from rich.text import Text
+
+        backend = RichRenderBackend.__new__(RichRenderBackend)
+        backend._console = unittest.mock.Mock()
+        backend.print_error("[err]")
+        (arg,), _kwargs = backend._console.print.call_args
+        self.assertIsInstance(arg, Text)
+        self.assertEqual(arg.plain, "[err]")
 
     def test_format_status_returns_plain_text(self) -> None:
         from fantasy_simulator.ui.render_backend import RichRenderBackend
@@ -332,12 +354,21 @@ class TestRichRenderBackendSafety(unittest.TestCase):
         status = backend.format_status("[alive]", True)
         self.assertEqual(status, "[alive]")
 
-    def test_print_menu_uses_i18n_and_no_markup_strings(self) -> None:
-        try:
-            import rich  # noqa: F401
-        except ImportError:
-            self.skipTest("rich is not installed")
+    def test_print_panel_uses_text_renderables(self) -> None:
+        from fantasy_simulator.ui.render_backend import RichRenderBackend
+        from rich.text import Text
 
+        backend = RichRenderBackend.__new__(RichRenderBackend)
+        backend._console = unittest.mock.Mock()
+        with patch("rich.panel.Panel") as mock_panel:
+            backend.print_panel("[title]", "[body]")
+        _args, kwargs = mock_panel.call_args
+        self.assertIsInstance(_args[0], Text)
+        self.assertEqual(_args[0].plain, "[body]")
+        self.assertIsInstance(kwargs["title"], Text)
+        self.assertEqual(kwargs["title"].plain, "[title]")
+
+    def test_print_menu_uses_i18n_and_no_markup_strings(self) -> None:
         from fantasy_simulator.i18n import set_locale
         from fantasy_simulator.ui.render_backend import RichRenderBackend
 

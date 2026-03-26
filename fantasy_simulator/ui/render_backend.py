@@ -170,28 +170,44 @@ class RichRenderBackend(PrintRenderBackend):
         self._console = Console()
 
     def print_line(self, text: str = "") -> None:
-        self._console.print(text, markup=False)
+        from rich.text import Text
+
+        self._console.print(Text(text))
 
     def print_heading(self, text: str) -> None:
-        self._console.print(text, style="bold", markup=False)
+        from rich.text import Text
+
+        self._console.print(Text(text, style="bold"))
 
     def print_separator(self, char: str = "=", width: int = 62) -> None:
-        self._console.print("  " + (char * width), style="dim", markup=False)
+        from rich.text import Text
+
+        self._console.print(Text("  " + (char * width), style="dim"))
 
     def print_error(self, text: str) -> None:
-        self._console.print(text, style="bold red")
+        from rich.text import Text
+
+        self._console.print(Text(text, style="bold red"))
 
     def print_success(self, text: str) -> None:
-        self._console.print(text, style="bold green")
+        from rich.text import Text
+
+        self._console.print(Text(text, style="bold green"))
 
     def print_warning(self, text: str) -> None:
-        self._console.print(text, style="bold yellow")
+        from rich.text import Text
+
+        self._console.print(Text(text, style="bold yellow"))
 
     def print_dim(self, text: str) -> None:
-        self._console.print(text, style="dim")
+        from rich.text import Text
+
+        self._console.print(Text(text, style="dim"))
 
     def print_highlighted(self, text: str) -> None:
-        self._console.print(text, style="bold cyan")
+        from rich.text import Text
+
+        self._console.print(Text(text, style="bold cyan"))
 
     def print_menu(
         self,
@@ -212,12 +228,13 @@ class RichRenderBackend(PrintRenderBackend):
             if default == str(i):
                 label_text.append(f" ({tr('menu_default_short')})", style="dim")
             table.add_row(str(i), label_text)
-        self._console.print(Panel(table, title=prompt, border_style="cyan"))
+        self._console.print(Panel(table, title=Text(prompt), border_style="cyan"))
 
     def print_panel(self, title: str, text: str) -> None:
         from rich.panel import Panel
+        from rich.text import Text
 
-        self._console.print(Panel(text, title=title, border_style="blue"))
+        self._console.print(Panel(Text(text), title=Text(title), border_style="blue"))
 
     def format_status(self, text: str, positive: bool) -> str:
         return text

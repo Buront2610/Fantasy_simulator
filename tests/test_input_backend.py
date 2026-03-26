@@ -195,6 +195,14 @@ class TestPromptToolkitDefaultFactory(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 create_default_input_backend()
 
+    def test_prompt_toolkit_pause_shows_press_enter_message(self) -> None:
+        backend = PromptToolkitInputBackend.__new__(PromptToolkitInputBackend)
+        seen: list[str] = []
+        backend._session = type("S", (), {"prompt": staticmethod(lambda p, **_k: seen.append(p) or "")})()
+        set_locale("en")
+        backend.pause()
+        self.assertTrue(any("Press ENTER" in p for p in seen))
+
 
 if __name__ == "__main__":
     unittest.main()

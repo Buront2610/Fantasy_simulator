@@ -92,7 +92,7 @@ def _run_simulation(world: World, years: int, ctx: UIContext | None = None) -> S
         sim.advance_years(1)
         alive = sum(1 for c in world.characters if c.alive)
         out.print_line(
-            f"  {tr('year_label')} {world.year}  |  {alive} {tr('alive')}"
+            f"  {tr('year_label')} {world.year}  |  {out.format_status(str(alive), True)} {tr('alive')}"
         )
     out.print_success(f"  {tr('simulation_complete')}")
     return sim
@@ -112,7 +112,7 @@ def _advance_simulation(sim: Simulator, years: int, ctx: UIContext | None = None
         alive = sum(1 for c in sim.world.characters if c.alive)
         out.print_line(
             f"  {tr('year_label')} {sim.world.year}  |  "
-            f"{alive} {tr('alive')}  |  "
+            f"{out.format_status(str(alive), True)} {tr('alive')}  |  "
             f"{pending} {tr('pending_choices')}"
         )
     out.print_success(f"  {tr('simulation_advanced_to_year', year=sim.world.year)}")
@@ -132,7 +132,7 @@ def _advance_auto(sim: Simulator, ctx: UIContext | None = None) -> None:
     pending = len(sim.get_pending_adventure_choices())
     out.print_line(
         f"  {tr('year_label')} {sim.world.year}  |  "
-        f"{alive} {tr('alive')}  |  "
+        f"{out.format_status(str(alive), True)} {tr('alive')}  |  "
         f"{pending} {tr('pending_choices')}"
     )
     reason_key = f"auto_pause_{reason}"
@@ -588,7 +588,7 @@ def _show_roster(world: World, ctx: UIContext | None = None) -> None:
             tr("status_alive") if c.alive else tr("status_dead"),
             10,
         )
-        status = status_text
+        status = out.format_status(status_text, c.alive)
         name_trunc = fit_display_width(c.name, 22)
         racejob = fit_display_width(f"{tr_term(c.race)} {tr_term(c.job)}", 22)
         loc_trunc = fit_display_width(world.location_name(c.location_id), 20)
@@ -608,7 +608,7 @@ def _show_single_story(sim: Simulator, ctx: UIContext | None = None) -> None:
 
     out.print_line()
     for i, c in enumerate(world.characters, 1):
-        status = tr("status_alive") if c.alive else tr("status_dead")
+        status = out.format_status(tr("status_alive") if c.alive else tr("status_dead"), c.alive)
         out.print_line(
             f"  {i:>2}. [{status}] {c.name} ({tr_term(c.race)} {tr_term(c.job)}, "
             f"{tr('age_short_label')} {c.age})"

@@ -118,7 +118,13 @@ class PromptToolkitInputBackend(StdInputBackend):
                 return resolved
 
     def pause(self, message: str = "") -> None:
-        self.read_line(message or "")
+        from ..i18n import tr
+
+        if message:
+            prompt = f"\n  {message}\n  {tr('press_enter')} "
+        else:
+            prompt = f"\n  {tr('press_enter')} "
+        self.read_line(prompt)
 
 
 def create_default_input_backend() -> InputBackend:
