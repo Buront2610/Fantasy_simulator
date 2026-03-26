@@ -228,16 +228,17 @@ class RichRenderBackend(PrintRenderBackend):
             if default == str(i):
                 label_text.append(f" ({tr('menu_default_short')})", style="dim")
             table.add_row(str(i), label_text)
-        self._console.print(Panel(table, title=Text(prompt), border_style="cyan"))
+        self._console.print(Panel(table, title=Text(prompt), border_style="cyan", expand=False, padding=(0, 0)))
 
     def print_panel(self, title: str, text: str) -> None:
         from rich.panel import Panel
         from rich.text import Text
 
-        self._console.print(Panel(Text(text), title=Text(title), border_style="blue"))
+        self._console.print(Panel(Text(text), title=Text(title), border_style="blue", expand=False, padding=(0, 0)))
 
     def format_status(self, text: str, positive: bool) -> str:
-        return text
+        marker = "✓" if positive else "✗"
+        return f"{marker}{text}"
 
     def get_terminal_width(self) -> int:
         return self._console.size.width

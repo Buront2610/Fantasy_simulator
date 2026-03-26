@@ -352,7 +352,8 @@ class TestRichRenderBackendSafety(unittest.TestCase):
         backend = RichRenderBackend.__new__(RichRenderBackend)
         backend._console = unittest.mock.Mock()
         status = backend.format_status("[alive]", True)
-        self.assertEqual(status, "[alive]")
+        self.assertIn("[alive]", status)
+        self.assertTrue(status.startswith("✓"))
 
     def test_print_panel_uses_text_renderables(self) -> None:
         from fantasy_simulator.ui.render_backend import RichRenderBackend
@@ -367,6 +368,8 @@ class TestRichRenderBackendSafety(unittest.TestCase):
         self.assertEqual(_args[0].plain, "[body]")
         self.assertIsInstance(kwargs["title"], Text)
         self.assertEqual(kwargs["title"].plain, "[title]")
+        self.assertFalse(kwargs["expand"])
+        self.assertEqual(kwargs["padding"], (0, 0))
 
     def test_print_menu_uses_i18n_and_no_markup_strings(self) -> None:
         from fantasy_simulator.i18n import set_locale

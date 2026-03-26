@@ -198,7 +198,7 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         # the separator/heading calls prove the route goes through backends)
         self.assertTrue(len(out.calls) > 3, "Too few backend calls captured")
 
-    def test_world_map_auto_mode_uses_compact_on_narrow_terminal(self) -> None:
+    def test_world_map_auto_mode_uses_minimal_on_narrow_terminal(self) -> None:
         from fantasy_simulator.ui.screens import _show_results, _build_default_world
 
         world = _build_default_world(num_characters=4, seed=42)
@@ -218,10 +218,10 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         ):
             _show_results(sim, ctx=ctx)
 
-        self.assertIn("COMPACT", out.text)
+        self.assertIn("MINIMAL", out.text)
         self.assertNotIn("WIDE", out.text)
 
-    def test_world_map_auto_mode_uses_minimal_on_tiny_terminal(self) -> None:
+    def test_world_map_auto_mode_uses_compact_on_medium_terminal(self) -> None:
         from fantasy_simulator.ui.screens import _show_results, _build_default_world
 
         world = _build_default_world(num_characters=4, seed=42)
@@ -234,15 +234,37 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         ctx = UIContext(inp=inp, out=out)
 
         with (
-            patch("shutil.get_terminal_size", return_value=os.terminal_size((30, 24))),
+            patch("shutil.get_terminal_size", return_value=os.terminal_size((72, 24))),
             patch("fantasy_simulator.ui.atlas_renderer.render_atlas_overview", return_value="WIDE"),
             patch("fantasy_simulator.ui.atlas_renderer.render_atlas_compact", return_value="COMPACT"),
             patch("fantasy_simulator.ui.atlas_renderer.render_atlas_minimal", return_value="MINIMAL"),
         ):
             _show_results(sim, ctx=ctx)
 
-        self.assertIn("MINIMAL", out.text)
+        self.assertIn("COMPACT", out.text)
         self.assertNotIn("WIDE", out.text)
+
+    def test_world_map_auto_mode_uses_wide_on_large_terminal(self) -> None:
+        from fantasy_simulator.ui.screens import _show_results, _build_default_world
+
+        world = _build_default_world(num_characters=4, seed=42)
+        from fantasy_simulator.simulator import Simulator
+        sim = Simulator(world, events_per_year=2)
+        sim.advance_years(1)
+
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(menu_keys=["world_map", "back_to_main", "back_to_main"])
+        ctx = UIContext(inp=inp, out=out)
+
+        with (
+            patch("shutil.get_terminal_size", return_value=os.terminal_size((100, 24))),
+            patch("fantasy_simulator.ui.atlas_renderer.render_atlas_overview", return_value="WIDE"),
+            patch("fantasy_simulator.ui.atlas_renderer.render_atlas_compact", return_value="COMPACT"),
+            patch("fantasy_simulator.ui.atlas_renderer.render_atlas_minimal", return_value="MINIMAL"),
+        ):
+            _show_results(sim, ctx=ctx)
+
+        self.assertIn("WIDE", out.text)
 
     def test_world_map_prints_semantic_legend_and_keys_hint(self) -> None:
         from fantasy_simulator.ui.screens import _show_results, _build_default_world

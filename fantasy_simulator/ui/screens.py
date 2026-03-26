@@ -417,9 +417,10 @@ def _show_world_map(sim: Simulator, ctx: UIContext | None = None) -> None:
             width = int(out.get_terminal_width())
         except Exception:
             width = shutil.get_terminal_size(fallback=(80, 24)).columns
-        if width < 40:
+        # NOTE: thresholds include panel frame/padding overhead in Rich mode.
+        if width < 56:
             return "minimal"
-        if width < 68:
+        if width < 88:
             return "compact"
         return "wide"
 
