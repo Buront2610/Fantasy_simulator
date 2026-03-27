@@ -1,14 +1,14 @@
 # UI改造計画書
 
-**最終更新**: 2026-03-25（PR-H1 は完了　次の公式着手対象は PR-H2）
+**最終更新**: 2026-03-25（PR-H2 は完了　次の公式着手対象は PR-I）
 
 この文書は、`Fantasy_simulator` のユーザインタフェース（UI）を現状の簡素な CLI から、物語生成ゲームにふさわしい魅力的な体験へ進化させるための計画書である。前半では現状の問題と目標を整理し、後半では5つの専門領域（世界シミュレーション、運営型シム、インタラクティブ叙述、4X設計、ソフトウェアアーキテクチャ）の視点から提案された改善策をまとめる。最後に採用するライブラリや段階的な実行計画を提示する。
 
 > **関連文書**: 本計画は `docs/implementation_plan.md`（公式な実装順・PR 分割・完了条件の正本）の `location_id` 移行・`WorldEventRecord` 導入・UI 連携規約、および `docs/next_version_plan.md` の `NarrativeContext` / `MapRenderInfo` 設計を前提としている。UI 改造の実装順や着手条件が他文書と衝突する場合は `docs/implementation_plan.md` を優先する。データモデルや migration の詳細はそれぞれの文書を参照のこと。
 >
-> **現時点の前提**: `docs/implementation_plan.md` 上では PR-0 から PR-H1 までが main に反映済みであり、
+> **現時点の前提**: `docs/implementation_plan.md` 上では PR-0 から PR-H2 までが main に反映済みであり、
 > region mapの意味化は導入済みである。次の公式着手対象は
-> **PR-H2（軽量 Rich シェル）**、その後 **PR-I** とする。本書もこの前提で読む。
+> **PR-I** とする。本書もこの前提で読む。
 
 ---
 
@@ -259,14 +259,14 @@ map renderer は最低でも次のモードを持つ。
 - [ ] 日本語英語混在時のセンタリング、表幅、AA 罫線が崩れないことを確認する包括的な幅崩れテストを拡張する
 - [ ] メインメニュー、ワールドマップ、月報、キャラクター一覧など主要画面全体の文字出力スナップショット比較テストを追加する
 - [ ] `WorldEventRecord` から期待するパネル・レポート・通知カードが生成されることを確認するイベント表示テストを追加する
-- [ ] 端末幅に応じて `compact` / `minimal` 表示へ自動的に切り替える統合テストは PR-H2 で追加する
+- [x] 端末幅に応じて `compact` / `minimal` 表示へ自動的に切り替える統合テストを追加する（PR-H2）
 - [ ] seed 固定 terrain preview / worldgen PoC の再現性テストは PR-G3 以降で追加する
 
 ## 結論
 
 短期的には **Rich + prompt_toolkit + wcwidth** の組み合わせが最も実用的で、既存 CLI を大きく壊さずに観測体験を改善できる。ただし順序は Rich 先行ではなく、**region map の意味論強化を主線、薄い Rich 化を補助線** とする。
 region map の意味論強化は PR-H1 で完了
-次段では PR-H2 として、薄い Rich 化を本線として進める
+PR-H2 で薄い Rich 化は完了しており、次段は PR-I で叙述文脈の強化を進める
 prompt_toolkit と将来の Textual は根本的に異なる入力モデルであるため、prompt_toolkit 依存コードは入力抽象の背後に隔離する。
 
 そのうえで、次段階の map UI は「5×5 地点盤面の豪華化」ではなく、**terrain を持つ world の上に site と route が重なり、さらに world memory が履歴として染み出す観測 UI** として設計する。  

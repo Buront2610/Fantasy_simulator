@@ -13,6 +13,7 @@ prompt_toolkit, or Textual in future phases.
 
 from __future__ import annotations
 
+import shutil
 from typing import Any, List, Optional
 
 from ..character import Character
@@ -406,21 +407,40 @@ def _show_world_map(sim: Simulator, ctx: UIContext | None = None) -> None:
     inp = ctx.inp
     world = sim.world
     info = build_map_info(world)
-    atlas_mode = "wide"  # default mode
+    atlas_mode = "auto"  # default mode
+
+    def _resolved_mode() -> str:
+        if atlas_mode != "auto":
+            return atlas_mode
+        width = 80
+        try:
+            width = int(out.get_terminal_width())
+        except Exception:
+            width = shutil.get_terminal_size(fallback=(80, 24)).columns
+        # NOTE: thresholds include panel frame/padding overhead in Rich mode.
+        if width < 56:
+            return "minimal"
+        if width < 88:
+            return "compact"
+        return "wide"
 
     while True:
         out.print_line()
-        if atlas_mode == "compact":
-            out.print_line(render_atlas_compact(info))
-        elif atlas_mode == "minimal":
-            out.print_line(render_atlas_minimal(info))
+        render_mode = _resolved_mode()
+        if render_mode == "compact":
+            atlas_text = render_atlas_compact(info)
+        elif render_mode == "minimal":
+            atlas_text = render_atlas_minimal(info)
         else:
-            out.print_line(render_atlas_overview(info))
+            atlas_text = render_atlas_overview(info)
+
+        panel_title = f"{tr('world_map')} ({tr('atlas_mode_' + render_mode)})"
+        out.print_panel(panel_title, atlas_text)
 
         # --- Direct selection shortlist (item 11) ---
         labeled = atlas_labeled_sites(info)
         out.print_line()
-        out.print_line(f"  {tr('atlas_site_list')}:")
+        out.print_heading(f"  {tr('atlas_site_list')}:")
         for i, (loc_id, name) in enumerate(labeled, 1):
             cell = None
             for c in info.cells.values():
@@ -433,6 +453,13 @@ def _show_world_map(sim: Simulator, ctx: UIContext | None = None) -> None:
                 ov = _overlay_suffix(cell)
                 overlay = f" [{ov}]" if ov else ""
             out.print_line(f"    {i:>2}. {name}{overlay}")
+        out.print_line()
+        out.print_heading(f"  {tr('map_semantic_legend_title')}")
+        out.print_error(f"    !  {tr('map_legend_danger_high')}")
+        out.print_warning(f"    $  {tr('map_legend_traffic_high')}")
+        out.print_highlighted(f"    ?  {tr('map_legend_rumor_high')}")
+        out.print_dim(f"    m  {tr('map_legend_memorial')} / a  {tr('map_legend_alias')}")
+        out.print_dim(f"  {tr('map_nav_keys_hint')}")
         out.print_line()
 
         action = ctx.choose_key(
@@ -487,6 +514,7 @@ def _show_world_map(sim: Simulator, ctx: UIContext | None = None) -> None:
             new_mode = ctx.choose_key(
                 tr("atlas_mode_prompt"),
                 [
+                    ("auto", tr("atlas_mode_auto")),
                     ("wide", tr("atlas_mode_wide")),
                     ("compact", tr("atlas_mode_compact")),
                     ("minimal", tr("atlas_mode_minimal")),

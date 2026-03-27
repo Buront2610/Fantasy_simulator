@@ -42,10 +42,22 @@ influence.
 Requirements:
 
 - Python 3.10+
+- Optional UI extras:
+  - `rich` (thin Rich render shell)
+  - `prompt_toolkit` (input assistance backend)
 
 Start the CLI:
 
 ```bash
+python -m fantasy_simulator
+```
+
+Optional backend selection (explicit opt-in):
+
+```bash
+# default: StdInputBackend + PrintRenderBackend
+export FANTASY_SIMULATOR_INPUT_BACKEND=prompt_toolkit
+export FANTASY_SIMULATOR_UI_BACKEND=rich
 python -m fantasy_simulator
 ```
 
@@ -111,8 +123,8 @@ fantasy_simulator/          # Main package
     view_models.py          # UI-facing view models from canonical data
     map_renderer.py         # Map data extraction (MapCellInfo/MapRenderInfo) and ASCII rendering
     atlas_renderer.py       # Atlas-scale overview rendering
-    input_backend.py        # InputBackend protocol and StdInputBackend
-    render_backend.py       # RenderBackend protocol and PrintRenderBackend
+    input_backend.py        # InputBackend protocol + Std / PromptToolkit backends
+    render_backend.py       # RenderBackend protocol + Print / Rich backends
   narrative/
     context.py              # Minimal NarrativeContext helpers for memorials / aliases
     template_history.py     # Template cooldown / selection helper
@@ -179,10 +191,10 @@ supports:
 
 ## Near-Term Priorities
 
-- Strengthen the region layer of the observation UI so it becomes a readable
-  local decision map (PR-H1)
-- Introduce a thin Rich-based presentation shell to improve layout, emphasis,
-  and input assistance (PR-H2)
+- Expand `NarrativeContext` so relation tags, rumors, memorials, and reports
+  can drive context-aware text selection (PR-I)
+- Continue world setting externalization work toward the first formal
+  `SettingBundle` authoring pass (PR-J)
 - Treat worldgen PoC work as parallel technical validation, not the next
   blocking mainline milestone
 

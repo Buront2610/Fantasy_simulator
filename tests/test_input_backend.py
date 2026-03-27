@@ -11,10 +11,16 @@ These tests verify:
 from __future__ import annotations
 
 import unittest
+from os import environ
 from unittest.mock import patch, MagicMock
 
 from fantasy_simulator.i18n import set_locale
-from fantasy_simulator.ui.input_backend import InputBackend, StdInputBackend
+from fantasy_simulator.ui.input_backend import (
+    InputBackend,
+    PromptToolkitInputBackend,
+    StdInputBackend,
+    create_default_input_backend,
+)
 
 
 class TestStdInputBackendReadLine(unittest.TestCase):
@@ -125,6 +131,77 @@ class TestCustomInputBackend(unittest.TestCase):
         )
         backend.pause("done")
         self.assertEqual(len(backend.calls), 3)
+
+
+class TestPromptToolkitDefaultFactory(unittest.TestCase):
+    """Default input backend factory should degrade gracefully."""
+
+    def test_factory_falls_back_to_std_when_prompt_toolkit_unavailable(self) -> None:
+        with (
+            patch.dict(environ, {"FANTASY_SIMULATOR_INPUT_BACKEND": "prompt_toolkit"}, clear=False),
+            patch(
+                "fantasy_simulator.ui.input_backend.PromptToolkitInputBackend",
+                side_effect=ImportError("no prompt_toolkit"),
+            ),
+        ):
+            backend = create_default_input_backend()
+        self.assertIsInstance(backend, StdInputBackend)
+
+    def test_factory_defaults_to_std_without_opt_in(self) -> None:
+        with patch.dict(environ, {"FANTASY_SIMULATOR_INPUT_BACKEND": ""}, clear=False):
+            backend = create_default_input_backend()
+        self.assertIsInstance(backend, StdInputBackend)
+
+    def test_factory_prefers_prompt_toolkit_when_available(self) -> None:
+        fake = object()
+        with (
+            patch.dict(environ, {"FANTASY_SIMULATOR_INPUT_BACKEND": "prompt_toolkit"}, clear=False),
+            patch(
+                "fantasy_simulator.ui.input_backend.PromptToolkitInputBackend",
+                return_value=fake,
+            ),
+        ):
+            backend = create_default_input_backend()
+        self.assertIs(backend, fake)
+
+    def test_prompt_toolkit_menu_key_uses_default(self) -> None:
+        backend = PromptToolkitInputBackend.__new__(PromptToolkitInputBackend)
+        backend._session = type("S", (), {"prompt": staticmethod(lambda *_a, **_k: "")})()
+        key = backend.read_menu_key([("a", "A"), ("b", "B")], default="2")
+        self.assertEqual(key, "b")
+
+    def test_prompt_toolkit_invalid_then_valid_string(self) -> None:
+        backend = PromptToolkitInputBackend.__new__(PromptToolkitInputBackend)
+        replies = iter(["invalid", "2"])
+        backend._session = type("S", (), {"prompt": staticmethod(lambda *_a, **_k: next(replies))})()
+        key = backend.read_menu_key([("alpha", "A"), ("beta", "B")], default="1")
+        self.assertEqual(key, "beta")
+
+    def test_prompt_toolkit_out_of_range_then_valid(self) -> None:
+        backend = PromptToolkitInputBackend.__new__(PromptToolkitInputBackend)
+        replies = iter(["99", "1"])
+        backend._session = type("S", (), {"prompt": staticmethod(lambda *_a, **_k: next(replies))})()
+        key = backend.read_menu_key([("alpha", "A"), ("beta", "B")], default=None)
+        self.assertEqual(key, "alpha")
+
+    def test_factory_does_not_swallow_runtime_error(self) -> None:
+        with (
+            patch.dict(environ, {"FANTASY_SIMULATOR_INPUT_BACKEND": "prompt_toolkit"}, clear=False),
+            patch(
+                "fantasy_simulator.ui.input_backend.PromptToolkitInputBackend",
+                side_effect=RuntimeError("boom"),
+            ),
+        ):
+            with self.assertRaises(RuntimeError):
+                create_default_input_backend()
+
+    def test_prompt_toolkit_pause_shows_press_enter_message(self) -> None:
+        backend = PromptToolkitInputBackend.__new__(PromptToolkitInputBackend)
+        seen: list[str] = []
+        backend._session = type("S", (), {"prompt": staticmethod(lambda p, **_k: seen.append(p) or "")})()
+        set_locale("en")
+        backend.pause()
+        self.assertTrue(any("Press ENTER" in p for p in seen))
 
 
 if __name__ == "__main__":

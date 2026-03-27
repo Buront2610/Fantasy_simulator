@@ -8,6 +8,8 @@ from typing import Dict
 TEXT_EN: Dict[str, str] = {
     'press_enter': '[Press ENTER to continue]',
     'your_choice': 'Your choice',
+    'menu_option_column': 'Option',
+    'menu_default_short': 'default',
     'year_label': 'Year',
     'age_short_label': 'age',
     'gender_label': 'Gender',
@@ -512,7 +514,9 @@ TEXT_EN: Dict[str, str] = {
     'atlas_site_list': 'Sites on atlas',
     'map_nav_select': 'Jump to site (direct selection)',
     'map_nav_mode': 'Switch atlas display mode',
+    'map_nav_keys_hint': 'Keys: 1-6 for menu, numbers for site list, mode for display switch',
     'atlas_mode_prompt': 'Display mode',
+    'atlas_mode_auto': 'Auto (fit terminal width)',
     'atlas_mode_wide': 'Wide atlas (full)',
     'atlas_mode_compact': 'Compact atlas (narrow)',
     'atlas_mode_minimal': 'Minimal (text only)',
@@ -520,6 +524,7 @@ TEXT_EN: Dict[str, str] = {
     'map_landmark_alias': 'Also known as',
     'map_landmark_memorial': 'Memorial',
     'map_landmark_trace': 'Recent',
+    'map_semantic_legend_title': 'Semantic legend',
 }
 
 TERMS_EN: Dict[str, str] = {

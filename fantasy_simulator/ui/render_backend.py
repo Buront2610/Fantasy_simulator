@@ -8,6 +8,7 @@ touching input or domain code.
 
 from __future__ import annotations
 
+import os
 import textwrap
 from typing import List, Optional, Protocol, Tuple, runtime_checkable
 
@@ -76,6 +77,14 @@ class RenderBackend(Protocol):
         """
         ...  # pragma: no cover
 
+    def print_panel(self, title: str, text: str) -> None:
+        """Print a titled panel block."""
+        ...  # pragma: no cover
+
+    def get_terminal_width(self) -> int:
+        """Return best-effort terminal width in columns."""
+        ...  # pragma: no cover
+
 
 class PrintRenderBackend:
     """Default backend that delegates to plain ``print()`` with ANSI codes."""
@@ -137,3 +146,136 @@ class PrintRenderBackend:
     def format_status(self, text: str, positive: bool) -> str:
         from .ui_helpers import green, red
         return green(text) if positive else red(text)
+
+    def print_panel(self, title: str, text: str) -> None:
+        self.print_separator("-")
+        self.print_heading(f"  {title}")
+        for line in text.splitlines():
+            self.print_line(line)
+        self.print_separator("-")
+
+    def get_terminal_width(self) -> int:
+        """Best-effort terminal width for responsive rendering."""
+        import shutil
+
+        return shutil.get_terminal_size(fallback=(80, 24)).columns
+
+
+class RichRenderBackend(PrintRenderBackend):
+    """Thin Rich-based shell with graceful fallback to ANSI/plain rendering."""
+
+    def __init__(self) -> None:
+        from rich.console import Console
+
+        self._console = Console()
+
+    def print_line(self, text: str = "") -> None:
+        from rich.text import Text
+
+        self._console.print(Text.from_ansi(text))
+
+    def print_heading(self, text: str) -> None:
+        from rich.text import Text
+
+        self._console.print(Text(text, style="bold"))
+
+    def print_separator(self, char: str = "=", width: int = 62) -> None:
+        from rich.text import Text
+
+        self._console.print(Text("  " + (char * width), style="dim"))
+
+    def print_error(self, text: str) -> None:
+        from rich.text import Text
+
+        self._console.print(Text(text, style="bold red"))
+
+    def print_success(self, text: str) -> None:
+        from rich.text import Text
+
+        self._console.print(Text(text, style="bold green"))
+
+    def print_warning(self, text: str) -> None:
+        from rich.text import Text
+
+        self._console.print(Text(text, style="bold yellow"))
+
+    def print_dim(self, text: str) -> None:
+        from rich.text import Text
+
+        self._console.print(Text(text, style="dim"))
+
+    def print_highlighted(self, text: str) -> None:
+        from rich.text import Text
+
+        self._console.print(Text(text, style="bold cyan"))
+
+    def print_wrapped(self, text: str, indent: int = 4) -> None:
+        from rich.text import Text
+
+        prefix = " " * indent
+        for line in text.splitlines():
+            if not line.strip():
+                self._console.print("")
+                continue
+            composed = Text(prefix) + Text.from_ansi(line)
+            self._console.print(composed, overflow="fold", no_wrap=False)
+
+    def print_menu(
+        self,
+        prompt: str,
+        key_label_pairs: List[Tuple[str, str]],
+        default: Optional[str] = None,
+    ) -> None:
+        from ..i18n import tr
+        from rich.panel import Panel
+        from rich.table import Table
+        from rich.text import Text
+
+        table = Table(show_header=True, header_style="bold magenta")
+        table.add_column("#", justify="right", style="bold")
+        table.add_column(tr("menu_option_column"))
+        for i, (_, label) in enumerate(key_label_pairs, 1):
+            label_text = Text(label)
+            if default == str(i):
+                label_text.append(f" ({tr('menu_default_short')})", style="dim")
+            table.add_row(str(i), label_text)
+        self._console.print(Panel(table, title=Text(prompt), border_style="cyan", expand=False, padding=(0, 0)))
+
+    def print_panel(self, title: str, text: str) -> None:
+        from rich.panel import Panel
+        from rich.text import Text
+
+        self._console.print(
+            Panel(
+                Text.from_ansi(text),
+                title=Text(title),
+                border_style="blue",
+                expand=False,
+                padding=(0, 0),
+            )
+        )
+
+    def format_status(self, text: str, positive: bool) -> str:
+        from .ui_helpers import green, red
+
+        return green(text) if positive else red(text)
+
+    def get_terminal_width(self) -> int:
+        return self._console.size.width
+
+
+def create_default_render_backend() -> RenderBackend:
+    """Return default render backend.
+
+    Default is ``PrintRenderBackend`` for reproducibility.  Set
+    ``FANTASY_SIMULATOR_UI_BACKEND=rich`` to opt in to Rich.
+    """
+    selected = os.getenv("FANTASY_SIMULATOR_UI_BACKEND", "").strip().lower()
+    if selected in {"", "plain", "print"}:
+        return PrintRenderBackend()
+    if selected not in {"rich"}:
+        return PrintRenderBackend()
+    try:
+        return RichRenderBackend()
+    except (ImportError, ModuleNotFoundError):
+        return PrintRenderBackend()

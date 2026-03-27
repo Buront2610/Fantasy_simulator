@@ -3,8 +3,9 @@ ui_context.py - Dependency container for the UI layer.
 
 ``UIContext`` bundles an ``InputBackend`` and ``RenderBackend`` together
 so that all screen functions receive a single injection point.  When no
-context is supplied, the default (``StdInputBackend`` + ``PrintRenderBackend``)
-is used — meaning existing callers see zero behaviour change.
+context is supplied, factory defaults are used (``StdInputBackend`` +
+``PrintRenderBackend``).  Rich/prompt_toolkit are opt-in via environment
+variables, so default behavior remains reproducible.
 
 Example (production)::
 
@@ -22,8 +23,8 @@ from __future__ import annotations
 
 from typing import List, Optional, Tuple
 
-from .input_backend import InputBackend, StdInputBackend
-from .render_backend import RenderBackend, PrintRenderBackend
+from .input_backend import InputBackend, create_default_input_backend
+from .render_backend import RenderBackend, create_default_render_backend
 
 
 class UIContext:
@@ -45,8 +46,8 @@ class UIContext:
         inp: InputBackend | None = None,
         out: RenderBackend | None = None,
     ) -> None:
-        self.inp: InputBackend = inp or StdInputBackend()
-        self.out: RenderBackend = out or PrintRenderBackend()
+        self.inp: InputBackend = inp or create_default_input_backend()
+        self.out: RenderBackend = out or create_default_render_backend()
 
     def choose_key(
         self,

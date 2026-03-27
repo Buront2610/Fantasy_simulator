@@ -13,12 +13,23 @@ These tests verify:
 from __future__ import annotations
 
 import io
+from os import environ
 import re
 import unittest
 from contextlib import redirect_stdout
 from unittest.mock import patch
 
-from fantasy_simulator.ui.render_backend import PrintRenderBackend, RenderBackend
+from fantasy_simulator.ui.render_backend import (
+    PrintRenderBackend,
+    RenderBackend,
+    create_default_render_backend,
+)
+
+try:
+    import rich  # noqa: F401
+    _RICH_AVAILABLE = True
+except ImportError:
+    _RICH_AVAILABLE = False
 
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
@@ -226,6 +237,12 @@ class TestCustomRenderBackend(unittest.TestCase):
             def print_menu(self, prompt, key_label_pairs, default=None) -> None:
                 self.lines.append(("menu", prompt, len(key_label_pairs)))
 
+            def print_panel(self, title: str, text: str) -> None:
+                self.lines.append(("panel", title, text))
+
+            def get_terminal_width(self) -> int:
+                return 80
+
         backend = BufferRenderBackend()
         self.assertIsInstance(backend, RenderBackend)
 
@@ -249,6 +266,155 @@ class TestCustomRenderBackend(unittest.TestCase):
         self.assertEqual(backend.lines[6], ("wrapped", "long text"))
         self.assertEqual(backend.lines[7], ("dim", "faint"))
         self.assertEqual(backend.lines[8], ("highlighted", "accent"))
+
+
+class TestRenderBackendFactory(unittest.TestCase):
+    """Default renderer factory should degrade gracefully."""
+
+    def test_factory_falls_back_to_print_backend(self) -> None:
+        with (
+            patch.dict(environ, {"FANTASY_SIMULATOR_UI_BACKEND": "rich"}, clear=False),
+            patch(
+                "fantasy_simulator.ui.render_backend.RichRenderBackend",
+                side_effect=ImportError("no rich"),
+            ),
+        ):
+            backend = create_default_render_backend()
+        self.assertIsInstance(backend, PrintRenderBackend)
+
+    def test_factory_defaults_to_print_without_opt_in(self) -> None:
+        with patch.dict(environ, {"FANTASY_SIMULATOR_UI_BACKEND": ""}, clear=False):
+            backend = create_default_render_backend()
+        self.assertIsInstance(backend, PrintRenderBackend)
+
+    def test_print_backend_panel_outputs_title_and_body(self) -> None:
+        backend = PrintRenderBackend()
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            backend.print_panel("PanelTitle", "line1\nline2")
+        text = _ANSI_RE.sub("", buf.getvalue())
+        self.assertIn("PanelTitle", text)
+        self.assertIn("line1", text)
+        self.assertIn("line2", text)
+
+    def test_factory_does_not_swallow_runtime_error(self) -> None:
+        with (
+            patch.dict(environ, {"FANTASY_SIMULATOR_UI_BACKEND": "rich"}, clear=False),
+            patch(
+                "fantasy_simulator.ui.render_backend.RichRenderBackend",
+                side_effect=RuntimeError("boom"),
+            ),
+        ):
+            with self.assertRaises(RuntimeError):
+                create_default_render_backend()
+
+
+@unittest.skipUnless(_RICH_AVAILABLE, "rich is not installed")
+class TestRichRenderBackendSafety(unittest.TestCase):
+    """Rich backend should avoid implicit markup interpolation hazards."""
+
+    def test_print_line_disables_markup(self) -> None:
+        from fantasy_simulator.ui.render_backend import RichRenderBackend
+        from rich.text import Text
+
+        backend = RichRenderBackend.__new__(RichRenderBackend)
+        backend._console = unittest.mock.Mock()
+        backend.print_line("[danger]")
+        (arg,), _kwargs = backend._console.print.call_args
+        self.assertIsInstance(arg, Text)
+        self.assertEqual(arg.plain, "[danger]")
+
+    def test_print_heading_disables_markup_and_uses_style(self) -> None:
+        from fantasy_simulator.ui.render_backend import RichRenderBackend
+        from rich.text import Text
+
+        backend = RichRenderBackend.__new__(RichRenderBackend)
+        backend._console = unittest.mock.Mock()
+        backend.print_heading("[Heading]")
+        (arg,), _kwargs = backend._console.print.call_args
+        self.assertIsInstance(arg, Text)
+        self.assertEqual(arg.plain, "[Heading]")
+
+    def test_print_error_uses_text_renderable(self) -> None:
+        from fantasy_simulator.ui.render_backend import RichRenderBackend
+        from rich.text import Text
+
+        backend = RichRenderBackend.__new__(RichRenderBackend)
+        backend._console = unittest.mock.Mock()
+        backend.print_error("[err]")
+        (arg,), _kwargs = backend._console.print.call_args
+        self.assertIsInstance(arg, Text)
+        self.assertEqual(arg.plain, "[err]")
+
+    def test_format_status_returns_plain_text(self) -> None:
+        from fantasy_simulator.ui.render_backend import RichRenderBackend
+
+        backend = RichRenderBackend.__new__(RichRenderBackend)
+        backend._console = unittest.mock.Mock()
+        status = backend.format_status("[alive]", True)
+        self.assertIn("[alive]", status)
+        self.assertIn("\033[32m", status)
+
+    def test_print_panel_uses_text_renderables(self) -> None:
+        from fantasy_simulator.ui.render_backend import RichRenderBackend
+        from rich.text import Text
+
+        backend = RichRenderBackend.__new__(RichRenderBackend)
+        backend._console = unittest.mock.Mock()
+        with patch("rich.panel.Panel") as mock_panel:
+            backend.print_panel("[title]", "[body]")
+        _args, kwargs = mock_panel.call_args
+        self.assertIsInstance(_args[0], Text)
+        self.assertEqual(_args[0].plain, "[body]")
+        self.assertIsInstance(kwargs["title"], Text)
+        self.assertEqual(kwargs["title"].plain, "[title]")
+        self.assertFalse(kwargs["expand"])
+        self.assertEqual(kwargs["padding"], (0, 0))
+
+    def test_print_wrapped_uses_rich_fold_with_indent(self) -> None:
+        from fantasy_simulator.ui.render_backend import RichRenderBackend
+        from rich.text import Text
+
+        backend = RichRenderBackend.__new__(RichRenderBackend)
+        backend._console = unittest.mock.Mock()
+        backend.print_wrapped("日本語 mixed width line", indent=2)
+        (renderable,), kwargs = backend._console.print.call_args
+        self.assertIsInstance(renderable, Text)
+        self.assertTrue(renderable.plain.startswith("  "))
+        self.assertEqual(kwargs["overflow"], "fold")
+        self.assertFalse(kwargs["no_wrap"])
+
+    def test_print_menu_uses_i18n_and_no_markup_strings(self) -> None:
+        from fantasy_simulator.i18n import set_locale
+        from fantasy_simulator.ui.render_backend import RichRenderBackend
+
+        set_locale("ja")
+        backend = RichRenderBackend.__new__(RichRenderBackend)
+        backend._console = unittest.mock.Mock()
+
+        class FakeTable:
+            def __init__(self, *args, **kwargs) -> None:
+                self.columns = []
+                self.rows = []
+
+            def add_column(self, name, **_kwargs) -> None:
+                self.columns.append(name)
+
+            def add_row(self, idx, label) -> None:
+                self.rows.append((idx, label))
+
+        fake_table = FakeTable()
+        fake_panel = object()
+        with (
+            patch("rich.table.Table", return_value=fake_table),
+            patch("rich.panel.Panel", return_value=fake_panel),
+        ):
+            backend.print_menu("Prompt", [("k1", "項目A"), ("k2", "項目B")], default="1")
+
+        self.assertIn("項目", fake_table.columns)
+        row_label = fake_table.rows[0][1]
+        self.assertFalse(isinstance(row_label, str))
+        backend._console.print.assert_called_once_with(fake_panel)
 
 
 if __name__ == "__main__":

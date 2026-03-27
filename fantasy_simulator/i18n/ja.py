@@ -8,6 +8,8 @@ from typing import Dict
 TEXT_JA: Dict[str, str] = {
     'press_enter': '[ENTERで続行]',
     'your_choice': '選択',
+    'menu_option_column': '項目',
+    'menu_default_short': '既定',
     'year_label': '年',
     'age_short_label': '年齢',
     'gender_label': '性別',
@@ -508,7 +510,9 @@ TEXT_JA: Dict[str, str] = {
     'atlas_site_list': 'アトラス上の地点',
     'map_nav_select': '地点へジャンプ（直接選択）',
     'map_nav_mode': 'アトラス表示モード切替',
+    'map_nav_keys_hint': '操作: メニューは1-6、地点選択は番号入力、表示切替はモード変更',
     'atlas_mode_prompt': '表示モード',
+    'atlas_mode_auto': '自動（端末幅に合わせる）',
     'atlas_mode_wide': 'ワイドアトラス（全幅）',
     'atlas_mode_compact': 'コンパクトアトラス（狭幅）',
     'atlas_mode_minimal': 'ミニマル（テキストのみ）',
@@ -516,6 +520,7 @@ TEXT_JA: Dict[str, str] = {
     'map_landmark_alias': '別名',
     'map_landmark_memorial': '記念碑',
     'map_landmark_trace': '最近の出来事',
+    'map_semantic_legend_title': '意味凡例',
 }
 
 TERMS_JA: Dict[str, str] = {
