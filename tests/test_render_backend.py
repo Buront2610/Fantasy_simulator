@@ -371,6 +371,19 @@ class TestRichRenderBackendSafety(unittest.TestCase):
         self.assertFalse(kwargs["expand"])
         self.assertEqual(kwargs["padding"], (0, 0))
 
+    def test_print_wrapped_uses_rich_fold_with_indent(self) -> None:
+        from fantasy_simulator.ui.render_backend import RichRenderBackend
+        from rich.text import Text
+
+        backend = RichRenderBackend.__new__(RichRenderBackend)
+        backend._console = unittest.mock.Mock()
+        backend.print_wrapped("日本語 mixed width line", indent=2)
+        (renderable,), kwargs = backend._console.print.call_args
+        self.assertIsInstance(renderable, Text)
+        self.assertTrue(renderable.plain.startswith("  "))
+        self.assertEqual(kwargs["overflow"], "fold")
+        self.assertFalse(kwargs["no_wrap"])
+
     def test_print_menu_uses_i18n_and_no_markup_strings(self) -> None:
         from fantasy_simulator.i18n import set_locale
         from fantasy_simulator.ui.render_backend import RichRenderBackend

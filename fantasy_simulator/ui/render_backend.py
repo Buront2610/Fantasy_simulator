@@ -209,6 +209,17 @@ class RichRenderBackend(PrintRenderBackend):
 
         self._console.print(Text(text, style="bold cyan"))
 
+    def print_wrapped(self, text: str, indent: int = 4) -> None:
+        from rich.text import Text
+
+        prefix = " " * indent
+        for line in text.splitlines():
+            if not line.strip():
+                self._console.print("")
+                continue
+            composed = Text(prefix) + Text.from_ansi(line)
+            self._console.print(composed, overflow="fold", no_wrap=False)
+
     def print_menu(
         self,
         prompt: str,
