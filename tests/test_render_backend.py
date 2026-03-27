@@ -352,8 +352,7 @@ class TestRichRenderBackendSafety(unittest.TestCase):
         backend = RichRenderBackend.__new__(RichRenderBackend)
         backend._console = unittest.mock.Mock()
         status = backend.format_status("[alive]", True)
-        self.assertIn("[alive]", status)
-        self.assertTrue(status.startswith("✓"))
+        self.assertEqual(status, "[alive]")
 
     def test_print_panel_uses_text_renderables(self) -> None:
         from fantasy_simulator.ui.render_backend import RichRenderBackend

@@ -237,8 +237,7 @@ class RichRenderBackend(PrintRenderBackend):
         self._console.print(Panel(Text(text), title=Text(title), border_style="blue", expand=False, padding=(0, 0)))
 
     def format_status(self, text: str, positive: bool) -> str:
-        marker = "✓" if positive else "✗"
-        return f"{marker}{text}"
+        return text
 
     def get_terminal_width(self) -> int:
         return self._console.size.width
