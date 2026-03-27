@@ -172,7 +172,7 @@ class RichRenderBackend(PrintRenderBackend):
     def print_line(self, text: str = "") -> None:
         from rich.text import Text
 
-        self._console.print(Text(text))
+        self._console.print(Text.from_ansi(text))
 
     def print_heading(self, text: str) -> None:
         from rich.text import Text
@@ -234,10 +234,20 @@ class RichRenderBackend(PrintRenderBackend):
         from rich.panel import Panel
         from rich.text import Text
 
-        self._console.print(Panel(Text(text), title=Text(title), border_style="blue", expand=False, padding=(0, 0)))
+        self._console.print(
+            Panel(
+                Text.from_ansi(text),
+                title=Text(title),
+                border_style="blue",
+                expand=False,
+                padding=(0, 0),
+            )
+        )
 
     def format_status(self, text: str, positive: bool) -> str:
-        return text
+        from .ui_helpers import green, red
+
+        return green(text) if positive else red(text)
 
     def get_terminal_width(self) -> int:
         return self._console.size.width
