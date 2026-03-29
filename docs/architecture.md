@@ -53,3 +53,15 @@ form that tests can enforce.
   outputs, not only low-level state equality.
 - README claims about entrypoints, schema version, canonical event store, and
   the next roadmap step should stay aligned with the implementation plan.
+
+## Operational Aids
+
+- `docs/contexts/implementation.md` and `docs/contexts/review.md` are short
+  task-mode context files, not new sources of truth.
+- `docs/subagent_contract.md` defines the preferred delegation shape for
+  focused subagent work.
+- `docs/session_handoffs/` is for concise repo-local handoffs; keep entries
+  short and factual, anchored to the template, and avoid carrying more than
+  the latest relevant dated note.
+- `scripts/quality_gate.py` provides `minimal`, `standard`, and `strict`
+  verification profiles for agent workflows.
