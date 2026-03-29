@@ -129,6 +129,7 @@ TEXT_EN: Dict[str, str] = {
     'characters_deceased': 'Characters deceased',
     'event_breakdown': 'Event breakdown',
     'notable_moments': 'Notable moments',
+    'history_born_into_world': 'Born into the world as a {race} {job}.',
     'recovered_from_injuries': '{name} recovered from earlier adventure injuries.',
     'history_recovered_from_injuries': 'Year {year}: Recovered from earlier adventure injuries.',
     'set_out_for_adventure': 'Year {year}: Set out from {origin} toward {destination}.',

@@ -73,7 +73,9 @@ recording, adventure coordination, and query/reporting). The UI layer is
 abstracted through `InputBackend` / `RenderBackend` protocols, a `UIContext`
 dependency container, renderer modules, and presenter/view-model helpers. The
 current roadmap is maintained in
-[`docs/implementation_plan.md`](docs/implementation_plan.md).
+[`docs/implementation_plan.md`](docs/implementation_plan.md), and the current
+repo-level guardrails are summarized in
+[`docs/architecture.md`](docs/architecture.md).
 
 **Compatibility note (PR-A):** CLI launch (`python -m fantasy_simulator` and
 `python main.py`) and save/load compatibility are preserved. However, old
@@ -138,6 +140,7 @@ main.py                     # Compatibility wrapper (delegates to package)
 tests/                      # Automated tests
 docs/
   implementation_plan.md    # Implementation roadmap and phase order
+  architecture.md           # Current architectural guardrails and canonical data rules
   next_version_plan.md      # Long-range design target
   ui_renovation_plan.md     # UI renovation strategy
 ```

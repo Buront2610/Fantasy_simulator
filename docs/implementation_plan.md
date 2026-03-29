@@ -32,6 +32,7 @@
 | 文書 | 役割 | 優先度 |
 |---|---|---|
 | `docs/implementation_plan.md` | 公式な実装順、PR 分割、着手条件、完了条件、現状認識 | 最優先 |
+| `docs/architecture.md` | 現行の依存境界、正規データ源、CI で強制する構造制約の要約 | 本書の補助 |
 | `docs/next_version_plan.md` | vNext の目標設計、将来像、To-Be の仕様詳細 | 参照用 |
 | `docs/ui_renovation_plan.md` | UI の段階的刷新方針と技術選定 | 参照用 |
 | `README.md` | 現在の公開サマリー、起動方法、近接優先事項 | 本書と同期 |
@@ -40,6 +41,7 @@
 
 - 実装順の変更、Phase の入れ替え、PR の完了条件変更は **本書を先に更新する**。
 - `README.md` は「理想像」ではなく、**現状と近接優先事項を誤読なく伝える文書**として扱う。
+- `docs/architecture.md` は本書の代替ではなく、**現行 guardrail を短く機械可読に保つ補助文書**として扱う。
 - `docs/next_version_plan.md` と `docs/ui_renovation_plan.md` に残る将来像は活かすが、実装順の判断は本書を優先する。
 - 差分が出たまま次の PR に持ち越さず、PR-0 で確定した正本運用を維持する。
 
