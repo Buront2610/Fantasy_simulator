@@ -129,6 +129,7 @@ TEXT_JA: Dict[str, str] = {
     'characters_deceased': '死亡キャラクター',
     'event_breakdown': 'イベント内訳',
     'notable_moments': '主な出来事',
+    'history_born_into_world': '{race} の {job} としてこの世界に生を受けた。',
     'recovered_from_injuries': '{name} は以前の冒険で負った傷から回復しました。',
     'history_recovered_from_injuries': 'Year {year}: 以前の冒険で負った傷から回復した。',
     'set_out_for_adventure': 'Year {year}: {origin} を出発し、{destination} を目指した。',

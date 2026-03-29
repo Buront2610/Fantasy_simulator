@@ -6,6 +6,15 @@ import random
 from types import SimpleNamespace
 
 from fantasy_simulator.character_creator import CharacterCreator
+from fantasy_simulator.i18n import get_locale, set_locale
+
+
+def setup_function():
+    setup_function.previous_locale = get_locale()
+
+
+def teardown_function():
+    set_locale(setup_function.previous_locale)
 
 
 class TestCharacterCreator:
@@ -18,6 +27,19 @@ class TestCharacterCreator:
         creator = CharacterCreator()
         char = creator.create_from_template("warrior", name="Aldric")
         assert not any(entry.startswith("Year 0:") for entry in char.history)
+
+    def test_random_character_history_is_localized_in_japanese(self):
+        set_locale("ja")
+        creator = CharacterCreator()
+        char = creator.create_random(name="Aldric", rng=random.Random(42))
+        assert "この世界に生を受けた" in char.history[0]
+        assert "Born into the world" not in char.history[0]
+
+    def test_template_character_history_is_localized_in_english(self):
+        set_locale("en")
+        creator = CharacterCreator()
+        char = creator.create_from_template("warrior", name="Aldric", rng=random.Random(42))
+        assert char.history[0] == "Born into the world as a Human Warrior."
 
 
 class TestCreateRandomReproducibility:
