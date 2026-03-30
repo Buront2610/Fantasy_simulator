@@ -98,7 +98,7 @@ def _capture_bundle(locale: str) -> dict[str, object]:
     }
 
 
-def _record_projection_tags(kind: str, tags: list[str]) -> tuple[str, ...]:
+def _normalize_event_tags(kind: str, tags: list[str]) -> tuple[str, ...]:
     return tuple(tags) if tags else (kind,)
 
 
@@ -137,7 +137,7 @@ def _capture_projection_contract(locale: str) -> dict[str, object]:
         for cid in ([rec.primary_actor_id] if rec.primary_actor_id else []) + list(rec.secondary_actor_ids)
     })
     event_tags = sorted({
-        _record_projection_tags(rec.kind, rec.tags)
+        _normalize_event_tags(rec.kind, rec.tags)
         for rec in sim.world.event_records
     })
     relation_tags = sorted(
@@ -163,6 +163,10 @@ def _capture_projection_contract(locale: str) -> dict[str, object]:
         if loc.aliases or loc.memorial_ids or loc.live_traces
     )
     detail_cell = next(cell for cell in info.cells.values() if cell.location_id == detail_location_id)
+    detail_memory_tags = next(
+        (tags for loc_id, tags in memory_tags if loc_id == detail_location_id),
+        (),
+    )
 
     return {
         "summary": {
@@ -191,7 +195,7 @@ def _capture_projection_contract(locale: str) -> dict[str, object]:
         "detail_projection": {
             "location_id": detail_location_id,
             "canonical_name": detail_cell.canonical_name,
-            "memory_tags": next(tags for loc_id, tags in memory_tags if loc_id == detail_location_id),
+            "memory_tags": detail_memory_tags,
         },
     }
 
