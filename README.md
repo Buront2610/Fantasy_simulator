@@ -101,6 +101,10 @@ python scripts/quality_gate.py strict
 `minimal` is intentionally explicit: pass one or more `--pytest-target` values
 for the changed area you want to verify.
 
+`standard` is the repo's day-to-day guardrail profile. It exercises the
+architecture constraints, the quality-gate self-test, the agent workflow docs
+checks, doc freshness, and the harness scenario suite.
+
 ## Project Structure
 
 ```

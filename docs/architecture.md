@@ -64,4 +64,6 @@ form that tests can enforce.
   short and factual, anchored to the template, and avoid carrying more than
   the latest relevant dated note.
 - `scripts/quality_gate.py` provides `minimal`, `standard`, and `strict`
-  verification profiles for agent workflows.
+  verification profiles for agent workflows. The `standard` profile is the
+  routine guardrail suite for architecture constraints, quality-gate coverage,
+  agent workflow docs, doc freshness, and harness scenarios.

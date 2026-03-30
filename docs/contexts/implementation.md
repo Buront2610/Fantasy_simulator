@@ -21,6 +21,8 @@ Use this file when the task is primarily about changing code.
 
 - Changed-area work: `python scripts/quality_gate.py minimal --pytest-target ...`
 - Guardrail-sensitive work: `python scripts/quality_gate.py standard`
+  (architecture constraints, quality-gate self-tests, agent workflow docs,
+  doc freshness, and harness scenarios)
 - Cross-cutting or release-sensitive work: `python scripts/quality_gate.py strict`
 
 ## Avoid

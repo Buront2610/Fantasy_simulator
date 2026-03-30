@@ -8,7 +8,7 @@ import random
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from .character import Character, random_stats
-from .i18n import tr
+from .i18n import tr, tr_term
 from .content.world_data import JOBS, RACES, ALL_SKILLS
 
 if TYPE_CHECKING:
@@ -163,7 +163,7 @@ class CharacterCreator:
         skills = {s: 1 for s in job_skills_raw}
 
         char = Character(name=name, age=age, gender=gender, race=race, job=job, skills=skills, **stats)
-        char.add_history(tr("history_born_into_world", race=race, job=job))
+        char.add_history(tr("history_born_into_world", race=tr_term(race), job=tr_term(job)))
         out.print_line(f"\n  {tr('character_created')}")
         out.print_line(char.stat_block())
         return char
@@ -195,7 +195,7 @@ class CharacterCreator:
             name=char_name, age=age, gender=gender, race=race, job=job,
             skills=skills, rng=char_rng, **stats,
         )
-        char.add_history(tr("history_born_into_world", race=race, job=job))
+        char.add_history(tr("history_born_into_world", race=tr_term(race), job=tr_term(job)))
         return char
 
     def create_from_template(self, template_name: str, name: Optional[str] = None, rng: Any = random) -> Character:
@@ -219,7 +219,7 @@ class CharacterCreator:
             name=char_name, age=age, gender=gender, race=race, job=job,
             skills=skills, rng=char_rng, **stats,
         )
-        char.add_history(tr("history_born_into_world", race=race, job=job))
+        char.add_history(tr("history_born_into_world", race=tr_term(race), job=tr_term(job)))
         return char
 
     @staticmethod

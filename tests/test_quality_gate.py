@@ -26,8 +26,10 @@ def test_minimal_profile_accepts_explicit_pytest_targets():
 def test_standard_profile_runs_targeted_harness_suite():
     commands = build_profile_commands("standard")
     assert len(commands) == 1
-    assert commands[0].argv[-3:] == [
+    assert commands[0].argv[-5:] == [
         "tests/test_architecture_constraints.py",
+        "tests/test_quality_gate.py",
+        "tests/test_agent_workflow_docs.py",
         "tests/test_doc_freshness.py",
         "tests/test_harness_scenarios.py",
     ]
@@ -37,7 +39,13 @@ def test_standard_profile_can_prepend_changed_area_pytest():
     commands = build_profile_commands("standard", pytest_targets=["tests/test_character_creator.py"])
     assert len(commands) == 2
     assert commands[0].argv[-1] == "tests/test_character_creator.py"
-    assert commands[1].argv[-1] == "tests/test_harness_scenarios.py"
+    assert commands[1].argv[-5:] == [
+        "tests/test_architecture_constraints.py",
+        "tests/test_quality_gate.py",
+        "tests/test_agent_workflow_docs.py",
+        "tests/test_doc_freshness.py",
+        "tests/test_harness_scenarios.py",
+    ]
 
 
 def test_strict_profile_includes_targeted_lint_and_full_pytest():

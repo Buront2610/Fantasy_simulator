@@ -6,7 +6,7 @@ import random
 from types import SimpleNamespace
 
 from fantasy_simulator.character_creator import CharacterCreator
-from fantasy_simulator.i18n import get_locale, set_locale
+from fantasy_simulator.i18n import get_locale, set_locale, tr, tr_term
 
 
 def setup_function():
@@ -32,14 +32,24 @@ class TestCharacterCreator:
         set_locale("ja")
         creator = CharacterCreator()
         char = creator.create_random(name="Aldric", rng=random.Random(42))
-        assert "この世界に生を受けた" in char.history[0]
+        assert char.history[0] == tr(
+            "history_born_into_world",
+            race=tr_term(char.race),
+            job=tr_term(char.job),
+        )
+        assert "Human" not in char.history[0]
+        assert "Warrior" not in char.history[0]
         assert "Born into the world" not in char.history[0]
 
     def test_template_character_history_is_localized_in_english(self):
         set_locale("en")
         creator = CharacterCreator()
         char = creator.create_from_template("warrior", name="Aldric", rng=random.Random(42))
-        assert char.history[0] == "Born into the world as a Human Warrior."
+        assert char.history[0] == tr(
+            "history_born_into_world",
+            race=tr_term(char.race),
+            job=tr_term(char.job),
+        )
 
 
 class TestCreateRandomReproducibility:

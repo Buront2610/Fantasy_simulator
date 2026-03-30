@@ -16,15 +16,26 @@ def _module_name(path: Path) -> str:
     return ".".join(relative.parts)
 
 
-def _resolve_import(current_module: str, node: ast.ImportFrom) -> str:
+def _resolve_import(current_module: str, node: ast.ImportFrom) -> list[str]:
     current_package = current_module.split(".")[:-1]
     if node.level:
         base = current_package[: len(current_package) - (node.level - 1)]
     else:
         base = []
-    if node.module:
-        return ".".join(base + node.module.split("."))
-    return ".".join(base)
+    resolved_base = base + (node.module.split(".") if node.module else [])
+    if not node.names:
+        return [".".join(resolved_base)] if resolved_base else []
+
+    resolved_targets: list[str] = []
+    for alias in node.names:
+        if alias.name == "*":
+            if resolved_base:
+                resolved_targets.append(".".join(resolved_base))
+            continue
+        parts = resolved_base + alias.name.split(".")
+        if parts:
+            resolved_targets.append(".".join(parts))
+    return resolved_targets
 
 
 def _iter_import_targets(path: Path) -> list[str]:
@@ -35,8 +46,22 @@ def _iter_import_targets(path: Path) -> list[str]:
         if isinstance(node, ast.Import):
             imports.extend(alias.name for alias in node.names)
         elif isinstance(node, ast.ImportFrom):
-            imports.append(_resolve_import(module_name, node))
+            imports.extend(_resolve_import(module_name, node))
     return imports
+
+
+def test_resolve_import_expands_relative_package_aliases() -> None:
+    node = ast.parse("from .. import persistence").body[0]
+
+    assert isinstance(node, ast.ImportFrom)
+    assert _resolve_import("fantasy_simulator.ui.screens", node) == ["fantasy_simulator.persistence"]
+
+
+def test_resolve_import_expands_aliases_under_relative_module() -> None:
+    node = ast.parse("from ..persistence import save_load").body[0]
+
+    assert isinstance(node, ast.ImportFrom)
+    assert _resolve_import("fantasy_simulator.ui.screens", node) == ["fantasy_simulator.persistence.save_load"]
 
 
 def _iter_attribute_names(path: Path) -> list[str]:
