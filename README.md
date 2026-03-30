@@ -73,7 +73,9 @@ recording, adventure coordination, and query/reporting). The UI layer is
 abstracted through `InputBackend` / `RenderBackend` protocols, a `UIContext`
 dependency container, renderer modules, and presenter/view-model helpers. The
 current roadmap is maintained in
-[`docs/implementation_plan.md`](docs/implementation_plan.md).
+[`docs/implementation_plan.md`](docs/implementation_plan.md), and the current
+repo-level guardrails are summarized in
+[`docs/architecture.md`](docs/architecture.md).
 
 **Compatibility note (PR-A):** CLI launch (`python -m fantasy_simulator` and
 `python main.py`) and save/load compatibility are preserved. However, old
@@ -87,6 +89,21 @@ Run tests:
 ```bash
 python -m pytest
 ```
+
+Agent-oriented verification profiles:
+
+```bash
+python scripts/quality_gate.py minimal --pytest-target tests/test_character_creator.py
+python scripts/quality_gate.py standard
+python scripts/quality_gate.py strict
+```
+
+`minimal` is intentionally explicit: pass one or more `--pytest-target` values
+for the changed area you want to verify.
+
+`standard` is the repo's day-to-day guardrail profile. It exercises the
+architecture constraints, the quality-gate self-test, the agent workflow docs
+checks, doc freshness, and the harness scenario suite.
 
 ## Project Structure
 
@@ -138,8 +155,16 @@ main.py                     # Compatibility wrapper (delegates to package)
 tests/                      # Automated tests
 docs/
   implementation_plan.md    # Implementation roadmap and phase order
+  architecture.md           # Current architectural guardrails and canonical data rules
+  contexts/                 # Short task-mode context docs for implementation/review
+  session_handoffs/         # Template + latest repo-local handoff notes
+  subagent_contract.md      # Delegation format for subagent tasks
+  agent_lessons.md          # Curated recurring agent workflow lessons
   next_version_plan.md      # Long-range design target
   ui_renovation_plan.md     # UI renovation strategy
+scripts/
+  quality_gate.py           # minimal|standard|strict verification runner
+  quality_gate.ps1          # Thin PowerShell wrapper for the quality gate
 ```
 
 ## CLI Flow

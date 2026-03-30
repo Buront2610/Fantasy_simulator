@@ -681,6 +681,21 @@ class World:
 
     MAX_EVENT_LOG = 2000
 
+    def _format_event_log_entry(
+        self,
+        event_text: str,
+        *,
+        year: Optional[int] = None,
+        month: Optional[int] = None,
+    ) -> str:
+        """Format a compatibility event-log line from canonical event data."""
+        effective_year = self.year if year is None else year
+        if month is not None:
+            prefix = tr("event_log_prefix_month", year=effective_year, month=month)
+        else:
+            prefix = tr("event_log_prefix", year=effective_year)
+        return f"{prefix} {event_text}"
+
     def log_event(self, event_text: str, *, month: Optional[int] = None) -> None:
         """Append a formatted compatibility log entry for legacy CLI consumers.
 
@@ -692,11 +707,7 @@ class World:
         When *month* is provided, the prefix includes month information so that
         the player-visible log reflects monthly causality introduced in PR-B.
         """
-        if month is not None:
-            prefix = tr("event_log_prefix_month", year=self.year, month=month)
-        else:
-            prefix = tr("event_log_prefix", year=self.year)
-        self.event_log.append(f"{prefix} {event_text}")
+        self.event_log.append(self._format_event_log_entry(event_text, month=month))
         if len(self.event_log) > self.MAX_EVENT_LOG:
             self.event_log = self.event_log[-self.MAX_EVENT_LOG:]
 
