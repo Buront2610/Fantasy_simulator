@@ -130,3 +130,23 @@ def test_production_code_does_not_call_legacy_events_by_type() -> None:
         assert pattern.search(path.read_text(encoding="utf-8")) is None, (
             f"Legacy events_by_type() call found in {path}"
         )
+
+
+def test_reports_module_does_not_import_ui_layers() -> None:
+    path = PACKAGE_ROOT / "reports.py"
+    forbidden = [
+        target
+        for target in _iter_import_targets(path)
+        if target.startswith("fantasy_simulator.ui")
+    ]
+    assert forbidden == [], f"{path} imports UI modules: {forbidden}"
+
+
+def test_map_renderer_does_not_import_reports_module() -> None:
+    path = PACKAGE_ROOT / "ui" / "map_renderer.py"
+    forbidden = [
+        target
+        for target in _iter_import_targets(path)
+        if target == "fantasy_simulator.reports" or target.startswith("fantasy_simulator.reports.")
+    ]
+    assert forbidden == [], f"{path} imports report modules: {forbidden}"

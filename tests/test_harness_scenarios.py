@@ -98,6 +98,104 @@ def _capture_bundle(locale: str) -> dict[str, object]:
     }
 
 
+def _record_projection_tags(kind: str, tags: list[str]) -> tuple[str, ...]:
+    return tuple(tags) if tags else (kind,)
+
+
+def _capture_projection_contract(locale: str) -> dict[str, object]:
+    set_locale(locale)
+    world = _build_seeded_world(7)
+    sim = Simulator(world, events_per_year=4, adventure_steps_per_year=2, seed=99)
+    sim.advance_months(60)
+    info = build_map_info(world)
+    detail_location_id = "loc_elderroot_forest"
+
+    if locale == "en":
+        yearly_overview_header = "  ▶ World Overview"
+        yearly_notable_header = "  ▶ Notable Events"
+        yearly_region_header = "  ▶ Regional Events"
+        monthly_notable_header = "  ▶ Notable Events"
+        monthly_world_header = "  ▶ World News"
+        monthly_rumors_header = "  ▶ Rumors"
+    else:
+        yearly_overview_header = "  ▶ 世界の概要"
+        yearly_notable_header = "  ▶ 主な出来事"
+        yearly_region_header = "  ▶ 地域の出来事"
+        monthly_notable_header = "  ▶ 主な出来事"
+        monthly_world_header = "  ▶ 世界の動き"
+        monthly_rumors_header = "  ▶ 噂"
+
+    yearly_year = sim.get_latest_completed_report_year()
+    monthly_year = sim.world.year - 1
+    monthly_month = 3
+    yearly_report = sim.get_yearly_report(yearly_year)
+    monthly_report = sim.get_monthly_report(monthly_year, monthly_month)
+
+    subject_ids = sorted({
+        cid
+        for rec in sim.world.event_records
+        for cid in ([rec.primary_actor_id] if rec.primary_actor_id else []) + list(rec.secondary_actor_ids)
+    })
+    event_tags = sorted({
+        _record_projection_tags(rec.kind, rec.tags)
+        for rec in sim.world.event_records
+    })
+    relation_tags = sorted(
+        (char.char_id, other_id, tuple(tags))
+        for char in sim.world.characters
+        for other_id, tags in char.relation_tags.items()
+        if tags
+    )
+    memory_tags = sorted(
+        (
+            loc.id,
+            tuple(
+                tag
+                for tag, present in (
+                    ("alias", bool(loc.aliases)),
+                    ("memorial", bool(loc.memorial_ids)),
+                    ("trace", bool(loc.live_traces)),
+                )
+                if present
+            ),
+        )
+        for loc in sim.world.grid.values()
+        if loc.aliases or loc.memorial_ids or loc.live_traces
+    )
+    detail_cell = next(cell for cell in info.cells.values() if cell.location_id == detail_location_id)
+
+    return {
+        "summary": {
+            "total_events": len(sim.world.event_records),
+            "kind_counts": dict(sorted(Counter(rec.kind for rec in sim.world.event_records).items())),
+        },
+        "subject_ids": subject_ids,
+        "event_tags": event_tags,
+        "relation_tags": relation_tags,
+        "memory_tags": memory_tags,
+        "report_sections": {
+            "yearly": {
+                "year": yearly_year,
+                "overview": bool(_extract_section(yearly_report, yearly_overview_header)),
+                "notable": bool(_extract_section(yearly_report, yearly_notable_header)),
+                "regions": bool(_extract_section(yearly_report, yearly_region_header)),
+            },
+            "monthly": {
+                "year": monthly_year,
+                "month": monthly_month,
+                "notable": bool(_extract_section(monthly_report, monthly_notable_header)),
+                "world": bool(_extract_section(monthly_report, monthly_world_header)),
+                "rumors": bool(_extract_section(monthly_report, monthly_rumors_header)),
+            },
+        },
+        "detail_projection": {
+            "location_id": detail_location_id,
+            "canonical_name": detail_cell.canonical_name,
+            "memory_tags": next(tags for loc_id, tags in memory_tags if loc_id == detail_location_id),
+        },
+    }
+
+
 @pytest.fixture(autouse=True)
 def _restore_locale():
     previous = get_locale()
@@ -271,9 +369,92 @@ EXPECTED_JA = {
 }
 
 
+EXPECTED_PROJECTION_CONTRACT = {
+    "summary": {
+        "total_events": 39,
+        "kind_counts": {
+            "adventure_arrived": 2,
+            "adventure_choice": 1,
+            "adventure_discovery": 2,
+            "adventure_retreated": 1,
+            "adventure_returned": 1,
+            "adventure_started": 2,
+            "battle": 3,
+            "condition_worsened": 3,
+            "death": 1,
+            "discovery": 2,
+            "injury_recovery": 1,
+            "journey": 9,
+            "meeting": 4,
+            "skill_training": 7,
+        },
+    },
+    "subject_ids": [
+        "1738f7d9",
+        "4a23d596",
+        "4cdd2055",
+        "8ede0d7a",
+        "907a70c3",
+        "a5aa3c81",
+    ],
+    "event_tags": [
+        ("adventure_arrived",),
+        ("adventure_choice",),
+        ("adventure_discovery",),
+        ("adventure_retreated",),
+        ("adventure_returned",),
+        ("adventure_started",),
+        ("battle",),
+        ("condition_worsened",),
+        ("death",),
+        ("discovery",),
+        ("injury_recovery",),
+        ("journey",),
+        ("meeting",),
+        ("skill_training",),
+    ],
+    "relation_tags": [
+        ("1738f7d9", "8ede0d7a", ("rival",)),
+        ("8ede0d7a", "1738f7d9", ("rival",)),
+    ],
+    "memory_tags": [
+        ("loc_dragonbone_ridge", ("trace",)),
+        ("loc_elderroot_forest", ("trace",)),
+    ],
+    "report_sections": {
+        "yearly": {
+            "year": 1004,
+            "overview": True,
+            "notable": True,
+            "regions": True,
+        },
+        "monthly": {
+            "year": 1004,
+            "month": 3,
+            "notable": True,
+            "world": True,
+            "rumors": True,
+        },
+    },
+    "detail_projection": {
+        "location_id": "loc_elderroot_forest",
+        "canonical_name": "Elderroot Forest",
+        "memory_tags": ("trace",),
+    },
+}
+
+
 def test_seeded_acceptance_bundle_matches_english_projection() -> None:
     assert _capture_bundle("en") == EXPECTED_EN
 
 
 def test_seeded_acceptance_bundle_matches_japanese_projection() -> None:
     assert _capture_bundle("ja") == EXPECTED_JA
+
+
+def test_seeded_projection_contract_matches_expected_inputs() -> None:
+    assert _capture_projection_contract("en") == EXPECTED_PROJECTION_CONTRACT
+
+
+def test_seeded_projection_contract_is_locale_stable() -> None:
+    assert _capture_projection_contract("ja") == EXPECTED_PROJECTION_CONTRACT
