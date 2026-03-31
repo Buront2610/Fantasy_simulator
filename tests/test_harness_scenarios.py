@@ -133,6 +133,28 @@ def _memory_tags_for_location(location_state) -> tuple[str, ...]:
     )
 
 
+def _selected_records_for_descriptions(
+    records,
+    descriptions: list[str],
+    *,
+    location_id: str | None = None,
+) -> list[tuple[object, ...]]:
+    remaining_records = [
+        record
+        for record in records
+        if location_id is None or record.location_id == location_id
+    ]
+    selected: list[tuple[object, ...]] = []
+    for description in descriptions:
+        for index, record in enumerate(remaining_records):
+            if record.description != description:
+                continue
+            selected.append(_record_selection_key(record))
+            del remaining_records[index]
+            break
+    return selected
+
+
 def _capture_projection_contract(locale: str) -> dict[str, Any]:
     set_locale(locale)
     world = _build_seeded_world(7)
@@ -192,14 +214,21 @@ def _capture_projection_contract(locale: str) -> dict[str, Any]:
                 "total_events": yearly_report.total_events,
                 "deaths_this_year": yearly_report.deaths_this_year,
                 "character_ids": [entry.char_id for entry in yearly_report.character_entries],
-                "notable_records": [
-                    _record_selection_key(rec)
-                    for rec in yearly_records
-                    if rec.severity >= 3
-                ],
+                "notable_records": _selected_records_for_descriptions(
+                    yearly_records,
+                    yearly_report.notable_events,
+                ),
                 "location_ids": [entry.location_id for entry in yearly_report.location_entries],
                 "location_event_counts": {
                     entry.location_id: entry.event_count for entry in yearly_report.location_entries
+                },
+                "location_notable_records": {
+                    entry.location_id: _selected_records_for_descriptions(
+                        yearly_records,
+                        entry.notable_events,
+                        location_id=entry.location_id,
+                    )
+                    for entry in yearly_report.location_entries
                 },
             },
             "monthly": {
@@ -207,14 +236,21 @@ def _capture_projection_contract(locale: str) -> dict[str, Any]:
                 "month": monthly_month,
                 "total_events": monthly_report.total_events,
                 "character_ids": [entry.char_id for entry in monthly_report.character_entries],
-                "notable_records": [
-                    _record_selection_key(rec)
-                    for rec in monthly_records
-                    if rec.severity >= 2
-                ],
+                "notable_records": _selected_records_for_descriptions(
+                    monthly_records,
+                    monthly_report.notable_events,
+                ),
                 "location_ids": [entry.location_id for entry in monthly_report.location_entries],
                 "location_event_counts": {
                     entry.location_id: entry.event_count for entry in monthly_report.location_entries
+                },
+                "location_notable_records": {
+                    entry.location_id: _selected_records_for_descriptions(
+                        monthly_records,
+                        entry.notable_events,
+                        location_id=entry.location_id,
+                    )
+                    for entry in monthly_report.location_entries
                 },
                 "rumor_ids": [entry.rumor_id for entry in monthly_report.rumor_entries],
                 "rumor_categories": {
@@ -466,6 +502,12 @@ EXPECTED_PROJECTION_CONTRACT = {
             ],
             "location_ids": ["loc_the_verdant_vale"],
             "location_event_counts": {"loc_the_verdant_vale": 3},
+            "location_notable_records": {
+                "loc_the_verdant_vale": [
+                    ("battle", "loc_the_verdant_vale", "8ede0d7a", ("1738f7d9",)),
+                    ("battle", "loc_the_verdant_vale", "8ede0d7a", ("1738f7d9",)),
+                ],
+            },
         },
         "monthly": {
             "year": 1004,
@@ -477,6 +519,11 @@ EXPECTED_PROJECTION_CONTRACT = {
             ],
             "location_ids": ["loc_the_verdant_vale"],
             "location_event_counts": {"loc_the_verdant_vale": 1},
+            "location_notable_records": {
+                "loc_the_verdant_vale": [
+                    ("battle", "loc_the_verdant_vale", "8ede0d7a", ("1738f7d9",)),
+                ],
+            },
             "rumor_ids": ["rum_f17c0793e07a"],
             "rumor_categories": {"rum_f17c0793e07a": "battle"},
         },
