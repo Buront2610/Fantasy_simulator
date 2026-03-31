@@ -510,6 +510,22 @@ class TestSimulatorReportIntegration:
         # Should contain a readable fallback, not crash
         assert "Some unknown kind" in summary or "some_unknown_kind" in summary
 
+    def test_get_summary_includes_adventure_death_in_notable_moments(self):
+        world = World()
+        world.record_event(WorldEventRecord(
+            record_id="fatal_summary_1",
+            kind="adventure_death",
+            year=1000,
+            month=3,
+            description="A hero fell on an adventure",
+            severity=5,
+        ))
+        sim = Simulator(world, events_per_year=0, seed=42)
+
+        summary = sim.get_summary()
+
+        assert "A hero fell on an adventure" in summary
+
     def test_current_month_serialization_round_trip(self):
         world = World()
         c = _make_char("Hero")

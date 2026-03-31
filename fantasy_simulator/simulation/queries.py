@@ -17,6 +17,7 @@ from typing import Dict, List, Optional
 
 from ..events import EventResult, WorldEventRecord
 from ..i18n import tr, tr_term
+from ..narrative.constants import EVENT_KINDS_FATAL
 from ..reports import (
     format_monthly_report,
     format_yearly_report,
@@ -67,7 +68,7 @@ class QueryMixin:
         lines.append(f"  {tr('notable_moments')}:")
         dramatic = [
             rec for rec in records
-            if rec.kind in ("marriage", "battle_fatal", "death", "discovery")
+            if rec.kind in (EVENT_KINDS_FATAL | {"marriage", "discovery"})
         ]
         shown = dramatic[:5] if len(dramatic) >= 5 else dramatic
         for rec in shown:
