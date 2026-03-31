@@ -9,6 +9,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = PROJECT_ROOT / "fantasy_simulator"
+REPORTS_MODULE = "fantasy_simulator.reports"
 
 
 def _module_name(path: Path) -> str:
@@ -130,3 +131,27 @@ def test_production_code_does_not_call_legacy_events_by_type() -> None:
         assert pattern.search(path.read_text(encoding="utf-8")) is None, (
             f"Legacy events_by_type() call found in {path}"
         )
+
+
+def test_reports_module_does_not_import_ui_layers() -> None:
+    path = PACKAGE_ROOT / "reports.py"
+    forbidden = [
+        target
+        for target in _iter_import_targets(path)
+        if target.startswith("fantasy_simulator.ui")
+    ]
+    assert forbidden == [], f"{path} imports UI modules: {forbidden}"
+
+
+def test_core_ui_modules_do_not_import_reports_module() -> None:
+    allowed_composition_file = PACKAGE_ROOT / "ui" / "screens.py"
+    for path in sorted((PACKAGE_ROOT / "ui").glob("*.py")):
+        # screens.py is the composition layer that can orchestrate report output.
+        if path == allowed_composition_file:
+            continue
+        forbidden = [
+            target
+            for target in _iter_import_targets(path)
+            if target == REPORTS_MODULE or target.startswith(f"{REPORTS_MODULE}.")
+        ]
+        assert forbidden == [], f"{path} imports report modules: {forbidden}"
