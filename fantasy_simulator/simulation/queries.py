@@ -68,7 +68,7 @@ class QueryMixin:
         lines.append(f"  {tr('notable_moments')}:")
         dramatic = [
             rec for rec in records
-            if rec.kind in (EVENT_KINDS_FATAL | {"marriage", "discovery"})
+            if rec.kind in EVENT_KINDS_FATAL or rec.kind in {"marriage", "discovery"}
         ]
         shown = dramatic[:5] if len(dramatic) >= 5 else dramatic
         for rec in shown:

@@ -18,8 +18,6 @@ from ..i18n import tr
 from ..reports import generate_yearly_report
 from .constants import (
     EVENT_KIND_ADVENTURE_DEATH,
-    EVENT_KIND_BATTLE_FATAL,
-    EVENT_KIND_DEATH,
     EVENT_KINDS_FATAL,
 )
 from .template_history import TemplateHistory
@@ -168,9 +166,8 @@ def epitaph_for_character(
     else:
         candidates.extend(["memorial_epitaph_default", "memorial_epitaph_adventurer"])
 
-    if template_history is not None:
-        return tr(template_history.choose(candidates), name=char_name, year=year, location=location_name)
-    return tr(candidates[0], name=char_name, year=year, location=location_name)
+    key = template_history.choose(candidates) if template_history is not None else candidates[0]
+    return tr(key, name=char_name, year=year, location=location_name)
 
 
 def alias_for_event(
