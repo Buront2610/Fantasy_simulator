@@ -14,6 +14,7 @@ Keep this file curated. Add only lessons that are likely to recur.
 - `docs/implementation_plan.md` is roadmap authority.
 - `docs/architecture.md` is guardrail authority.
 - Advance roadmap work with well-bounded subagents when possible.
+- Let subagents hand off bounded follow-up review/implementation work, but keep the same plan anchor and progress text in sync.
 - Keep roadmap / status text synchronized with actual progress in the same change.
 - Save/load compatibility matters; avoid format changes unless explicitly requested.
 - User-facing strings must go through i18n helpers.
