@@ -565,11 +565,12 @@ def test_seeded_projection_contract_is_locale_stable() -> None:
     assert _capture_projection_contract("ja") == EXPECTED_PROJECTION_CONTRACT
 
 
-def test_midyear_save_load_preserves_seeded_projection_contract(tmp_path) -> None:
+def test_midyear_save_load_preserves_projection_contract(tmp_path) -> None:
     set_locale("en")
     sim = Simulator(_build_seeded_world(7), events_per_year=4, adventure_steps_per_year=2, seed=99)
     sim.advance_months(30)
     save_path = tmp_path / "midyear-seeded.json"
+    remaining_months = 18
 
     assert save_simulation(sim, str(save_path)) is True
 
@@ -581,7 +582,7 @@ def test_midyear_save_load_preserves_seeded_projection_contract(tmp_path) -> Non
     assert len(restored.world.event_records) == len(sim.world.event_records)
     assert len(restored.world.event_log) == len(sim.world.event_log)
 
-    sim.advance_months(18)
-    restored.advance_months(18)
+    sim.advance_months(remaining_months)
+    restored.advance_months(remaining_months)
 
     assert _projection_contract_for_sim(restored) == _projection_contract_for_sim(sim)
