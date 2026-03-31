@@ -142,11 +142,15 @@ def _selected_records_for_descriptions(
     *,
     location_id: str | None = None,
 ) -> list[tuple[str, str | None, str | None, tuple[str, ...]]]:
-    """Map report description selections back to scoped event-record identities."""
+    """Map report description selections back to scoped event-record identities.
+
+    Descriptions are matched greedily in record order so duplicate descriptions
+    resolve the same way the report generator emitted them.
+    """
     candidate_records = [
         record for record in records if location_id is None or record.location_id == location_id
     ]
-    selected: list[tuple[object, ...]] = []
+    selected: list[tuple[str, str | None, str | None, tuple[str, ...]]] = []
     used_indexes: set[int] = set()
     for description in descriptions:
         for index, record in enumerate(candidate_records):
