@@ -35,8 +35,9 @@ def test_plan_and_implementation_context_require_progress_sync():
 
     assert "サブエージェント" in plan_text
     assert "委譲" in plan_text
-    assert "README" in plan_text
-    assert "同期" in plan_text
+    # Guard the specific new rules in §2.2, not just pre-existing keywords
+    assert "同じ変更で同期する" in plan_text
+    assert "PR 状態" in plan_text
     assert "Sync roadmap/status text" in implementation
     assert "well-bounded subagents" in lessons
     assert "synchronized with actual progress" in lessons
