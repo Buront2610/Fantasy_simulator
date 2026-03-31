@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from .i18n import tr
+from .content.setting_bundle import SettingBundle, default_aethoria_bundle
 from .content.world_data import (
     DEFAULT_LOCATIONS,
     NAME_TO_LOCATION_ID,
@@ -319,6 +320,10 @@ class World:
     ) -> None:
         self.name: str = name
         self.lore: str = lore
+        self.setting_bundle: SettingBundle = default_aethoria_bundle(
+            display_name=name,
+            lore_text=lore,
+        )
         self.width: int = width
         self.height: int = height
         self.year: int = year

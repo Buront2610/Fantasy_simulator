@@ -18,7 +18,7 @@ from ..adventure import (
     generate_adventure_id,
     select_party_policy,
 )
-from ..narrative.context import alias_for_event, epitaph_for_character
+from ..narrative.context import alias_for_event, derive_relation_hint, epitaph_for_character
 from ..i18n import tr
 
 if TYPE_CHECKING:
@@ -293,7 +293,12 @@ class AdventureMixin:
             # Generate a location alias (capped by World.MAX_ALIASES)
             dest_loc = self.world.get_location_by_id(dest)
             if dest_loc is not None:
-                alias = alias_for_event("adventure_death", char_name, dest_name)
+                alias = alias_for_event(
+                    "adventure_death",
+                    char_name,
+                    dest_name,
+                    relation_hint=derive_relation_hint(char),
+                )
                 self.world.add_alias(dest, alias)
 
     def get_adventure_summaries(self, include_active: bool = True) -> List[str]:

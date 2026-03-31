@@ -1,9 +1,9 @@
 """
 narrative/context.py - Minimal NarrativeContext for world memory generation.
 
-PR-F: Provides just enough context-aware text selection for memorial
-epitaphs and location aliases.  Full NarrativeContext expansion
-(relation tags, reports, world memory integration) is deferred to PR-H.
+PR-F established the minimal template-selection hooks for memorial
+epitaphs and location aliases. PR-I starts feeding relation-tag context
+into those hooks while keeping the API small and deterministic.
 
 Design §E-2: "NarrativeContext 導入前でも最低限のテンプレート選択で
 memorial / alias テキストを安定生成する"
@@ -38,6 +38,42 @@ _MAGIC_JOBS: frozenset = frozenset({
     "Mage", "Witch", "Healer", "Sage", "Druid", "Bard",
 })
 
+_RELATION_PRIORITY: tuple[str, ...] = (
+    "spouse",
+    "savior",
+    "friend",
+    "betrayer",
+    "rival",
+)
+
+_RELATION_EPITAPH_KEYS = {
+    "spouse": "memorial_epitaph_cherished",
+    "savior": "memorial_epitaph_cherished",
+    "friend": "memorial_epitaph_cherished",
+    "betrayer": "memorial_epitaph_contested",
+    "rival": "memorial_epitaph_contested",
+}
+
+_RELATION_ALIAS_KEYS = {
+    "spouse": "alias_rest_site",
+    "savior": "alias_rest_site",
+    "friend": "alias_rest_site",
+    "betrayer": "alias_fall_site",
+    "rival": "alias_fall_site",
+}
+
+
+def derive_relation_hint(char: Optional["Character"]) -> Optional[str]:
+    """Return the most narratively significant relation tag for *char*."""
+
+    if char is None:
+        return None
+    all_tags = {tag for tags in char.relation_tags.values() for tag in tags}
+    for tag in _RELATION_PRIORITY:
+        if tag in all_tags:
+            return tag
+    return None
+
 
 def epitaph_for_character(
     char_name: str,
@@ -66,6 +102,13 @@ def epitaph_for_character(
     # Future hook:
     # relation_hint / title_hint / favorite can influence variant weighting
     # once relation_tags and report metadata are fed into NarrativeContext.
+    relation_hint = relation_hint or derive_relation_hint(char)
+    relation_key = _RELATION_EPITAPH_KEYS.get(relation_hint or "")
+    if relation_key is not None:
+        if template_history is not None:
+            relation_key = template_history.choose([relation_key, "memorial_epitaph_default"])
+        return tr(relation_key, name=char_name, year=year, location=location_name)
+
     if char is not None:
         job = getattr(char, "job", "")
         if job in _COMBAT_JOBS:
@@ -110,7 +153,7 @@ def alias_for_event(
     # Future hook:
     # relation_hint can branch into rival/savior/betrayer alias families.
     if event_kind in (EVENT_KIND_ADVENTURE_DEATH, EVENT_KIND_DEATH, EVENT_KIND_BATTLE_FATAL):
-        key = "alias_death_site"
+        key = _RELATION_ALIAS_KEYS.get(relation_hint or "", "alias_death_site")
     else:
         key = "alias_notable_site"
     if template_history is not None:

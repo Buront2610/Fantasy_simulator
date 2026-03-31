@@ -424,9 +424,17 @@ TEXT_EN: Dict[str, str] = {
         'Here rests the spirit of {name}, an adventurer who perished at {location} in year {year}.'
     ),
     'memorial_epitaph_default': 'In memory of {name}, who fell at {location} in year {year}.',
+    'memorial_epitaph_cherished': (
+        'Here is remembered {name}, dearly cherished even after falling at {location} in year {year}.'
+    ),
+    'memorial_epitaph_contested': (
+        '{name} met a contested end at {location} in year {year}, and the tale is not yet quiet.'
+    ),
     # Location aliases generated from significant events
     'alias_death_site': "Site of {name}'s Demise",
     'alias_notable_site': "{name}'s Discovery",
+    'alias_rest_site': "{name}'s Rest",
+    'alias_fall_site': "{name}'s Fall",
     # Location detail view UI labels
     'location_detail_header': 'LOCATION DETAIL - {name}',
     'location_aliases_label': 'Known as',

@@ -420,9 +420,17 @@ TEXT_JA: Dict[str, str] = {
         '{name} の魂、ここに安らかなれ。{year}年、{location} にて果てた冒険者。'
     ),
     'memorial_epitaph_default': '{year}年、{location} に倒れた {name} を偲ぶ。',
+    'memorial_epitaph_cherished': (
+        '{name} を偲ぶ声はなお絶えない。{year}年、{location} にて倒れし者。'
+    ),
+    'memorial_epitaph_contested': (
+        '{name} は {year}年、{location} にて論争を残したまま倒れた。'
+    ),
     # 重大イベントによって生成される地名の別名
     'alias_death_site': '{name} 終焉の地',
     'alias_notable_site': '{name} の発見地',
+    'alias_rest_site': '{name} の眠る地',
+    'alias_fall_site': '{name} 堕つる地',
     # 地点詳細ビューの UI ラベル
     'location_detail_header': '地点詳細 - {name}',
     'location_aliases_label': '別称',

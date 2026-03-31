@@ -276,6 +276,18 @@ class TestWorldMemoryRoundTrip:
 # ---------------------------------------------------------------------------
 
 class TestEpitaphForCharacter:
+    def test_spouse_relation_uses_cherished_template(self):
+        char = _make_char_stub(job="Warrior")
+        char.add_relation_tag("partner", "spouse")
+        result = epitaph_for_character("Aldric", 1005, "Thornwood", "adventure_death", char=char)
+        assert "cherished" in result.lower()
+
+    def test_rival_relation_uses_contested_template(self):
+        char = _make_char_stub(job="Warrior")
+        char.add_relation_tag("enemy", "rival")
+        result = epitaph_for_character("Aldric", 1005, "Thornwood", "adventure_death", char=char)
+        assert "contested end" in result.lower()
+
     def test_warrior_job_uses_warrior_template(self):
         char = _make_char_stub(job="Warrior")
         result = epitaph_for_character("Aldric", 1005, "Thornwood", "adventure_death", char=char)
@@ -324,6 +336,14 @@ class TestEpitaphForCharacter:
 # ---------------------------------------------------------------------------
 
 class TestAliasForEvent:
+    def test_relation_hint_uses_rest_alias_for_death(self):
+        result = alias_for_event("adventure_death", "Aldric", "Thornwood", relation_hint="spouse")
+        assert "Rest" in result
+
+    def test_relation_hint_uses_fall_alias_for_death(self):
+        result = alias_for_event("adventure_death", "Aldric", "Thornwood", relation_hint="rival")
+        assert "Fall" in result
+
     def test_adventure_death_returns_death_alias(self):
         result = alias_for_event("adventure_death", "Aldric", "Thornwood")
         assert "Aldric" in result
@@ -495,6 +515,41 @@ class TestApplyWorldMemory:
         mem = next(iter(world.memorials.values()))
         assert mem.character_id == "cC"
         assert "Companion" in mem.character_name
+
+    def test_apply_world_memory_uses_relation_context_for_memorial_and_alias(self):
+        from unittest.mock import MagicMock
+        from fantasy_simulator.adventure import AdventureRun
+        from fantasy_simulator.simulation.adventure_coordinator import AdventureMixin
+        from fantasy_simulator.character import Character
+
+        world = _make_world()
+        world.year = 1010
+        char = Character(name="Aldric", age=30, gender="Male", race="Human",
+                         job="Warrior", char_id="cA")
+        char.location_id = "loc_aethoria_capital"
+        char.add_relation_tag("partner", "spouse")
+        world.add_character(char)
+
+        run = MagicMock(spec=AdventureRun)
+        run.destination = "loc_thornwood"
+        run.character_id = "cA"
+        run.character_name = "Aldric"
+        run.outcome = "death"
+        run.year_started = 1008
+        run.is_party = False
+        run.member_ids = ["cA"]
+        run.death_member_id = None
+
+        mixin = object.__new__(AdventureMixin)
+        mixin.world = world
+        mixin.id_rng = random.Random(9)
+
+        mixin._apply_world_memory(run)
+
+        memorial = next(iter(world.memorials.values()))
+        assert "cherished" in memorial.epitaph.lower()
+        dest = world.get_location_by_id("loc_thornwood")
+        assert "Aldric's Rest" in dest.aliases
 
     def test_apply_world_memory_safe_return_no_memorial(self):
         """Safe return → live trace only, no memorial."""

@@ -18,12 +18,13 @@ from typing import Any, List, Optional
 
 from ..character import Character
 from ..character_creator import CharacterCreator
+from ..content.setting_bundle import default_aethoria_bundle
 from ..i18n import set_locale, tr, tr_term
 from ..persistence.save_load import load_simulation, save_simulation
 from ..simulator import Simulator
 from .ui_helpers import fit_display_width
 from ..world import World
-from ..content.world_data import JOBS, RACES, WORLD_LORE
+from ..content.world_data import JOBS, RACES
 from .presenters import AdventurePresenter, LocationPresenter, ReportPresenter
 from .view_models import AdventureSummaryView, LocationHistoryView, build_monthly_report_card_view
 
@@ -989,15 +990,17 @@ def screen_custom_simulation(ctx: UIContext | None = None) -> None:
             break
 
 
-def screen_world_lore(ctx: UIContext | None = None) -> None:
+def screen_world_lore(world: World | None = None, ctx: UIContext | None = None) -> None:
     ctx = _default_ctx(ctx)
     out = ctx.out
+    bundle = world.setting_bundle if world is not None else default_aethoria_bundle()
+    lore_text = bundle.world_definition.lore_text
 
     out.print_line()
     out.print_separator("=")
     out.print_heading(f"  {tr('world_lore')}")
     out.print_separator("=")
-    out.print_wrapped(WORLD_LORE)
+    out.print_wrapped(lore_text)
     out.print_line()
     out.print_heading(f"  {tr('races_of_aethoria')}")
     out.print_separator()

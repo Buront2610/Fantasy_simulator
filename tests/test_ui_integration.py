@@ -386,6 +386,21 @@ class TestWorldLoreUsesBackends(unittest.TestCase):
         wrapped = [c for c in out.calls if c[0] == "print_wrapped"]
         self.assertTrue(len(wrapped) > 0, "World lore was not sent through print_wrapped")
 
+    def test_lore_output_prefers_world_setting_bundle(self) -> None:
+        from fantasy_simulator.content.setting_bundle import default_aethoria_bundle
+        from fantasy_simulator.ui.screens import screen_world_lore
+
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend()
+        ctx = UIContext(inp=inp, out=out)
+        world = World()
+        world.setting_bundle = default_aethoria_bundle(lore_text="Bundle lore text for tests.")
+
+        screen_world_lore(world=world, ctx=ctx)
+
+        wrapped = [c for c in out.calls if c[0] == "print_wrapped"]
+        self.assertTrue(any("Bundle lore text for tests." in call[1] for call in wrapped))
+
 
 # ---------------------------------------------------------------------------
 # Tests: main.py routes through backends
