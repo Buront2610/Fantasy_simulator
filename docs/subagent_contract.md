@@ -6,6 +6,7 @@ Use this contract when delegating focused work to a subagent.
 
 - `Goal`: the concrete question or task
 - `Why`: the larger purpose behind the task
+- `Plan anchor`: the roadmap item, checklist entry, or text section that must stay accurate
 - `Allowed scope`: files, modules, or read-only boundaries
 - `Forbidden scope`: files or actions the subagent must not touch
 - `Expected output`: the exact shape of the answer you want back
@@ -29,6 +30,7 @@ Use this contract when delegating focused work to a subagent.
 - Files changed
 - Behavior changed
 - Verification performed
+- Text or plan sections that must be synchronized with the progress
 
 ### Review
 
@@ -42,4 +44,6 @@ Use this contract when delegating focused work to a subagent.
 - Ask for evidence, not confidence language.
 - Prefer one well-bounded task per subagent.
 - Avoid overlapping write scopes across subagents.
+- When the task advances a roadmap item, update the linked plan text in the same change.
+- Keep public/status text synchronized with actual progress; do not leave stale checklist or roadmap wording behind.
 - If the result is incomplete, send a follow-up question before accepting it.

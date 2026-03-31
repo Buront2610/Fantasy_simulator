@@ -24,6 +24,23 @@ def test_subagent_contract_contains_required_sections():
     text = _read("docs/subagent_contract.md")
     for required in ("Required Inputs", "Research", "Plan", "Implement", "Review"):
         assert required in text
+    assert "Plan anchor" in text
+    assert "synchronized with actual progress" in text
+
+
+def test_plan_and_implementation_context_require_progress_sync():
+    plan_text = _read("docs/implementation_plan.md")
+    implementation = _read("docs/contexts/implementation.md")
+    lessons = _read("docs/agent_lessons.md")
+
+    assert "サブエージェント" in plan_text
+    assert "委譲" in plan_text
+    # Guard the specific new rules in §2.2, not just pre-existing keywords
+    assert "同じ変更で同期する" in plan_text
+    assert "PR 状態" in plan_text
+    assert "Sync roadmap/status text" in implementation
+    assert "well-bounded subagents" in lessons
+    assert "synchronized with actual progress" in lessons
 
 
 def test_agent_lessons_and_handoff_template_exist():
@@ -37,4 +54,5 @@ def test_agent_lessons_and_handoff_template_exist():
 
     assert "Recurrent Pitfalls" in lessons
     assert "Confirmed Facts" in template
+    assert "progress text sync status" in template
     assert all(path.stem[:4].isdigit() for path in dated_notes)
