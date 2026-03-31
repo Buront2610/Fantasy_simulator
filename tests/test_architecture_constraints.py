@@ -9,6 +9,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = PROJECT_ROOT / "fantasy_simulator"
+REPORTS_MODULE = "fantasy_simulator.reports"
 
 
 def _module_name(path: Path) -> str:
@@ -151,6 +152,6 @@ def test_core_ui_modules_do_not_import_reports_module() -> None:
         forbidden = [
             target
             for target in _iter_import_targets(path)
-            if target == "fantasy_simulator.reports" or target.startswith("fantasy_simulator.reports.")
+            if target == REPORTS_MODULE or target.startswith(f"{REPORTS_MODULE}.")
         ]
         assert forbidden == [], f"{path} imports report modules: {forbidden}"

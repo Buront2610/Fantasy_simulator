@@ -104,20 +104,32 @@ def _normalize_event_tags(kind: str, tags: list[str]) -> tuple[str, ...]:
     return tuple(tags) if tags else (kind,)
 
 
-def _record_actor_ids(record) -> list[str]:
+def _record_actor_ids(event_record) -> list[str]:
     actor_ids: list[str] = []
-    if record.primary_actor_id:
-        actor_ids.append(record.primary_actor_id)
-    actor_ids.extend(record.secondary_actor_ids)
+    if event_record.primary_actor_id:
+        actor_ids.append(event_record.primary_actor_id)
+    actor_ids.extend(event_record.secondary_actor_ids)
     return actor_ids
 
 
-def _record_selection_key(record) -> tuple[object, ...]:
+def _record_selection_key(event_record) -> tuple[object, ...]:
     return (
-        record.kind,
-        record.location_id,
-        record.primary_actor_id,
-        tuple(record.secondary_actor_ids),
+        event_record.kind,
+        event_record.location_id,
+        event_record.primary_actor_id,
+        tuple(event_record.secondary_actor_ids),
+    )
+
+
+def _memory_tags_for_location(location_state) -> tuple[str, ...]:
+    return tuple(
+        tag
+        for tag, present in (
+            ("alias", bool(location_state.aliases)),
+            ("memorial", bool(location_state.memorial_ids)),
+            ("trace", bool(location_state.live_traces)),
+        )
+        if present
     )
 
 
@@ -156,20 +168,9 @@ def _capture_projection_contract(locale: str) -> dict[str, Any]:
         if tags
     )
     memory_tags = sorted(
-        (
-            loc.id,
-            tuple(
-                tag
-                for tag, present in (
-                    ("alias", bool(loc.aliases)),
-                    ("memorial", bool(loc.memorial_ids)),
-                    ("trace", bool(loc.live_traces)),
-                )
-                if present
-            ),
-        )
+        (loc.id, _memory_tags_for_location(loc))
         for loc in sim.world.grid.values()
-        if loc.aliases or loc.memorial_ids or loc.live_traces
+        if _memory_tags_for_location(loc)
     )
     detail_memory_tags = next(
         (tags for loc_id, tags in memory_tags if loc_id == detail_location_id),
