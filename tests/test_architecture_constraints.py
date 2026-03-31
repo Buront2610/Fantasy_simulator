@@ -142,11 +142,14 @@ def test_reports_module_does_not_import_ui_layers() -> None:
     assert forbidden == [], f"{path} imports UI modules: {forbidden}"
 
 
-def test_map_renderer_does_not_import_reports_module() -> None:
-    path = PACKAGE_ROOT / "ui" / "map_renderer.py"
-    forbidden = [
-        target
-        for target in _iter_import_targets(path)
-        if target == "fantasy_simulator.reports" or target.startswith("fantasy_simulator.reports.")
-    ]
-    assert forbidden == [], f"{path} imports report modules: {forbidden}"
+def test_core_ui_modules_do_not_import_reports_module() -> None:
+    allowed_composition_file = PACKAGE_ROOT / "ui" / "screens.py"
+    for path in sorted((PACKAGE_ROOT / "ui").glob("*.py")):
+        if path == allowed_composition_file:
+            continue
+        forbidden = [
+            target
+            for target in _iter_import_targets(path)
+            if target == "fantasy_simulator.reports" or target.startswith("fantasy_simulator.reports.")
+        ]
+        assert forbidden == [], f"{path} imports report modules: {forbidden}"

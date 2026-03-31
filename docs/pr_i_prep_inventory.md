@@ -12,11 +12,11 @@ PR-I の前提整備として、「今すぐ直すべき漏れ」と「今は触
 
 | Surface | Current source | Notes |
 | --- | --- | --- |
-| world lore 本文 | `fantasy_simulator/content/world_data.py:12` `WORLD_LORE` | `ui/screens.py` の `screen_world_lore()` が `out.print_wrapped(WORLD_LORE)` で直接表示する |
-| race の説明文 | `fantasy_simulator/content/world_data.py:33` `RACES[*][1]` | `screen_world_lore()` が `rdesc` を直接表示する |
-| race 名 | `fantasy_simulator/content/world_data.py:33` `RACES[*][0]` | `screen_world_lore()` では `tr_term(rname)` ではなく `rname` をそのまま見せている |
-| stat bonus 表記の stat 名 | `ui/screens.py:1005`-`1011` | `strength`, `intelligence` などのキーをそのまま bonus 行へ出している |
-| job の説明文 | `fantasy_simulator/content/world_data.py:88` `JOBS[*][1]` | job 名自体は `tr_term(jname)` だが説明文 `jdesc` は直接表示 |
+| world lore 本文 | `fantasy_simulator/content/world_data.py` `WORLD_LORE` | `ui/screens.py` の `screen_world_lore()` が `WORLD_LORE` を直接表示する |
+| race の説明文 | `fantasy_simulator/content/world_data.py` `RACES[*][1]` | `screen_world_lore()` が `rdesc` を直接表示する |
+| race 名 | `fantasy_simulator/content/world_data.py` `RACES[*][0]` | `screen_world_lore()` では `tr_term(rname)` ではなく `rname` をそのまま見せている |
+| stat bonus 表記の stat 名 | `fantasy_simulator/ui/screens.py` lore bonus 行 | `strength`, `intelligence` などのキーをそのまま bonus 行へ出している |
+| job の説明文 | `fantasy_simulator/content/world_data.py` `JOBS[*][1]` | job 名自体は `tr_term(jname)` だが説明文 `jdesc` は直接表示 |
 
 ### 判断
 

@@ -9,6 +9,7 @@ import pytest
 
 from fantasy_simulator.character_creator import CharacterCreator
 from fantasy_simulator.i18n import get_locale, set_locale
+from fantasy_simulator.reports import generate_monthly_report, generate_yearly_report
 from fantasy_simulator.simulator import Simulator
 from fantasy_simulator.ui.map_renderer import build_map_info, render_location_detail
 from fantasy_simulator.world import World
@@ -102,34 +103,33 @@ def _normalize_event_tags(kind: str, tags: list[str]) -> tuple[str, ...]:
     return tuple(tags) if tags else (kind,)
 
 
+def _record_selection_key(record) -> tuple[object, ...]:
+    return (
+        record.kind,
+        record.location_id,
+        record.primary_actor_id,
+        tuple(record.secondary_actor_ids),
+    )
+
+
 def _capture_projection_contract(locale: str) -> dict[str, object]:
     set_locale(locale)
     world = _build_seeded_world(7)
     sim = Simulator(world, events_per_year=4, adventure_steps_per_year=2, seed=99)
     sim.advance_months(60)
-    info = build_map_info(world)
     detail_location_id = "loc_elderroot_forest"
-
-    if locale == "en":
-        yearly_overview_header = "  ▶ World Overview"
-        yearly_notable_header = "  ▶ Notable Events"
-        yearly_region_header = "  ▶ Regional Events"
-        monthly_notable_header = "  ▶ Notable Events"
-        monthly_world_header = "  ▶ World News"
-        monthly_rumors_header = "  ▶ Rumors"
-    else:
-        yearly_overview_header = "  ▶ 世界の概要"
-        yearly_notable_header = "  ▶ 主な出来事"
-        yearly_region_header = "  ▶ 地域の出来事"
-        monthly_notable_header = "  ▶ 主な出来事"
-        monthly_world_header = "  ▶ 世界の動き"
-        monthly_rumors_header = "  ▶ 噂"
 
     yearly_year = sim.get_latest_completed_report_year()
     monthly_year = sim.world.year - 1
     monthly_month = 3
-    yearly_report = sim.get_yearly_report(yearly_year)
-    monthly_report = sim.get_monthly_report(monthly_year, monthly_month)
+    yearly_report = generate_yearly_report(world, yearly_year)
+    monthly_report = generate_monthly_report(world, monthly_year, monthly_month)
+    yearly_records = [rec for rec in world.event_records if rec.year == yearly_year]
+    monthly_records = [
+        rec
+        for rec in world.event_records
+        if rec.year == monthly_year and rec.month == monthly_month
+    ]
 
     subject_ids = sorted({
         cid
@@ -162,7 +162,6 @@ def _capture_projection_contract(locale: str) -> dict[str, object]:
         for loc in sim.world.grid.values()
         if loc.aliases or loc.memorial_ids or loc.live_traces
     )
-    detail_cell = next(cell for cell in info.cells.values() if cell.location_id == detail_location_id)
     detail_memory_tags = next(
         (tags for loc_id, tags in memory_tags if loc_id == detail_location_id),
         (),
@@ -177,24 +176,44 @@ def _capture_projection_contract(locale: str) -> dict[str, object]:
         "event_tags": event_tags,
         "relation_tags": relation_tags,
         "memory_tags": memory_tags,
-        "report_sections": {
+        "report_selection": {
             "yearly": {
                 "year": yearly_year,
-                "overview": bool(_extract_section(yearly_report, yearly_overview_header)),
-                "notable": bool(_extract_section(yearly_report, yearly_notable_header)),
-                "regions": bool(_extract_section(yearly_report, yearly_region_header)),
+                "total_events": yearly_report.total_events,
+                "deaths_this_year": yearly_report.deaths_this_year,
+                "character_ids": [entry.char_id for entry in yearly_report.character_entries],
+                "notable_records": [
+                    _record_selection_key(rec)
+                    for rec in yearly_records
+                    if rec.severity >= 3
+                ],
+                "location_ids": [entry.location_id for entry in yearly_report.location_entries],
+                "location_event_counts": {
+                    entry.location_id: entry.event_count for entry in yearly_report.location_entries
+                },
             },
             "monthly": {
                 "year": monthly_year,
                 "month": monthly_month,
-                "notable": bool(_extract_section(monthly_report, monthly_notable_header)),
-                "world": bool(_extract_section(monthly_report, monthly_world_header)),
-                "rumors": bool(_extract_section(monthly_report, monthly_rumors_header)),
+                "total_events": monthly_report.total_events,
+                "character_ids": [entry.char_id for entry in monthly_report.character_entries],
+                "notable_records": [
+                    _record_selection_key(rec)
+                    for rec in monthly_records
+                    if rec.severity >= 2
+                ],
+                "location_ids": [entry.location_id for entry in monthly_report.location_entries],
+                "location_event_counts": {
+                    entry.location_id: entry.event_count for entry in monthly_report.location_entries
+                },
+                "rumor_ids": [entry.rumor_id for entry in monthly_report.rumor_entries],
+                "rumor_categories": {
+                    entry.rumor_id: entry.category for entry in monthly_report.rumor_entries
+                },
             },
         },
         "detail_projection": {
             "location_id": detail_location_id,
-            "canonical_name": detail_cell.canonical_name,
             "memory_tags": detail_memory_tags,
         },
     }
@@ -425,24 +444,35 @@ EXPECTED_PROJECTION_CONTRACT = {
         ("loc_dragonbone_ridge", ("trace",)),
         ("loc_elderroot_forest", ("trace",)),
     ],
-    "report_sections": {
+    "report_selection": {
         "yearly": {
             "year": 1004,
-            "overview": True,
-            "notable": True,
-            "regions": True,
+            "total_events": 7,
+            "deaths_this_year": 0,
+            "character_ids": [],
+            "notable_records": [
+                ("battle", "loc_the_verdant_vale", "8ede0d7a", ("1738f7d9",)),
+                ("battle", "loc_the_verdant_vale", "8ede0d7a", ("1738f7d9",)),
+            ],
+            "location_ids": ["loc_the_verdant_vale"],
+            "location_event_counts": {"loc_the_verdant_vale": 3},
         },
         "monthly": {
             "year": 1004,
             "month": 3,
-            "notable": True,
-            "world": True,
-            "rumors": True,
+            "total_events": 1,
+            "character_ids": [],
+            "notable_records": [
+                ("battle", "loc_the_verdant_vale", "8ede0d7a", ("1738f7d9",)),
+            ],
+            "location_ids": ["loc_the_verdant_vale"],
+            "location_event_counts": {"loc_the_verdant_vale": 1},
+            "rumor_ids": ["rum_f17c0793e07a"],
+            "rumor_categories": {"rum_f17c0793e07a": "battle"},
         },
     },
     "detail_projection": {
         "location_id": "loc_elderroot_forest",
-        "canonical_name": "Elderroot Forest",
         "memory_tags": ("trace",),
     },
 }
