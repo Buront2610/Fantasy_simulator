@@ -25,6 +25,7 @@ from .template_history import TemplateHistory
 
 if TYPE_CHECKING:
     from ..character import Character
+    from ..reports import YearlyReport
     from ..world import World
 
 
@@ -72,15 +73,20 @@ def build_narrative_context(
     *,
     observer: Optional["Character"] = None,
     subject_id: Optional[str] = None,
+    yearly_report: Optional["YearlyReport"] = None,
 ) -> NarrativeContext:
-    """Build a minimal PR-I context from relation tags, reports, and world memory."""
+    """Build a minimal PR-I context from relation tags, reports, and world memory.
+
+    Callers that need multiple contexts for the same year can pass a precomputed
+    ``yearly_report`` to avoid repeating yearly aggregation work.
+    """
     relation_tags: Sequence[str] = ()
     if observer is not None and subject_id:
         relation_tags = tuple(observer.get_relation_tags(subject_id))
 
-    yearly_report = generate_yearly_report(world, year)
+    report = yearly_report if yearly_report is not None else generate_yearly_report(world, year)
     location_report = next(
-        (entry for entry in yearly_report.location_entries if entry.location_id == location_id),
+        (entry for entry in report.location_entries if entry.location_id == location_id),
         None,
     )
     location = world.get_location_by_id(location_id)
@@ -90,7 +96,7 @@ def build_narrative_context(
     notable_count = len(location_report.notable_events) if location_report is not None else 0
     return NarrativeContext(
         relation_tags=relation_tags,
-        yearly_death_count=yearly_report.deaths_this_year,
+        yearly_death_count=report.deaths_this_year,
         report_notable_count=notable_count,
         location_memorial_count=len(memorials),
         location_alias_count=len(aliases),
@@ -139,7 +145,7 @@ def epitaph_for_character(
         char: Live ``Character`` object for job-based variant selection.
     """
     candidates: List[str] = []
-    active_relation = relation_hint or getattr(context, "primary_relation_tag", None)
+    active_relation = relation_hint or (context.primary_relation_tag if context else None)
     if active_relation == "rival":
         candidates.append("memorial_epitaph_rival")
     elif active_relation in _CLOSE_RELATION_TAGS or favorite or title_hint:
@@ -147,6 +153,8 @@ def epitaph_for_character(
     elif context is not None and context.is_tragic_site:
         candidates.append("memorial_epitaph_tragic_year")
 
+    # If no relation- or tragedy-specific tone applies, the job/cause fallbacks
+    # below still guarantee at least one candidate before selection happens.
     if char is not None:
         job = getattr(char, "job", "")
         if job in _COMBAT_JOBS:

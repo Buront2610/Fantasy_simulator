@@ -314,10 +314,12 @@ class AdventureMixin:
         self,
         run: AdventureRun,
         deceased_id: str,
-    ):
+    ) -> Optional["Character"]:
         """Return the best surviving observer for NarrativeContext relation lookup."""
-        # Keep getattr-based access here so direct tests or older serialized run
-        # shapes can omit optional party fields without breaking context lookup.
+        # Keep getattr-based access for optional ``is_party`` / ``member_ids``
+        # so direct tests or older serialized run shapes fall back cleanly.
+        # Prefer a surviving party member first, then fall back to the run leader
+        # when they are different from the deceased.
         if getattr(run, "is_party", False):
             for member_id in getattr(run, "member_ids", []):
                 if member_id == deceased_id:

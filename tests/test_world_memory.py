@@ -14,6 +14,7 @@ from typing import Any
 
 from fantasy_simulator.adventure import AdventureRun
 from fantasy_simulator.character import Character
+from fantasy_simulator.simulator import Simulator
 from fantasy_simulator.world import MemorialRecord, World
 from fantasy_simulator.events import WorldEventRecord
 from fantasy_simulator.narrative.context import (
@@ -337,6 +338,16 @@ class TestEpitaphForCharacter:
         )
         assert "loving memory" in result.lower()
 
+    def test_relation_hint_uses_beloved_template_for_backward_compat(self):
+        result = epitaph_for_character(
+            "Aldric",
+            1005,
+            "Thornwood",
+            "adventure_death",
+            relation_hint="friend",
+        )
+        assert "whose loss was deeply felt" in result
+
     def test_rival_relation_context_uses_rival_template(self):
         result = epitaph_for_character(
             "Aldric",
@@ -440,6 +451,43 @@ class TestBuildNarrativeContext:
         assert context.location_memorial_count == 1
         assert context.location_trace_count == 2
 
+    def test_counts_fatal_event_kinds_in_yearly_death_signal(self):
+        world = _make_world()
+        observer = _make_char_stub(name="Leader", char_id="c_leader")
+        subject = _make_char_stub(name="Companion", char_id="c_companion")
+        observer.add_relation_tag(subject.char_id, "friend")
+        world.add_character(observer)
+        world.add_character(subject)
+        world.record_event(WorldEventRecord(
+            record_id="fatal_1",
+            kind="adventure_death",
+            year=1010,
+            month=3,
+            location_id="loc_thornwood",
+            description="Adventure death",
+            severity=5,
+        ))
+        world.record_event(WorldEventRecord(
+            record_id="fatal_2",
+            kind="battle_fatal",
+            year=1010,
+            month=7,
+            location_id="loc_thornwood",
+            description="Battle fatality",
+            severity=5,
+        ))
+
+        context = build_narrative_context(
+            world,
+            "loc_thornwood",
+            1010,
+            observer=observer,
+            subject_id=subject.char_id,
+        )
+
+        assert context.yearly_death_count == 2
+        assert context.is_tragic_site is True
+
 
 # ---------------------------------------------------------------------------
 # adventure_coordinator._apply_world_memory integration
@@ -450,9 +498,6 @@ class TestApplyWorldMemory:
 
     def _make_sim(self, seed: int = 42) -> Any:
         """Return a Simulator with a small seeded world."""
-        from fantasy_simulator.simulator import Simulator
-        from fantasy_simulator.character import Character
-
         world = World()
         for i in range(4):
             char = Character(
@@ -510,14 +555,9 @@ class TestApplyWorldMemory:
 
     def test_apply_world_memory_on_death_directly(self):
         """Test _apply_world_memory directly via a mock AdventureRun."""
-        from unittest.mock import MagicMock
-        from fantasy_simulator.adventure import AdventureRun
-        from fantasy_simulator.simulation.adventure_coordinator import AdventureMixin
-
         world = _make_world()
         world.year = 1010
         # Add a character
-        from fantasy_simulator.character import Character
         char = Character(name="Aldric", age=30, gender="Male", race="Human",
                          job="Warrior", char_id="cA")
         char.location_id = "loc_aethoria_capital"
@@ -558,11 +598,6 @@ class TestApplyWorldMemory:
 
     def test_apply_world_memory_uses_deceased_member_for_memorial(self):
         """When a companion dies, memorial must reference companion, not leader."""
-        from unittest.mock import MagicMock
-        from fantasy_simulator.adventure import AdventureRun
-        from fantasy_simulator.simulation.adventure_coordinator import AdventureMixin
-        from fantasy_simulator.character import Character
-
         world = _make_world()
         world.year = 1010
         leader = Character(name="Leader", age=30, gender="Male", race="Human", job="Warrior", char_id="cL")
@@ -625,10 +660,6 @@ class TestApplyWorldMemory:
 
     def test_apply_world_memory_safe_return_no_memorial(self):
         """Safe return → live trace only, no memorial."""
-        from unittest.mock import MagicMock
-        from fantasy_simulator.adventure import AdventureRun
-        from fantasy_simulator.simulation.adventure_coordinator import AdventureMixin
-
         world = _make_world()
         world.year = 1010
 
@@ -654,10 +685,6 @@ class TestApplyWorldMemory:
 
     def test_apply_world_memory_trace_text_reflects_outcome(self):
         """Trace text should differ between safe_return and retreat outcomes."""
-        from unittest.mock import MagicMock
-        from fantasy_simulator.adventure import AdventureRun
-        from fantasy_simulator.simulation.adventure_coordinator import AdventureMixin
-
         world = _make_world()
         world.year = 1010
 

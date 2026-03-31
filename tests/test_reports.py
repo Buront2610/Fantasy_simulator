@@ -237,6 +237,24 @@ class TestGenerateYearlyReport:
         report = generate_yearly_report(world_with_chars, 1001)
         assert report.deaths_this_year == 2
 
+    def test_deaths_counted_from_all_fatal_event_kinds(self, world_with_chars):
+        world_with_chars.record_event(WorldEventRecord(
+            record_id="df1", kind="death", year=1001, month=2,
+            description="Death 1", severity=5,
+        ))
+        world_with_chars.record_event(WorldEventRecord(
+            record_id="df2", kind="adventure_death", year=1001, month=6,
+            description="Adventure death", severity=5,
+        ))
+        world_with_chars.record_event(WorldEventRecord(
+            record_id="df3", kind="battle_fatal", year=1001, month=9,
+            description="Battle fatality", severity=5,
+        ))
+
+        report = generate_yearly_report(world_with_chars, 1001)
+
+        assert report.deaths_this_year == 3
+
     def test_report_includes_watched_character_year_summaries(self, world_with_chars):
         hero = world_with_chars.characters[0]
         world_with_chars.record_event(WorldEventRecord(
