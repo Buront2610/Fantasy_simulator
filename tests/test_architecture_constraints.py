@@ -145,6 +145,7 @@ def test_reports_module_does_not_import_ui_layers() -> None:
 def test_core_ui_modules_do_not_import_reports_module() -> None:
     allowed_composition_file = PACKAGE_ROOT / "ui" / "screens.py"
     for path in sorted((PACKAGE_ROOT / "ui").glob("*.py")):
+        # screens.py is the composition layer that can orchestrate report output.
         if path == allowed_composition_file:
             continue
         forbidden = [

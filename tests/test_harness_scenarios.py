@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import random
 from collections import Counter
+from typing import Any
 
 import pytest
 
@@ -103,6 +104,14 @@ def _normalize_event_tags(kind: str, tags: list[str]) -> tuple[str, ...]:
     return tuple(tags) if tags else (kind,)
 
 
+def _record_actor_ids(record) -> list[str]:
+    actor_ids: list[str] = []
+    if record.primary_actor_id:
+        actor_ids.append(record.primary_actor_id)
+    actor_ids.extend(record.secondary_actor_ids)
+    return actor_ids
+
+
 def _record_selection_key(record) -> tuple[object, ...]:
     return (
         record.kind,
@@ -112,7 +121,7 @@ def _record_selection_key(record) -> tuple[object, ...]:
     )
 
 
-def _capture_projection_contract(locale: str) -> dict[str, object]:
+def _capture_projection_contract(locale: str) -> dict[str, Any]:
     set_locale(locale)
     world = _build_seeded_world(7)
     sim = Simulator(world, events_per_year=4, adventure_steps_per_year=2, seed=99)
@@ -134,7 +143,7 @@ def _capture_projection_contract(locale: str) -> dict[str, object]:
     subject_ids = sorted({
         cid
         for rec in sim.world.event_records
-        for cid in ([rec.primary_actor_id] if rec.primary_actor_id else []) + list(rec.secondary_actor_ids)
+        for cid in _record_actor_ids(rec)
     })
     event_tags = sorted({
         _normalize_event_tags(rec.kind, rec.tags)
