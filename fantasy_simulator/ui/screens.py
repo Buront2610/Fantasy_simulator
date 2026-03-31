@@ -991,6 +991,8 @@ def screen_custom_simulation(ctx: UIContext | None = None) -> None:
 
 
 def screen_world_lore(world: World | None = None, ctx: UIContext | None = None) -> None:
+    """Show lore using the active world's bundle, or the default bundle pre-sim."""
+
     ctx = _default_ctx(ctx)
     out = ctx.out
     bundle = world.setting_bundle if world is not None else default_aethoria_bundle()

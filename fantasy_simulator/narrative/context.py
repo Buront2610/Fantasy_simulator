@@ -11,7 +11,7 @@ memorial / alias テキストを安定生成する"
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Tuple
 
 from ..i18n import tr
 from .constants import (
@@ -38,7 +38,7 @@ _MAGIC_JOBS: frozenset = frozenset({
     "Mage", "Witch", "Healer", "Sage", "Druid", "Bard",
 })
 
-_RELATION_PRIORITY: tuple[str, ...] = (
+_RELATION_PRIORITY: Tuple[str, ...] = (
     "spouse",
     "savior",
     "friend",
@@ -75,6 +75,16 @@ def derive_relation_hint(char: Optional["Character"]) -> Optional[str]:
     return None
 
 
+def _choose_template_key(
+    primary_key: str,
+    fallback_key: str,
+    template_history: Optional[TemplateHistory],
+) -> str:
+    if template_history is None:
+        return primary_key
+    return template_history.choose([primary_key, fallback_key])
+
+
 def epitaph_for_character(
     char_name: str,
     year: int,
@@ -102,35 +112,46 @@ def epitaph_for_character(
     # Future hook:
     # relation_hint / title_hint / favorite can influence variant weighting
     # once relation_tags and report metadata are fed into NarrativeContext.
-    relation_hint = relation_hint or derive_relation_hint(char)
+    relation_hint = relation_hint if relation_hint is not None else derive_relation_hint(char)
     relation_key = _RELATION_EPITAPH_KEYS.get(relation_hint or "")
     if relation_key is not None:
-        if template_history is not None:
-            relation_key = template_history.choose([relation_key, "memorial_epitaph_default"])
+        relation_key = _choose_template_key(
+            relation_key,
+            "memorial_epitaph_default",
+            template_history,
+        )
         return tr(relation_key, name=char_name, year=year, location=location_name)
 
     if char is not None:
         job = getattr(char, "job", "")
         if job in _COMBAT_JOBS:
-            key = "memorial_epitaph_warrior"
-            if template_history is not None:
-                key = template_history.choose([key, "memorial_epitaph_adventurer"])
+            key = _choose_template_key(
+                "memorial_epitaph_warrior",
+                "memorial_epitaph_adventurer",
+                template_history,
+            )
             return tr(key, name=char_name, year=year, location=location_name)
         if job in _MAGIC_JOBS:
-            key = "memorial_epitaph_mage"
-            if template_history is not None:
-                key = template_history.choose([key, "memorial_epitaph_adventurer"])
+            key = _choose_template_key(
+                "memorial_epitaph_mage",
+                "memorial_epitaph_adventurer",
+                template_history,
+            )
             return tr(key, name=char_name, year=year, location=location_name)
 
     if cause in (EVENT_KIND_ADVENTURE_DEATH, "death_cause_dungeon"):
-        key = "memorial_epitaph_adventurer"
-        if template_history is not None:
-            key = template_history.choose([key, "memorial_epitaph_default"])
+        key = _choose_template_key(
+            "memorial_epitaph_adventurer",
+            "memorial_epitaph_default",
+            template_history,
+        )
         return tr(key, name=char_name, year=year, location=location_name)
 
-    key = "memorial_epitaph_default"
-    if template_history is not None:
-        key = template_history.choose([key, "memorial_epitaph_adventurer"])
+    key = _choose_template_key(
+        "memorial_epitaph_default",
+        "memorial_epitaph_adventurer",
+        template_history,
+    )
     return tr(key, name=char_name, year=year, location=location_name)
 
 
@@ -156,6 +177,5 @@ def alias_for_event(
         key = _RELATION_ALIAS_KEYS.get(relation_hint or "", "alias_death_site")
     else:
         key = "alias_notable_site"
-    if template_history is not None:
-        key = template_history.choose([key, "alias_notable_site"])
+    key = _choose_template_key(key, "alias_notable_site", template_history)
     return tr(key, name=char_name)

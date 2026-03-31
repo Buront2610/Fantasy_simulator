@@ -76,3 +76,15 @@ def test_load_setting_bundle_from_json(tmp_path):
     assert bundle.schema_version == 3
     assert bundle.world_definition.display_name == "Archive"
     assert bundle.world_definition.cultures == ["Archivists"]
+
+
+def test_load_setting_bundle_reports_missing_required_fields(tmp_path):
+    bundle_path = tmp_path / "invalid-bundle.json"
+    bundle_path.write_text(json.dumps({"schema_version": 1}), encoding="utf-8")
+
+    try:
+        load_setting_bundle(bundle_path)
+    except ValueError as exc:
+        assert "missing required field" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError for missing world_definition")

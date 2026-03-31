@@ -10,7 +10,11 @@ from __future__ import annotations
 
 import random
 from typing import Any
+from unittest.mock import MagicMock
 
+from fantasy_simulator.adventure import AdventureRun
+from fantasy_simulator.character import Character
+from fantasy_simulator.simulation.adventure_coordinator import AdventureMixin
 from fantasy_simulator.world import MemorialRecord, World
 from fantasy_simulator.narrative.context import alias_for_event, epitaph_for_character
 
@@ -31,7 +35,6 @@ def _first_loc_id(world: World) -> str:
 
 def _make_char_stub(name: str = "Hero", job: str = "Warrior", char_id: str = "c1"):
     """Return a minimal Character-like object for narrative context tests."""
-    from fantasy_simulator.character import Character
     return Character(name=name, age=30, gender="Male", race="Human", job=job, char_id=char_id)
 
 
@@ -375,7 +378,6 @@ class TestApplyWorldMemory:
     def _make_sim(self, seed: int = 42) -> Any:
         """Return a Simulator with a small seeded world."""
         from fantasy_simulator.simulator import Simulator
-        from fantasy_simulator.character import Character
 
         world = World()
         for i in range(4):
@@ -434,14 +436,9 @@ class TestApplyWorldMemory:
 
     def test_apply_world_memory_on_death_directly(self):
         """Test _apply_world_memory directly via a mock AdventureRun."""
-        from unittest.mock import MagicMock
-        from fantasy_simulator.adventure import AdventureRun
-        from fantasy_simulator.simulation.adventure_coordinator import AdventureMixin
-
         world = _make_world()
         world.year = 1010
         # Add a character
-        from fantasy_simulator.character import Character
         char = Character(name="Aldric", age=30, gender="Male", race="Human",
                          job="Warrior", char_id="cA")
         char.location_id = "loc_aethoria_capital"
@@ -482,11 +479,6 @@ class TestApplyWorldMemory:
 
     def test_apply_world_memory_uses_deceased_member_for_memorial(self):
         """When a companion dies, memorial must reference companion, not leader."""
-        from unittest.mock import MagicMock
-        from fantasy_simulator.adventure import AdventureRun
-        from fantasy_simulator.simulation.adventure_coordinator import AdventureMixin
-        from fantasy_simulator.character import Character
-
         world = _make_world()
         world.year = 1010
         leader = Character(name="Leader", age=30, gender="Male", race="Human", job="Warrior", char_id="cL")
@@ -517,11 +509,6 @@ class TestApplyWorldMemory:
         assert "Companion" in mem.character_name
 
     def test_apply_world_memory_uses_relation_context_for_memorial_and_alias(self):
-        from unittest.mock import MagicMock
-        from fantasy_simulator.adventure import AdventureRun
-        from fantasy_simulator.simulation.adventure_coordinator import AdventureMixin
-        from fantasy_simulator.character import Character
-
         world = _make_world()
         world.year = 1010
         char = Character(name="Aldric", age=30, gender="Male", race="Human",
@@ -553,10 +540,6 @@ class TestApplyWorldMemory:
 
     def test_apply_world_memory_safe_return_no_memorial(self):
         """Safe return → live trace only, no memorial."""
-        from unittest.mock import MagicMock
-        from fantasy_simulator.adventure import AdventureRun
-        from fantasy_simulator.simulation.adventure_coordinator import AdventureMixin
-
         world = _make_world()
         world.year = 1010
 
@@ -582,10 +565,6 @@ class TestApplyWorldMemory:
 
     def test_apply_world_memory_trace_text_reflects_outcome(self):
         """Trace text should differ between safe_return and retreat outcomes."""
-        from unittest.mock import MagicMock
-        from fantasy_simulator.adventure import AdventureRun
-        from fantasy_simulator.simulation.adventure_coordinator import AdventureMixin
-
         world = _make_world()
         world.year = 1010
 

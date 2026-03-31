@@ -86,5 +86,15 @@ def load_setting_bundle(path: str | Path) -> SettingBundle:
     """Load a setting bundle from a JSON file."""
 
     bundle_path = Path(path)
-    data = json.loads(bundle_path.read_text(encoding="utf-8"))
-    return SettingBundle.from_dict(data)
+    try:
+        data = json.loads(bundle_path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(f"Setting bundle not found: {bundle_path}") from exc
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid setting bundle JSON in {bundle_path}: {exc.msg}") from exc
+
+    try:
+        return SettingBundle.from_dict(data)
+    except KeyError as exc:
+        missing = exc.args[0]
+        raise ValueError(f"Setting bundle {bundle_path} is missing required field: {missing}") from exc
