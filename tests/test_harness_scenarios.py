@@ -101,6 +101,7 @@ def _capture_bundle(locale: str) -> dict[str, object]:
 
 
 def _normalize_event_tags(kind: str, tags: list[str]) -> tuple[str, ...]:
+    """Normalize event tags, falling back to the event kind when none exist."""
     return tuple(tags) if tags else (kind,)
 
 
@@ -112,7 +113,7 @@ def _record_actor_ids(event_record) -> list[str]:
     )
 
 
-def _record_selection_key(event_record) -> tuple[object, ...]:
+def _record_selection_key(event_record) -> tuple[str, str | None, str | None, tuple[str, ...]]:
     """Return the identity fields used to pin report selection behavior."""
     return (
         event_record.kind,
@@ -140,7 +141,7 @@ def _selected_records_for_descriptions(
     descriptions: list[str],
     *,
     location_id: str | None = None,
-) -> list[tuple[object, ...]]:
+) -> list[tuple[str, str | None, str | None, tuple[str, ...]]]:
     """Map report description selections back to scoped event-record identities."""
     candidate_records = [
         record for record in records if location_id is None or record.location_id == location_id
