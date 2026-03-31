@@ -12,7 +12,13 @@ import random
 from typing import Any
 
 from fantasy_simulator.world import MemorialRecord, World
-from fantasy_simulator.narrative.context import alias_for_event, epitaph_for_character
+from fantasy_simulator.events import WorldEventRecord
+from fantasy_simulator.narrative.context import (
+    NarrativeContext,
+    alias_for_event,
+    build_narrative_context,
+    epitaph_for_character,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -318,6 +324,36 @@ class TestEpitaphForCharacter:
         assert "1005" in result
         assert "Thornwood Forest" in result
 
+    def test_close_relation_context_uses_beloved_template(self):
+        result = epitaph_for_character(
+            "Aldric",
+            1005,
+            "Thornwood",
+            "adventure_death",
+            context=NarrativeContext(relation_tags=("spouse",)),
+        )
+        assert "loving memory" in result.lower()
+
+    def test_rival_relation_context_uses_rival_template(self):
+        result = epitaph_for_character(
+            "Aldric",
+            1005,
+            "Thornwood",
+            "adventure_death",
+            context=NarrativeContext(relation_tags=("rival",)),
+        )
+        assert "rivals" in result.lower()
+
+    def test_tragic_site_context_uses_tragic_year_template(self):
+        result = epitaph_for_character(
+            "Aldric",
+            1005,
+            "Thornwood",
+            "battle",
+            context=NarrativeContext(yearly_death_count=3),
+        )
+        assert "grievous year" in result.lower()
+
 
 # ---------------------------------------------------------------------------
 # narrative/context.py — alias_for_event
@@ -343,6 +379,63 @@ class TestAliasForEvent:
         result = alias_for_event("adventure_death", "Aldric", "Thornwood")
         # The alias key alias_death_site uses {name} only, not {location}
         assert "Thornwood" not in result
+
+    def test_alias_uses_memorial_variant_when_location_has_prior_memorials(self):
+        result = alias_for_event(
+            "adventure_death",
+            "Aldric",
+            "Thornwood",
+            context=NarrativeContext(location_memorial_count=2),
+        )
+        assert "memorial" in result.lower()
+
+
+class TestBuildNarrativeContext:
+    def test_collects_relation_tags_report_signal_and_world_memory(self):
+        world = _make_world()
+        world.year = 1010
+        observer = _make_char_stub(name="Leader", job="Warrior", char_id="c_leader")
+        subject = _make_char_stub(name="Companion", job="Mage", char_id="c_companion")
+        observer.add_relation_tag(subject.char_id, "spouse")
+        world.add_character(observer)
+        world.add_character(subject)
+        world.add_memorial("m1", subject.char_id, subject.name, "loc_thornwood", 1009, "adventure_death", "Epitaph")
+        thornwood = world.get_location_by_id("loc_thornwood")
+        thornwood.live_traces.extend([
+            {"year": 1009, "char_name": "A", "text": "A"},
+            {"year": 1009, "char_name": "B", "text": "B"},
+        ])
+        world.record_event(WorldEventRecord(
+            record_id="d1",
+            kind="death",
+            year=1010,
+            month=2,
+            location_id="loc_thornwood",
+            description="Death in Thornwood",
+            severity=4,
+        ))
+        world.record_event(WorldEventRecord(
+            record_id="d2",
+            kind="death",
+            year=1010,
+            month=4,
+            description="Another death",
+            severity=5,
+        ))
+
+        context = build_narrative_context(
+            world,
+            "loc_thornwood",
+            1010,
+            observer=observer,
+            subject_id=subject.char_id,
+        )
+
+        assert context.primary_relation_tag == "spouse"
+        assert context.yearly_death_count == 2
+        assert context.report_notable_count == 1
+        assert context.location_memorial_count == 1
+        assert context.location_trace_count == 2
 
 
 # ---------------------------------------------------------------------------
@@ -495,6 +588,42 @@ class TestApplyWorldMemory:
         mem = next(iter(world.memorials.values()))
         assert mem.character_id == "cC"
         assert "Companion" in mem.character_name
+
+    def test_apply_world_memory_uses_relation_context_for_party_epitaph(self):
+        from unittest.mock import MagicMock
+        from fantasy_simulator.adventure import AdventureRun
+        from fantasy_simulator.simulation.adventure_coordinator import AdventureMixin
+        from fantasy_simulator.character import Character
+
+        world = _make_world()
+        world.year = 1010
+        leader = Character(name="Leader", age=30, gender="Male", race="Human", job="Warrior", char_id="cL")
+        companion = Character(name="Companion", age=28, gender="Female", race="Elf", job="Mage", char_id="cC")
+        leader.add_relation_tag("cC", "spouse")
+        leader.location_id = "loc_aethoria_capital"
+        companion.location_id = "loc_aethoria_capital"
+        companion.alive = False
+        world.add_character(leader)
+        world.add_character(companion)
+
+        run = MagicMock(spec=AdventureRun)
+        run.destination = "loc_thornwood"
+        run.character_id = "cL"
+        run.character_name = "Leader"
+        run.death_member_id = "cC"
+        run.outcome = "death"
+        run.year_started = 1008
+        run.is_party = True
+        run.member_ids = ["cL", "cC"]
+
+        mixin = object.__new__(AdventureMixin)
+        mixin.world = world
+        mixin.id_rng = random.Random(9)
+
+        mixin._apply_world_memory(run)
+
+        mem = next(iter(world.memorials.values()))
+        assert "loving memory" in mem.epitaph.lower()
 
     def test_apply_world_memory_safe_return_no_memorial(self):
         """Safe return → live trace only, no memorial."""
