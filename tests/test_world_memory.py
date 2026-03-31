@@ -9,8 +9,11 @@ World serialization round-trips for all new fields.
 from __future__ import annotations
 
 import random
+from unittest.mock import MagicMock
 from typing import Any
 
+from fantasy_simulator.adventure import AdventureRun
+from fantasy_simulator.character import Character
 from fantasy_simulator.world import MemorialRecord, World
 from fantasy_simulator.events import WorldEventRecord
 from fantasy_simulator.narrative.context import (
@@ -19,6 +22,7 @@ from fantasy_simulator.narrative.context import (
     build_narrative_context,
     epitaph_for_character,
 )
+from fantasy_simulator.simulation.adventure_coordinator import AdventureMixin
 
 
 # ---------------------------------------------------------------------------
@@ -37,7 +41,6 @@ def _first_loc_id(world: World) -> str:
 
 def _make_char_stub(name: str = "Hero", job: str = "Warrior", char_id: str = "c1"):
     """Return a minimal Character-like object for narrative context tests."""
-    from fantasy_simulator.character import Character
     return Character(name=name, age=30, gender="Male", race="Human", job=job, char_id=char_id)
 
 
@@ -589,12 +592,7 @@ class TestApplyWorldMemory:
         assert mem.character_id == "cC"
         assert "Companion" in mem.character_name
 
-    def test_apply_world_memory_uses_relation_context_for_party_epitaph(self):
-        from unittest.mock import MagicMock
-        from fantasy_simulator.adventure import AdventureRun
-        from fantasy_simulator.simulation.adventure_coordinator import AdventureMixin
-        from fantasy_simulator.character import Character
-
+    def test_apply_world_memory_uses_spouse_relation_context_for_epitaph(self):
         world = _make_world()
         world.year = 1010
         leader = Character(name="Leader", age=30, gender="Male", race="Human", job="Warrior", char_id="cL")

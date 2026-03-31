@@ -316,6 +316,8 @@ class AdventureMixin:
         deceased_id: str,
     ):
         """Return the best surviving observer for NarrativeContext relation lookup."""
+        # Keep getattr-based access here so direct tests or older serialized run
+        # shapes can omit optional party fields without breaking context lookup.
         if getattr(run, "is_party", False):
             for member_id in getattr(run, "member_ids", []):
                 if member_id == deceased_id:

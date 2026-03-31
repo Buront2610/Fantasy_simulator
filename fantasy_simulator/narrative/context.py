@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, List, Optional, Sequence
 
 from ..i18n import tr
+from ..reports import generate_yearly_report
 from .constants import (
     EVENT_KIND_ADVENTURE_DEATH,
     EVENT_KIND_BATTLE_FATAL,
@@ -28,6 +29,8 @@ if TYPE_CHECKING:
 
 
 _CLOSE_RELATION_TAGS = ("spouse", "family", "friend", "savior", "rescued")
+# Prefer the most intimate / narratively defining tie first, leaving "rival"
+# as a fallback so close-loss tones win over adversarial tones when both exist.
 _RELATION_PRIORITY = ("spouse", "family", "savior", "rescued", "friend", "rival")
 
 
@@ -75,8 +78,6 @@ def build_narrative_context(
     if observer is not None and subject_id:
         relation_tags = tuple(observer.get_relation_tags(subject_id))
 
-    from ..reports import generate_yearly_report
-
     yearly_report = generate_yearly_report(world, year)
     location_report = next(
         (entry for entry in yearly_report.location_entries if entry.location_id == location_id),
@@ -95,6 +96,7 @@ def build_narrative_context(
         location_alias_count=len(aliases),
         location_trace_count=len(traces),
     )
+
 
 # ---------------------------------------------------------------------------
 # Job category classification for epitaph variant selection
@@ -137,7 +139,7 @@ def epitaph_for_character(
         char: Live ``Character`` object for job-based variant selection.
     """
     candidates: List[str] = []
-    active_relation = relation_hint or (context.primary_relation_tag if context is not None else None)
+    active_relation = relation_hint or getattr(context, "primary_relation_tag", None)
     if active_relation == "rival":
         candidates.append("memorial_epitaph_rival")
     elif active_relation in _CLOSE_RELATION_TAGS or favorite or title_hint:
@@ -157,10 +159,9 @@ def epitaph_for_character(
     else:
         candidates.extend(["memorial_epitaph_default", "memorial_epitaph_adventurer"])
 
-    key = candidates[0] if candidates else "memorial_epitaph_default"
     if template_history is not None:
-        key = template_history.choose(candidates or [key, "memorial_epitaph_adventurer"])
-    return tr(key, name=char_name, year=year, location=location_name)
+        return tr(template_history.choose(candidates), name=char_name, year=year, location=location_name)
+    return tr(candidates[0], name=char_name, year=year, location=location_name)
 
 
 def alias_for_event(
@@ -186,12 +187,11 @@ def alias_for_event(
             candidates.append("alias_memorial_site")
         if context is not None and context.location_trace_count >= 3:
             candidates.append("alias_fallen_path")
-        key = "alias_death_site"
+        candidates.append("alias_death_site")
     else:
-        key = "alias_notable_site"
-    candidates.append(key)
+        candidates.append("alias_notable_site")
     if template_history is not None:
         key = template_history.choose(candidates)
-    else:
-        key = candidates[0]
+        return tr(key, name=char_name)
+    key = candidates[0]
     return tr(key, name=char_name)
