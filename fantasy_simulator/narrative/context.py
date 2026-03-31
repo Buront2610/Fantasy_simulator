@@ -20,6 +20,7 @@ from .constants import (
     EVENT_KIND_ADVENTURE_DEATH,
     EVENT_KIND_BATTLE_FATAL,
     EVENT_KIND_DEATH,
+    EVENT_KINDS_FATAL,
 )
 from .template_history import TemplateHistory
 
@@ -190,7 +191,7 @@ def alias_for_event(
             the alias text is standalone).
     """
     candidates: List[str] = []
-    if event_kind in (EVENT_KIND_ADVENTURE_DEATH, EVENT_KIND_DEATH, EVENT_KIND_BATTLE_FATAL):
+    if event_kind in EVENT_KINDS_FATAL:
         if context is not None and context.location_memorial_count >= 1:
             candidates.append("alias_memorial_site")
         if context is not None and context.location_trace_count >= 3:

@@ -199,6 +199,14 @@ def test_content_tags_from_event():
     assert "tragic" in tags
 
 
+def test_content_tags_from_all_fatal_event_kinds():
+    for kind in ("death", "adventure_death", "battle_fatal"):
+        event = _make_event(severity=4, kind=kind)
+        tags = _content_tags_from_event(event)
+        assert kind in tags
+        assert "tragic" in tags
+
+
 # ------------------------------------------------------------------
 # Aging and trimming
 # ------------------------------------------------------------------

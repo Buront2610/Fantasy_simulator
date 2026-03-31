@@ -384,6 +384,11 @@ class TestAliasForEvent:
         result2 = alias_for_event("battle_fatal", "Aldric", "Thornwood")
         assert result1 == result2
 
+    def test_death_returns_same_death_alias_family(self):
+        result1 = alias_for_event("adventure_death", "Aldric", "Thornwood")
+        result2 = alias_for_event("death", "Aldric", "Thornwood")
+        assert result1 == result2
+
     def test_other_event_returns_notable_alias(self):
         result = alias_for_event("discovery", "Lysara", "Millhaven")
         assert "Lysara" in result
