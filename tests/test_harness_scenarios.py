@@ -10,6 +10,7 @@ import pytest
 
 from fantasy_simulator.character_creator import CharacterCreator
 from fantasy_simulator.i18n import get_locale, set_locale
+from fantasy_simulator.persistence.save_load import load_simulation, save_simulation
 from fantasy_simulator.reports import generate_monthly_report, generate_yearly_report
 from fantasy_simulator.simulator import Simulator
 from fantasy_simulator.ui.map_renderer import build_map_info, render_location_detail
@@ -162,23 +163,19 @@ def _selected_records_for_descriptions(
     return selected
 
 
-def _capture_projection_contract(locale: str) -> dict[str, Any]:
-    """Capture the seeded, locale-stable projection contract for report/detail selection."""
-    set_locale(locale)
-    world = _build_seeded_world(7)
-    sim = Simulator(world, events_per_year=4, adventure_steps_per_year=2, seed=99)
-    sim.advance_months(60)
+def _projection_contract_for_sim(sim: Simulator) -> dict[str, Any]:
+    """Capture a locale-stable projection contract for an existing simulator."""
     detail_location_id = "loc_elderroot_forest"
 
     yearly_year = sim.get_latest_completed_report_year()
     monthly_year = sim.world.year - 1
     monthly_month = 3
-    yearly_report = generate_yearly_report(world, yearly_year)
-    monthly_report = generate_monthly_report(world, monthly_year, monthly_month)
-    yearly_records = [rec for rec in world.event_records if rec.year == yearly_year]
+    yearly_report = generate_yearly_report(sim.world, yearly_year)
+    monthly_report = generate_monthly_report(sim.world, monthly_year, monthly_month)
+    yearly_records = [rec for rec in sim.world.event_records if rec.year == yearly_year]
     monthly_records = [
         rec
-        for rec in world.event_records
+        for rec in sim.world.event_records
         if rec.year == monthly_year and rec.month == monthly_month
     ]
 
@@ -271,6 +268,15 @@ def _capture_projection_contract(locale: str) -> dict[str, Any]:
             "memory_tags": detail_memory_tags,
         },
     }
+
+
+def _capture_projection_contract(locale: str) -> dict[str, Any]:
+    """Capture the seeded, locale-stable projection contract for report/detail selection."""
+    set_locale(locale)
+    world = _build_seeded_world(7)
+    sim = Simulator(world, events_per_year=4, adventure_steps_per_year=2, seed=99)
+    sim.advance_months(60)
+    return _projection_contract_for_sim(sim)
 
 
 @pytest.fixture(autouse=True)
@@ -557,3 +563,26 @@ def test_seeded_projection_contract_matches_expected_inputs() -> None:
 
 def test_seeded_projection_contract_is_locale_stable() -> None:
     assert _capture_projection_contract("ja") == EXPECTED_PROJECTION_CONTRACT
+
+
+def test_midyear_save_load_preserves_projection_contract(tmp_path) -> None:
+    set_locale("en")
+    sim = Simulator(_build_seeded_world(7), events_per_year=4, adventure_steps_per_year=2, seed=99)
+    sim.advance_months(30)
+    save_path = tmp_path / "midyear-seeded.json"
+    remaining_months = 18
+
+    assert save_simulation(sim, str(save_path)) is True
+
+    restored = load_simulation(str(save_path))
+
+    assert restored is not None
+    assert restored.world.year == sim.world.year
+    assert restored.current_month == sim.current_month
+    assert len(restored.world.event_records) == len(sim.world.event_records)
+    assert len(restored.world.event_log) == len(sim.world.event_log)
+
+    sim.advance_months(remaining_months)
+    restored.advance_months(remaining_months)
+
+    assert _projection_contract_for_sim(restored) == _projection_contract_for_sim(sim)
