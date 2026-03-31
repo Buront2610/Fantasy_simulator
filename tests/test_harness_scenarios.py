@@ -105,14 +105,15 @@ def _normalize_event_tags(kind: str, tags: list[str]) -> tuple[str, ...]:
 
 
 def _record_actor_ids(event_record) -> list[str]:
-    actor_ids: list[str] = []
-    if event_record.primary_actor_id:
-        actor_ids.append(event_record.primary_actor_id)
-    actor_ids.extend(event_record.secondary_actor_ids)
-    return actor_ids
+    """Return all actor ids referenced by an event record."""
+    return (
+        ([event_record.primary_actor_id] if event_record.primary_actor_id else [])
+        + list(event_record.secondary_actor_ids)
+    )
 
 
 def _record_selection_key(event_record) -> tuple[object, ...]:
+    """Return the identity fields used to pin report selection behavior."""
     return (
         event_record.kind,
         event_record.location_id,
@@ -122,6 +123,7 @@ def _record_selection_key(event_record) -> tuple[object, ...]:
 
 
 def _memory_tags_for_location(location_state) -> tuple[str, ...]:
+    """Return stable memory marker tags for a location state."""
     return tuple(
         tag
         for tag, present in (
@@ -139,23 +141,24 @@ def _selected_records_for_descriptions(
     *,
     location_id: str | None = None,
 ) -> list[tuple[object, ...]]:
-    remaining_records = [
-        record
-        for record in records
-        if location_id is None or record.location_id == location_id
+    """Map report description selections back to scoped event-record identities."""
+    candidate_records = [
+        record for record in records if location_id is None or record.location_id == location_id
     ]
     selected: list[tuple[object, ...]] = []
+    used_indexes: set[int] = set()
     for description in descriptions:
-        for index, record in enumerate(remaining_records):
-            if record.description != description:
+        for index, record in enumerate(candidate_records):
+            if index in used_indexes or record.description != description:
                 continue
             selected.append(_record_selection_key(record))
-            del remaining_records[index]
+            used_indexes.add(index)
             break
     return selected
 
 
 def _capture_projection_contract(locale: str) -> dict[str, Any]:
+    """Capture the seeded, locale-stable projection contract for report/detail selection."""
     set_locale(locale)
     world = _build_seeded_world(7)
     sim = Simulator(world, events_per_year=4, adventure_steps_per_year=2, seed=99)
