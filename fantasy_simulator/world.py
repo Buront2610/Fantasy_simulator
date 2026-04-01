@@ -877,7 +877,7 @@ class World:
     def to_dict(self) -> Dict[str, Any]:
         result: Dict[str, Any] = {
             "name": self.name,
-            "lore": self.lore,
+            "lore": self.setting_bundle.world_definition.lore_text,
             "width": self.width,
             "height": self.height,
             "year": self.year,
@@ -900,6 +900,8 @@ class World:
         # PR-G2: persist atlas layout
         if self.atlas_layout is not None:
             result["atlas_layout"] = self.atlas_layout.to_dict()
+        if self.setting_bundle is not None:
+            result["setting_bundle"] = self.setting_bundle.to_dict()
         return result
 
     @classmethod
@@ -970,6 +972,10 @@ class World:
             world.atlas_layout = AtlasLayout.from_dict(data["atlas_layout"])
         else:
             world.atlas_layout = world._build_atlas_layout_from_current_state()
+
+        if "setting_bundle" in data:
+            world.setting_bundle = SettingBundle.from_dict(data["setting_bundle"])
+            world.lore = world.setting_bundle.world_definition.lore_text
 
         world.normalize_after_load()
         return world

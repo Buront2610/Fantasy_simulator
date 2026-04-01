@@ -990,7 +990,7 @@ def screen_custom_simulation(ctx: UIContext | None = None) -> None:
             break
 
 
-def screen_world_lore(world: World | None = None, ctx: UIContext | None = None) -> None:
+def screen_world_lore(ctx: UIContext | None = None, *, world: World | None = None) -> None:
     """Show lore using the active world's bundle, or the default bundle pre-sim."""
 
     ctx = _default_ctx(ctx)

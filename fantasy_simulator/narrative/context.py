@@ -11,7 +11,7 @@ memorial / alias テキストを安定生成する"
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING, Iterable, Optional, Tuple
 
 from ..i18n import tr
 from .constants import (
@@ -63,12 +63,17 @@ _RELATION_ALIAS_KEYS = {
 }
 
 
-def derive_relation_hint(char: Optional["Character"]) -> Optional[str]:
-    """Return the most narratively significant relation tag for *char*."""
+def derive_relation_hint(
+    observers: Iterable["Character"],
+    subject_id: Optional[str],
+) -> Optional[str]:
+    """Return the strongest directional relation tag from observers to subject."""
 
-    if char is None:
+    if subject_id is None:
         return None
-    all_tags = {tag for tags in char.relation_tags.values() for tag in tags}
+    all_tags = set()
+    for observer in observers:
+        all_tags.update(observer.get_relation_tags(subject_id))
     for tag in _RELATION_PRIORITY:
         if tag in all_tags:
             return tag
@@ -112,7 +117,6 @@ def epitaph_for_character(
     # Future hook:
     # relation_hint / title_hint / favorite can influence variant weighting
     # once relation_tags and report metadata are fed into NarrativeContext.
-    relation_hint = relation_hint if relation_hint is not None else derive_relation_hint(char)
     relation_key = _RELATION_EPITAPH_KEYS.get(relation_hint or "")
     if relation_key is not None:
         relation_key = _choose_template_key(

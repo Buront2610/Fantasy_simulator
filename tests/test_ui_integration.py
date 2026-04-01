@@ -401,6 +401,18 @@ class TestWorldLoreUsesBackends(unittest.TestCase):
         wrapped = [c for c in out.calls if c[0] == "print_wrapped"]
         self.assertTrue(any("Bundle lore text for tests." in call[1] for call in wrapped))
 
+    def test_lore_output_accepts_ctx_as_first_positional_argument(self) -> None:
+        from fantasy_simulator.ui.screens import screen_world_lore
+
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend()
+        ctx = UIContext(inp=inp, out=out)
+
+        screen_world_lore(ctx)
+
+        wrapped = [c for c in out.calls if c[0] == "print_wrapped"]
+        self.assertTrue(len(wrapped) > 0, "Positional ctx call should still render lore text")
+
 
 # ---------------------------------------------------------------------------
 # Tests: main.py routes through backends
