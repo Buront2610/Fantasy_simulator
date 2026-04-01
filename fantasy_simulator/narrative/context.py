@@ -79,6 +79,8 @@ def derive_relation_hint(
     if observers is None:
         return None
     if subject_id is None:
+        if not hasattr(observers, "relation_tags"):
+            return None
         char = observers
         all_tags = {tag for tags in char.relation_tags.values() for tag in tags}
         for tag in _RELATION_PRIORITY:

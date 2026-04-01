@@ -561,7 +561,7 @@ class TestApplyWorldMemory:
         assert mem.character_id == "cC"
         assert "Companion" in mem.character_name
 
-    def test_apply_world_memory_uses_survivor_relation_context_for_memorial_and_alias(self):
+    def test_apply_world_memory_uses_survivor_relation_for_epitaph(self):
         world = _make_world()
         world.year = 1010
         leader = Character(name="Leader", age=30, gender="Male", race="Human",
@@ -626,6 +626,39 @@ class TestApplyWorldMemory:
         assert "warrior" in memorial.epitaph.lower()
         dest = world.get_location_by_id("loc_thornwood")
         assert "Aldric's Rest" not in dest.aliases
+
+    def test_apply_world_memory_party_death_without_relations_uses_job_epitaph(self):
+        world = _make_world()
+        world.year = 1010
+        leader = Character(name="Leader", age=30, gender="Male", race="Human",
+                           job="Warrior", char_id="cL")
+        leader.location_id = "loc_aethoria_capital"
+        companion = Character(name="Companion", age=28, gender="Female", race="Elf",
+                              job="Mage", char_id="cC")
+        companion.location_id = "loc_aethoria_capital"
+        companion.alive = False
+        world.add_character(leader)
+        world.add_character(companion)
+
+        run = MagicMock(spec=AdventureRun)
+        run.destination = "loc_thornwood"
+        run.character_id = "cL"
+        run.character_name = "Leader"
+        run.outcome = "death"
+        run.year_started = 1008
+        run.is_party = True
+        run.member_ids = ["cL", "cC"]
+        run.death_member_id = "cC"
+
+        mixin = object.__new__(AdventureMixin)
+        mixin.world = world
+        mixin.id_rng = random.Random(13)
+
+        mixin._apply_world_memory(run)
+
+        memorial = next(iter(world.memorials.values()))
+        assert "cherished" not in memorial.epitaph.lower()
+        assert "knowledge" in memorial.epitaph.lower()
 
     def test_apply_world_memory_safe_return_no_memorial(self):
         """Safe return → live trace only, no memorial."""
