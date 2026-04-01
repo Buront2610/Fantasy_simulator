@@ -588,7 +588,7 @@ class TestApplyWorldMemory:
         dest = world.get_location_by_id("loc_thornwood")
         assert "Companion's Rest" in dest.aliases
 
-    def test_apply_world_memory_solo_death_ignores_deceased_outbound_relation_tags(self):
+    def test_apply_world_memory_solo_death_uses_job_based_epitaph(self):
         world = _make_world()
         world.year = 1010
         char = Character(name="Aldric", age=30, gender="Male", race="Human",
