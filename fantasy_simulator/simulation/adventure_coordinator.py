@@ -18,7 +18,7 @@ from ..adventure import (
     generate_adventure_id,
     select_party_policy,
 )
-from ..narrative.context import alias_for_event, derive_relation_hint, epitaph_for_character
+from ..narrative.context import alias_for_event, build_narrative_context, derive_relation_hint, epitaph_for_character
 from ..i18n import tr
 
 if TYPE_CHECKING:
@@ -274,6 +274,13 @@ class AdventureMixin:
             char = self.world.get_character_by_id(deceased_id)
             char_name = char.name if char is not None else run.character_name
             observers = self._surviving_observers_for_deceased(run, deceased_id)
+            context = build_narrative_context(
+                self.world,
+                dest,
+                self.world.year,
+                observer=observers,
+                subject_id=deceased_id,
+            )
             relation_hint = derive_relation_hint(observers, deceased_id)
             epitaph = epitaph_for_character(
                 char_name,
@@ -282,6 +289,7 @@ class AdventureMixin:
                 "adventure_death",
                 char=char,
                 relation_hint=relation_hint,
+                context=context,
             )
             memorial_id = generate_adventure_id(self.id_rng)
             self.world.add_memorial(
@@ -301,6 +309,7 @@ class AdventureMixin:
                     char_name,
                     dest_name,
                     relation_hint=relation_hint,
+                    context=context,
                 )
                 self.world.add_alias(dest, alias)
 
@@ -309,17 +318,16 @@ class AdventureMixin:
         run: AdventureRun,
         deceased_id: str,
     ) -> List["Character"]:
-        """Return living party members whose relation to the deceased is meaningful."""
-
-        if not run.is_party:
+        """Return living party observers for directional relation lookup."""
+        if not getattr(run, "is_party", False):
             return []
         observers: List["Character"] = []
-        for member_id in run.member_ids:
+        for member_id in getattr(run, "member_ids", []):
             if member_id == deceased_id:
                 continue
-            member = self.world.get_character_by_id(member_id)
-            if member is not None and member.alive:
-                observers.append(member)
+            observer = self.world.get_character_by_id(member_id)
+            if observer is not None and observer.alive:
+                observers.append(observer)
         return observers
 
     def get_adventure_summaries(self, include_active: bool = True) -> List[str]:

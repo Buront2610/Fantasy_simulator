@@ -237,6 +237,24 @@ class TestGenerateYearlyReport:
         report = generate_yearly_report(world_with_chars, 1001)
         assert report.deaths_this_year == 2
 
+    def test_deaths_counted_from_all_fatal_event_kinds(self, world_with_chars):
+        world_with_chars.record_event(WorldEventRecord(
+            record_id="df1", kind="death", year=1001, month=2,
+            description="Death 1", severity=5,
+        ))
+        world_with_chars.record_event(WorldEventRecord(
+            record_id="df2", kind="adventure_death", year=1001, month=6,
+            description="Adventure death", severity=5,
+        ))
+        world_with_chars.record_event(WorldEventRecord(
+            record_id="df3", kind="battle_fatal", year=1001, month=9,
+            description="Battle fatality", severity=5,
+        ))
+
+        report = generate_yearly_report(world_with_chars, 1001)
+
+        assert report.deaths_this_year == 3
+
     def test_report_includes_watched_character_year_summaries(self, world_with_chars):
         hero = world_with_chars.characters[0]
         world_with_chars.record_event(WorldEventRecord(
@@ -491,6 +509,22 @@ class TestSimulatorReportIntegration:
         summary = sim.get_summary()
         # Should contain a readable fallback, not crash
         assert "Some unknown kind" in summary or "some_unknown_kind" in summary
+
+    def test_get_summary_includes_adventure_death_in_notable_moments(self):
+        world = World()
+        world.record_event(WorldEventRecord(
+            record_id="fatal_summary_1",
+            kind="adventure_death",
+            year=1000,
+            month=3,
+            description="A hero fell on an adventure",
+            severity=5,
+        ))
+        sim = Simulator(world, events_per_year=0, seed=42)
+
+        summary = sim.get_summary()
+
+        assert "A hero fell on an adventure" in summary
 
     def test_current_month_serialization_round_trip(self):
         world = World()

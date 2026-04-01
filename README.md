@@ -207,19 +207,17 @@ supports:
   set to Japanese.
 - Terrain generation is still deterministic scaffolding from the current site
   grid, not a full worldgen pipeline.
-- NarrativeContext has started its PR-I expansion: memorial / alias text now
-  reacts to relation tags, but reports and rumor-driven selection are still
-  pending.
+- NarrativeContext is still minimal and currently focused on memorial / alias
+  text selection.
 - The base world setting is still largely hard-coded in
-  `content/world_data.py`, though the lore screen now reads through a minimal
-  `SettingBundle` foundation for future externalization.
+  `content/world_data.py`; it is not yet loaded as an external setting bundle.
 - The simulation is tuned for readability and experimentation rather than
   perfect realism.
 
 ## Near-Term Priorities
 
-- Continue PR-I by extending `NarrativeContext` from relation-aware
-  memorial/alias text to report- and rumor-aware selection
+- Continue PR-I after the first `NarrativeContext` slice that now feeds relation
+  tags, yearly reports, and location memory into memorial / alias text selection
 - Continue world setting externalization work toward the first formal
   `SettingBundle` authoring pass (PR-J)
 - Treat worldgen PoC work as parallel technical validation, not the next

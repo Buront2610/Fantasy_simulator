@@ -44,6 +44,8 @@ Use this contract when delegating focused work to a subagent.
 - Ask for evidence, not confidence language.
 - Prefer one well-bounded task per subagent.
 - Avoid overlapping write scopes across subagents.
+- If a bounded gap remains, launch a follow-up subagent anchored to the same plan text before accepting drift.
+- Recursive review/implement loops are fine when each hop narrows scope and the top-level owner keeps accountability.
 - When the task advances a roadmap item, update the linked plan text in the same change.
 - Keep public/status text synchronized with actual progress; do not leave stale checklist or roadmap wording behind.
 - If the result is incomplete, send a follow-up question before accepting it.

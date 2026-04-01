@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Dict, List, Set
 
 from .i18n import tr
+from .narrative.constants import EVENT_KINDS_FATAL
 from .rumor import RUMOR_MAX_AGE_MONTHS
 
 if TYPE_CHECKING:
@@ -225,11 +226,11 @@ def generate_yearly_report(
 
     Character entries are built only for watched characters that actually
     appear in that year's event records.  Death counts are derived from
-    event records with kind ``"death"``, not from current world state.
+    fatal event records, not from current world state.
     """
     records = [r for r in world.event_records if r.year == year]
 
-    deaths_this_year = sum(1 for r in records if r.kind == "death")
+    deaths_this_year = sum(1 for r in records if r.kind in EVENT_KINDS_FATAL)
 
     watched = _watched_char_ids(world)
     names = _char_name_map(world)

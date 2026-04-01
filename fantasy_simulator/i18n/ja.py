@@ -420,17 +420,22 @@ TEXT_JA: Dict[str, str] = {
         '{name} の魂、ここに安らかなれ。{year}年、{location} にて果てた冒険者。'
     ),
     'memorial_epitaph_default': '{year}年、{location} に倒れた {name} を偲ぶ。',
-    'memorial_epitaph_cherished': (
-        '{name} を偲ぶ声はなお絶えない。{year}年、{location} にて倒れし者。'
+    'memorial_epitaph_beloved': (
+        '{year}年、{location} で失われた {name} を深く悼む。忘れがたき者、ここに眠る。'
     ),
-    'memorial_epitaph_contested': (
-        '{name} は {year}年、{location} にて論争を残したまま倒れた。'
+    'memorial_epitaph_rival': (
+        '{year}年、{location} にて倒れた {name}。宿敵ですらその最期を忘れない。'
+    ),
+    'memorial_epitaph_tragic_year': (
+        '痛ましき {year}年、{location} の悲嘆に {name} の名が加わった。'
     ),
     # 重大イベントによって生成される地名の別名
     'alias_death_site': '{name} 終焉の地',
-    'alias_notable_site': '{name} の発見地',
     'alias_rest_site': '{name} の眠る地',
-    'alias_fall_site': '{name} 堕つる地',
+    'alias_fall_site': '{name} の倒れし地',
+    'alias_memorial_site': '{name} の慰霊地',
+    'alias_fallen_path': '{name} の倒れし路',
+    'alias_notable_site': '{name} の発見地',
     # 地点詳細ビューの UI ラベル
     'location_detail_header': '地点詳細 - {name}',
     'location_aliases_label': '別称',

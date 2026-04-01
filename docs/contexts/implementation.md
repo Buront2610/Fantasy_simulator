@@ -15,8 +15,9 @@ Use this file when the task is primarily about changing code.
 1. Confirm the changed area and nearest relevant tests.
 2. Make the smallest coherent patch that satisfies the task.
 3. Run the narrowest useful verification first.
-4. Sync roadmap/status text (`docs/implementation_plan.md`, README, related docs) before considering the task done.
-5. Escalate to broader verification if the change crosses boundaries.
+4. If review/verification exposes a bounded gap, spin a follow-up subagent against the same plan anchor before widening scope.
+5. Sync roadmap/status text (`docs/implementation_plan.md`, README, related docs) before considering the task done.
+6. Escalate to broader verification if the change crosses boundaries.
 
 ## Default Verification
 

@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from .i18n import tr
+from .narrative.constants import EVENT_KINDS_FATAL
 
 if TYPE_CHECKING:
     from .events import WorldEventRecord
@@ -176,7 +177,7 @@ def _content_tags_from_event(record: WorldEventRecord) -> List[str]:
     tags: List[str] = [record.kind]
     if record.severity >= 4:
         tags.append("major")
-    if record.kind in ("death", "battle_fatal", "adventure_death"):
+    if record.kind in EVENT_KINDS_FATAL:
         tags.append("tragic")
     if record.kind in ("marriage", "anniversary"):
         tags.append("social")
