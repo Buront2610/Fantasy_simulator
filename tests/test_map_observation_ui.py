@@ -13,6 +13,7 @@ from __future__ import annotations
 import random
 import unittest
 
+from fantasy_simulator.events import WorldEventRecord
 from fantasy_simulator.i18n import set_locale, tr
 from fantasy_simulator.ui.map_renderer import (
     MapCellInfo,
@@ -221,6 +222,25 @@ class TestRenderWorldOverview(unittest.TestCase):
         output = render_world_overview(info)
         self.assertIn("Aethoria", output)
         self.assertIn("Legend", output)
+
+    def test_build_map_info_marks_adventure_death_site_as_recent_death(self) -> None:
+        world = World()
+        first_location = list(world.grid.values())[0]
+        world.record_event(WorldEventRecord(
+            record_id="fatal_map_1",
+            kind="adventure_death",
+            year=world.year,
+            month=1,
+            location_id=first_location.id,
+            description="Adventure death",
+            severity=5,
+        ))
+
+        info = build_map_info(world)
+        marked_cells = [cell for cell in info.cells.values() if cell.location_id == first_location.id]
+
+        self.assertTrue(marked_cells)
+        self.assertTrue(marked_cells[0].recent_death_site)
 
 
 class TestRenderRegionMap(unittest.TestCase):

@@ -18,7 +18,7 @@ from ..adventure import (
     generate_adventure_id,
     select_party_policy,
 )
-from ..narrative.context import alias_for_event, epitaph_for_character
+from ..narrative.context import alias_for_event, build_narrative_context, epitaph_for_character
 from ..i18n import tr
 
 if TYPE_CHECKING:
@@ -273,12 +273,21 @@ class AdventureMixin:
             deceased_id = run.death_member_id or run.character_id
             char = self.world.get_character_by_id(deceased_id)
             char_name = char.name if char is not None else run.character_name
+            observer = self._narrative_observer_for_run(run, deceased_id)
+            context = build_narrative_context(
+                self.world,
+                dest,
+                self.world.year,
+                observer=observer,
+                subject_id=deceased_id,
+            )
             epitaph = epitaph_for_character(
                 char_name,
                 self.world.year,
                 dest_name,
                 "adventure_death",
                 char=char,
+                context=context,
             )
             memorial_id = generate_adventure_id(self.id_rng)
             self.world.add_memorial(
@@ -293,8 +302,34 @@ class AdventureMixin:
             # Generate a location alias (capped by World.MAX_ALIASES)
             dest_loc = self.world.get_location_by_id(dest)
             if dest_loc is not None:
-                alias = alias_for_event("adventure_death", char_name, dest_name)
+                alias = alias_for_event(
+                    "adventure_death",
+                    char_name,
+                    dest_name,
+                    context=context,
+                )
                 self.world.add_alias(dest, alias)
+
+    def _narrative_observer_for_run(
+        self,
+        run: AdventureRun,
+        deceased_id: str,
+    ) -> Optional["Character"]:
+        """Return the best surviving observer for NarrativeContext relation lookup."""
+        # Keep getattr-based access for optional ``is_party`` / ``member_ids``
+        # so direct tests or older serialized run shapes fall back cleanly.
+        # Prefer a surviving party member first, then fall back to the run leader
+        # when they are different from the deceased.
+        if getattr(run, "is_party", False):
+            for member_id in getattr(run, "member_ids", []):
+                if member_id == deceased_id:
+                    continue
+                observer = self.world.get_character_by_id(member_id)
+                if observer is not None:
+                    return observer
+        if getattr(run, "character_id", None) and run.character_id != deceased_id:
+            return self.world.get_character_by_id(run.character_id)
+        return None
 
     def get_adventure_summaries(self, include_active: bool = True) -> List[str]:
         """Return summary lines for known adventures."""

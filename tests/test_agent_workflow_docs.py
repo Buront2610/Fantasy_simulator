@@ -43,6 +43,20 @@ def test_plan_and_implementation_context_require_progress_sync():
     assert "synchronized with actual progress" in lessons
 
 
+def test_recursive_subagent_follow_through_is_documented():
+    plan_text = _read("docs/implementation_plan.md")
+    contract = _read("docs/subagent_contract.md")
+    implementation = _read("docs/contexts/implementation.md")
+    review = _read("docs/contexts/review.md")
+    lessons = _read("docs/agent_lessons.md")
+
+    assert "自己回帰的" in plan_text
+    assert "follow-up subagent" in contract
+    assert "same plan anchor" in implementation
+    assert "Smallest follow-up implementation/research subagent" in review
+    assert "follow-up review/implementation work" in lessons
+
+
 def test_agent_lessons_and_handoff_template_exist():
     lessons = _read("docs/agent_lessons.md")
     template = _read("docs/session_handoffs/TEMPLATE.md")

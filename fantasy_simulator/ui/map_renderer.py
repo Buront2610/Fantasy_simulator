@@ -27,6 +27,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set, Tuple, TYPE_CHECKING
 
 from ..i18n import tr, tr_term
+from ..narrative.constants import EVENT_KINDS_FATAL
 from .ui_helpers import fit_display_width
 
 if TYPE_CHECKING:
@@ -163,7 +164,7 @@ def build_map_info(
 
     death_site_location_ids = {
         rec.location_id for rec in world.event_records[-120:]
-        if rec.kind in ("death", "battle_fatal", "adventure_death") and rec.location_id
+        if rec.kind in EVENT_KINDS_FATAL and rec.location_id
     }
 
     # Build site coordinate lookup

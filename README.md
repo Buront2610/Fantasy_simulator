@@ -216,8 +216,8 @@ supports:
 
 ## Near-Term Priorities
 
-- Expand `NarrativeContext` so relation tags, rumors, memorials, and reports
-  can drive context-aware text selection (PR-I)
+- Continue PR-I after the first `NarrativeContext` slice that now feeds relation
+  tags, yearly reports, and location memory into memorial / alias text selection
 - Continue world setting externalization work toward the first formal
   `SettingBundle` authoring pass (PR-J)
 - Treat worldgen PoC work as parallel technical validation, not the next
