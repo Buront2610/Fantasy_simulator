@@ -80,8 +80,10 @@ def derive_relation_hint(
         return None
     if subject_id is None:
         # Keep a duck-typed compatibility path for older single-character callers
-        # without requiring a runtime Character import in this module.
-        if not hasattr(observers, "relation_tags"):
+        # without requiring a runtime Character import in this module. The
+        # object is expected to expose a dict-like ``relation_tags`` attribute.
+        relation_tags = getattr(observers, "relation_tags", None)
+        if relation_tags is None:
             return None
         char = observers
         all_tags = {tag for tags in char.relation_tags.values() for tag in tags}
