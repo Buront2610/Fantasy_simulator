@@ -64,12 +64,26 @@ _RELATION_ALIAS_KEYS = {
 
 
 def derive_relation_hint(
-    observers: Iterable["Character"],
-    subject_id: Optional[str],
+    observers: Optional[Iterable["Character"] | "Character"],
+    subject_id: Optional[str] = None,
 ) -> Optional[str]:
-    """Return the strongest directional relation tag from observers to subject."""
+    """Return the strongest relation tag, preferring directional observer semantics.
 
+    When ``subject_id`` is provided, relation tags are read directionally from
+    ``observers -> subject``. This is the preferred PR-I path.
+
+    When ``subject_id`` is omitted, a single-character compatibility mode is used
+    and tags are aggregated from that character's outbound relation map.
+    """
+
+    if observers is None:
+        return None
     if subject_id is None:
+        char = observers
+        all_tags = {tag for tags in char.relation_tags.values() for tag in tags}
+        for tag in _RELATION_PRIORITY:
+            if tag in all_tags:
+                return tag
         return None
     all_tags = set()
     for observer in observers:

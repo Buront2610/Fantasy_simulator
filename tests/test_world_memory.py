@@ -392,6 +392,14 @@ class TestDeriveRelationHint:
 
         assert result is None
 
+    def test_legacy_single_character_mode_remains_available(self):
+        char = _make_char_stub(name="Aldric", char_id="c_legacy")
+        char.add_relation_tag("partner", "spouse")
+
+        result = derive_relation_hint(char)
+
+        assert result == "spouse"
+
     def test_adventure_death_returns_death_alias(self):
         result = alias_for_event("adventure_death", "Aldric", "Thornwood")
         assert "Aldric" in result
