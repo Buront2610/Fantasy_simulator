@@ -875,9 +875,11 @@ class World:
         return render_map_ascii(info)
 
     def to_dict(self) -> Dict[str, Any]:
-        lore_text = self.lore
-        if self.setting_bundle is not None:
-            lore_text = self.setting_bundle.world_definition.lore_text
+        lore_text = (
+            self.setting_bundle.world_definition.lore_text
+            if self.setting_bundle is not None
+            else self.lore
+        )
         result: Dict[str, Any] = {
             "name": self.name,
             "lore": lore_text,

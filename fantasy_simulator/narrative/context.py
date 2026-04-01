@@ -79,6 +79,8 @@ def derive_relation_hint(
     if observers is None:
         return None
     if subject_id is None:
+        # Keep a duck-typed compatibility path for older single-character callers
+        # without requiring a runtime Character import in this module.
         if not hasattr(observers, "relation_tags"):
             return None
         char = observers
