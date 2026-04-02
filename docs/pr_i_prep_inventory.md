@@ -43,6 +43,19 @@ PR-I の前提整備として、「今すぐ直すべき漏れ」と「今は触
 - detail は **location-scoped projection** ベース
 - narrative は上記 projection の **見せ方** を変えても、入力素材の選定規則を壊さない
 
+## 2.5 すでに着手した PR-I slice 1
+
+- `narrative/context.py` は memorial / alias 生成時に relation tags を読めるようになった
+- `fantasy_simulator/content/setting_bundle.py` に最小 `WorldDefinition` /
+  `SettingBundle` dataclass と JSON loader を追加した
+- `World.setting_bundle` と `screen_world_lore()` の参照経路を接続した
+
+### まだ残る PR-I 本体
+
+- reports / rumors / world memory を narrative 入力へ広げる
+- relation tags の「誰が誰をどう見ているか」をテンプレート分岐へ増やす
+- PR-J の authoring に備え、bundle の実データ整理はまだ始めない
+
 ## 3. 当面 legacy のまま扱うもの
 
 以下は PR-I の対象に含めない。inventory 上も「今は触るな」の扱い。

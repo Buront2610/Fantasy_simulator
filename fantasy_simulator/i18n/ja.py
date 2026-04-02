@@ -431,6 +431,8 @@ TEXT_JA: Dict[str, str] = {
     ),
     # 重大イベントによって生成される地名の別名
     'alias_death_site': '{name} 終焉の地',
+    'alias_rest_site': '{name} の眠る地',
+    'alias_fall_site': '{name} の倒れし地',
     'alias_memorial_site': '{name} の慰霊地',
     'alias_fallen_path': '{name} の倒れし路',
     'alias_notable_site': '{name} の発見地',

@@ -14,15 +14,17 @@ from typing import Any
 
 from fantasy_simulator.adventure import AdventureRun
 from fantasy_simulator.character import Character
-from fantasy_simulator.simulator import Simulator
-from fantasy_simulator.world import MemorialRecord, World
+from fantasy_simulator.content.setting_bundle import default_aethoria_bundle
 from fantasy_simulator.events import WorldEventRecord
 from fantasy_simulator.narrative.context import (
     NarrativeContext,
     alias_for_event,
     build_narrative_context,
+    derive_relation_hint,
     epitaph_for_character,
 )
+from fantasy_simulator.simulator import Simulator
+from fantasy_simulator.world import MemorialRecord, World
 from fantasy_simulator.simulation.adventure_coordinator import AdventureMixin
 
 
@@ -235,6 +237,18 @@ class TestGetMemorialsForLocation:
 # ---------------------------------------------------------------------------
 
 class TestWorldMemoryRoundTrip:
+    def test_setting_bundle_survives_to_dict_from_dict(self):
+        world = _make_world()
+        world.setting_bundle = default_aethoria_bundle(lore_text="Bundle lore for save/load.")
+        world.setting_bundle.world_definition.era = "Second Dawn"
+
+        data = world.to_dict()
+        restored = World.from_dict(data)
+
+        assert restored.setting_bundle.world_definition.lore_text == "Bundle lore for save/load."
+        assert restored.setting_bundle.world_definition.era == "Second Dawn"
+        assert restored.lore == "Bundle lore for save/load."
+
     def test_memorials_survive_to_dict_from_dict(self):
         world = _make_world()
         world.add_memorial("m1", "c1", "Aldric", "loc_aethoria_capital", 1005,
@@ -374,6 +388,14 @@ class TestEpitaphForCharacter:
 # ---------------------------------------------------------------------------
 
 class TestAliasForEvent:
+    def test_relation_hint_uses_rest_alias_for_death(self):
+        result = alias_for_event("adventure_death", "Aldric", "Thornwood", relation_hint="spouse")
+        assert "Rest" in result
+
+    def test_relation_hint_uses_fall_alias_for_death(self):
+        result = alias_for_event("adventure_death", "Aldric", "Thornwood", relation_hint="rival")
+        assert "Fall" in result
+
     def test_adventure_death_returns_death_alias(self):
         result = alias_for_event("adventure_death", "Aldric", "Thornwood")
         assert "Aldric" in result
@@ -407,6 +429,41 @@ class TestAliasForEvent:
             context=NarrativeContext(location_memorial_count=2),
         )
         assert "memorial" in result.lower()
+
+
+class TestDeriveRelationHint:
+    def test_returns_survivor_relation_toward_subject(self):
+        observer = _make_char_stub(name="Leader", char_id="c_leader")
+        observer.add_relation_tag("c_subject", "spouse")
+        subject = _make_char_stub(name="Companion", char_id="c_subject")
+
+        result = derive_relation_hint([observer], subject.char_id)
+
+        assert result == "spouse"
+
+    def test_ignores_subject_outbound_relations(self):
+        observer = _make_char_stub(name="Leader", char_id="c_leader")
+        subject = _make_char_stub(name="Companion", char_id="c_subject")
+        subject.add_relation_tag(observer.char_id, "spouse")
+
+        result = derive_relation_hint([observer], subject.char_id)
+
+        assert result is None
+
+    def test_legacy_single_character_mode_remains_available(self):
+        char = _make_char_stub(name="Aldric", char_id="c_legacy")
+        char.add_relation_tag("partner", "spouse")
+
+        result = derive_relation_hint(char)
+
+        assert result == "spouse"
+
+    def test_legacy_single_character_mode_returns_none_without_relations(self):
+        char = _make_char_stub(name="Aldric", char_id="c_legacy")
+
+        result = derive_relation_hint(char)
+
+        assert result is None
 
 
 class TestBuildNarrativeContext:
@@ -455,6 +512,28 @@ class TestBuildNarrativeContext:
         assert context.report_notable_count == 1
         assert context.location_memorial_count == 1
         assert context.location_trace_count == 2
+
+    def test_collects_relation_tags_from_multiple_observers(self):
+        world = _make_world()
+        subject = _make_char_stub(name="Companion", char_id="c_subject")
+        observer_a = _make_char_stub(name="Leader", char_id="c_leader")
+        observer_b = _make_char_stub(name="Scout", char_id="c_scout")
+        observer_a.add_relation_tag(subject.char_id, "friend")
+        observer_b.add_relation_tag(subject.char_id, "spouse")
+        world.add_character(observer_a)
+        world.add_character(observer_b)
+        world.add_character(subject)
+
+        context = build_narrative_context(
+            world,
+            "loc_thornwood",
+            1010,
+            observer=[observer_a, observer_b],
+            subject_id=subject.char_id,
+        )
+
+        assert context.primary_relation_tag == "spouse"
+        assert set(context.relation_tags) == {"friend", "spouse"}
 
     def test_counts_fatal_event_kinds_in_yearly_death_signal(self):
         world = _make_world()
@@ -632,7 +711,7 @@ class TestApplyWorldMemory:
         assert mem.character_id == "cC"
         assert "Companion" in mem.character_name
 
-    def test_apply_world_memory_uses_spouse_relation_context_for_epitaph(self):
+    def test_apply_world_memory_uses_survivor_relation_for_epitaph(self):
         world = _make_world()
         world.year = 1010
         leader = Character(name="Leader", age=30, gender="Male", race="Human", job="Warrior", char_id="cL")
@@ -662,6 +741,69 @@ class TestApplyWorldMemory:
 
         mem = next(iter(world.memorials.values()))
         assert "loving memory" in mem.epitaph.lower()
+        dest = world.get_location_by_id("loc_thornwood")
+        assert "Companion's Rest" in dest.aliases
+
+    def test_apply_world_memory_solo_death_uses_job_based_epitaph(self):
+        world = _make_world()
+        world.year = 1010
+        char = Character(name="Aldric", age=30, gender="Male", race="Human", job="Warrior", char_id="cA")
+        char.location_id = "loc_aethoria_capital"
+        char.add_relation_tag("partner", "spouse")
+        world.add_character(char)
+
+        run = MagicMock(spec=AdventureRun)
+        run.destination = "loc_thornwood"
+        run.character_id = "cA"
+        run.character_name = "Aldric"
+        run.outcome = "death"
+        run.year_started = 1008
+        run.is_party = False
+        run.member_ids = ["cA"]
+        run.death_member_id = None
+
+        mixin = object.__new__(AdventureMixin)
+        mixin.world = world
+        mixin.id_rng = random.Random(11)
+
+        mixin._apply_world_memory(run)
+
+        memorial = next(iter(world.memorials.values()))
+        assert "loving memory" not in memorial.epitaph.lower()
+        assert "warrior" in memorial.epitaph.lower()
+        dest = world.get_location_by_id("loc_thornwood")
+        assert "Aldric's Rest" not in dest.aliases
+
+    def test_apply_world_memory_party_death_without_relations_uses_job_epitaph(self):
+        world = _make_world()
+        world.year = 1010
+        leader = Character(name="Leader", age=30, gender="Male", race="Human", job="Warrior", char_id="cL")
+        leader.location_id = "loc_aethoria_capital"
+        companion = Character(name="Companion", age=28, gender="Female", race="Elf", job="Mage", char_id="cC")
+        companion.location_id = "loc_aethoria_capital"
+        companion.alive = False
+        world.add_character(leader)
+        world.add_character(companion)
+
+        run = MagicMock(spec=AdventureRun)
+        run.destination = "loc_thornwood"
+        run.character_id = "cL"
+        run.character_name = "Leader"
+        run.death_member_id = "cC"
+        run.outcome = "death"
+        run.year_started = 1008
+        run.is_party = True
+        run.member_ids = ["cL", "cC"]
+
+        mixin = object.__new__(AdventureMixin)
+        mixin.world = world
+        mixin.id_rng = random.Random(13)
+
+        mixin._apply_world_memory(run)
+
+        memorial = next(iter(world.memorials.values()))
+        assert "loving memory" not in memorial.epitaph.lower()
+        assert "knowledge" in memorial.epitaph.lower()
 
     def test_apply_world_memory_safe_return_no_memorial(self):
         """Safe return → live trace only, no memorial."""

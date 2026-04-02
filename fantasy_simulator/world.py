@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from .i18n import tr
+from .content.setting_bundle import SettingBundle, default_aethoria_bundle
 from .content.world_data import (
     DEFAULT_LOCATIONS,
     NAME_TO_LOCATION_ID,
@@ -319,6 +320,10 @@ class World:
     ) -> None:
         self.name: str = name
         self.lore: str = lore
+        self.setting_bundle: SettingBundle = default_aethoria_bundle(
+            display_name=name,
+            lore_text=lore,
+        )
         self.width: int = width
         self.height: int = height
         self.year: int = year
@@ -870,9 +875,14 @@ class World:
         return render_map_ascii(info)
 
     def to_dict(self) -> Dict[str, Any]:
+        lore_text = (
+            self.setting_bundle.world_definition.lore_text
+            if self.setting_bundle is not None
+            else self.lore
+        )
         result: Dict[str, Any] = {
             "name": self.name,
-            "lore": self.lore,
+            "lore": lore_text,
             "width": self.width,
             "height": self.height,
             "year": self.year,
@@ -895,6 +905,8 @@ class World:
         # PR-G2: persist atlas layout
         if self.atlas_layout is not None:
             result["atlas_layout"] = self.atlas_layout.to_dict()
+        if self.setting_bundle is not None:
+            result["setting_bundle"] = self.setting_bundle.to_dict()
         return result
 
     @classmethod
@@ -965,6 +977,10 @@ class World:
             world.atlas_layout = AtlasLayout.from_dict(data["atlas_layout"])
         else:
             world.atlas_layout = world._build_atlas_layout_from_current_state()
+
+        if "setting_bundle" in data:
+            world.setting_bundle = SettingBundle.from_dict(data["setting_bundle"])
+            world.lore = world.setting_bundle.world_definition.lore_text
 
         world.normalize_after_load()
         return world
