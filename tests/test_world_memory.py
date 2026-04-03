@@ -23,6 +23,7 @@ from fantasy_simulator.narrative.context import (
     derive_relation_hint,
     epitaph_for_character,
 )
+from fantasy_simulator.rumor import Rumor, RUMOR_MAX_AGE_MONTHS
 from fantasy_simulator.simulator import Simulator
 from fantasy_simulator.world import MemorialRecord, World
 from fantasy_simulator.simulation.adventure_coordinator import AdventureMixin
@@ -382,6 +383,16 @@ class TestEpitaphForCharacter:
         )
         assert "grievous year" in result.lower()
 
+    def test_rumor_heavy_context_uses_whispered_template(self):
+        result = epitaph_for_character(
+            "Aldric",
+            1005,
+            "Thornwood",
+            "battle",
+            context=NarrativeContext(location_rumor_count=2),
+        )
+        assert "whispers" in result.lower()
+
 
 # ---------------------------------------------------------------------------
 # narrative/context.py — alias_for_event
@@ -429,6 +440,15 @@ class TestAliasForEvent:
             context=NarrativeContext(location_memorial_count=2),
         )
         assert "memorial" in result.lower()
+
+    def test_alias_uses_whisper_variant_when_location_is_rumor_heavy(self):
+        result = alias_for_event(
+            "adventure_death",
+            "Aldric",
+            "Thornwood",
+            context=NarrativeContext(location_rumor_count=2),
+        )
+        assert "whisper" in result.lower()
 
 
 class TestDeriveRelationHint:
@@ -571,6 +591,30 @@ class TestBuildNarrativeContext:
 
         assert context.yearly_death_count == 2
         assert context.is_tragic_site is True
+
+    def test_collects_active_rumor_signal_for_location(self):
+        world = _make_world()
+        observer = _make_char_stub(name="Leader", char_id="c_leader")
+        subject = _make_char_stub(name="Companion", char_id="c_companion")
+        observer.add_relation_tag(subject.char_id, "friend")
+        world.add_character(observer)
+        world.add_character(subject)
+        world.rumors.extend([
+            Rumor(source_location_id="loc_thornwood", age_in_months=0),
+            Rumor(source_location_id="loc_thornwood", age_in_months=RUMOR_MAX_AGE_MONTHS - 1),
+            Rumor(source_location_id="loc_thornwood", age_in_months=RUMOR_MAX_AGE_MONTHS),
+            Rumor(source_location_id="loc_millhaven", age_in_months=0),
+        ])
+
+        context = build_narrative_context(
+            world,
+            "loc_thornwood",
+            1010,
+            observer=observer,
+            subject_id=subject.char_id,
+        )
+
+        assert context.location_rumor_count == 2
 
 
 # ---------------------------------------------------------------------------

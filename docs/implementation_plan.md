@@ -84,7 +84,7 @@
 - ~~`WorldEventRecord.tags` は未導入~~ → PR-B で導入済み。`summary_key` は未導入
 - ~~`SIMULATION_DENSITY` は未導入~~ → PR-B で最小版を導入済み
 - `NarrativeContext` 主体の文脈依存叙述は未完成であり、PR-I の最小着手として memorial / alias 生成に
-  relation tags / yearly report / world memory を接続済み。rumor / SettingBundle との本格接続は後続で進める
+  relation tags / yearly report / rumor / world memory を接続済み。SettingBundle との本格接続は後続で進める
 - ~~5×5 盤面から離脱した可変サイズ world、terrain / site / route 分離、worldgen PoC は未着手である~~
   → PR-G1 で `World(width, height)`、`terrain_map` / `sites` / `routes`、schema v6 migration を導入済み。
   worldgen PoC 自体は未着手

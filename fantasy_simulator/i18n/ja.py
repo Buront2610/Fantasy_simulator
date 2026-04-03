@@ -429,11 +429,15 @@ TEXT_JA: Dict[str, str] = {
     'memorial_epitaph_tragic_year': (
         '痛ましき {year}年、{location} の悲嘆に {name} の名が加わった。'
     ),
+    'memorial_epitaph_whispered': (
+        '{year}年に {location} で倒れた {name} の噂は、今なお人々の囁きに残る。'
+    ),
     # 重大イベントによって生成される地名の別名
     'alias_death_site': '{name} 終焉の地',
     'alias_rest_site': '{name} の眠る地',
     'alias_fall_site': '{name} の倒れし地',
     'alias_memorial_site': '{name} の慰霊地',
+    'alias_whisper_site': '{name} の囁きの地',
     'alias_fallen_path': '{name} の倒れし路',
     'alias_notable_site': '{name} の発見地',
     # 地点詳細ビューの UI ラベル
