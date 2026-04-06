@@ -602,6 +602,7 @@ class TestBuildNarrativeContext:
         world.rumors.extend([
             Rumor(source_location_id="loc_thornwood", age_in_months=0),
             Rumor(source_location_id="loc_thornwood", age_in_months=RUMOR_MAX_AGE_MONTHS - 1),
+            # Rumors at the exact max age are expired and should not be counted.
             Rumor(source_location_id="loc_thornwood", age_in_months=RUMOR_MAX_AGE_MONTHS),
             Rumor(source_location_id="loc_millhaven", age_in_months=0),
         ])

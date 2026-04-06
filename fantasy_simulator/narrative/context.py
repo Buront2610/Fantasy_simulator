@@ -147,10 +147,11 @@ def build_narrative_context(
     memorials = world.get_memorials_for_location(location_id)
     aliases = list(location.aliases) if location is not None else []
     traces = list(location.live_traces) if location is not None else []
-    active_rumors = [
-        rumor for rumor in world.rumors
+    active_rumor_count = sum(
+        1
+        for rumor in world.rumors
         if rumor.source_location_id == location_id and not rumor.is_expired
-    ]
+    )
     notable_count = len(location_report.notable_events) if location_report is not None else 0
     return NarrativeContext(
         relation_tags=relation_tags,
@@ -159,7 +160,7 @@ def build_narrative_context(
         location_memorial_count=len(memorials),
         location_alias_count=len(aliases),
         location_trace_count=len(traces),
-        location_rumor_count=len(active_rumors),
+        location_rumor_count=active_rumor_count,
     )
 
 
