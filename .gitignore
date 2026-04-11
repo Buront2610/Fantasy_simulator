@@ -5,3 +5,5 @@ __pycache__/
 .claude/worktrees/
 .claude/settings.local.json
 .history/
+.runs/*
+!.runs/README.md
