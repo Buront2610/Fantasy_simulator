@@ -166,6 +166,12 @@ def route_verification_profile(changed_files: Sequence[str], target_area: str | 
         return "strict"
     if any("simulation/" in path for path in areas):
         return "strict"
+    if any("narrative/" in path for path in areas):
+        return "strict"
+    if any(path.startswith("fantasy_simulator/ui/") for path in areas):
+        return "strict"
+    if any(path == "fantasy_simulator/reports.py" for path in areas):
+        return "strict"
     if any(path.startswith("docs/architecture") or path.startswith("docs/implementation_plan") for path in areas):
         return "standard"
     if docs_only:
@@ -203,6 +209,30 @@ def docs_sync_required(changed_files: Sequence[str]) -> bool:
     )
 
 
+def semantic_audit_required(changed_files: Sequence[str]) -> bool:
+    required_prefixes = (
+        "docs/architecture.md",
+        "docs/implementation_plan.md",
+        "fantasy_simulator/narrative/",
+        "fantasy_simulator/ui/",
+        "fantasy_simulator/reports.py",
+        "fantasy_simulator/world.py",
+        "fantasy_simulator/events.py",
+    )
+    return any(any(path.startswith(prefix) for prefix in required_prefixes) for path in changed_files)
+
+
+def _validate_semantic_audit(task: OrchestratorInput, changed_files: Sequence[str]) -> None:
+    if not semantic_audit_required(changed_files):
+        return
+    if not task.consulted_design_texts:
+        raise ValueError("Semantic audit required: provide --consulted-design-text at least once.")
+    if not task.canonical_source_notes:
+        raise ValueError("Semantic audit required: provide --canonical-source-note at least once.")
+    if any("narrative/" in path for path in changed_files) and not task.narrative_docs_revalidated:
+        raise ValueError("Narrative changes require --narrative-doc-revalidated.")
+
+
 def _format_command(argv: Sequence[str]) -> str:
     return " ".join(shlex.quote(part) for part in argv)
 
@@ -230,6 +260,7 @@ class AgentOrchestrator:
         implementer = self.adapter.run_implementer(task, plan_anchor, planner)
 
         changed_area = implementer.files_changed or list(task.changed_files)
+        _validate_semantic_audit(task, changed_area)
         profile = route_verification_profile(changed_area, task.target_area)
         verification_commands = build_verification_commands(profile, changed_area)
 

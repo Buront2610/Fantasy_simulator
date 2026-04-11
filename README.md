@@ -117,6 +117,11 @@ When `minimal` is selected for docs-only changes, orchestrator picks path-aware
 targets (e.g., role-contract docs include `test_agent_workflow_docs.py` plus
 `test_doc_freshness.py`).
 
+For high-impact areas (architecture/roadmap source-of-truth docs, narrative,
+observer-facing UI/report paths), semantic-audit inputs are required. Provide at
+least one `--consulted-design-text` and one `--canonical-source-note`, and for
+narrative changes also provide `--narrative-doc-revalidated`.
+
 `minimal` is intentionally explicit: pass one or more `--pytest-target` values
 for the changed area you want to verify.
 

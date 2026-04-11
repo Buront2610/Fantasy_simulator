@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from scripts.agent_orchestrator import (
     AgentOrchestrator,
     OrchestratorInput,
@@ -33,6 +35,8 @@ def test_orchestrator_runs_roles_in_expected_order(tmp_path: Path) -> None:
             task_id='test-order',
             goal='Validate role ordering',
             changed_files=['docs/architecture.md'],
+            consulted_design_texts=['docs/architecture.md'],
+            canonical_source_notes=['Architecture sync checked'],
         )
     )
 
@@ -126,6 +130,8 @@ def test_docs_sync_status_is_recorded(tmp_path: Path) -> None:
             goal='Record docs sync state',
             changed_files=['docs/implementation_plan.md'],
             docs_sync_status='confirmed',
+            consulted_design_texts=['docs/implementation_plan.md'],
+            canonical_source_notes=['Plan sync checked'],
         )
     )
 
@@ -136,6 +142,8 @@ def test_docs_sync_status_is_recorded(tmp_path: Path) -> None:
 def test_profile_routing_representative_areas() -> None:
     assert route_verification_profile(['fantasy_simulator/persistence/save_load.py']) == 'strict'
     assert route_verification_profile(['fantasy_simulator/simulation/timeline.py']) == 'strict'
+    assert route_verification_profile(['fantasy_simulator/narrative/context.py']) == 'strict'
+    assert route_verification_profile(['fantasy_simulator/ui/map_renderer.py']) == 'strict'
     assert route_verification_profile(['docs/agent_roles/planner.md']) == 'minimal'
 
 
@@ -163,6 +171,32 @@ def test_semantic_audit_fields_are_explicit_inputs(tmp_path: Path) -> None:
     assert manifest["narrative_docs_revalidated"] == ["docs/contexts/review.md"]
     assert manifest["canonical_source_affected"] is True
     assert manifest["canonical_source_notes"] == ["World.event_records contract reviewed"]
+
+
+def test_semantic_audit_is_required_for_high_impact_changes(tmp_path: Path) -> None:
+    orchestrator = AgentOrchestrator(command_runner=RecordingRunner(), runs_root=tmp_path)
+    with pytest.raises(ValueError, match="Semantic audit required"):
+        orchestrator.run(
+            OrchestratorInput(
+                task_id="missing-audit",
+                goal="Update architecture guardrails",
+                changed_files=["docs/architecture.md"],
+            )
+        )
+
+
+def test_narrative_changes_require_narrative_revalidation(tmp_path: Path) -> None:
+    orchestrator = AgentOrchestrator(command_runner=RecordingRunner(), runs_root=tmp_path)
+    with pytest.raises(ValueError, match="Narrative changes require"):
+        orchestrator.run(
+            OrchestratorInput(
+                task_id="narrative-audit",
+                goal="Update narrative context rules",
+                changed_files=["fantasy_simulator/narrative/context.py"],
+                consulted_design_texts=["docs/implementation_plan.md"],
+                canonical_source_notes=["Narrative contract reviewed"],
+            )
+        )
 
 
 def test_orchestrator_writes_manifests_to_custom_root_only(tmp_path: Path) -> None:

@@ -12,3 +12,6 @@ Required manifest fields include:
 - lessons hook (`repeated_failure_key`, `suggested_lesson`, `suggested_test_or_guardrail`)
 
 Artifacts under `.runs/` are local workflow traces and can be cleaned between sessions.
+
+For high-impact changed areas, semantic audit fields are expected to be filled
+explicitly instead of left empty.
