@@ -53,6 +53,7 @@ PR-I の前提整備として、「今すぐ直すべき漏れ」と「今は触
 ### まだ残る PR-I 本体
 
 - relation tags / reports / rumors / world memory を narrative 入力へ広げる最小接続は実施済み
+- `SettingBundle` の era 文脈と template cooldown を memorial / alias 選択へ最小接続した
 - relation tags の「誰が誰をどう見ているか」をテンプレート分岐へ増やす
 - PR-J の authoring に備え、bundle の実データ整理はまだ始めない
 

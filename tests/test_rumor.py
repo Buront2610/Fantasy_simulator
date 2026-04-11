@@ -2,6 +2,7 @@
 
 import random
 
+from fantasy_simulator.content.setting_bundle import CalendarDefinition, CalendarMonthDefinition
 from fantasy_simulator.rumor import (
     DISCLOSURE,
     RELIABILITY_LEVELS,
@@ -594,6 +595,55 @@ def test_cross_year_sort_prefers_current_year_over_prior_december():
     assert len(rumors) >= 1
     # January (current year) must beat December (prior year)
     assert rumors[0].source_event_id == "evt_new_jan"
+
+
+def test_generate_rumor_uses_absolute_day_after_calendar_change():
+    world = World()
+    old_calendar = CalendarDefinition(
+        calendar_key="old_cycle",
+        display_name="Old Cycle",
+        months=[
+            CalendarMonthDefinition("first", "First", 30, season="winter"),
+            CalendarMonthDefinition("second", "Second", 30, season="summer"),
+        ],
+    )
+    new_calendar = CalendarDefinition(
+        calendar_key="new_cycle",
+        display_name="New Cycle",
+        months=[
+            CalendarMonthDefinition("a", "A", 20, season="winter"),
+            CalendarMonthDefinition("b", "B", 20, season="spring"),
+            CalendarMonthDefinition("c", "C", 20, season="summer"),
+        ],
+    )
+    world.setting_bundle.world_definition.calendar = old_calendar
+    world.calendar_baseline = CalendarDefinition.from_dict(old_calendar.to_dict())
+    world.apply_calendar_definition(new_calendar, changed_year=1001, changed_month=1, changed_day=1)
+
+    record = WorldEventRecord(
+        record_id="evt_old",
+        kind="battle",
+        year=1000,
+        month=2,
+        absolute_day=60,
+        calendar_key="old_cycle",
+        location_id="loc_aethoria_capital",
+        description="Ancient battle",
+        severity=4,
+    )
+
+    rumor = generate_rumor_from_event(
+        record,
+        listener_location_id="loc_aethoria_capital",
+        current_year=1001,
+        current_month=1,
+        current_absolute_day=80,
+        world=world,
+        rng=random.Random(0),
+    )
+
+    assert rumor is not None
+    assert rumor.age_in_months == 1
 
 
 # ------------------------------------------------------------------

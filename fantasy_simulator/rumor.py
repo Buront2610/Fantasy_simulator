@@ -78,6 +78,8 @@ class Rumor:
     source_event_id: Optional[str] = None
     year_created: int = 0
     month_created: int = 1
+    created_absolute_day: int = 0
+    created_calendar_key: str = ""
 
     def __post_init__(self) -> None:
         if self.reliability not in RELIABILITY_LEVELS:
@@ -103,6 +105,8 @@ class Rumor:
             "source_event_id": self.source_event_id,
             "year_created": self.year_created,
             "month_created": self.month_created,
+            "created_absolute_day": self.created_absolute_day,
+            "created_calendar_key": self.created_calendar_key,
         }
 
     @classmethod
@@ -120,6 +124,8 @@ class Rumor:
             source_event_id=data.get("source_event_id"),
             year_created=data.get("year_created", 0),
             month_created=data.get("month_created", 1),
+            created_absolute_day=max(0, int(data.get("created_absolute_day", 0))),
+            created_calendar_key=data.get("created_calendar_key", ""),
         )
 
 
@@ -267,6 +273,7 @@ def generate_rumor_from_event(
     listener_location_id: Optional[str],
     current_year: int,
     current_month: int,
+    current_absolute_day: int = 0,
     world: Optional[World] = None,
     rng: Any = random,
 ) -> Optional[Rumor]:
@@ -288,8 +295,15 @@ def generate_rumor_from_event(
         listener_location_id is not None
         and record.location_id == listener_location_id
     )
-    months_elapsed = (current_year - record.year) * 12 + (current_month - record.month)
-    months_elapsed = max(0, months_elapsed)
+    if current_absolute_day > 0 and record.absolute_day > 0 and world is not None:
+        period_calendar = world.calendar_definition_for_date(current_year, current_month)
+        avg_days_per_month = max(1, period_calendar.days_per_year // period_calendar.months_per_year)
+        months_elapsed = max(0, (current_absolute_day - record.absolute_day) // avg_days_per_month)
+    else:
+        period_calendar = world.calendar_definition_for_date(current_year, current_month) if world is not None else None
+        months_per_year = period_calendar.months_per_year if period_calendar is not None else 12
+        months_elapsed = (current_year - record.year) * months_per_year + (current_month - record.month)
+        months_elapsed = max(0, months_elapsed)
 
     reliability = _determine_reliability(
         record.severity, same_location, months_elapsed, rng=rng,
@@ -315,6 +329,10 @@ def generate_rumor_from_event(
         source_event_id=record.record_id,
         year_created=current_year,
         month_created=current_month,
+        created_absolute_day=current_absolute_day,
+        created_calendar_key=(
+            period_calendar.calendar_key if period_calendar is not None else record.calendar_key
+        ),
     )
 
 
@@ -333,18 +351,19 @@ def generate_rumors_for_period(
     that yearly batch generation (called at month 12) captures events
     from the entire year rather than only the final quarter.
     """
-    lookback_months = 12
+    lookback_months = world.months_per_year
     cutoff_year = year
     cutoff_month = month - lookback_months
     while cutoff_month < 1:
-        cutoff_month += 12
+        cutoff_month += world.months_per_year
         cutoff_year -= 1
 
     candidates: List[WorldEventRecord] = []
-    cutoff_abs = cutoff_year * 12 + cutoff_month
-    current_abs = year * 12 + month
+    cutoff_abs = cutoff_year * world.months_per_year + cutoff_month
+    current_abs = year * world.months_per_year + month
+    current_absolute_day = world.latest_absolute_day_before_or_on(year, month)
     for r in world.event_records:
-        event_abs = r.year * 12 + r.month
+        event_abs = r.year * world.months_per_year + r.month
         if cutoff_abs <= event_abs <= current_abs and r.severity >= _MIN_SEVERITY_FOR_RUMOR:
             candidates.append(r)
 
@@ -352,7 +371,13 @@ def generate_rumors_for_period(
     # reflects "what the world is talking about" rather than array order.
     # Use absolute month (year*12+month) so cross-year lookback sorts
     # correctly (e.g. prior-year Dec < current-year Jan).
-    candidates.sort(key=lambda r: (-(r.year * 12 + r.month), -r.severity))
+    candidates.sort(
+        key=lambda r: (
+            -r.absolute_day,
+            -(r.year * world.months_per_year + r.month),
+            -r.severity,
+        )
+    )
 
     existing_event_ids = {rum.source_event_id for rum in world.rumors}
     existing_event_ids.update(rum.source_event_id for rum in world.rumor_archive)
@@ -362,7 +387,13 @@ def generate_rumors_for_period(
         if record.record_id in existing_event_ids:
             continue
         rumor = generate_rumor_from_event(
-            record, listener_location_id, year, month, world=world, rng=rng,
+            record,
+            listener_location_id,
+            year,
+            month,
+            current_absolute_day=current_absolute_day,
+            world=world,
+            rng=rng,
         )
         if rumor is not None:
             rumors.append(rumor)

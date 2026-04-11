@@ -62,6 +62,8 @@ class MonthlyReport:
 
     year: int
     month: int
+    month_label: str = ""
+    season: str = "unknown"
     character_entries: List[CharacterReportEntry] = field(default_factory=list)
     notable_events: List[str] = field(default_factory=list)
     location_entries: List[LocationReportEntry] = field(default_factory=list)
@@ -81,23 +83,8 @@ class YearlyReport:
     deaths_this_year: int = 0
 
 
-# ------------------------------------------------------------------
-# Season helpers
-# ------------------------------------------------------------------
-
-_SEASON_MAP: Dict[int, str] = {
-    1: "winter", 2: "winter", 3: "spring",
-    4: "spring", 5: "spring", 6: "summer",
-    7: "summer", 8: "summer", 9: "autumn",
-    10: "autumn", 11: "autumn", 12: "winter",
-}
-
 _SEVERITY_THRESHOLD_MONTHLY = 2
 _SEVERITY_THRESHOLD_YEARLY = 3
-
-
-def _season_for_month(month: int) -> str:
-    return _SEASON_MAP.get(month, "unknown")
 
 
 def _watched_char_ids(world: World) -> Set[str]:
@@ -142,6 +129,13 @@ def generate_monthly_report(
         r for r in world.event_records
         if r.year == year and r.month == month
     ]
+    record_calendar_key = next((r.calendar_key for r in records if r.calendar_key), "")
+    month_label = world.month_display_name_for_date(
+        year,
+        month,
+        calendar_key=record_calendar_key,
+    )
+    season = world.season_for_date(year, month, calendar_key=record_calendar_key)
 
     watched = _watched_char_ids(world)
     names = _char_name_map(world)
@@ -187,15 +181,25 @@ def generate_monthly_report(
     # after the simulation advances and ages/removes rumors.
     # Read from both active rumors and the archive so that past reports
     # remain reproducible after rumors expire or are trimmed.
-    _RUMOR_FRESHNESS_MONTHS = 6
-    report_abs_month = year * 12 + month
+    period_calendar = world.calendar_definition_for_date(year, month, calendar_key=record_calendar_key)
+    _RUMOR_FRESHNESS_MONTHS = max(1, period_calendar.months_per_year // 2)
+    report_absolute_day = max(
+        (record.absolute_day for record in records if record.absolute_day > 0),
+        default=world.latest_absolute_day_before_or_on(year, month),
+    )
+    avg_days_per_month = max(1, period_calendar.days_per_year // period_calendar.months_per_year)
     all_rumors = list(world.rumors) + list(world.rumor_archive)
     rumor_entries = []
     for r in all_rumors:
-        created_abs = r.year_created * 12 + r.month_created
-        if created_abs > report_abs_month:
+        if (r.year_created, r.month_created) > (year, month):
             continue
-        age_at_report = report_abs_month - created_abs
+        if report_absolute_day > 0 and r.created_absolute_day > 0:
+            age_at_report = max(0, (report_absolute_day - r.created_absolute_day) // avg_days_per_month)
+        else:
+            rumor_calendar = world.calendar_definition_for_date(
+                r.year_created, r.month_created, calendar_key=r.created_calendar_key
+            )
+            age_at_report = ((year - r.year_created) * rumor_calendar.months_per_year) + (month - r.month_created)
         if age_at_report >= RUMOR_MAX_AGE_MONTHS:
             continue
         if age_at_report > _RUMOR_FRESHNESS_MONTHS:
@@ -210,6 +214,8 @@ def generate_monthly_report(
     return MonthlyReport(
         year=year,
         month=month,
+        month_label=month_label,
+        season=season,
         character_entries=char_entries,
         notable_events=notable,
         location_entries=loc_entries,
@@ -290,10 +296,15 @@ def generate_yearly_report(
 
 def format_monthly_report(report: MonthlyReport) -> str:
     """Format a MonthlyReport as displayable text."""
-    season = _season_for_month(report.month)
+    title = tr(
+        "report_monthly_title",
+        year=report.year,
+        month=report.month_label or report.month,
+        season=tr("season_" + report.season),
+    )
     lines = [
         "=" * 55,
-        f"  {tr('report_monthly_title', year=report.year, month=report.month, season=tr('season_' + season))}",
+        f"  {title}",
         "=" * 55,
     ]
 

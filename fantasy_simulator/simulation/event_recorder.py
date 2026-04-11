@@ -37,6 +37,8 @@ class EventRecorderMixin:
     Expected attributes on *self* (provided by ``engine.Simulator``):
     - ``world``: the World instance
     - ``current_month``: current in-world month (1–12)
+    - ``current_day``: current in-world day (1–30)
+    - ``elapsed_days``: absolute in-world days elapsed since simulation start
     - ``id_rng``: RNG for generating record IDs
     - ``pending_notifications``: list of records that passed notification threshold
     - ``history``: legacy EventResult list (compatibility adapter)
@@ -76,18 +78,22 @@ class EventRecorderMixin:
         ``event_records`` and ``event_log`` but not in ``history``.
         """
         effective_month = self.current_month if month is None else month
-        self.world.log_event(description, month=effective_month)
+        effective_day = self.current_day
+        self.world.log_event(description, month=effective_month, day=effective_day)
         record = WorldEventRecord(
             record_id=generate_record_id(self.id_rng),
             kind=kind,
             year=self.world.year if year is None else year,
             month=effective_month,
+            day=effective_day,
+            absolute_day=self.elapsed_days + 1,
             location_id=location_id,
             primary_actor_id=primary_actor_id,
             secondary_actor_ids=[] if secondary_actor_ids is None else list(secondary_actor_ids),
             description=description,
             severity=severity,
             visibility=visibility,
+            calendar_key=self.world.calendar_definition.calendar_key,
         )
         self.world.record_event(record)
         # Apply event impact on location state and record causal impacts

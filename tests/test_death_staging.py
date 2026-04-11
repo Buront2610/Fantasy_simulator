@@ -209,8 +209,8 @@ class TestSI11DyingAlive:
         # Some should worsen rather than die outright
         assert worsened_count > 0
 
-    def test_natural_death_worsening_not_resolved_same_year(self):
-        """Natural-death worsening should leave a reaction window until next year."""
+    def test_natural_death_worsening_precedes_any_fatal_resolution(self):
+        """Even with finer-grained time, worsening should appear before death."""
         world = World(name="TestWorld", year=1000)
         char = _make_char(
             name="Elder",
@@ -224,14 +224,17 @@ class TestSI11DyingAlive:
         world.add_character(char)
         sim = Simulator(world, events_per_year=0, seed=4)
 
-        # Year 1: no pre-existing dying, natural death worsens to dying.
-        sim._run_year()
-        assert char.alive is True
-        assert char.injury_status == "dying"
+        sim.advance_years(2)
 
-        # Year 2: pre-existing dying resolves.
-        sim._run_year()
-        assert char.injury_status in ("dying", "serious") or (char.alive is False)
+        health_events = [
+            record.kind
+            for record in world.event_records
+            if record.primary_actor_id == char.char_id
+            and record.kind in {"condition_worsened", "death", "dying_rescued"}
+        ]
+
+        assert health_events
+        assert health_events[0] == "condition_worsened"
 
 
 class TestRecoveryStages:

@@ -138,9 +138,9 @@ class TestMonthlyReportScreen(unittest.TestCase):
     def test_month_season_hint_contains_all_months(self) -> None:
         from fantasy_simulator.ui.screens import _month_season_hint
 
-        hint = _month_season_hint()
-        self.assertIn("1 (Winter)", hint)
-        self.assertIn("12 (Winter)", hint)
+        hint = _month_season_hint(World(), 1000)
+        self.assertIn("1: Embermorn (Winter)", hint)
+        self.assertIn("12: Nightfrost (Winter)", hint)
         self.assertEqual(hint.count("("), 12)
 
     def test_show_monthly_report_uses_latest_completed_report_year(self) -> None:
@@ -149,7 +149,12 @@ class TestMonthlyReportScreen(unittest.TestCase):
         from fantasy_simulator.ui.render_backend import PrintRenderBackend
 
         sim = SimpleNamespace(
-            world=SimpleNamespace(year=1002),
+            world=SimpleNamespace(
+                year=1002,
+                months_per_year_for_date=lambda year, month=1, day=1: 12,
+                month_display_name_for_date=lambda year, month, day=1: World().month_display_name(month),
+                season_for_date=lambda year, month, day=1: World().season_for_month(month),
+            ),
             get_latest_completed_report_year=lambda: 1001,
             get_monthly_report=lambda year, month: f"REPORT {year}-{month}",
         )
@@ -174,7 +179,7 @@ class TestMonthlyReportScreen(unittest.TestCase):
 
         text = _ANSI_RE.sub("", captured.getvalue())
         self.assertIn("Year: 1001", text)
-        self.assertIn("1 (Winter)", text)
+        self.assertIn("1: Embermorn (Winter)", text)
         self.assertIn("REPORT 1001-1", text)
 
 

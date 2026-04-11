@@ -51,17 +51,13 @@ def _get_numeric_choice(prompt: str, count: int, ctx: UIContext | None = None) -
     return idx
 
 
-def _month_season_hint() -> str:
-    """Return a compact month -> season hint for monthly report selection."""
-    season_by_month = {
-        1: "winter", 2: "winter", 3: "spring",
-        4: "spring", 5: "spring", 6: "summer",
-        7: "summer", 8: "summer", 9: "autumn",
-        10: "autumn", 11: "autumn", 12: "winter",
-    }
+def _month_season_hint(world: World, year: int) -> str:
+    """Return a compact historical-calendar hint for monthly report selection."""
+    months_per_year = world.months_per_year_for_date(year, 1, 1)
     return ", ".join(
-        f"{month} ({tr('season_' + season_by_month[month])})"
-        for month in range(1, 13)
+        f"{month}: {world.month_display_name_for_date(year, month)} "
+        f"({tr('season_' + world.season_for_date(year, month))})"
+        for month in range(1, months_per_year + 1)
     )
 
 
@@ -140,8 +136,8 @@ def _advance_auto(sim: Simulator, ctx: UIContext | None = None) -> None:
     reason_text = tr(reason_key)
     supplemental = result.get("supplemental_reasons", [])
     pause_context = result.get("pause_context", {})
-    years = months // 12
-    remainder_months = months % 12
+    years = months // sim.world.months_per_year
+    remainder_months = months % sim.world.months_per_year
     if remainder_months == 0:
         out.print_warning(f"  {tr('auto_paused_after', years=years)}: {reason_text}")
     else:
@@ -536,7 +532,7 @@ def _show_world_map(sim: Simulator, ctx: UIContext | None = None) -> None:
 def _show_monthly_report(sim: Simulator, ctx: UIContext | None = None) -> None:
     """Show a monthly report for the latest completed year.
 
-    The user picks a month (1-12) within that year.  Reports are
+    The user picks a month in the active world calendar for that year. Reports are
     derived solely from event records, so content stays stable.
     """
     ctx = _default_ctx(ctx)
@@ -545,9 +541,12 @@ def _show_monthly_report(sim: Simulator, ctx: UIContext | None = None) -> None:
     year = sim.get_latest_completed_report_year()
     out.print_line()
     out.print_line(f"  {tr('year_label')}: {year}")
-    out.print_line(f"  {_month_season_hint()}")
+    report_months = sim.world.months_per_year_for_date(year, 1, 1)
+    out.print_line(f"  {_month_season_hint(sim.world, year)}")
     month_idx = _get_numeric_choice(
-        f"  {tr('monthly_report')} (1-12): ", 12, ctx=ctx,
+        f"  {tr('monthly_report')} (1-{report_months}): ",
+        report_months,
+        ctx=ctx,
     )
     if month_idx is None:
         return

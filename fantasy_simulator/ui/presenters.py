@@ -37,7 +37,7 @@ class LocationPresenter:
 class ReportPresenter:
     @staticmethod
     def render_monthly_card(card: MonthlyReportCardView) -> List[str]:
-        lines = [tr("monthly_report_card_header", year=card.year, month=card.month)]
+        lines = [tr("monthly_report_card_header", year=card.year, month=card.month_label or card.month)]
         if card.highlighted_characters:
             lines.append(tr("monthly_report_card_characters", names=", ".join(card.highlighted_characters)))
         if card.highlighted_locations:

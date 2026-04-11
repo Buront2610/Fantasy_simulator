@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from .i18n import tr
-from .content.setting_bundle import SettingBundle, default_aethoria_bundle
+from .content.setting_bundle import CalendarDefinition, SettingBundle, default_aethoria_bundle
 from .content.world_data import (
     DEFAULT_LOCATIONS,
     NAME_TO_LOCATION_ID,
@@ -36,6 +36,10 @@ if TYPE_CHECKING:
 
 def _clamp_state(value: int) -> int:
     return max(0, min(100, int(value)))
+
+
+def _clone_calendar(calendar: CalendarDefinition) -> CalendarDefinition:
+    return CalendarDefinition.from_dict(calendar.to_dict())
 
 
 @dataclass
@@ -76,6 +80,33 @@ class MemorialRecord:
             year=data["year"],
             cause=data["cause"],
             epitaph=data["epitaph"],
+        )
+
+
+@dataclass
+class CalendarChangeRecord:
+    """A dated calendar-definition transition for future world-timeline features."""
+
+    year: int
+    month: int
+    day: int
+    calendar: CalendarDefinition
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "year": self.year,
+            "month": self.month,
+            "day": self.day,
+            "calendar": self.calendar.to_dict(),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "CalendarChangeRecord":
+        return cls(
+            year=int(data.get("year", 0)),
+            month=max(1, int(data.get("month", 1))),
+            day=max(1, int(data.get("day", 1))),
+            calendar=CalendarDefinition.from_dict(data.get("calendar", {})),
         )
 
 
@@ -324,6 +355,9 @@ class World:
             display_name=name,
             lore_text=lore,
         )
+        self.calendar_baseline: CalendarDefinition = _clone_calendar(
+            self.setting_bundle.world_definition.calendar
+        )
         self.width: int = width
         self.height: int = height
         self.year: int = year
@@ -344,6 +378,8 @@ class World:
         self.completed_adventures: List[AdventureRun] = []
         # PR-F: keyed by memorial_id
         self.memorials: Dict[str, MemorialRecord] = {}
+        # Future-facing trace of in-world calendar transitions.
+        self.calendar_history: List[CalendarChangeRecord] = []
         # PR-G: terrain / site / route layers
         self.terrain_map: Optional[TerrainMap] = None
         self.sites: List[Site] = []
@@ -670,9 +706,71 @@ class World:
             options = [loc for loc in options if loc.region_type != "dungeon"]
         return rng.choice(options)
 
+    @property
+    def calendar_definition(self):
+        return self.setting_bundle.world_definition.calendar
+
+    @property
+    def months_per_year(self) -> int:
+        return self.calendar_definition.months_per_year
+
+    @property
+    def days_per_year(self) -> int:
+        return self.calendar_definition.days_per_year
+
+    def days_in_month(self, month: int) -> int:
+        return self.calendar_definition.days_in_month(month)
+
+    def month_display_name(self, month: int) -> str:
+        return self.calendar_definition.month_display_name(month)
+
+    def calendar_definition_by_key(self, calendar_key: str) -> CalendarDefinition:
+        if not calendar_key:
+            return self.calendar_definition
+        if self.calendar_definition.calendar_key == calendar_key:
+            return self.calendar_definition
+        if self.calendar_baseline.calendar_key == calendar_key:
+            return self.calendar_baseline
+        for entry in reversed(sorted(self.calendar_history, key=lambda item: (item.year, item.month, item.day))):
+            if entry.calendar.calendar_key == calendar_key:
+                return entry.calendar
+        return self.calendar_definition
+
+    def calendar_definition_for_date(
+        self,
+        year: int,
+        month: int = 1,
+        day: int = 1,
+        *,
+        calendar_key: str = "",
+    ) -> CalendarDefinition:
+        if calendar_key:
+            return self.calendar_definition_by_key(calendar_key)
+        target = (int(year), max(1, int(month)), max(1, int(day)))
+        selected = self.calendar_baseline
+        for entry in sorted(self.calendar_history, key=lambda item: (item.year, item.month, item.day)):
+            if (entry.year, entry.month, entry.day) <= target:
+                selected = entry.calendar
+            else:
+                break
+        return selected
+
+    def months_per_year_for_date(
+        self, year: int, month: int = 1, day: int = 1, *, calendar_key: str = ""
+    ) -> int:
+        return self.calendar_definition_for_date(
+            year, month, day, calendar_key=calendar_key
+        ).months_per_year
+
+    def month_display_name_for_date(
+        self, year: int, month: int, day: int = 1, *, calendar_key: str = ""
+    ) -> str:
+        calendar = self.calendar_definition_for_date(year, month, day, calendar_key=calendar_key)
+        return calendar.month_display_name(month)
+
     @staticmethod
     def get_season(month: int) -> str:
-        """Return season name for a given month (1-12)."""
+        """Return the default season mapping used by the built-in calendar."""
         if month in (12, 1, 2):
             return "winter"
         if month in (3, 4, 5):
@@ -681,8 +779,98 @@ class World:
             return "summer"
         return "autumn"
 
+    def season_for_month(self, month: int) -> str:
+        """Return the season for a month in the active world definition.
+
+        If the active calendar does not provide an explicit season tag for that
+        month, the simulator falls back to the built-in ordinal month mapping
+        used by the default Aethorian calendar.
+        """
+        season = self.calendar_definition.season_for_month(month)
+        if season != "unknown":
+            return season
+        return self.get_season(month)
+
+    def season_for_date(
+        self, year: int, month: int, day: int = 1, *, calendar_key: str = ""
+    ) -> str:
+        """Return the season for a historical date using the relevant calendar.
+
+        Missing season tags fall back to the built-in ordinal month mapping so
+        irregular calendars without explicit season metadata still resolve to a
+        stable season label.
+        """
+        calendar = self.calendar_definition_for_date(year, month, day, calendar_key=calendar_key)
+        season = calendar.season_for_month(month)
+        if season != "unknown":
+            return season
+        return self.get_season(month)
+
+    def clamp_calendar_position(self, month: int, day: int) -> Tuple[int, int]:
+        """Clamp month/day into the active calendar's valid ranges."""
+        clamped_month = max(1, min(self.months_per_year, int(month)))
+        clamped_day = max(1, min(self.days_in_month(clamped_month), int(day)))
+        return clamped_month, clamped_day
+
+    def apply_calendar_definition(
+        self,
+        calendar: CalendarDefinition,
+        *,
+        changed_year: Optional[int] = None,
+        changed_month: int = 1,
+        changed_day: int = 1,
+    ) -> None:
+        """Apply a new active calendar immediately and record its change date.
+
+        This method is intentionally *not* a scheduler. It switches the active
+        world calendar now. The optional ``changed_*`` fields exist only so
+        imports, migrations, or timeline reconstruction can stamp the
+        historical date of the transition in ``calendar_history``.
+        """
+        self.setting_bundle.world_definition.calendar = calendar
+        month = max(1, min(calendar.months_per_year, int(changed_month)))
+        day = max(1, min(calendar.days_in_month(month), int(changed_day)))
+        self.calendar_history.append(CalendarChangeRecord(
+            year=self.year if changed_year is None else changed_year,
+            month=month,
+            day=day,
+            calendar=_clone_calendar(calendar),
+        ))
+        self.calendar_history.sort(key=lambda item: (item.year, item.month, item.day))
+
+    def remaining_days_in_year(self, month: int, day: int) -> int:
+        """Return how many in-world days remain including the current date."""
+        clamped_month, clamped_day = self.clamp_calendar_position(month, day)
+        remaining = self.days_in_month(clamped_month) - clamped_day + 1
+        for month_index in range(clamped_month + 1, self.months_per_year + 1):
+            remaining += self.days_in_month(month_index)
+        return remaining
+
+    def advance_calendar_position(self, month: int, day: int, days: int = 1) -> Tuple[int, int, int]:
+        """Advance a month/day position and return ``(month, day, year_delta)``."""
+        current_month, current_day = self.clamp_calendar_position(month, day)
+        year_delta = 0
+        for _ in range(max(0, int(days))):
+            current_day += 1
+            if current_day > self.days_in_month(current_month):
+                current_day = 1
+                current_month += 1
+                if current_month > self.months_per_year:
+                    current_month = 1
+                    year_delta += 1
+        return current_month, current_day, year_delta
+
     def advance_time(self, years: int = 1) -> None:
         self.year += years
+
+    def latest_absolute_day_before_or_on(self, year: int, month: int) -> int:
+        """Return the latest known absolute day on or before a given report period."""
+        matching_days = [
+            record.absolute_day
+            for record in self.event_records
+            if record.absolute_day > 0 and (record.year, record.month) <= (year, month)
+        ]
+        return max(matching_days, default=0)
 
     MAX_EVENT_LOG = 2000
 
@@ -692,16 +880,25 @@ class World:
         *,
         year: Optional[int] = None,
         month: Optional[int] = None,
+        day: Optional[int] = None,
     ) -> str:
         """Format a compatibility event-log line from canonical event data."""
         effective_year = self.year if year is None else year
-        if month is not None:
+        if month is not None and day is not None:
+            prefix = tr("event_log_prefix_day", year=effective_year, month=month, day=day)
+        elif month is not None:
             prefix = tr("event_log_prefix_month", year=effective_year, month=month)
         else:
             prefix = tr("event_log_prefix", year=effective_year)
         return f"{prefix} {event_text}"
 
-    def log_event(self, event_text: str, *, month: Optional[int] = None) -> None:
+    def log_event(
+        self,
+        event_text: str,
+        *,
+        month: Optional[int] = None,
+        day: Optional[int] = None,
+    ) -> None:
         """Append a formatted compatibility log entry for legacy CLI consumers.
 
         This buffer is intentionally separate from ``event_records`` during the
@@ -709,10 +906,10 @@ class World:
         ``event_records`` as the canonical history and view this method as a
         presentation-layer compatibility path.
 
-        When *month* is provided, the prefix includes month information so that
-        the player-visible log reflects monthly causality introduced in PR-B.
+        When *month*/*day* are provided, the prefix includes intra-year date
+        information so that the player-visible log reflects finer causality.
         """
-        self.event_log.append(self._format_event_log_entry(event_text, month=month))
+        self.event_log.append(self._format_event_log_entry(event_text, month=month, day=day))
         if len(self.event_log) > self.MAX_EVENT_LOG:
             self.event_log = self.event_log[-self.MAX_EVENT_LOG:]
 
@@ -773,12 +970,14 @@ class World:
     # high-danger/traffic locations (e.g. dungeons, mountains).
     _STATE_DECAY_RATE = 0.30
 
-    def _decay_toward_baseline(self) -> None:
+    def _decay_toward_baseline(self, months: int = 12) -> None:
         """Pull volatile state fields back toward their region-type defaults.
 
         Without this, additive event impacts and neighbor propagation cause
         states to drift monotonically toward 0 or 100 over long simulations.
         """
+        period_months = max(1, months)
+        decay_rate = 1.0 - ((1.0 - self._STATE_DECAY_RATE) ** (period_months / self.months_per_year))
         for loc in self.grid.values():
             defaults = get_location_state_defaults(loc.id, loc.region_type)
             for attr in ("danger", "traffic", "mood", "safety", "rumor_heat"):
@@ -788,21 +987,30 @@ class World:
                 if diff == 0:
                     continue
                 # Move a fraction of the distance back toward baseline
-                adjustment = int(diff * self._STATE_DECAY_RATE)
+                adjustment = int(diff * decay_rate)
                 if adjustment == 0:
                     adjustment = 1 if diff > 0 else -1
                 setattr(loc, attr, _clamp_state(current + adjustment))
 
-    def propagate_state(self) -> None:
+    def propagate_state(self, months: int = 12) -> None:
         """Propagate location state to neighbors (design §5.6).
 
-        Called once per simulated year after events are processed.
+        Called after a simulated period to diffuse location-state changes.
         Applies natural decay toward baseline first, then propagation,
         so that state quantities stabilise over time instead of
         accumulating unboundedly.
         """
+        period_months = max(1, months)
+        period_fraction = period_months / self.months_per_year
+
+        def _scaled(value: int) -> int:
+            scaled = int(round(value * period_fraction))
+            if value != 0 and scaled == 0:
+                scaled = 1 if value > 0 else -1
+            return scaled
+
         # Decay toward baseline before propagation
-        self._decay_toward_baseline()
+        self._decay_toward_baseline(months=period_months)
 
         pending_changes: List[tuple] = []
 
@@ -816,6 +1024,7 @@ class World:
             rule = PROPAGATION_RULES["danger"]
             if loc.danger >= rule["min_source"]:
                 spread = min(int(loc.danger * rule["decay"]), rule["cap"])
+                spread = _scaled(spread)
                 for n in neighbours:
                     if n.danger < loc.danger:
                         capped = min(spread, loc.danger - n.danger)
@@ -825,6 +1034,7 @@ class World:
             rule = PROPAGATION_RULES["traffic"]
             if loc.traffic >= rule["min_source"]:
                 spread = min(int(loc.traffic * rule["decay"]), rule["cap"])
+                spread = _scaled(spread)
                 for n in neighbours:
                     if n.traffic < loc.traffic:
                         capped = min(spread, loc.traffic - n.traffic)
@@ -833,13 +1043,14 @@ class World:
             # Mood penalty from ruined neighbors
             rule = PROPAGATION_RULES["mood_from_ruin"]
             if loc.prosperity < rule["source_threshold"]:
+                penalty = _scaled(-rule["neighbor_penalty"])
                 for n in neighbours[:rule["max_neighbors"]]:
-                    pending_changes.append((n.id, "mood", -rule["neighbor_penalty"]))
+                    pending_changes.append((n.id, "mood", penalty))
 
             # Road damage from high danger
             rule = PROPAGATION_RULES["road_damage_from_danger"]
             if loc.danger >= rule["danger_threshold"]:
-                pending_changes.append((loc.id, "road_condition", -rule["road_penalty"]))
+                pending_changes.append((loc.id, "road_condition", _scaled(-rule["road_penalty"])))
 
         for loc_id, attr, delta in pending_changes:
             loc = self._location_id_index.get(loc_id)
@@ -894,6 +1105,8 @@ class World:
             "active_adventures": [run.to_dict() for run in self.active_adventures],
             "completed_adventures": [run.to_dict() for run in self.completed_adventures],
             "memorials": {k: v.to_dict() for k, v in self.memorials.items()},
+            "calendar_baseline": self.calendar_baseline.to_dict(),
+            "calendar_history": [entry.to_dict() for entry in self.calendar_history],
         }
         # PR-G: persist terrain/site/route layers
         if self.terrain_map is not None:
@@ -959,6 +1172,16 @@ class World:
         world.memorials = {
             k: MemorialRecord.from_dict(v) for k, v in data.get("memorials", {}).items()
         }
+        world.calendar_baseline = CalendarDefinition.from_dict(
+            data.get(
+                "calendar_baseline",
+                world.setting_bundle.world_definition.calendar.to_dict(),
+            )
+        )
+        world.calendar_history = [
+            CalendarChangeRecord.from_dict(item)
+            for item in data.get("calendar_history", [])
+        ]
 
         # PR-G: restore terrain/site/route layers if present;
         # otherwise derive from loaded grid.
@@ -981,6 +1204,8 @@ class World:
         if "setting_bundle" in data:
             world.setting_bundle = SettingBundle.from_dict(data["setting_bundle"])
             world.lore = world.setting_bundle.world_definition.lore_text
+        if "calendar_baseline" not in data:
+            world.calendar_baseline = _clone_calendar(world.setting_bundle.world_definition.calendar)
 
         world.normalize_after_load()
         return world

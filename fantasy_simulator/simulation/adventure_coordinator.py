@@ -43,14 +43,17 @@ class AdventureMixin:
     - ``_recently_completed_adventures``: list of recently completed runs
     """
 
-    def _maybe_start_adventure(self) -> None:
-        """Start at most one new adventure (solo or party) in the current year."""
+    def _maybe_start_adventure(self, year_fraction: float = 1.0) -> None:
+        """Start at most one new adventure during the current simulation step."""
         candidates = [
             c for c in self.world.characters
             if c.alive and c.active_adventure_id is None
             and c.injury_status not in ("injured", "serious", "dying")
         ]
-        if not candidates or self.rng.random() >= 0.25:
+        if not candidates:
+            return
+        start_chance = 0.25 if year_fraction >= 1.0 else 1.0 - ((1.0 - 0.25) ** year_fraction)
+        if self.rng.random() >= start_chance:
             return
 
         # 30% chance to form a party adventure when enough candidates exist
@@ -163,10 +166,11 @@ class AdventureMixin:
             result += f" +{len(members) - max_shown}"
         return result
 
-    def _advance_adventures(self) -> None:
-        """Advance active adventures by multiple internal steps per year."""
+    def _advance_adventures(self, steps: Optional[int] = None) -> None:
+        """Advance active adventures by a configurable number of internal steps."""
         paused_until_next_year = set()
-        for _ in range(self.adventure_steps_per_year):
+        step_budget = self.adventure_steps_per_year if steps is None else max(0, steps)
+        for _ in range(step_budget):
             active_ids = [run.adventure_id for run in self.world.active_adventures]
             for adventure_id in active_ids:
                 if adventure_id in paused_until_next_year:
@@ -270,6 +274,8 @@ class AdventureMixin:
 
         # -- Memorial + alias (death only) --------------------------------
         if run.outcome == "death":
+            memorial_template_history = getattr(self, "memorial_template_history", None)
+            alias_template_history = getattr(self, "alias_template_history", None)
             deceased_id = run.death_member_id or run.character_id
             char = self.world.get_character_by_id(deceased_id)
             char_name = char.name if char is not None else run.character_name
@@ -288,6 +294,7 @@ class AdventureMixin:
                 dest_name,
                 "adventure_death",
                 char=char,
+                template_history=memorial_template_history,
                 relation_hint=relation_hint,
                 context=context,
             )
@@ -308,6 +315,7 @@ class AdventureMixin:
                     "adventure_death",
                     char_name,
                     dest_name,
+                    template_history=alias_template_history,
                     relation_hint=relation_hint,
                     context=context,
                 )

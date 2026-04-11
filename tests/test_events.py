@@ -508,6 +508,9 @@ class TestGenerateRandomEvent:
     def test_random_event_table_excludes_direct_death(self, es):
         assert "death" not in es._EVENT_WEIGHTS
 
+    def test_random_event_table_excludes_aging(self, es):
+        assert "aging" not in es._EVENT_WEIGHTS
+
 
 # ---------------------------------------------------------------------------
 # WorldEventRecord

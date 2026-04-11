@@ -1,13 +1,13 @@
 """
-test_monthly_engine.py - Determinism and correctness tests for the PR-B monthly engine.
+test_monthly_engine.py - Determinism and correctness tests for the time engine.
 
 Design reference: docs/implementation_plan.md §7.3 (Phase B)
 
 Tests in this module verify:
 1.  Seeded world generation is deterministic (B-2 prerequisite)
 2.  Seeded 12-month progression is deterministic (B-2 core)
-3.  advance_months() advances the correct number of months
-4.  Event records are timestamped to the month they actually occurred
+3.  advance_months() / advance_days() advance the clock correctly
+4.  Event records are timestamped to the period they actually occurred
 5.  SIMULATION_DENSITY scales internal event generation
 6.  WorldEventRecord.tags field round-trips via serialisation
 """
@@ -122,13 +122,15 @@ class TestSeeded12MonthProgressionIsDeterministic:
 # ---------------------------------------------------------------------------
 
 class TestAdvanceMonths:
-    """advance_months() must advance current_month and world.year correctly."""
+    """advance_months() must advance current_month/current_day and year correctly."""
 
     def test_advance_one_month(self):
         sim = Simulator(_build_seeded_world(1, n_chars=2), events_per_year=0, seed=1)
         assert sim.current_month == 1
+        assert sim.current_day == 1
         sim.advance_months(1)
         assert sim.current_month == 2
+        assert sim.current_day == 1
 
     def test_advance_six_months(self):
         sim = Simulator(_build_seeded_world(1, n_chars=2), events_per_year=0, seed=1)
@@ -146,6 +148,7 @@ class TestAdvanceMonths:
         sim = Simulator(_build_seeded_world(1, n_chars=2), events_per_year=0, seed=1)
         sim.advance_months(12)
         assert sim.current_month == 1
+        assert sim.current_day == 1
 
     def test_advance_24_months_increments_year_twice(self):
         world = _build_seeded_world(1, n_chars=2)
@@ -154,6 +157,7 @@ class TestAdvanceMonths:
         sim.advance_months(24)
         assert sim.world.year == start_year + 2
         assert sim.current_month == 1
+        assert sim.current_day == 1
 
     def test_advance_13_months_correct_state(self):
         world = _build_seeded_world(1, n_chars=2)
@@ -162,6 +166,7 @@ class TestAdvanceMonths:
         sim.advance_months(13)
         assert sim.world.year == start_year + 1
         assert sim.current_month == 2
+        assert sim.current_day == 1
 
     def test_pending_notifications_cleared_at_start(self):
         sim = Simulator(_build_seeded_world(5, n_chars=3), events_per_year=4, seed=5)
@@ -175,12 +180,30 @@ class TestAdvanceMonths:
         assert sim.pending_notifications == []
 
 
+class TestAdvanceDays:
+    """advance_days() should expose finer-grained progression than months."""
+
+    def test_advance_one_day(self):
+        sim = Simulator(_build_seeded_world(6, n_chars=2), events_per_year=0, seed=6)
+        assert sim.current_month == 1
+        assert sim.current_day == 1
+        sim.advance_days(1)
+        assert sim.current_month == 1
+        assert sim.current_day == 2
+
+    def test_day_wraps_after_30_days(self):
+        sim = Simulator(_build_seeded_world(6, n_chars=2), events_per_year=0, seed=6)
+        sim.advance_days(30)
+        assert sim.current_month == 2
+        assert sim.current_day == 1
+
+
 # ---------------------------------------------------------------------------
 # Monthly event timestamps
 # ---------------------------------------------------------------------------
 
 class TestMonthlyEventTimestamps:
-    """Events generated in _run_month() must carry the correct month stamp."""
+    """Events generated in the timeline must carry valid month/day stamps."""
 
     def test_events_have_month_in_range(self):
         sim = Simulator(_build_seeded_world(3, n_chars=4), events_per_year=6, seed=3)
@@ -190,14 +213,21 @@ class TestMonthlyEventTimestamps:
                 f"Record {record.record_id} has out-of-range month {record.month}"
             )
 
+    def test_events_have_day_in_range(self):
+        sim = Simulator(_build_seeded_world(3, n_chars=4), events_per_year=6, seed=3)
+        sim.advance_months(12)
+        for record in sim.world.event_records:
+            assert 1 <= record.day <= 30, (
+                f"Record {record.record_id} has out-of-range day {record.day}"
+            )
+
     def test_no_randomised_month_stamps(self):
         """After the monthly engine, events should be spread across multiple months
         rather than all sharing a single randomly-chosen month."""
         sim = Simulator(_build_seeded_world(11, n_chars=6), events_per_year=12, seed=11)
         sim.advance_months(12)
         months_seen = {r.month for r in sim.world.event_records}
-        # With events_per_year=12 and 6 chars, at least 4 distinct months should
-        # appear (health events at 1, recovery at 2, adventure at 3, random events)
+        # Daily timing still rolls up into broad month coverage across the year.
         assert len(months_seen) >= 4, (
             f"Expected broad month coverage, got only months {sorted(months_seen)}"
         )
@@ -219,8 +249,8 @@ class TestMonthlyEventTimestamps:
         month1_health = [r for r in month1_records if r.kind in health_kinds]
         assert len(month1_health) > 0, "Expected at least one health event at month 1"
 
-    def test_adventure_events_stamped_to_month3(self):
-        """Adventure start and progression events are stamped to month 3 (spring)."""
+    def test_adventure_events_carry_day_precision(self):
+        """Adventure events should no longer be pinned to a single scripted month."""
         world = _build_seeded_world(21, n_chars=4)
         sim = Simulator(world, events_per_year=0, adventure_steps_per_year=3, seed=21)
         sim.advance_months(12)
@@ -232,9 +262,21 @@ class TestMonthlyEventTimestamps:
         adventure_records = [r for r in world.event_records if r.kind in adventure_kinds]
         if adventure_records:
             for rec in adventure_records:
-                assert rec.month == 3, (
-                    f"Adventure event {rec.kind!r} should be at month 3, got {rec.month}"
-                )
+                assert 1 <= rec.month <= 12
+                assert 1 <= rec.day <= 30
+
+    def test_aging_events_stamped_to_month12(self):
+        """Deterministic aging should occur at year-end for all living characters."""
+        world = _build_seeded_world(88, n_chars=4)
+        living_ids = {c.char_id for c in world.characters if c.alive}
+        sim = Simulator(world, events_per_year=0, adventure_steps_per_year=0, seed=88)
+
+        sim.advance_months(12)
+
+        aging_records = [r for r in world.event_records if r.kind == "aging"]
+        assert len(aging_records) == len(living_ids)
+        assert {r.primary_actor_id for r in aging_records} == living_ids
+        assert {r.month for r in aging_records} == {12}
 
 
 # ---------------------------------------------------------------------------
@@ -255,7 +297,7 @@ class TestSimulationDensity:
             assert sim.SIMULATION_DENSITY == 1.0
             sim.advance_months(12)
             random_event_kinds = {"meeting", "journey", "skill_training", "discovery",
-                                  "battle", "aging", "romance", "anniversary"}
+                                  "battle", "romance", "anniversary"}
             count = sum(
                 1 for r in sim.world.event_records if r.kind in random_event_kinds
             )
@@ -346,9 +388,7 @@ class TestWorldEventRecordTags:
 # ---------------------------------------------------------------------------
 
 class TestMonthlyAutoPause:
-    """advance_until_pause() should now operate at monthly granularity,
-    pausing at the exact month a condition occurs rather than waiting
-    until the end of the year."""
+    """advance_until_pause() should surface fine-grained progress counters."""
 
     def test_dying_char_pauses_immediately(self):
         """A dying character should cause auto-pause before the year ends."""
@@ -370,9 +410,10 @@ class TestMonthlyAutoPause:
         """Result dict must include months_advanced and years_advanced."""
         sim = Simulator(_build_seeded_world(7, n_chars=3), events_per_year=4, seed=7)
         result = sim.advance_until_pause(max_years=1)
+        assert "days_advanced" in result
         assert "months_advanced" in result
         assert "years_advanced" in result
-        assert result["months_advanced"] >= 1
+        assert result["days_advanced"] >= 1
 
     def test_auto_pause_mid_year_does_not_complete_year(self):
         """A very old, low-constitution character must trigger dying_any
@@ -429,14 +470,15 @@ class TestMonthlyAutoPause:
 # ---------------------------------------------------------------------------
 
 class TestMidYearSaveLoad:
-    """Saving and loading mid-year should preserve month state and produce
+    """Saving and loading mid-year should preserve day/month state and produce
     consistent subsequent simulation."""
 
     def test_mid_year_save_preserves_current_month(self):
         from fantasy_simulator.persistence.save_load import load_simulation, save_simulation
         sim = Simulator(_build_seeded_world(10, n_chars=3), events_per_year=4, seed=10)
-        sim.advance_months(5)
-        assert sim.current_month == 6
+        sim.advance_days(17)
+        assert sim.current_month == 1
+        assert sim.current_day == 18
         import tempfile
         import os
         with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
@@ -444,7 +486,8 @@ class TestMidYearSaveLoad:
         try:
             save_simulation(sim, path)
             restored = load_simulation(path)
-            assert restored.current_month == 6
+            assert restored.current_month == 1
+            assert restored.current_day == 18
         finally:
             os.unlink(path)
 
@@ -461,30 +504,67 @@ class TestMidYearSaveLoad:
 
         # Run 2: save at month 6, load, continue to month 12
         sim2 = Simulator(_build_seeded_world(22, n_chars=3), events_per_year=2, seed=22)
-        sim2.advance_months(5)
+        sim2.advance_days(150)
         with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
             path = f.name
         try:
             save_simulation(sim2, path)
             restored = load_simulation(path)
-            restored.advance_months(7)
+            restored.advance_days(210)
             state_resumed = restored.to_dict()
         finally:
             os.unlink(path)
 
         assert state_full == state_resumed
 
-    def test_advance_years_from_mid_year_does_not_replay_early_months(self):
-        """advance_years() from current_month=6 should advance exactly 12 months
-        from that position, not restart from month 1 in the same year."""
+
+class TestDeterministicAging:
+    """Aging should be driven by elapsed time, not random-event selection."""
+
+    def test_all_living_characters_age_once_per_year(self):
+        world = _build_seeded_world(123, n_chars=5)
+        initial_ages = {c.char_id: c.age for c in world.characters}
+        sim = Simulator(world, events_per_year=0, adventure_steps_per_year=0, seed=123)
+
+        sim.advance_months(12)
+
+        for char in world.characters:
+            assert char.age == initial_ages[char.char_id] + 1
+
+    def test_characters_do_not_age_before_full_year_elapsed(self):
+        world = _build_seeded_world(124, n_chars=5)
+        initial_ages = {c.char_id: c.age for c in world.characters}
+        sim = Simulator(world, events_per_year=0, adventure_steps_per_year=0, seed=124)
+
+        sim.advance_months(11)
+
+        for char in world.characters:
+            assert char.age == initial_ages[char.char_id]
+
+    def test_dead_characters_are_not_aged_at_year_end(self):
+        world = _build_seeded_world(125, n_chars=3)
+        victim = world.characters[0]
+        victim.alive = False
+        initial_dead_age = victim.age
+        living_ages = {c.char_id: c.age for c in world.characters if c.alive}
+        sim = Simulator(world, events_per_year=0, adventure_steps_per_year=0, seed=125)
+
+        sim.advance_months(12)
+
+        assert victim.age == initial_dead_age
+        for char in world.characters[1:]:
+            assert char.age == living_ages[char.char_id] + 1
+
+    def test_advance_years_from_midyear_day_does_not_replay_early_period(self):
+        """advance_years() should preserve both month and day offset across a year."""
         sim = Simulator(_build_seeded_world(33, n_chars=2), events_per_year=0, seed=33)
-        sim.advance_months(5)
+        sim.advance_days(164)
         assert sim.current_month == 6
+        assert sim.current_day == 15
         start_year = sim.world.year
         sim.advance_years(1)
-        # advance_years(1) = advance_months(12). From month 6:
-        # 6→7→8→9→10→11→12 (year+1) →1→2→3→4→5 → current_month = 6
         assert sim.current_month == 6
+        assert sim.current_day == 15
         assert sim.world.year == start_year + 1
 
 
@@ -493,7 +573,7 @@ class TestMidYearSaveLoad:
 # ---------------------------------------------------------------------------
 
 class TestAdventureSeasonAlignment:
-    """Adventure events must occur at month 3 (spring), not month 2 (winter)."""
+    """Season helpers remain correct even though adventures are no longer month-3-only."""
 
     def test_month_3_is_spring(self):
         assert World.get_season(3) == "spring"
@@ -501,21 +581,18 @@ class TestAdventureSeasonAlignment:
     def test_month_2_is_winter(self):
         assert World.get_season(2) == "winter"
 
-    def test_adventure_starts_in_spring(self):
-        """Adventures should start at month 3 which is spring, matching the
-        seasonal modifier expectations for safer travel."""
+    def test_adventure_start_months_are_not_hardcoded(self):
+        """Adventure starts should be date-stamped, not pinned to a single month."""
         world = _build_seeded_world(55, n_chars=4)
         sim = Simulator(world, events_per_year=0, adventure_steps_per_year=3, seed=55)
-        # Run several years to ensure at least one adventure starts
         sim.advance_months(12 * 5)
         adventure_kinds = {"adventure_started", "adventure_arrived", "adventure_discovery",
                            "adventure_returned"}
         adventure_records = [r for r in world.event_records if r.kind in adventure_kinds]
         if adventure_records:
             for rec in adventure_records:
-                assert rec.month == 3, (
-                    f"Adventure event {rec.kind} at month {rec.month}, expected 3 (spring)"
-                )
+                assert 1 <= rec.month <= 12
+                assert 1 <= rec.day <= 30
 
     def test_spring_modifiers_active_during_adventure(self):
         """Spring seasonal modifiers should be active when adventures process."""
@@ -540,9 +617,8 @@ class TestAdventureSeasonAlignment:
 # Event log monthly prefix
 # ---------------------------------------------------------------------------
 
-class TestEventLogMonthlyPrefix:
-    """Event log entries should now include month information for player
-    visibility of monthly causality."""
+class TestEventLogDatePrefix:
+    """Event log entries should include month/day information for player visibility."""
 
     def test_event_log_entries_contain_month(self):
         """After advancing with events, log entries should contain month info."""
@@ -553,9 +629,9 @@ class TestEventLogMonthlyPrefix:
             sim = Simulator(_build_seeded_world(44, n_chars=4), events_per_year=6, seed=44)
             sim.advance_months(12)
             # At least some entries should have month prefix
-            month_entries = [e for e in sim.world.event_log if "Month" in e]
-            assert len(month_entries) > 0, (
-                "Expected at least some event log entries with month prefix"
+            dated_entries = [e for e in sim.world.event_log if "Day" in e]
+            assert len(dated_entries) > 0, (
+                "Expected at least some event log entries with day prefix"
             )
         finally:
             set_locale(prev)
@@ -568,9 +644,9 @@ class TestEventLogMonthlyPrefix:
         try:
             sim = Simulator(_build_seeded_world(45, n_chars=4), events_per_year=6, seed=45)
             sim.advance_months(12)
-            month_entries = [e for e in sim.world.event_log if "月]" in e]
-            assert len(month_entries) > 0, (
-                "Expected at least some event log entries with 月 prefix"
+            dated_entries = [e for e in sim.world.event_log if "日]" in e]
+            assert len(dated_entries) > 0, (
+                "Expected at least some event log entries with 日 prefix"
             )
         finally:
             set_locale(prev)

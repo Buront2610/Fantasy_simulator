@@ -18,6 +18,7 @@ from .content.world_data import (
     JOURNEY_EVENTS,
 )
 from .i18n import tr, tr_term
+from .simulation.calendar import annual_probability_to_fraction
 
 if TYPE_CHECKING:
     from .character import Character
@@ -75,18 +76,23 @@ class WorldEventRecord:
     kind: str = "generic"
     year: int = 0
     month: int = 1
+    day: int = 1
+    absolute_day: int = 0
     location_id: Optional[str] = None
     primary_actor_id: Optional[str] = None
     secondary_actor_ids: List[str] = field(default_factory=list)
     description: str = ""
     severity: int = 1
     visibility: str = "public"
+    calendar_key: str = ""
     tags: List[str] = field(default_factory=list)
     impacts: List[Dict[str, Any]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         self.severity = max(1, min(5, self.severity))
-        self.month = max(1, min(12, int(self.month)))
+        self.month = max(1, int(self.month))
+        self.day = max(1, int(self.day))
+        self.absolute_day = max(0, int(self.absolute_day))
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -94,12 +100,15 @@ class WorldEventRecord:
             "kind": self.kind,
             "year": self.year,
             "month": self.month,
+            "day": self.day,
+            "absolute_day": self.absolute_day,
             "location_id": self.location_id,
             "primary_actor_id": self.primary_actor_id,
             "secondary_actor_ids": list(self.secondary_actor_ids),
             "description": self.description,
             "severity": self.severity,
             "visibility": self.visibility,
+            "calendar_key": self.calendar_key,
             "tags": list(self.tags),
             "impacts": list(self.impacts),
         }
@@ -111,12 +120,15 @@ class WorldEventRecord:
             kind=data.get("kind", "generic"),
             year=data.get("year", 0),
             month=data.get("month", 1),
+            day=data.get("day", 1),
+            absolute_day=data.get("absolute_day", 0),
             location_id=data.get("location_id"),
             primary_actor_id=data.get("primary_actor_id"),
             secondary_actor_ids=list(data.get("secondary_actor_ids", [])),
             description=data.get("description", ""),
             severity=data.get("severity", 1),
             visibility=data.get("visibility", "public"),
+            calendar_key=data.get("calendar_key", ""),
             tags=list(data.get("tags", [])),
             impacts=list(data.get("impacts", [])),
         )
@@ -129,6 +141,9 @@ class WorldEventRecord:
         severity: int = 1,
         rng: Optional[Any] = None,
         month: int = 1,
+        day: int = 1,
+        absolute_day: int = 0,
+        calendar_key: str = "",
     ) -> "WorldEventRecord":
         """Create a WorldEventRecord from an EventResult."""
         primary = result.affected_characters[0] if result.affected_characters else None
@@ -138,11 +153,14 @@ class WorldEventRecord:
             kind=result.event_type,
             year=result.year,
             month=month,
+            day=day,
+            absolute_day=absolute_day,
             location_id=location_id,
             primary_actor_id=primary,
             secondary_actor_ids=secondary,
             description=result.description,
             severity=severity,
+            calendar_key=calendar_key,
         )
 
 
@@ -155,7 +173,6 @@ class EventSystem:
         "skill_training": 20,
         "discovery": 10,
         "battle": 15,
-        "aging": 10,
         "marriage": 5,
     }
 
@@ -635,12 +652,19 @@ class EventSystem:
             year=world.year,
         )
 
-    def check_natural_death(self, char: Character, world: World, rng: Any = random) -> Optional[EventResult]:
+    def check_natural_death(
+        self,
+        char: Character,
+        world: World,
+        rng: Any = random,
+        year_fraction: float = 1.0,
+    ) -> Optional[EventResult]:
         if not char.alive:
             return None
         age_ratio = char.age / max(char.max_age, 1)
         con_factor = (100 - char.constitution) / 100 * 0.5 + 0.5
-        death_chance = max(0.0, (age_ratio - 0.6) / 0.4) ** 2 * con_factor
+        annual_death_chance = max(0.0, (age_ratio - 0.6) / 0.4) ** 2 * con_factor
+        death_chance = annual_probability_to_fraction(annual_death_chance, year_fraction)
 
         # Death staging (design §8): dying characters die outright;
         # others may worsen toward dying before actual death
@@ -669,7 +693,11 @@ class EventSystem:
         return None
 
     def check_dying_resolution(
-        self, char: Character, world: World, rng: Any = random
+        self,
+        char: Character,
+        world: World,
+        rng: Any = random,
+        year_fraction: float = 1.0,
     ) -> Optional[EventResult]:
         """Resolve dying characters: rescue or death (design §8.3).
 
@@ -688,8 +716,17 @@ class EventSystem:
             if c.char_id != char.char_id and c.alive and c.injury_status != "dying"
         ]
         ally_bonus = min(len(allies_at_loc) * 0.1, 0.3)
-        rescue_chance = 0.1 + safety_bonus + con_bonus + ally_bonus
-        if rng.random() < rescue_chance:
+        annual_rescue_chance = max(0.0, min(0.95, 0.1 + safety_bonus + con_bonus + ally_bonus))
+        if year_fraction >= 1.0:
+            rescue_roll = rng.random()
+            rescue_chance = annual_rescue_chance
+            death_chance = 1.0 - rescue_chance
+        else:
+            rescue_chance = annual_probability_to_fraction(annual_rescue_chance, year_fraction)
+            death_chance = annual_probability_to_fraction(1.0 - annual_rescue_chance, year_fraction)
+            death_chance = min(death_chance, max(0.0, 1.0 - rescue_chance))
+            rescue_roll = rng.random()
+        if rescue_roll < rescue_chance:
             char.injury_status = "serious"
             rescuer = allies_at_loc[0] if allies_at_loc else None
             relation_tag_updates: List[Dict[str, str]] = []
@@ -725,8 +762,9 @@ class EventSystem:
                 year=world.year,
                 metadata={"relation_tag_updates": relation_tag_updates},
             )
-        # Death
-        return self.event_death(char, world, rng=rng)
+        if rescue_roll < rescue_chance + death_chance:
+            return self.event_death(char, world, rng=rng)
+        return None
 
     def generate_random_event(
         self, characters: List[Character], world: World, rng: Any = random
@@ -745,7 +783,7 @@ class EventSystem:
         if chosen_type in ("marriage", "battle", "meeting"):
             pair = self._find_collocated_pair(eligible, rng=rng)
             if pair is None:
-                chosen_type = rng.choice(["skill_training", "discovery", "journey", "aging"])
+                chosen_type = rng.choice(["skill_training", "discovery", "journey"])
             else:
                 char1, char2 = pair
                 if chosen_type == "marriage":
@@ -761,8 +799,6 @@ class EventSystem:
             return self.event_skill_training(char, world, rng=rng)
         if chosen_type == "journey":
             return self.event_journey(char, world, rng=rng)
-        if chosen_type == "aging":
-            return self.event_aging(char, world, rng=rng)
         return self.event_skill_training(char, world, rng=rng)
 
     @staticmethod

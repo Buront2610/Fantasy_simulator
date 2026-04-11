@@ -41,6 +41,7 @@ class NarrativeContext:
     """Narrative selection context derived from relations, reports, and memory."""
 
     relation_tags: Sequence[str] = field(default_factory=tuple)
+    observer_count: int = 0
     yearly_death_count: int = 0
     report_notable_count: int = 0
     location_memorial_count: int = 0
@@ -48,6 +49,10 @@ class NarrativeContext:
     location_trace_count: int = 0
     location_rumor_count: int = 0
     subject_rumor_count: int = 0
+    world_definition_key: str = ""
+    world_display_name: str = ""
+    world_era: str = ""
+    location_region_type: str = ""
 
     @property
     def primary_relation_tag(self) -> Optional[str]:
@@ -138,6 +143,7 @@ def build_narrative_context(
     ``yearly_report`` to avoid repeating yearly aggregation work.
     """
     relation_tags = _collect_relation_tags(observer, subject_id)
+    observers = _normalize_observers(observer)
 
     report = yearly_report if yearly_report is not None else generate_yearly_report(world, year)
     location_report = next(
@@ -145,6 +151,7 @@ def build_narrative_context(
         None,
     )
     location = world.get_location_by_id(location_id)
+    world_definition = world.setting_bundle.world_definition if world.setting_bundle is not None else None
     memorials = world.get_memorials_for_location(location_id)
     aliases = list(location.aliases) if location is not None else []
     traces = list(location.live_traces) if location is not None else []
@@ -166,6 +173,7 @@ def build_narrative_context(
     notable_count = len(location_report.notable_events) if location_report is not None else 0
     return NarrativeContext(
         relation_tags=relation_tags,
+        observer_count=len(observers),
         yearly_death_count=report.deaths_this_year,
         report_notable_count=notable_count,
         location_memorial_count=len(memorials),
@@ -173,6 +181,10 @@ def build_narrative_context(
         location_trace_count=len(traces),
         location_rumor_count=active_rumor_count,
         subject_rumor_count=subject_rumor_count,
+        world_definition_key=world_definition.world_key if world_definition is not None else "",
+        world_display_name=world_definition.display_name if world_definition is not None else world.name,
+        world_era=world_definition.era if world_definition is not None else "",
+        location_region_type=location.region_type if location is not None else "",
     )
 
 
@@ -221,7 +233,11 @@ def epitaph_for_character(
     if active_relation in _ADVERSARIAL_RELATION_TAGS:
         candidates.append("memorial_epitaph_rival")
     elif active_relation in _CLOSE_RELATION_TAGS or favorite or title_hint:
+        if context is not None and context.observer_count >= 2:
+            candidates.append("memorial_epitaph_companions")
         candidates.append("memorial_epitaph_beloved")
+    elif context is not None and context.is_tragic_site and context.world_era:
+        candidates.append("memorial_epitaph_era")
     elif context is not None and context.is_tragic_site:
         candidates.append("memorial_epitaph_tragic_year")
     elif context is not None and context.subject_rumor_count >= 2:
@@ -242,7 +258,13 @@ def epitaph_for_character(
         candidates.extend(["memorial_epitaph_default", "memorial_epitaph_adventurer"])
 
     key = template_history.choose(candidates) if template_history is not None else candidates[0]
-    return tr(key, name=char_name, year=year, location=location_name)
+    return tr(
+        key,
+        name=char_name,
+        year=year,
+        location=location_name,
+        era=context.world_era if context is not None else "",
+    )
 
 
 def alias_for_event(
@@ -266,6 +288,8 @@ def alias_for_event(
     active_relation = relation_hint or (context.primary_relation_tag if context else None)
     if event_kind in EVENT_KINDS_FATAL:
         if active_relation in _CLOSE_RELATION_TAGS:
+            if context is not None and context.observer_count >= 2:
+                candidates.append("alias_vigil_site")
             candidates.append("alias_rest_site")
         elif active_relation in _ADVERSARIAL_RELATION_TAGS:
             candidates.append("alias_fall_site")
@@ -275,6 +299,8 @@ def alias_for_event(
             candidates.append("alias_whisper_site")
         if context is not None and context.location_trace_count >= 3:
             candidates.append("alias_fallen_path")
+        elif context is not None and context.world_era and context.location_alias_count >= 1:
+            candidates.append("alias_echo_site")
         candidates.append("alias_death_site")
     else:
         candidates.append("alias_notable_site")
