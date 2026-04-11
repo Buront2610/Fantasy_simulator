@@ -27,6 +27,7 @@ from fantasy_simulator.rumor import Rumor, RUMOR_MAX_AGE_MONTHS
 from fantasy_simulator.simulator import Simulator
 from fantasy_simulator.world import MemorialRecord, World
 from fantasy_simulator.simulation.adventure_coordinator import AdventureMixin
+from fantasy_simulator.narrative.template_history import TemplateHistory
 
 
 # ---------------------------------------------------------------------------
@@ -414,6 +415,26 @@ class TestEpitaphForCharacter:
         assert "deeply felt" in result.lower()
         assert "whispers" not in result.lower()
 
+    def test_multiple_observers_use_companions_template(self):
+        result = epitaph_for_character(
+            "Aldric",
+            1005,
+            "Thornwood",
+            "adventure_death",
+            context=NarrativeContext(relation_tags=("friend",), observer_count=2),
+        )
+        assert "still speak" in result.lower()
+
+    def test_era_context_uses_era_template_for_tragic_sites(self):
+        result = epitaph_for_character(
+            "Aldric",
+            1005,
+            "Thornwood",
+            "battle",
+            context=NarrativeContext(yearly_death_count=3, world_era="Age of Embers"),
+        )
+        assert "age of embers" in result.lower()
+
 
 # ---------------------------------------------------------------------------
 # narrative/context.py — alias_for_event
@@ -489,6 +510,45 @@ class TestAliasForEvent:
         )
         assert "rest" in result.lower()
         assert "whisper" not in result.lower()
+
+    def test_alias_uses_vigil_variant_when_multiple_survivors_mourn(self):
+        result = alias_for_event(
+            "adventure_death",
+            "Aldric",
+            "Thornwood",
+            context=NarrativeContext(relation_tags=("friend",), observer_count=2),
+        )
+        assert "vigil" in result.lower()
+
+    def test_alias_uses_echo_variant_for_era_marked_sites(self):
+        result = alias_for_event(
+            "adventure_death",
+            "Aldric",
+            "Thornwood",
+            context=NarrativeContext(world_era="Age of Embers", location_alias_count=1),
+        )
+        assert "echo" in result.lower()
+
+    def test_template_history_rotates_alias_variants(self):
+        history = TemplateHistory(cooldown_size=2)
+
+        first = alias_for_event(
+            "adventure_death",
+            "Aldric",
+            "Thornwood",
+            template_history=history,
+            context=NarrativeContext(relation_tags=("friend",), observer_count=2),
+        )
+        second = alias_for_event(
+            "adventure_death",
+            "Aldric",
+            "Thornwood",
+            template_history=history,
+            context=NarrativeContext(relation_tags=("friend",), observer_count=2),
+        )
+
+        assert "vigil" in first.lower()
+        assert "rest" in second.lower()
 
 
 class TestDeriveRelationHint:
@@ -572,6 +632,10 @@ class TestBuildNarrativeContext:
         assert context.report_notable_count == 1
         assert context.location_memorial_count == 1
         assert context.location_trace_count == 2
+        assert context.observer_count == 1
+        assert context.world_definition_key == "aethoria"
+        assert context.world_era == "Age of Embers"
+        assert context.location_region_type == "forest"
 
     def test_collects_relation_tags_from_multiple_observers(self):
         world = _make_world()
@@ -667,6 +731,22 @@ class TestBuildNarrativeContext:
 
         assert context.location_rumor_count == 4
         assert context.subject_rumor_count == 2
+
+
+class TestTemplateHistory:
+    def test_round_trip_preserves_recent_cooldown_entries(self):
+        history = TemplateHistory(cooldown_size=2)
+        history.record("alpha")
+        history.record("beta")
+
+        restored = TemplateHistory.from_dict(history.to_dict())
+
+        assert restored.choose(["beta", "gamma"]) == "gamma"
+
+    def test_missing_cooldown_size_defaults_to_current_window(self):
+        restored = TemplateHistory.from_dict({"recent": ["alpha", "beta", "gamma", "delta"]})
+
+        assert restored.cooldown_size == 4
 
 
 # ---------------------------------------------------------------------------

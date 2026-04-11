@@ -5,6 +5,12 @@ tests/test_world.py - Unit tests for the World class.
 import unicodedata
 
 from fantasy_simulator.character import Character
+from fantasy_simulator.content.setting_bundle import (
+    CalendarDefinition,
+    CalendarMonthDefinition,
+    SettingBundle,
+    WorldDefinition,
+)
 from fantasy_simulator.i18n import set_locale
 from fantasy_simulator.world import LocationState, World
 from fantasy_simulator.content.world_data import get_location_state_defaults
@@ -214,6 +220,94 @@ class TestWorld:
         assert restored_capital is not None
         assert restored_capital.danger == 42
         assert restored_capital.visited is True
+
+    def test_custom_calendar_round_trips_with_world(self):
+        world = World()
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom World",
+                lore_text="Custom lore",
+                calendar=CalendarDefinition(
+                    calendar_key="lunar_cycle",
+                    display_name="Lunar Cycle",
+                    months=[
+                        CalendarMonthDefinition("wax", "Wax", 20, season="winter"),
+                        CalendarMonthDefinition("wane", "Wane", 35, season="summer"),
+                    ],
+                ),
+            ),
+        )
+
+        restored = World.from_dict(world.to_dict())
+
+        assert restored.months_per_year == 2
+        assert restored.days_in_month(1) == 20
+        assert restored.days_in_month(2) == 35
+        assert restored.season_for_month(2) == "summer"
+
+    def test_advance_calendar_position_respects_variable_month_lengths(self):
+        world = World()
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom World",
+                lore_text="Custom lore",
+                calendar=CalendarDefinition(
+                    calendar_key="irregular",
+                    display_name="Irregular Reckoning",
+                    months=[
+                        CalendarMonthDefinition("short", "Short", 10, season="winter"),
+                        CalendarMonthDefinition("long", "Long", 40, season="spring"),
+                    ],
+                ),
+            ),
+        )
+
+        month, day, year_delta = world.advance_calendar_position(1, 10, days=1)
+        assert (month, day, year_delta) == (2, 1, 0)
+
+        month, day, year_delta = world.advance_calendar_position(2, 40, days=1)
+        assert (month, day, year_delta) == (1, 1, 1)
+
+    def test_apply_calendar_definition_records_transition(self):
+        world = World(year=1234)
+        calendar = CalendarDefinition(
+            calendar_key="starfall",
+            display_name="Starfall Cycle",
+            months=[
+                CalendarMonthDefinition("wane", "Wane", 20, season="winter"),
+                CalendarMonthDefinition("wax", "Wax", 25, season="summer"),
+            ],
+        )
+
+        world.apply_calendar_definition(calendar, effective_year=1235, effective_month=2, effective_day=25)
+
+        assert world.calendar_definition.calendar_key == "starfall"
+        assert len(world.calendar_history) == 1
+        assert world.calendar_history[0].year == 1235
+        assert world.calendar_history[0].month == 2
+        assert world.calendar_history[0].day == 25
+
+    def test_calendar_history_round_trips_with_world(self):
+        world = World(year=1234)
+        calendar = CalendarDefinition(
+            calendar_key="moonstep",
+            display_name="Moonstep",
+            months=[
+                CalendarMonthDefinition("arc", "Arc", 18, season="winter"),
+                CalendarMonthDefinition("glow", "Glow", 18, season="spring"),
+            ],
+        )
+        world.apply_calendar_definition(calendar, effective_year=1235, effective_month=2, effective_day=18)
+
+        restored = World.from_dict(world.to_dict())
+
+        assert len(restored.calendar_history) == 1
+        assert restored.calendar_history[0].calendar.calendar_key == "moonstep"
+        assert restored.calendar_history[0].day == 18
 
     def test_from_dict_rebuilds_recent_event_ids_from_event_records(self):
         from fantasy_simulator.events import WorldEventRecord

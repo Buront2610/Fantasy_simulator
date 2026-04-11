@@ -272,6 +272,7 @@ TEXT_EN: Dict[str, str] = {
     'invalid_options': 'Invalid choice. Options: {choices}',
     'event_log_prefix': '[Year {year}]',
     'event_log_prefix_month': '[Year {year}, Month {month}]',
+    'event_log_prefix_day': '[Year {year}, Month {month}, Day {day}]',
     'injury_status_none': 'none',
     'injury_status_injured': 'injured',
     'injury_status_serious': 'serious',
@@ -427,11 +428,17 @@ TEXT_EN: Dict[str, str] = {
     'memorial_epitaph_beloved': (
         'In loving memory of {name}, whose loss was deeply felt at {location} in year {year}.'
     ),
+    'memorial_epitaph_companions': (
+        'Those who returned from {location} still speak of {name}, lost there in year {year}.'
+    ),
     'memorial_epitaph_rival': (
         'Here ended {name}, remembered even by rivals after the fall at {location} in year {year}.'
     ),
     'memorial_epitaph_tragic_year': (
         'In the grievous year {year}, {name} was added to the sorrows of {location}.'
+    ),
+    'memorial_epitaph_era': (
+        'In the {era}, {name} was counted among the dead of {location} in year {year}.'
     ),
     'memorial_epitaph_whispered': (
         'Even now, whispers of {name} linger around {location}, where they fell in year {year}.'
@@ -439,9 +446,11 @@ TEXT_EN: Dict[str, str] = {
     # Location aliases generated from significant events
     'alias_death_site': "Site of {name}'s Demise",
     'alias_rest_site': "{name}'s Rest",
+    'alias_vigil_site': "{name}'s Vigil",
     'alias_fall_site': "{name}'s Fall",
     'alias_memorial_site': "{name}'s Memorial",
     'alias_whisper_site': "{name}'s Whisper",
+    'alias_echo_site': "{name}'s Echo",
     'alias_fallen_path': "{name}'s Fallen Path",
     'alias_notable_site': "{name}'s Discovery",
     # Location detail view UI labels

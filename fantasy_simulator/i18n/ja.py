@@ -272,6 +272,7 @@ TEXT_JA: Dict[str, str] = {
     'invalid_options': '無効な選択です。候補: {choices}',
     'event_log_prefix': '[{year}年]',
     'event_log_prefix_month': '[{year}年{month}月]',
+    'event_log_prefix_day': '[{year}年{month}月{day}日]',
     'injury_status_none': 'なし',
     'injury_status_injured': '負傷中',
     'injury_status_serious': '重傷',
@@ -423,11 +424,17 @@ TEXT_JA: Dict[str, str] = {
     'memorial_epitaph_beloved': (
         '{year}年、{location} で失われた {name} を深く悼む。忘れがたき者、ここに眠る。'
     ),
+    'memorial_epitaph_companions': (
+        '{year}年、{location} から戻った仲間たちは、失われた {name} を今も語り継ぐ。'
+    ),
     'memorial_epitaph_rival': (
         '{year}年、{location} にて倒れた {name}。宿敵ですらその最期を忘れない。'
     ),
     'memorial_epitaph_tragic_year': (
         '痛ましき {year}年、{location} の悲嘆に {name} の名が加わった。'
+    ),
+    'memorial_epitaph_era': (
+        '{era}のさなか、{year}年の {location} で失われた者として {name} の名が刻まれた。'
     ),
     'memorial_epitaph_whispered': (
         '{year}年に {location} で倒れた {name} の噂は、今なお人々の囁きに残る。'
@@ -435,9 +442,11 @@ TEXT_JA: Dict[str, str] = {
     # 重大イベントによって生成される地名の別名
     'alias_death_site': '{name} 終焉の地',
     'alias_rest_site': '{name} の眠る地',
+    'alias_vigil_site': '{name} を悼む地',
     'alias_fall_site': '{name} の倒れし地',
     'alias_memorial_site': '{name} の慰霊地',
     'alias_whisper_site': '{name} の囁きの地',
+    'alias_echo_site': '{name} の残響地',
     'alias_fallen_path': '{name} の倒れし路',
     'alias_notable_site': '{name} の発見地',
     # 地点詳細ビューの UI ラベル

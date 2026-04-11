@@ -39,6 +39,7 @@ class LocationHistoryView:
 class MonthlyReportCardView:
     year: int
     month: int
+    month_label: str = ""
     highlighted_characters: List[str] = field(default_factory=list)
     highlighted_locations: List[str] = field(default_factory=list)
     completed_adventures: List[str] = field(default_factory=list)
@@ -93,6 +94,11 @@ def build_monthly_report_card_view(world: "World", year: int, month: int) -> Mon
     return MonthlyReportCardView(
         year=year,
         month=month,
+        month_label=(
+            world.month_display_name_for_date(year, month)
+            if hasattr(world, "month_display_name_for_date")
+            else str(month)
+        ),
         highlighted_characters=highlights,
         highlighted_locations=location_highlights,
         completed_adventures=completed_adventures[:3],

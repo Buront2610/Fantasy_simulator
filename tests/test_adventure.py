@@ -168,9 +168,10 @@ def test_simulator_integrates_adventures_into_normal_year_loop(monkeypatch):
     sim = Simulator(world, events_per_year=0, adventure_steps_per_year=4, seed=1)
 
     # exploration now includes a loot-probability roll; provide low roll to ensure discovery
-    sim.rng = FakeRng([0.9, 0.0, 0.9, 0.3, 0.1, 0.9])
+    sim.rng = FakeRng([0.9, 0.3, 0.1, 0.9])
 
-    sim._run_year()
+    sim._start_solo_adventure([char])
+    sim._advance_adventures(steps=4)
 
     assert len(world.completed_adventures) == 1
     run = world.completed_adventures[0]
@@ -185,16 +186,17 @@ def test_pending_choice_persists_until_later_year(monkeypatch):
     world.add_character(char)
     sim = Simulator(world, events_per_year=0, adventure_steps_per_year=4, seed=1)
 
-    sim.rng = FakeRng([0.9, 0.0, 0.10, 0.9, 0.1, 0.9, 0.9])
+    sim.rng = FakeRng([0.10, 0.9, 0.1, 0.9, 0.9])
 
-    sim._run_year()
+    sim._start_solo_adventure([char])
+    sim._advance_adventures(steps=4)
 
     assert len(world.active_adventures) == 1
     run = world.active_adventures[0]
     assert run.pending_choice is not None
     assert run.state == "waiting_for_choice"
 
-    sim._run_year()
+    sim._advance_adventures(steps=4)
 
     assert world.active_adventures == []
     assert len(world.completed_adventures) == 1

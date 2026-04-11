@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 
 from fantasy_simulator.content.setting_bundle import (
+    CalendarDefinition,
     SettingBundle,
     WorldDefinition,
     default_aethoria_bundle,
@@ -88,3 +89,15 @@ def test_load_setting_bundle_reports_missing_required_fields(tmp_path):
         assert "missing required field" in str(exc)
     else:
         raise AssertionError("Expected ValueError for missing world_definition")
+
+
+def test_empty_calendar_definition_uses_consistent_30_day_fallback():
+    calendar = CalendarDefinition(
+        calendar_key="empty",
+        display_name="Empty",
+        months=[],
+    )
+
+    assert calendar.months_per_year == 1
+    assert calendar.days_in_month(1) == 30
+    assert calendar.days_per_year == 30

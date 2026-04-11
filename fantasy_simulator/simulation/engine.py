@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from ..adventure import AdventureRun
 from ..events import EventResult, EventSystem, WorldEventRecord
 from ..i18n import get_locale, set_locale
+from ..narrative.template_history import TemplateHistory
 
 from .adventure_coordinator import AdventureMixin
 from .event_recorder import EventRecorderMixin
@@ -84,6 +85,8 @@ class Simulator(
         # current simulated year. This value is serialized and restored as-is
         # to preserve in-progress context across save/load.
         self.current_month: int = 1
+        self.current_day: int = 1
+        self.elapsed_days: int = 0
         # Baseline year used for "latest completed report year" fallback when
         # the simulation has not yet completed a full year.
         self.start_year: int = world.year
@@ -100,6 +103,9 @@ class Simulator(
         self._favorites_worsened_this_year: set[str] = set()
         # Accumulated seasonal delta tuples for _revert_seasonal_modifiers()
         self._active_seasonal_deltas: List[tuple] = []
+        # PR-I: deterministic cooldown history for world-memory text selection.
+        self.memorial_template_history = TemplateHistory(cooldown_size=4)
+        self.alias_template_history = TemplateHistory(cooldown_size=4)
 
     # ------------------------------------------------------------------
     # Static helpers
@@ -156,43 +162,50 @@ class Simulator(
         self.advance_years(years)
 
     def advance_years(self, years: int = 1) -> None:
-        """Advance the simulation by exactly *years × 12* months.
-
-        Implemented via ``advance_months(years * 12)`` so that mid-year state
-        is always respected: processing starts from ``current_month`` and
-        advances exactly ``years * 12`` months forward, wrapping across year
-        boundaries naturally.
-        """
-        self.advance_months(years * 12)
+        """Advance the simulation by exactly *years × 360* in-world days."""
+        self.advance_days(years * self.world.days_per_year)
 
     def advance_months(self, months: int = 1) -> None:
-        """Advance the simulation by *months* in-world months.
+        """Advance the simulation by *months* in-world months."""
+        total_days = 0
+        month_cursor = self.current_month
+        day_cursor = self.current_day
+        for _ in range(months):
+            total_days += self.world.days_in_month(month_cursor) - day_cursor + 1
+            month_cursor += 1
+            if month_cursor > self.world.months_per_year:
+                month_cursor = 1
+            day_cursor = 1
+        self.advance_days(total_days)
 
-        Handles year-end transitions automatically: when month 12 completes,
-        world.advance_time(1) is called and per-year tracking sets are cleared,
-        then processing continues with month 1 of the next year.
+    def advance_days(self, days: int = 1) -> None:
+        """Advance the simulation by *days* in-world days.
 
-        Always respects the current position within the year so partial-year
-        advancement is supported.  ``advance_years()`` delegates here.
+        This is the canonical progression path. Month and year helpers
+        delegate here so that partial-month state is preserved naturally.
         """
         self.pending_notifications.clear()
-        for _ in range(months):
-            if self.current_month == 1:
+        for _ in range(days):
+            if self.current_month == 1 and self.current_day == 1:
                 # Reset per-year tracking at the start of each new year
                 self._recently_completed_adventures.clear()
                 self._favorites_worsened_this_year.clear()
-            self._run_month(self.current_month)
-            if self.current_month == 12:
-                self.world.advance_time(1)
-            self.current_month = (self.current_month % 12) + 1
+            self._run_day(self.current_month, self.current_day)
+            self.current_month, self.current_day, year_delta = self.world.advance_calendar_position(
+                self.current_month,
+                self.current_day,
+                days=1,
+            )
+            self.elapsed_days += 1
+            if year_delta:
+                self.world.advance_time(year_delta)
 
     def advance_until_pause(self, max_years: int = 12) -> Dict[str, Any]:
-        """Advance the simulation month-by-month until a pause condition triggers.
+        """Advance the simulation day-by-day until a pause condition triggers.
 
-        Returns a dict with 'months_advanced', 'years_advanced', 'pause_reason',
-        and 'pause_priority'.  The monthly granularity allows pause conditions
-        (e.g. dying, pending decisions) to fire at the exact month they occur
-        rather than waiting until the end of the year.
+        Returns a dict with 'days_advanced', 'months_advanced', 'years_advanced',
+        'pause_reason', and 'pause_priority'. The daily granularity allows pause
+        conditions to fire without waiting for a month or year boundary.
 
         This implements the conditional auto-advance system (design §4.4).
         """
@@ -203,6 +216,7 @@ class Simulator(
         if preexisting_reason is not None:
             all_reasons = self._collect_pause_conditions()
             return {
+                "days_advanced": 0,
                 "months_advanced": 0,
                 "years_advanced": 0,
                 "pause_reason": preexisting_reason,
@@ -210,31 +224,44 @@ class Simulator(
                 "supplemental_reasons": [r for r in all_reasons if r != preexisting_reason],
                 "pause_context": self._pause_context_for_reason(preexisting_reason),
             }
-        max_months = max_years * 12
+        max_days = max_years * self.world.days_per_year
+        days_advanced = 0
         months_advanced = 0
-        for _ in range(max_months):
-            if self.current_month == 1:
+        years_advanced = 0
+        for _ in range(max_days):
+            if self.current_month == 1 and self.current_day == 1:
                 self._recently_completed_adventures.clear()
                 self._favorites_worsened_this_year.clear()
-            self._run_month(self.current_month)
-            if self.current_month == 12:
-                self.world.advance_time(1)
-            self.current_month = (self.current_month % 12) + 1
-            months_advanced += 1
+            previous_month = self.current_month
+            self._run_day(self.current_month, self.current_day)
+            self.current_month, self.current_day, year_delta = self.world.advance_calendar_position(
+                self.current_month,
+                self.current_day,
+                days=1,
+            )
+            self.elapsed_days += 1
+            if year_delta:
+                self.world.advance_time(year_delta)
+                years_advanced += year_delta
+            if self.current_day == 1 and self.current_month != previous_month:
+                months_advanced += 1
+            days_advanced += 1
             reason = self._check_pause_conditions()
             if reason is not None:
                 all_reasons = self._collect_pause_conditions()
                 return {
+                    "days_advanced": days_advanced,
                     "months_advanced": months_advanced,
-                    "years_advanced": months_advanced // 12,
+                    "years_advanced": years_advanced,
                     "pause_reason": reason,
                     "pause_priority": self.AUTO_PAUSE_PRIORITIES.get(reason, 0),
                     "supplemental_reasons": [r for r in all_reasons if r != reason],
                     "pause_context": self._pause_context_for_reason(reason),
                 }
         return {
+            "days_advanced": days_advanced,
             "months_advanced": months_advanced,
-            "years_advanced": months_advanced // 12,
+            "years_advanced": years_advanced,
             "pause_reason": "years_elapsed",
             "pause_priority": self.AUTO_PAUSE_PRIORITIES["years_elapsed"],
             "supplemental_reasons": [],
@@ -321,11 +348,15 @@ class Simulator(
             "events_per_year": self.events_per_year,
             "adventure_steps_per_year": self.adventure_steps_per_year,
             "current_month": self.current_month,
+            "current_day": self.current_day,
+            "elapsed_days": self.elapsed_days,
             "start_year": self.start_year,
             "locale": get_locale(),
             "rng_state": repr(self.rng.getstate()),
             "id_rng_state": repr(self.id_rng.getstate()),
             "history": [ev.to_dict() for ev in self.history],
+            "memorial_template_history": self.memorial_template_history.to_dict(),
+            "alias_template_history": self.alias_template_history.to_dict(),
         }
 
     @classmethod
@@ -349,9 +380,19 @@ class Simulator(
         sim._restore_rng_state(sim.rng, data.get("rng_state"))
         if not sim._restore_rng_state(sim.id_rng, data.get("id_rng_state")):
             sim.id_rng.seed(sim._legacy_id_seed(data))
-        sim.current_month = max(1, min(12, data.get("current_month", 1)))
+        sim.current_month, sim.current_day = sim.world.clamp_calendar_position(
+            data.get("current_month", 1),
+            data.get("current_day", 1),
+        )
+        sim.elapsed_days = max(0, int(data.get("elapsed_days", 0)))
         sim.start_year = data.get("start_year", sim.world.year)
         sim.history = [
             EventResult.from_dict(ev) for ev in data.get("history", [])
         ]
+        sim.memorial_template_history = TemplateHistory.from_dict(
+            data.get("memorial_template_history", {})
+        )
+        sim.alias_template_history = TemplateHistory.from_dict(
+            data.get("alias_template_history", {})
+        )
         return sim

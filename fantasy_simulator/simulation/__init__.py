@@ -19,6 +19,12 @@ Import the assembled Simulator from this package::
     from fantasy_simulator.simulation import Simulator
 """
 
-from .engine import Simulator
-
 __all__ = ["Simulator"]
+
+
+def __getattr__(name: str):
+    if name == "Simulator":
+        from .engine import Simulator
+
+        return Simulator
+    raise AttributeError(name)

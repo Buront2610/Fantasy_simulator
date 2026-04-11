@@ -4,6 +4,7 @@ tests/test_reports.py - Unit tests for the reports module.
 
 import pytest
 from fantasy_simulator.character import Character
+from fantasy_simulator.content.setting_bundle import CalendarDefinition, CalendarMonthDefinition
 from fantasy_simulator.events import WorldEventRecord
 from fantasy_simulator.i18n import get_locale, set_locale, tr
 from fantasy_simulator.reports import (
@@ -67,7 +68,7 @@ def world_with_chars(world) -> World:
 
 
 # ---------------------------------------------------------------------------
-# WorldEventRecord month field tests — SI-9: month must be 1..12
+# WorldEventRecord time field tests — SI-9: month/day must be in range
 # ---------------------------------------------------------------------------
 
 class TestWorldEventRecordMonth:
@@ -87,9 +88,9 @@ class TestWorldEventRecordMonth:
         rec = WorldEventRecord(kind="battle", year=1000, month=0)
         assert rec.month == 1
 
-    def test_month_clamped_to_max_twelve(self):
+    def test_month_preserves_large_values_for_non_gregorian_calendars(self):
         rec = WorldEventRecord(kind="battle", year=1000, month=99)
-        assert rec.month == 12
+        assert rec.month == 99
 
     def test_month_in_to_dict(self):
         rec = WorldEventRecord(kind="journey", year=1001, month=7)
@@ -117,6 +118,14 @@ class TestWorldEventRecordMonth:
         er = EventResult(description="test", event_type="meeting", year=1000)
         rec = WorldEventRecord.from_event_result(er)
         assert rec.month == 1
+
+    def test_day_defaults_to_one(self):
+        rec = WorldEventRecord(kind="battle", year=1000)
+        assert rec.day == 1
+
+    def test_day_clamped_to_range(self):
+        assert WorldEventRecord(kind="battle", year=1000, day=0).day == 1
+        assert WorldEventRecord(kind="battle", year=1000, day=99).day == 99
 
 
 # ---------------------------------------------------------------------------
@@ -202,6 +211,47 @@ class TestGenerateMonthlyReport:
         report = generate_monthly_report(world_with_chars, 1000, 3)
         assert report.total_events == 1
         assert "March event" in report.notable_events
+
+    def test_month_label_uses_historical_calendar_after_calendar_change(self, world_with_chars):
+        old_calendar = CalendarDefinition(
+            calendar_key="old_reckoning",
+            display_name="Old Reckoning",
+            months=[
+                CalendarMonthDefinition("dawn", "Dawnturn", 30, season="winter"),
+                CalendarMonthDefinition("wane", "Wanetide", 30, season="summer"),
+            ],
+        )
+        new_calendar = CalendarDefinition(
+            calendar_key="new_reckoning",
+            display_name="New Reckoning",
+            months=[
+                CalendarMonthDefinition("glass", "Glassrise", 30, season="winter"),
+                CalendarMonthDefinition("ember", "Emberwane", 30, season="spring"),
+                CalendarMonthDefinition("storm", "Stormwake", 30, season="summer"),
+            ],
+        )
+        world_with_chars.setting_bundle.world_definition.calendar = old_calendar
+        world_with_chars.calendar_baseline = CalendarDefinition.from_dict(old_calendar.to_dict())
+        world_with_chars.record_event(WorldEventRecord(
+            record_id="hist_1",
+            kind="meeting",
+            year=1000,
+            month=2,
+            calendar_key="old_reckoning",
+            description="Old calendar event",
+            severity=2,
+        ))
+        world_with_chars.apply_calendar_definition(
+            new_calendar,
+            effective_year=1001,
+            effective_month=1,
+            effective_day=1,
+        )
+
+        report = generate_monthly_report(world_with_chars, 1000, 2)
+
+        assert report.month_label == "Wanetide"
+        assert report.season == "summer"
 
 
 # ---------------------------------------------------------------------------
@@ -327,10 +377,10 @@ class TestGenerateYearlyReport:
 
 class TestFormatMonthlyReport:
     def test_format_contains_title(self):
-        report = MonthlyReport(year=1003, month=2, total_events=0)
+        report = MonthlyReport(year=1003, month=2, month_label="Frostwane", season="winter", total_events=0)
         text = format_monthly_report(report)
         assert "1003" in text
-        assert "2" in text
+        assert "Frostwane" in text
 
     def test_format_contains_character_entries(self):
         entry = CharacterReportEntry(
@@ -354,12 +404,12 @@ class TestFormatMonthlyReport:
         assert "dragon" in text
 
     def test_season_shown_in_format(self):
-        report = MonthlyReport(year=1003, month=1, total_events=0)
+        report = MonthlyReport(year=1003, month=1, month_label="Embermorn", season="winter", total_events=0)
         text = format_monthly_report(report)
         assert "Winter" in text
 
     def test_summer_month(self):
-        report = MonthlyReport(year=1003, month=7, total_events=0)
+        report = MonthlyReport(year=1003, month=7, month_label="Goldleaf", season="summer", total_events=0)
         text = format_monthly_report(report)
         assert "Summer" in text
 
@@ -429,6 +479,7 @@ class TestSimulatorReportIntegration:
         assert sim.current_month >= 1
         sim.advance_years(1)
         assert 1 <= sim.current_month <= 12
+        assert 1 <= sim.current_day <= 30
 
     def test_get_monthly_report_returns_string(self):
         world = World()
@@ -532,10 +583,13 @@ class TestSimulatorReportIntegration:
         world.add_character(c)
         sim = Simulator(world, events_per_year=4, seed=42)
         sim.current_month = 7
+        sim.current_day = 13
         data = sim.to_dict()
         assert data["current_month"] == 7
+        assert data["current_day"] == 13
         sim2 = Simulator.from_dict(data)
         assert sim2.current_month == 7
+        assert sim2.current_day == 13
 
     def test_start_year_serialization_round_trip(self):
         world = World(year=1234)
@@ -549,15 +603,17 @@ class TestSimulatorReportIntegration:
         assert sim2.get_latest_completed_report_year() == 1234
 
     def test_current_month_from_dict_clamped(self):
-        """Loading a save with month=0 should clamp to 1."""
+        """Loading a save with invalid month/day should clamp into range."""
         world = World()
         c = _make_char("Hero")
         world.add_character(c)
         sim = Simulator(world, events_per_year=4, seed=42)
         data = sim.to_dict()
         data["current_month"] = 0
+        data["current_day"] = 0
         sim2 = Simulator.from_dict(data)
         assert sim2.current_month == 1
+        assert sim2.current_day == 1
 
     def test_start_year_from_dict_defaults_to_world_year(self):
         world = World(year=1005)
@@ -570,7 +626,7 @@ class TestSimulatorReportIntegration:
         assert sim2.start_year == 1005
 
     def test_resolve_adventure_choice_has_valid_month(self):
-        """Events from resolve_adventure_choice must have month in 1..12."""
+        """Events from resolve_adventure_choice must have valid month/day."""
         world = World()
         c = _make_char("Hero")
         world.add_character(c)
@@ -582,6 +638,9 @@ class TestSimulatorReportIntegration:
             if rec.kind == "adventure_choice":
                 assert 1 <= rec.month <= 12, (
                     f"adventure_choice record has month={rec.month}"
+                )
+                assert 1 <= rec.day <= 30, (
+                    f"adventure_choice record has day={rec.day}"
                 )
 
 

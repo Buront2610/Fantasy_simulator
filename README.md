@@ -9,7 +9,9 @@ influence.
 
 ## Features
 
-- Yearly CLI progression backed by a monthly-resolution simulation engine
+- Yearly CLI progression backed by a day-granular simulation engine
+- Deterministic annual aging for all living characters after each full in-world year
+- Setting-bundle calendars with named / irregular months and room for in-world calendar changes
 - Character generation with random and template-based creation
 - Event system for meetings, journeys, discoveries, training, battles, aging,
   marriage, and natural death
@@ -148,7 +150,8 @@ fantasy_simulator/          # Main package
   simulation/               # Simulator split into single-responsibility modules
     __init__.py             # Re-exports Simulator
     engine.py               # Core Simulator class (orchestration, loops, serialization)
-    timeline.py             # Monthly processing, seasonal modifiers, dying/injury
+    timeline.py             # Day-by-day processing, seasonal modifiers, dying/injury
+    calendar.py             # Shared calendar/rate helpers for time progression
     notifications.py        # Notification threshold evaluation
     event_recorder.py       # Event recording across all event stores
     adventure_coordinator.py # Adventure lifecycle management
@@ -241,8 +244,8 @@ supports:
 ## Near-Term Priorities
 
 - Continue PR-I after the first `NarrativeContext` slice that now feeds relation
-  tags, yearly reports, rumors, and location memory into memorial / alias text
-  selection
+  tags, yearly reports, rumors, location memory, and setting-bundle era context
+  into memorial / alias text selection, with cooldown-backed template rotation
 - Continue world setting externalization work toward the first formal
   `SettingBundle` authoring pass (PR-J)
 - Treat worldgen PoC work as parallel technical validation, not the next
