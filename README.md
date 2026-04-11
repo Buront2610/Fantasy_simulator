@@ -98,6 +98,17 @@ python scripts/quality_gate.py standard
 python scripts/quality_gate.py strict
 ```
 
+Minimal role-based orchestration (planner -> implementer -> verifier -> reviewer):
+
+```bash
+python scripts/agent_orchestrator.py "Add bounded orchestration contract" \
+  --plan-anchor PR-I-orchestrator \
+  --changed-file scripts/agent_orchestrator.py \
+  --changed-file tests/test_agent_orchestrator.py
+```
+
+Run artifacts are persisted as `.runs/<task-id>/manifest.json` for machine-readable workflow traces.
+
 `minimal` is intentionally explicit: pass one or more `--pytest-target` values
 for the changed area you want to verify.
 
