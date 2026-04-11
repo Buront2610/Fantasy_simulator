@@ -4,10 +4,13 @@
 **コンポーネント**: Aethoria System Terminal (Textual TUI Client)  
 **版**: vNext-UI-Integration Draft 4 (Final/Contract-Refined)  
 **位置づけ**: Fantasy Simulator vNext のプレイヤー体験（神の端末としての観察・介入）を実現するための、Textual ベース次世代 TUI 詳細設計。
+**ステータス**: **RFC（提案）**。採用決定文書ではなく、実装前レビュー用の合意形成ドラフト。
 
 > **整合性ルール**: 実装順序・公式着手対象・完了条件は `docs/implementation_plan.md` を正本とする。本書は UI 詳細設計であり、計画上の優先順位と衝突する場合は `docs/implementation_plan.md` を優先する。
 >
 > **現時点での適用範囲**: `docs/implementation_plan.md`（2026-03-31 時点）で次の公式着手対象は PR-I（NarrativeContext 拡張）。本書は PR-I 以降に段階適用する Textual UI 契約案として扱う。
+>
+> **採用判断**: Textual は現時点で「評価候補」であり、正式採用は PoC と pilot テスト結果をもって別 PR / 別文書で決定する。
 
 ---
 
@@ -75,6 +78,17 @@
 - `max_lines=500` で上限管理
 - `WorldEventRecord` 由来の表示ストリーム
 
+### 4.4 既存 `MapRenderInfo` / view model 接続方針
+
+- **再利用優先**: 既存の `ui/map_renderer.py` にある `MapRenderInfo` / `MapCellInfo` と、
+  `ui/view_models.py` のイベント・通知 view model を first-class な入力源として扱う。
+- **段階移行**:
+  1. Phase 1 は `MapRenderInfo` を直接 `MapViewportSnapshot` へ写像する adapter を追加する
+  2. 既存 CLI 描画（ASCII / atlas）と Textual 描画は同じ source DTO を共有する
+  3. domain 層（`World`, `Simulator`）に Textual 固有依存を持ち込まない
+- **互換性原則**: `MapViewportSnapshot` は `MapRenderInfo` 置換ではなく UI transport DTO。
+  canonical な world 参照経路と既存 renderer テストを壊さない。
+
 ---
 
 ## 5. イベントループとスレッドセーフティ
@@ -108,6 +122,19 @@ def run_simulation_auto(self):
 - 月次進行完了時に描画用 immutable DTO を生成
 - `SimulationAdvancedEvent` に添付して UI に受け渡す
 
+### 5.3 並行実行規約（single-flight / cancel / stale snapshot）
+
+- **single-flight**: Step / Auto-Run worker は同時に 1 本のみ実行可。
+  実行中に次の進行要求が来た場合は reject し、UI に busy 状態を返す。
+- **cancel**: Auto-Run はユーザー操作（Pause / Quit / Intervene）で cancel 要求可能とし、
+  cancel は「次の安全停止点（月末）」で反映する。
+- **stale snapshot 防止**:
+  - `run_id`（単調増加）を worker 起動時に採番し、`SimulationAdvancedEvent` に含める
+  - UI は最新 `run_id` 未満の snapshot を破棄する
+  - `PauseRequiredEvent` と `SimulationAdvancedEvent` は同一 `run_id` で関連づける
+- **UI 操作の独立**: カメラ移動や Inspector フォーカス変更は simulation worker と独立し、
+  last known snapshot 上で完結させる。
+
 ---
 
 ## 6. 点字レンダリング仕様（Zoom OUT）
@@ -128,6 +155,21 @@ def run_simulation_auto(self):
 - EventStream の強調は Rich タグ経由
 - UI 状態（カメラ・ズーム）は save/load JSON に含めない
 - ロード時は world center + Zoom OUT で開始
+
+### 7.1 狭幅端末 degradation policy
+
+- **Tier-Full（120x35 以上）**: 3 ペイン完全表示（WORLD MATRIX / INSPECTOR / EVENT STREAM）
+- **Tier-Compact（100x30 以上）**:
+  - EVENT STREAM を高さ圧縮（直近 N 件のみ）
+  - INSPECTOR を要約表示（詳細行を折りたたみ）
+  - マップは主要 POI 記号のみ維持
+- **Tier-Minimal（80x24 以上）**:
+  - 単一ペイン切替（Map / Inspector / Event をタブ切替）
+  - 点字レンダリング無効、ASCII 最小表示へフォールバック
+  - Auto-Run 中はメトリクスを 1 行ステータスへ集約
+- **Below-Minimum（80x24 未満）**:
+  - 操作不能状態のまま描画継続しない
+  - 「端末サイズを拡大してください」オーバーレイを表示し、進行入力を停止する
 
 ---
 
@@ -237,5 +279,4 @@ class DashboardSnapshot:
 2. **正規イベント源**: Event Stream を `WorldEventRecord` 起点で扱う点は、実装計画書の canonical 方針と一致する。  
 3. **i18n 方針**: `tr()` / `tr_term()` 経由を必須化しており、既存規約と一致する。  
 4. **段階移行**: 一括置換ではなく Phase 分割で移行するため、既存の段階導入原則と一致する。  
-5. **優先順位の扱い**: 本書は「詳細設計」であり、実装順序の最終判断は `docs/implementation_plan.md` 優先と明記済み。
-
+5. **優先順位の扱い**: 本書は RFC（提案）であり、実装順序の最終判断は `docs/implementation_plan.md` 優先と明記済み。
