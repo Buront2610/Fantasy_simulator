@@ -55,7 +55,8 @@ def _month_season_hint(world: World, year: int) -> str:
     """Return a compact historical-calendar hint for monthly report selection."""
     months_per_year = world.months_per_year_for_date(year, 1, 1)
     return ", ".join(
-        f"{month}: {world.month_display_name_for_date(year, month)} ({tr('season_' + world.season_for_date(year, month))})"
+        f"{month}: {world.month_display_name_for_date(year, month)} "
+        f"({tr('season_' + world.season_for_date(year, month))})"
         for month in range(1, months_per_year + 1)
     )
 

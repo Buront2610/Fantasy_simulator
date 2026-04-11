@@ -12,7 +12,7 @@ Reports are generated on demand for display and never saved to disk.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, List, Set
+from typing import TYPE_CHECKING, Dict, List, Set
 
 from .i18n import tr
 from .narrative.constants import EVENT_KINDS_FATAL
@@ -130,7 +130,11 @@ def generate_monthly_report(
         if r.year == year and r.month == month
     ]
     record_calendar_key = next((r.calendar_key for r in records if r.calendar_key), "")
-    month_label = world.month_display_name_for_date(year, month, calendar_key=record_calendar_key)
+    month_label = world.month_display_name_for_date(
+        year,
+        month,
+        calendar_key=record_calendar_key,
+    )
     season = world.season_for_date(year, month, calendar_key=record_calendar_key)
 
     watched = _watched_char_ids(world)
@@ -292,9 +296,15 @@ def generate_yearly_report(
 
 def format_monthly_report(report: MonthlyReport) -> str:
     """Format a MonthlyReport as displayable text."""
+    title = tr(
+        "report_monthly_title",
+        year=report.year,
+        month=report.month_label or report.month,
+        season=tr("season_" + report.season),
+    )
     lines = [
         "=" * 55,
-        f"  {tr('report_monthly_title', year=report.year, month=report.month_label or report.month, season=tr('season_' + report.season))}",
+        f"  {title}",
         "=" * 55,
     ]
 

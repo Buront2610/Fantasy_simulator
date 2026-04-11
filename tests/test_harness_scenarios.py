@@ -316,8 +316,10 @@ EXPECTED_EN = {
         "    Adventure departure     1 times",
         "    Adventure arrival       1 times",
         "  Notable moments:",
-        "    • Petra Shadowmere discovered a fragment of a prophetic tablet near The Verdant Vale. The discovery will prove useful in future battles.",
-        "    • Brynn Zephyrhaven discovered a hidden shrine to a forgotten deity near Sunbaked Plains. Word of the discovery spread quickly, raising their reputation.",
+        "    • Petra Shadowmere discovered a fragment of a prophetic tablet near "
+        "The Verdant Vale. The discovery will prove useful in future battles.",
+        "    • Brynn Zephyrhaven discovered a hidden shrine to a forgotten deity "
+        "near Sunbaked Plains. Word of the discovery spread quickly, raising their reputation.",
     ],
     "yearly_overview": ["    Total events recorded: 8"],
     "yearly_notable": [],
@@ -376,8 +378,10 @@ EXPECTED_JA = {
         "    冒険出発                    1 回",
         "    冒険到着                    1 回",
         "  主な出来事:",
-        "    • Petra Shadowmere は The Verdant Vale 近くで 予言の石板の破片 を発見した。その発見は、これからの戦いで大いに役立つだろう。",
-        "    • Brynn Zephyrhaven は Sunbaked Plains 近くで 忘れられた神を祀る隠された祠 を発見した。発見の噂はすぐに広まり、名声を高めた。",
+        "    • Petra Shadowmere は The Verdant Vale 近くで 予言の石板の破片 を発見した。"
+        "その発見は、これからの戦いで大いに役立つだろう。",
+        "    • Brynn Zephyrhaven は Sunbaked Plains 近くで 忘れられた神を祀る隠された祠 "
+        "を発見した。発見の噂はすぐに広まり、名声を高めた。",
     ],
     "yearly_overview": ["    記録イベント数: 8"],
     "yearly_notable": [],

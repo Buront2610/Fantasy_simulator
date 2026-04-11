@@ -39,5 +39,5 @@ class TemplateHistory:
     def from_dict(cls, data: Dict[str, Any]) -> "TemplateHistory":
         history = cls(cooldown_size=int(data.get("cooldown_size", cls().cooldown_size)))
         recent: List[str] = [str(item) for item in data.get("recent", [])]
-        history._recent = deque(recent[-history.cooldown_size :])
+        history._recent = deque(recent[-history.cooldown_size:])
         return history
