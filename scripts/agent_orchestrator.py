@@ -67,6 +67,10 @@ class OrchestratorInput:
     changed_files: list[str] = field(default_factory=list)
     target_area: str | None = None
     docs_sync_status: str = "pending"
+    consulted_design_texts: list[str] = field(default_factory=list)
+    narrative_docs_revalidated: list[str] = field(default_factory=list)
+    canonical_source_affected: bool | None = None
+    canonical_source_notes: list[str] = field(default_factory=list)
 
 
 class RoleAdapter:
@@ -178,7 +182,15 @@ def build_verification_commands(profile: str, changed_files: Sequence[str]) -> l
         for test_path in changed_tests:
             command.extend(["--pytest-target", test_path])
     elif profile == "minimal":
-        command.extend(["--pytest-target", "tests/test_doc_freshness.py"])
+        minimal_targets: list[str] = []
+        if any(path.startswith("docs/") for path in changed_files):
+            minimal_targets.append("tests/test_doc_freshness.py")
+        if any(path.startswith("docs/agent_roles/") or path == "docs/subagent_contract.md" for path in changed_files):
+            minimal_targets.append("tests/test_agent_workflow_docs.py")
+        if not minimal_targets:
+            minimal_targets.append("tests/test_doc_freshness.py")
+        for target in sorted(set(minimal_targets)):
+            command.extend(["--pytest-target", target])
     return [command]
 
 
@@ -288,9 +300,14 @@ class AgentOrchestrator:
             "follow_up_task": follow_up_task,
             "docs_sync_required": docs_sync_required(changed_area),
             "docs_sync_status": task.docs_sync_status,
-            "consulted_design_texts": ["docs/implementation_plan.md", "docs/architecture.md"],
-            "narrative_docs_revalidated": any("narrative/" in path for path in changed_area),
-            "canonical_source_affected": any("event_records" in path for path in changed_area),
+            "consulted_design_texts": list(task.consulted_design_texts),
+            "narrative_docs_revalidated": list(task.narrative_docs_revalidated),
+            "canonical_source_affected": (
+                bool(task.canonical_source_affected)
+                if task.canonical_source_affected is not None
+                else False
+            ),
+            "canonical_source_notes": list(task.canonical_source_notes),
             "repeated_failure_key": "reviewer_blocker" if follow_up_needed else "",
             "suggested_lesson": follow_up_reason if follow_up_needed else "",
             "suggested_test_or_guardrail": (
@@ -318,6 +335,10 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--changed-file", action="append", default=[])
     parser.add_argument("--target-area", default=None)
     parser.add_argument("--docs-sync-status", default="pending")
+    parser.add_argument("--consulted-design-text", action="append", default=[])
+    parser.add_argument("--narrative-doc-revalidated", action="append", default=[])
+    parser.add_argument("--canonical-source-affected", action="store_true")
+    parser.add_argument("--canonical-source-note", action="append", default=[])
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args(argv)
 
@@ -331,6 +352,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         changed_files=args.changed_file,
         target_area=args.target_area,
         docs_sync_status=args.docs_sync_status,
+        consulted_design_texts=args.consulted_design_text,
+        narrative_docs_revalidated=args.narrative_doc_revalidated,
+        canonical_source_affected=args.canonical_source_affected,
+        canonical_source_notes=args.canonical_source_note,
     )
     orchestrator = AgentOrchestrator()
     manifest = orchestrator.run(task, dry_run=args.dry_run)

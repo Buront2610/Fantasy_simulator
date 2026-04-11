@@ -3,7 +3,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from scripts.agent_orchestrator import AgentOrchestrator, OrchestratorInput, route_verification_profile
+from scripts.agent_orchestrator import (
+    AgentOrchestrator,
+    OrchestratorInput,
+    build_verification_commands,
+    route_verification_profile,
+)
 
 
 class RecordingRunner:
@@ -89,6 +94,7 @@ def test_manifest_contains_required_fields(tmp_path: Path) -> None:
         'consulted_design_texts',
         'narrative_docs_revalidated',
         'canonical_source_affected',
+        'canonical_source_notes',
     }
     assert required_keys.issubset(manifest.keys())
 
@@ -131,6 +137,32 @@ def test_profile_routing_representative_areas() -> None:
     assert route_verification_profile(['fantasy_simulator/persistence/save_load.py']) == 'strict'
     assert route_verification_profile(['fantasy_simulator/simulation/timeline.py']) == 'strict'
     assert route_verification_profile(['docs/agent_roles/planner.md']) == 'minimal'
+
+
+def test_minimal_docs_role_changes_include_agent_workflow_docs_target() -> None:
+    commands = build_verification_commands("minimal", ["docs/agent_roles/planner.md"])
+    argv = commands[0]
+    assert "tests/test_doc_freshness.py" in argv
+    assert "tests/test_agent_workflow_docs.py" in argv
+
+
+def test_semantic_audit_fields_are_explicit_inputs(tmp_path: Path) -> None:
+    orchestrator = AgentOrchestrator(command_runner=RecordingRunner(), runs_root=tmp_path)
+    manifest = orchestrator.run(
+        OrchestratorInput(
+            task_id="semantic-audit",
+            goal="Record explicit semantic audit data",
+            changed_files=["scripts/agent_orchestrator.py"],
+            consulted_design_texts=["docs/implementation_plan.md"],
+            narrative_docs_revalidated=["docs/contexts/review.md"],
+            canonical_source_affected=True,
+            canonical_source_notes=["World.event_records contract reviewed"],
+        )
+    )
+    assert manifest["consulted_design_texts"] == ["docs/implementation_plan.md"]
+    assert manifest["narrative_docs_revalidated"] == ["docs/contexts/review.md"]
+    assert manifest["canonical_source_affected"] is True
+    assert manifest["canonical_source_notes"] == ["World.event_records contract reviewed"]
 
 
 def test_orchestrator_writes_manifests_to_custom_root_only(tmp_path: Path) -> None:
