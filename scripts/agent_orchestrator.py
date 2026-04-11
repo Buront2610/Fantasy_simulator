@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shlex
 import subprocess
 import sys
 from dataclasses import asdict, dataclass, field
@@ -161,42 +162,53 @@ def route_verification_profile(changed_files: Sequence[str], target_area: str | 
         return "strict"
     if any("simulation/" in path for path in areas):
         return "strict"
+    if any(path.startswith("docs/architecture") or path.startswith("docs/implementation_plan") for path in areas):
+        return "standard"
     if docs_only:
         return "minimal"
     if tests_only:
         return "minimal"
-    if any(path.startswith("docs/architecture") or path.startswith("docs/implementation_plan") for path in areas):
-        return "standard"
     return "standard"
 
 
-def build_verification_commands(profile: str, changed_files: Sequence[str]) -> list[str]:
+def build_verification_commands(profile: str, changed_files: Sequence[str]) -> list[list[str]]:
     changed_tests = [path for path in changed_files if path.startswith("tests/")]
     command = [sys.executable, "scripts/quality_gate.py", profile]
     if profile == "minimal" and changed_tests:
         for test_path in changed_tests:
             command.extend(["--pytest-target", test_path])
     elif profile == "minimal":
-        command.extend(["--pytest-target", "tests/test_quality_gate.py"])
-    return [" ".join(command)]
+        command.extend(["--pytest-target", "tests/test_doc_freshness.py"])
+    return [command]
 
 
 def docs_sync_required(changed_files: Sequence[str]) -> bool:
-    return any(path.startswith("docs/") or path.startswith("scripts/") for path in changed_files)
+    return any(
+        path.startswith("docs/")
+        or path.startswith("scripts/")
+        or path.startswith("fantasy_simulator/")
+        for path in changed_files
+    )
 
 
-def _default_command_runner(command: str) -> int:
-    return subprocess.run(command, cwd=REPO_ROOT, shell=True, check=False).returncode
+def _format_command(argv: Sequence[str]) -> str:
+    return " ".join(shlex.quote(part) for part in argv)
+
+
+def _default_command_runner(command: Sequence[str]) -> int:
+    return subprocess.run(command, cwd=REPO_ROOT, check=False).returncode
 
 
 class AgentOrchestrator:
     def __init__(
         self,
         adapter: RoleAdapter | None = None,
-        command_runner: Callable[[str], int] | None = None,
+        command_runner: Callable[[Sequence[str]], int] | None = None,
+        runs_root: Path | None = None,
     ) -> None:
         self.adapter = adapter or StubRoleAdapter()
         self.command_runner = command_runner or _default_command_runner
+        self.runs_root = runs_root or RUNS_ROOT
 
     def run(self, task: OrchestratorInput, dry_run: bool = False) -> dict:
         task_id = task.task_id or f"task-{uuid4().hex[:8]}"
@@ -210,10 +222,19 @@ class AgentOrchestrator:
         verification_commands = build_verification_commands(profile, changed_area)
 
         verification_result = "skipped"
+        verification_command_results: list[dict[str, object]] = []
         if not dry_run:
             verification_result = "passed"
             for command in verification_commands:
                 rc = self.command_runner(command)
+                verification_command_results.append(
+                    {
+                        "argv": list(command),
+                        "command": _format_command(command),
+                        "returncode": rc,
+                        "status": "passed" if rc == 0 else "failed",
+                    }
+                )
                 if rc != 0:
                     verification_result = "failed"
                     break
@@ -250,9 +271,16 @@ class AgentOrchestrator:
                     "smallest_follow_up_task": reviewer.smallest_follow_up_task,
                     "blocker": reviewer.blocker,
                 },
+                "verifier": {
+                    "verification_profile": profile,
+                    "verification_commands": [_format_command(command) for command in verification_commands],
+                    "verification_result": verification_result,
+                    "command_results": verification_command_results,
+                },
             },
             "verification_profile": profile,
-            "verification_commands": verification_commands,
+            "verification_commands": [_format_command(command) for command in verification_commands],
+            "verification_command_results": verification_command_results,
             "verification_result": verification_result,
             "result": "blocked" if follow_up_needed else ("failed" if verification_result == "failed" else "completed"),
             "follow_up_needed": follow_up_needed,
@@ -260,6 +288,9 @@ class AgentOrchestrator:
             "follow_up_task": follow_up_task,
             "docs_sync_required": docs_sync_required(changed_area),
             "docs_sync_status": task.docs_sync_status,
+            "consulted_design_texts": ["docs/implementation_plan.md", "docs/architecture.md"],
+            "narrative_docs_revalidated": any("narrative/" in path for path in changed_area),
+            "canonical_source_affected": any("event_records" in path for path in changed_area),
             "repeated_failure_key": "reviewer_blocker" if follow_up_needed else "",
             "suggested_lesson": follow_up_reason if follow_up_needed else "",
             "suggested_test_or_guardrail": (
@@ -273,7 +304,7 @@ class AgentOrchestrator:
         return manifest
 
     def _write_manifest(self, task_id: str, manifest: dict) -> None:
-        run_dir = RUNS_ROOT / task_id
+        run_dir = self.runs_root / task_id
         run_dir.mkdir(parents=True, exist_ok=True)
         path = run_dir / "manifest.json"
         path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")

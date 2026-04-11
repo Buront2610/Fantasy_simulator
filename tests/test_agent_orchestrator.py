@@ -8,20 +8,20 @@ from scripts.agent_orchestrator import AgentOrchestrator, OrchestratorInput, rou
 
 class RecordingRunner:
     def __init__(self) -> None:
-        self.commands: list[str] = []
+        self.commands: list[list[str]] = []
 
-    def __call__(self, command: str) -> int:
-        self.commands.append(command)
+    def __call__(self, command: list[str]) -> int:
+        self.commands.append(list(command))
         return 0
 
 
-def _load_manifest(task_id: str) -> dict:
-    path = Path('.runs') / task_id / 'manifest.json'
-    return json.loads(path.read_text(encoding='utf-8'))
+def _load_manifest(runs_root: Path, task_id: str) -> dict:
+    path = runs_root / task_id / "manifest.json"
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
-def test_orchestrator_runs_roles_in_expected_order() -> None:
-    orchestrator = AgentOrchestrator(command_runner=RecordingRunner())
+def test_orchestrator_runs_roles_in_expected_order(tmp_path: Path) -> None:
+    orchestrator = AgentOrchestrator(command_runner=RecordingRunner(), runs_root=tmp_path)
 
     manifest = orchestrator.run(
         OrchestratorInput(
@@ -34,8 +34,8 @@ def test_orchestrator_runs_roles_in_expected_order() -> None:
     assert manifest['roles_run'] == ['planner', 'implementer', 'verifier', 'reviewer']
 
 
-def test_follow_up_keeps_same_plan_anchor_when_reviewer_blocks() -> None:
-    orchestrator = AgentOrchestrator(command_runner=RecordingRunner())
+def test_follow_up_keeps_same_plan_anchor_when_reviewer_blocks(tmp_path: Path) -> None:
+    orchestrator = AgentOrchestrator(command_runner=RecordingRunner(), runs_root=tmp_path)
 
     manifest = orchestrator.run(
         OrchestratorInput(
@@ -51,15 +51,15 @@ def test_follow_up_keeps_same_plan_anchor_when_reviewer_blocks() -> None:
 
 
 def test_verification_profile_routing_cases() -> None:
-    assert route_verification_profile(['docs/architecture.md']) == 'minimal'
+    assert route_verification_profile(['docs/architecture.md']) == 'standard'
     assert route_verification_profile(['tests/test_events.py']) == 'minimal'
     assert route_verification_profile(['fantasy_simulator/simulation/engine.py']) == 'strict'
     assert route_verification_profile(['fantasy_simulator/persistence/migrations.py']) == 'strict'
     assert route_verification_profile(['scripts/agent_orchestrator.py']) == 'standard'
 
 
-def test_manifest_contains_required_fields() -> None:
-    orchestrator = AgentOrchestrator(command_runner=RecordingRunner())
+def test_manifest_contains_required_fields(tmp_path: Path) -> None:
+    orchestrator = AgentOrchestrator(command_runner=RecordingRunner(), runs_root=tmp_path)
 
     task_id = 'test-required-fields'
     orchestrator.run(
@@ -69,7 +69,7 @@ def test_manifest_contains_required_fields() -> None:
             changed_files=['tests/test_agent_orchestrator.py'],
         )
     )
-    manifest = _load_manifest(task_id)
+    manifest = _load_manifest(tmp_path, task_id)
 
     required_keys = {
         'task_id',
@@ -80,18 +80,22 @@ def test_manifest_contains_required_fields() -> None:
         'roles_run',
         'verification_profile',
         'verification_commands',
+        'verification_command_results',
         'result',
         'follow_up_needed',
         'follow_up_reason',
         'docs_sync_required',
         'docs_sync_status',
+        'consulted_design_texts',
+        'narrative_docs_revalidated',
+        'canonical_source_affected',
     }
     assert required_keys.issubset(manifest.keys())
 
 
-def test_dry_run_does_not_execute_verification_commands() -> None:
+def test_dry_run_does_not_execute_verification_commands(tmp_path: Path) -> None:
     runner = RecordingRunner()
-    orchestrator = AgentOrchestrator(command_runner=runner)
+    orchestrator = AgentOrchestrator(command_runner=runner, runs_root=tmp_path)
 
     manifest = orchestrator.run(
         OrchestratorInput(
@@ -107,8 +111,8 @@ def test_dry_run_does_not_execute_verification_commands() -> None:
     assert manifest['dry_run'] is True
 
 
-def test_docs_sync_status_is_recorded() -> None:
-    orchestrator = AgentOrchestrator(command_runner=RecordingRunner())
+def test_docs_sync_status_is_recorded(tmp_path: Path) -> None:
+    orchestrator = AgentOrchestrator(command_runner=RecordingRunner(), runs_root=tmp_path)
 
     manifest = orchestrator.run(
         OrchestratorInput(
@@ -127,3 +131,18 @@ def test_profile_routing_representative_areas() -> None:
     assert route_verification_profile(['fantasy_simulator/persistence/save_load.py']) == 'strict'
     assert route_verification_profile(['fantasy_simulator/simulation/timeline.py']) == 'strict'
     assert route_verification_profile(['docs/agent_roles/planner.md']) == 'minimal'
+
+
+def test_orchestrator_writes_manifests_to_custom_root_only(tmp_path: Path) -> None:
+    task_id = "isolated-output"
+    orchestrator = AgentOrchestrator(command_runner=RecordingRunner(), runs_root=tmp_path)
+    orchestrator.run(
+        OrchestratorInput(
+            task_id=task_id,
+            goal="Use isolated manifest root",
+            changed_files=["tests/test_agent_orchestrator.py"],
+        )
+    )
+
+    assert (tmp_path / task_id / "manifest.json").exists()
+    assert not (Path(".runs") / task_id / "manifest.json").exists()
