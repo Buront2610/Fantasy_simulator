@@ -46,6 +46,8 @@ class NarrativeContext:
     location_memorial_count: int = 0
     location_alias_count: int = 0
     location_trace_count: int = 0
+    location_rumor_count: int = 0
+    subject_rumor_count: int = 0
 
     @property
     def primary_relation_tag(self) -> Optional[str]:
@@ -146,6 +148,21 @@ def build_narrative_context(
     memorials = world.get_memorials_for_location(location_id)
     aliases = list(location.aliases) if location is not None else []
     traces = list(location.live_traces) if location is not None else []
+    active_rumor_count = sum(
+        1
+        for rumor in world.rumors
+        if rumor.source_location_id == location_id and not rumor.is_expired
+    )
+    subject_rumor_count = sum(
+        1
+        for rumor in world.rumors
+        if (
+            rumor.source_location_id == location_id
+            and not rumor.is_expired
+            and subject_id is not None
+            and rumor.target_subject == subject_id
+        )
+    )
     notable_count = len(location_report.notable_events) if location_report is not None else 0
     return NarrativeContext(
         relation_tags=relation_tags,
@@ -154,6 +171,8 @@ def build_narrative_context(
         location_memorial_count=len(memorials),
         location_alias_count=len(aliases),
         location_trace_count=len(traces),
+        location_rumor_count=active_rumor_count,
+        subject_rumor_count=subject_rumor_count,
     )
 
 
@@ -205,6 +224,8 @@ def epitaph_for_character(
         candidates.append("memorial_epitaph_beloved")
     elif context is not None and context.is_tragic_site:
         candidates.append("memorial_epitaph_tragic_year")
+    elif context is not None and context.subject_rumor_count >= 2:
+        candidates.append("memorial_epitaph_whispered")
 
     # If no relation- or tragedy-specific tone applies, the job/cause fallbacks
     # below still guarantee at least one candidate before selection happens.
@@ -250,6 +271,8 @@ def alias_for_event(
             candidates.append("alias_fall_site")
         if context is not None and context.location_memorial_count >= 1:
             candidates.append("alias_memorial_site")
+        if context is not None and context.subject_rumor_count >= 2:
+            candidates.append("alias_whisper_site")
         if context is not None and context.location_trace_count >= 3:
             candidates.append("alias_fallen_path")
         candidates.append("alias_death_site")

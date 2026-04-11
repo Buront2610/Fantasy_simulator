@@ -23,6 +23,7 @@ from fantasy_simulator.narrative.context import (
     derive_relation_hint,
     epitaph_for_character,
 )
+from fantasy_simulator.rumor import Rumor, RUMOR_MAX_AGE_MONTHS
 from fantasy_simulator.simulator import Simulator
 from fantasy_simulator.world import MemorialRecord, World
 from fantasy_simulator.simulation.adventure_coordinator import AdventureMixin
@@ -382,6 +383,37 @@ class TestEpitaphForCharacter:
         )
         assert "grievous year" in result.lower()
 
+    def test_subject_rumor_heavy_context_uses_whispered_template(self):
+        result = epitaph_for_character(
+            "Aldric",
+            1005,
+            "Thornwood",
+            "battle",
+            context=NarrativeContext(subject_rumor_count=2),
+        )
+        assert "whispers" in result.lower()
+
+    def test_unrelated_location_rumors_do_not_use_whispered_template(self):
+        result = epitaph_for_character(
+            "Aldric",
+            1005,
+            "Thornwood",
+            "battle",
+            context=NarrativeContext(location_rumor_count=3),
+        )
+        assert "whispers" not in result.lower()
+
+    def test_relation_context_has_priority_over_subject_rumors(self):
+        result = epitaph_for_character(
+            "Aldric",
+            1005,
+            "Thornwood",
+            "battle",
+            context=NarrativeContext(relation_tags=("friend",), subject_rumor_count=2),
+        )
+        assert "deeply felt" in result.lower()
+        assert "whispers" not in result.lower()
+
 
 # ---------------------------------------------------------------------------
 # narrative/context.py — alias_for_event
@@ -429,6 +461,34 @@ class TestAliasForEvent:
             context=NarrativeContext(location_memorial_count=2),
         )
         assert "memorial" in result.lower()
+
+    def test_alias_uses_whisper_variant_when_subject_is_rumor_heavy(self):
+        result = alias_for_event(
+            "adventure_death",
+            "Aldric",
+            "Thornwood",
+            context=NarrativeContext(subject_rumor_count=2),
+        )
+        assert "whisper" in result.lower()
+
+    def test_alias_does_not_use_whisper_variant_for_unrelated_location_rumors(self):
+        result = alias_for_event(
+            "adventure_death",
+            "Aldric",
+            "Thornwood",
+            context=NarrativeContext(location_rumor_count=3),
+        )
+        assert "whisper" not in result.lower()
+
+    def test_alias_relation_priority_beats_subject_rumors(self):
+        result = alias_for_event(
+            "adventure_death",
+            "Aldric",
+            "Thornwood",
+            context=NarrativeContext(relation_tags=("friend",), subject_rumor_count=2),
+        )
+        assert "rest" in result.lower()
+        assert "whisper" not in result.lower()
 
 
 class TestDeriveRelationHint:
@@ -571,6 +631,42 @@ class TestBuildNarrativeContext:
 
         assert context.yearly_death_count == 2
         assert context.is_tragic_site is True
+
+    def test_collects_location_and_subject_rumor_signals_separately(self):
+        world = _make_world()
+        observer = _make_char_stub(name="Leader", char_id="c_leader")
+        subject = _make_char_stub(name="Companion", char_id="c_companion")
+        observer.add_relation_tag(subject.char_id, "friend")
+        world.add_character(observer)
+        world.add_character(subject)
+        world.rumors.extend([
+            Rumor(source_location_id="loc_thornwood", target_subject=subject.char_id, age_in_months=0),
+            Rumor(
+                source_location_id="loc_thornwood",
+                target_subject=subject.char_id,
+                age_in_months=RUMOR_MAX_AGE_MONTHS - 1,
+            ),
+            Rumor(source_location_id="loc_thornwood", target_subject="c_other", age_in_months=0),
+            Rumor(source_location_id="loc_thornwood", age_in_months=0),
+            # Rumors at the exact max age are expired and are not counted.
+            Rumor(
+                source_location_id="loc_thornwood",
+                target_subject=subject.char_id,
+                age_in_months=RUMOR_MAX_AGE_MONTHS,
+            ),
+            Rumor(source_location_id="loc_millhaven", target_subject=subject.char_id, age_in_months=0),
+        ])
+
+        context = build_narrative_context(
+            world,
+            "loc_thornwood",
+            1010,
+            observer=observer,
+            subject_id=subject.char_id,
+        )
+
+        assert context.location_rumor_count == 4
+        assert context.subject_rumor_count == 2
 
 
 # ---------------------------------------------------------------------------
@@ -773,6 +869,35 @@ class TestApplyWorldMemory:
         assert "warrior" in memorial.epitaph.lower()
         dest = world.get_location_by_id("loc_thornwood")
         assert "Aldric's Rest" not in dest.aliases
+
+    def test_apply_world_memory_current_death_does_not_trigger_whisper_variants(self):
+        world = _make_world()
+        world.year = 1010
+        char = Character(name="Aldric", age=30, gender="Male", race="Human", job="Warrior", char_id="cA")
+        char.location_id = "loc_aethoria_capital"
+        world.add_character(char)
+
+        run = MagicMock(spec=AdventureRun)
+        run.destination = "loc_thornwood"
+        run.character_id = "cA"
+        run.character_name = "Aldric"
+        run.outcome = "death"
+        run.year_started = 1008
+        run.is_party = False
+        run.member_ids = ["cA"]
+        run.death_member_id = None
+
+        mixin = object.__new__(AdventureMixin)
+        mixin.world = world
+        mixin.id_rng = random.Random(12)
+
+        mixin._apply_world_memory(run)
+
+        memorial = next(iter(world.memorials.values()))
+        dest = world.get_location_by_id("loc_thornwood")
+        assert "whispers" not in memorial.epitaph.lower()
+        assert all("whisper" not in alias.lower() for alias in dest.aliases)
+        assert world.rumors == []
 
     def test_apply_world_memory_party_death_without_relations_uses_job_epitaph(self):
         world = _make_world()
