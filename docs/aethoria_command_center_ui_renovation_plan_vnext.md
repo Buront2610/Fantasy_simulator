@@ -28,6 +28,9 @@
 - 非同期とストリーミング: 月次進行（時間）とカメラ操作（空間）を分離する
 - i18n 徹底: UI 文字列はすべて `tr()` / `tr_term()` を経由する
 
+> 補足: 数値は完全禁止ではなく、**UI 既定表示は label/band を正**とする。raw 数値は
+> trend 判定・ソート・デバッグ・テストに限定した補助情報として扱う。
+
 ---
 
 ## 2. 既存システムとの統合（Phase 0: 制御反転）
@@ -204,6 +207,13 @@ def run_simulation_auto(self):
 
 ## 9. UI Snapshot Contract
 
+### 9.0 契約境界（locale / numeric）
+
+- 本契約の snapshot は **locale 非依存 DTO** を基本とし、UI スレッドで `tr()` / `tr_term()` 解決する。
+- `*_key` / `*_args` 形式を原則とし、raw string は互換移行中の暫定表現としてのみ許容する。
+- Location 系メトリクスは `*_band` / `*_labels` を正規表示値とし、`int` は内部補助値とみなす。
+- 将来互換のため、raw string フィールドは段階的に `*_key` へ寄せる（Phase 2-3 で完了目標）。
+
 ```python
 from dataclasses import dataclass
 from typing import Optional, Dict, Tuple, List, Union
@@ -236,19 +246,21 @@ class PendingChoiceVM:
 class LocationInspectorSnapshot:
     target_name: str
     state_labels: List[str]
-    traffic: int
-    danger: int
-    live_traces: List[str]
-    rumors: List[str]
+    traffic_band: str          # UI 正規表示 (low|moderate|high|critical)
+    danger_band: str           # UI 正規表示 (safe|uneasy|dangerous|deadly)
+    traffic_value: int         # 内部補助値（既定で非表示）
+    danger_value: int          # 内部補助値（既定で非表示）
+    live_trace_keys: List[str]
+    rumor_keys: List[str]
 
 @dataclass(frozen=True)
 class CharacterInspectorSnapshot:
-    target_name: str
-    health_state: str
-    policy: str
-    scars: List[str]
-    vows: List[str]
-    relationships: List[str]
+    target_name_key: str
+    health_state: str          # enum key: healthy|injured|serious|dying
+    policy_key: str
+    scar_keys: List[str]
+    vow_keys: List[str]
+    relationship_keys: List[str]
 
 InspectorSnapshot = Union[LocationInspectorSnapshot, CharacterInspectorSnapshot]
 
@@ -257,7 +269,7 @@ class MapViewportSnapshot:
     grid_width: int
     grid_height: int
     terrain_grid: List[List[str]]
-    poi_markers: Dict[Tuple[int, int], str]
+    poi_markers: Dict[Tuple[int, int], str]  # marker symbol itself (locale independent)
     inspector_data: Dict[Tuple[int, int], List[InspectorSnapshot]]
 
 @dataclass(frozen=True)
@@ -279,4 +291,5 @@ class DashboardSnapshot:
 2. **正規イベント源**: Event Stream を `WorldEventRecord` 起点で扱う点は、実装計画書の canonical 方針と一致する。  
 3. **i18n 方針**: `tr()` / `tr_term()` 経由を必須化しており、既存規約と一致する。  
 4. **段階移行**: 一括置換ではなく Phase 分割で移行するため、既存の段階導入原則と一致する。  
-5. **優先順位の扱い**: 本書は RFC（提案）であり、実装順序の最終判断は `docs/implementation_plan.md` 優先と明記済み。
+5. **優先順位の扱い**: 本書は RFC（提案）であり、実装順序の最終判断は `docs/implementation_plan.md` 優先と明記済み。  
+6. **DTO 境界**: locale 非依存 snapshot + UI 側翻訳解決を原則化し、既存 i18n 方式と矛盾しない。
