@@ -618,7 +618,7 @@ def test_generate_rumor_uses_absolute_day_after_calendar_change():
     )
     world.setting_bundle.world_definition.calendar = old_calendar
     world.calendar_baseline = CalendarDefinition.from_dict(old_calendar.to_dict())
-    world.apply_calendar_definition(new_calendar, effective_year=1001, effective_month=1, effective_day=1)
+    world.apply_calendar_definition(new_calendar, changed_year=1001, changed_month=1, changed_day=1)
 
     record = WorldEventRecord(
         record_id="evt_old",

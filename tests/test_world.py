@@ -272,7 +272,7 @@ class TestWorld:
         month, day, year_delta = world.advance_calendar_position(2, 40, days=1)
         assert (month, day, year_delta) == (1, 1, 1)
 
-    def test_apply_calendar_definition_records_transition(self):
+    def test_apply_calendar_definition_switches_active_calendar_immediately(self):
         world = World(year=1234)
         calendar = CalendarDefinition(
             calendar_key="starfall",
@@ -283,7 +283,7 @@ class TestWorld:
             ],
         )
 
-        world.apply_calendar_definition(calendar, effective_year=1235, effective_month=2, effective_day=25)
+        world.apply_calendar_definition(calendar, changed_year=1235, changed_month=2, changed_day=25)
 
         assert world.calendar_definition.calendar_key == "starfall"
         assert len(world.calendar_history) == 1
@@ -301,13 +301,42 @@ class TestWorld:
                 CalendarMonthDefinition("glow", "Glow", 18, season="spring"),
             ],
         )
-        world.apply_calendar_definition(calendar, effective_year=1235, effective_month=2, effective_day=18)
+        world.apply_calendar_definition(calendar, changed_year=1235, changed_month=2, changed_day=18)
 
         restored = World.from_dict(world.to_dict())
 
         assert len(restored.calendar_history) == 1
         assert restored.calendar_history[0].calendar.calendar_key == "moonstep"
         assert restored.calendar_history[0].day == 18
+
+    def test_missing_season_metadata_falls_back_to_builtin_month_ordinal_policy(self):
+        world = World()
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom World",
+                lore_text="Custom lore",
+                calendar=CalendarDefinition(
+                    calendar_key="seasonless",
+                    display_name="Seasonless",
+                    months=[
+                        CalendarMonthDefinition("m1", "M1", 10),
+                        CalendarMonthDefinition("m2", "M2", 10),
+                        CalendarMonthDefinition("m3", "M3", 10),
+                        CalendarMonthDefinition("m4", "M4", 10),
+                        CalendarMonthDefinition("m5", "M5", 10),
+                    ],
+                ),
+            ),
+        )
+        world.calendar_baseline = CalendarDefinition.from_dict(
+            world.setting_bundle.world_definition.calendar.to_dict()
+        )
+
+        assert world.season_for_month(1) == "winter"
+        assert world.season_for_month(3) == "spring"
+        assert world.season_for_month(5) == "spring"
 
     def test_from_dict_rebuilds_recent_event_ids_from_event_records(self):
         from fantasy_simulator.events import WorldEventRecord

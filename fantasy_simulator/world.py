@@ -780,7 +780,12 @@ class World:
         return "autumn"
 
     def season_for_month(self, month: int) -> str:
-        """Return the season for a calendar month in the active world definition."""
+        """Return the season for a month in the active world definition.
+
+        If the active calendar does not provide an explicit season tag for that
+        month, the simulator falls back to the built-in ordinal month mapping
+        used by the default Aethorian calendar.
+        """
         season = self.calendar_definition.season_for_month(month)
         if season != "unknown":
             return season
@@ -789,6 +794,12 @@ class World:
     def season_for_date(
         self, year: int, month: int, day: int = 1, *, calendar_key: str = ""
     ) -> str:
+        """Return the season for a historical date using the relevant calendar.
+
+        Missing season tags fall back to the built-in ordinal month mapping so
+        irregular calendars without explicit season metadata still resolve to a
+        stable season label.
+        """
         calendar = self.calendar_definition_for_date(year, month, day, calendar_key=calendar_key)
         season = calendar.season_for_month(month)
         if season != "unknown":
@@ -805,21 +816,22 @@ class World:
         self,
         calendar: CalendarDefinition,
         *,
-        effective_year: Optional[int] = None,
-        effective_month: int = 1,
-        effective_day: int = 1,
+        changed_year: Optional[int] = None,
+        changed_month: int = 1,
+        changed_day: int = 1,
     ) -> None:
-        """Swap the active world calendar and record when the change took effect.
+        """Apply a new active calendar immediately and record its change date.
 
-        The simulator still owns the live clock, but keeping a dated transition
-        history on the world creates an explicit integration point for future
-        gameplay that changes the reference calendar mid-simulation.
+        This method is intentionally *not* a scheduler. It switches the active
+        world calendar now. The optional ``changed_*`` fields exist only so
+        imports, migrations, or timeline reconstruction can stamp the
+        historical date of the transition in ``calendar_history``.
         """
         self.setting_bundle.world_definition.calendar = calendar
-        month = max(1, min(calendar.months_per_year, int(effective_month)))
-        day = max(1, min(calendar.days_in_month(month), int(effective_day)))
+        month = max(1, min(calendar.months_per_year, int(changed_month)))
+        day = max(1, min(calendar.days_in_month(month), int(changed_day)))
         self.calendar_history.append(CalendarChangeRecord(
-            year=self.year if effective_year is None else effective_year,
+            year=self.year if changed_year is None else changed_year,
             month=month,
             day=day,
             calendar=_clone_calendar(calendar),

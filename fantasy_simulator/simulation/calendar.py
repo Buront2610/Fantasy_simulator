@@ -1,10 +1,7 @@
-"""Shared calendar and rate helpers for simulation time progression."""
+"""Shared rate helpers for simulation time progression."""
 
 from __future__ import annotations
 
-MONTHS_PER_YEAR = 12
-DAYS_PER_MONTH = 30
-DAYS_PER_YEAR = MONTHS_PER_YEAR * DAYS_PER_MONTH
 _FLOAT_EPS = 1e-9
 
 

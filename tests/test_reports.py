@@ -243,9 +243,9 @@ class TestGenerateMonthlyReport:
         ))
         world_with_chars.apply_calendar_definition(
             new_calendar,
-            effective_year=1001,
-            effective_month=1,
-            effective_day=1,
+            changed_year=1001,
+            changed_month=1,
+            changed_day=1,
         )
 
         report = generate_monthly_report(world_with_chars, 1000, 2)
