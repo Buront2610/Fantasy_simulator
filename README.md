@@ -104,10 +104,18 @@ Minimal role-based orchestration (planner -> implementer -> verifier -> reviewer
 python scripts/agent_orchestrator.py "Add bounded orchestration contract" \
   --plan-anchor PR-I-orchestrator \
   --changed-file scripts/agent_orchestrator.py \
-  --changed-file tests/test_agent_orchestrator.py
+  --changed-file tests/test_agent_orchestrator.py \
+  --consulted-design-text docs/implementation_plan.md \
+  --consulted-design-text docs/architecture.md \
+  --narrative-doc-revalidated docs/contexts/review.md \
+  --canonical-source-note "World.event_records contract reviewed"
 ```
 
 Run artifacts are persisted as `.runs/<task-id>/manifest.json` for machine-readable workflow traces.
+
+When `minimal` is selected for docs-only changes, orchestrator picks path-aware
+targets (e.g., role-contract docs include `test_agent_workflow_docs.py` plus
+`test_doc_freshness.py`).
 
 `minimal` is intentionally explicit: pass one or more `--pytest-target` values
 for the changed area you want to verify.
