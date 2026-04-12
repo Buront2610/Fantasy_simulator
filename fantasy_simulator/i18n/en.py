@@ -431,6 +431,18 @@ TEXT_EN: Dict[str, str] = {
     'memorial_epitaph_companions': (
         'Those who returned from {location} still speak of {name}, lost there in year {year}.'
     ),
+    'memorial_epitaph_spouse': (
+        'Gone from the hearth but never from the heart — {name} fell at {location} in year {year},'
+        ' leaving behind a bond that death cannot sever.'
+    ),
+    'memorial_epitaph_family': (
+        '{name} was taken from those who shared their blood.'
+        ' They fell at {location} in year {year}, and the loss lives in the family still.'
+    ),
+    'memorial_epitaph_savior': (
+        '{name} stood between others and death at {location} in year {year}.'
+        ' Those who returned owe their lives to this courage.'
+    ),
     'memorial_epitaph_rival': (
         'Here ended {name}, remembered even by rivals after the fall at {location} in year {year}.'
     ),
@@ -445,6 +457,7 @@ TEXT_EN: Dict[str, str] = {
     ),
     # Location aliases generated from significant events
     'alias_death_site': "Site of {name}'s Demise",
+    'alias_bond_site': "{name}'s Bond",
     'alias_rest_site': "{name}'s Rest",
     'alias_vigil_site': "{name}'s Vigil",
     'alias_fall_site': "{name}'s Fall",
