@@ -233,6 +233,13 @@ def epitaph_for_character(
     if active_relation in _ADVERSARIAL_RELATION_TAGS:
         candidates.append("memorial_epitaph_rival")
     elif active_relation in _CLOSE_RELATION_TAGS or favorite or title_hint:
+        # Fine-grained branching: most specific tie wins, then falls through to beloved.
+        if active_relation == "spouse":
+            candidates.append("memorial_epitaph_spouse")
+        elif active_relation == "family":
+            candidates.append("memorial_epitaph_family")
+        elif active_relation in ("savior", "rescued"):
+            candidates.append("memorial_epitaph_savior")
         if context is not None and context.observer_count >= 2:
             candidates.append("memorial_epitaph_companions")
         candidates.append("memorial_epitaph_beloved")
@@ -288,6 +295,9 @@ def alias_for_event(
     active_relation = relation_hint or (context.primary_relation_tag if context else None)
     if event_kind in EVENT_KINDS_FATAL:
         if active_relation in _CLOSE_RELATION_TAGS:
+            # Most specific tie comes first: spouse/family oath beats group vigil.
+            if active_relation in ("spouse", "family"):
+                candidates.append("alias_oath_site")
             if context is not None and context.observer_count >= 2:
                 candidates.append("alias_vigil_site")
             candidates.append("alias_rest_site")

@@ -12,6 +12,9 @@ import random
 from unittest.mock import MagicMock
 from typing import Any
 
+import pytest
+
+from fantasy_simulator.i18n.engine import set_locale
 from fantasy_simulator.adventure import AdventureRun
 from fantasy_simulator.character import Character
 from fantasy_simulator.content.setting_bundle import default_aethoria_bundle
@@ -33,6 +36,20 @@ from fantasy_simulator.narrative.template_history import TemplateHistory
 # ---------------------------------------------------------------------------
 # Helpers / fixtures
 # ---------------------------------------------------------------------------
+
+@pytest.fixture(autouse=True)
+def _reset_locale():
+    """Ensure every test in this module runs with the English locale.
+
+    i18n/_LOCALE is module-global.  Tests that change the locale (e.g.
+    test_i18n.py) can bleed state into this module when the test suite is
+    run in a non-deterministic order.  Resetting here keeps all
+    string-fragment assertions stable regardless of execution order.
+    """
+    set_locale("en")
+    yield
+    set_locale("en")
+
 
 def _make_world() -> World:
     """Return a fresh world with the default Aethoria map."""
@@ -345,12 +362,13 @@ class TestEpitaphForCharacter:
         assert "Thornwood Forest" in result
 
     def test_close_relation_context_uses_beloved_template(self):
+        # Generic close relation (friend) still falls through to the beloved template.
         result = epitaph_for_character(
             "Aldric",
             1005,
             "Thornwood",
             "adventure_death",
-            context=NarrativeContext(relation_tags=("spouse",)),
+            context=NarrativeContext(relation_tags=("friend",)),
         )
         assert "loving memory" in result.lower()
 
@@ -435,6 +453,66 @@ class TestEpitaphForCharacter:
         )
         assert "age of embers" in result.lower()
 
+    # --- PR-I: fine-grained relation tag branching ---
+
+    def test_spouse_relation_uses_spouse_template(self):
+        result = epitaph_for_character(
+            "Aldric",
+            1005,
+            "Thornwood",
+            "adventure_death",
+            context=NarrativeContext(relation_tags=("spouse",)),
+        )
+        assert "hearth" in result.lower()
+
+    def test_family_relation_uses_family_template(self):
+        result = epitaph_for_character(
+            "Aldric",
+            1005,
+            "Thornwood",
+            "adventure_death",
+            context=NarrativeContext(relation_tags=("family",)),
+        )
+        assert "blood" in result.lower()
+
+    def test_savior_relation_uses_savior_template(self):
+        result = epitaph_for_character(
+            "Aldric",
+            1005,
+            "Thornwood",
+            "adventure_death",
+            context=NarrativeContext(relation_tags=("savior",)),
+        )
+        assert "courage" in result.lower()
+
+    def test_rescued_relation_uses_savior_template(self):
+        result = epitaph_for_character(
+            "Aldric",
+            1005,
+            "Thornwood",
+            "adventure_death",
+            context=NarrativeContext(relation_tags=("rescued",)),
+        )
+        assert "courage" in result.lower()
+
+    def test_specific_templates_still_fall_through_to_beloved(self):
+        # beloved is always appended as fallback; template_history can rotate to it.
+        history = TemplateHistory(cooldown_size=1)
+        # First call should pick the spouse-specific template.
+        first = epitaph_for_character(
+            "Aldric", 1005, "Thornwood", "adventure_death",
+            context=NarrativeContext(relation_tags=("spouse",)),
+            template_history=history,
+        )
+        # Second call with same context — spouse template is on cooldown, falls to beloved.
+        second = epitaph_for_character(
+            "Aldric", 1005, "Thornwood", "adventure_death",
+            context=NarrativeContext(relation_tags=("spouse",)),
+            template_history=history,
+        )
+        assert "hearth" in first.lower()
+        assert "loving memory" in second.lower()
+
 
 # ---------------------------------------------------------------------------
 # narrative/context.py — alias_for_event
@@ -442,7 +520,8 @@ class TestEpitaphForCharacter:
 
 class TestAliasForEvent:
     def test_relation_hint_uses_rest_alias_for_death(self):
-        result = alias_for_event("adventure_death", "Aldric", "Thornwood", relation_hint="spouse")
+        # Generic close relation (friend) still gets the rest alias.
+        result = alias_for_event("adventure_death", "Aldric", "Thornwood", relation_hint="friend")
         assert "Rest" in result
 
     def test_relation_hint_uses_fall_alias_for_death(self):
@@ -549,6 +628,69 @@ class TestAliasForEvent:
 
         assert "vigil" in first.lower()
         assert "rest" in second.lower()
+
+    # --- PR-I: fine-grained relation tag branching ---
+
+    def test_spouse_relation_uses_bond_alias(self):
+        result = alias_for_event("adventure_death", "Aldric", "Thornwood", relation_hint="spouse")
+        assert "Oath" in result
+
+    def test_family_relation_uses_bond_alias(self):
+        result = alias_for_event("adventure_death", "Aldric", "Thornwood", relation_hint="family")
+        assert "Oath" in result
+
+    def test_friend_relation_still_uses_rest_alias(self):
+        result = alias_for_event("adventure_death", "Aldric", "Thornwood", relation_hint="friend")
+        assert "Rest" in result
+
+    def test_oath_alias_falls_through_to_rest_on_cooldown(self):
+        # No multiple observers: oath -> rest (no vigil in pool).
+        history = TemplateHistory(cooldown_size=1)
+        first = alias_for_event(
+            "adventure_death", "Aldric", "Thornwood",
+            relation_hint="spouse", template_history=history,
+        )
+        second = alias_for_event(
+            "adventure_death", "Aldric", "Thornwood",
+            relation_hint="spouse", template_history=history,
+        )
+        assert "Oath" in first
+        assert "Rest" in second
+
+    def test_spouse_with_multiple_observers_oath_beats_vigil(self):
+        # spouse + observer_count >= 2: Oath must come before Vigil.
+        result = alias_for_event(
+            "adventure_death",
+            "Aldric",
+            "Thornwood",
+            context=NarrativeContext(relation_tags=("spouse",), observer_count=2),
+        )
+        assert "Oath" in result
+
+    def test_family_with_multiple_observers_oath_beats_vigil(self):
+        result = alias_for_event(
+            "adventure_death",
+            "Aldric",
+            "Thornwood",
+            context=NarrativeContext(relation_tags=("family",), observer_count=2),
+        )
+        assert "Oath" in result
+
+    def test_spouse_with_multiple_observers_oath_then_vigil_on_cooldown(self):
+        # Oath on cooldown: next candidate should be Vigil (multiple observers present).
+        history = TemplateHistory(cooldown_size=1)
+        first = alias_for_event(
+            "adventure_death", "Aldric", "Thornwood",
+            template_history=history,
+            context=NarrativeContext(relation_tags=("spouse",), observer_count=2),
+        )
+        second = alias_for_event(
+            "adventure_death", "Aldric", "Thornwood",
+            template_history=history,
+            context=NarrativeContext(relation_tags=("spouse",), observer_count=2),
+        )
+        assert "Oath" in first
+        assert "Vigil" in second
 
 
 class TestDeriveRelationHint:
@@ -916,9 +1058,11 @@ class TestApplyWorldMemory:
         mixin._apply_world_memory(run)
 
         mem = next(iter(world.memorials.values()))
-        assert "loving memory" in mem.epitaph.lower()
+        # Spouse-specific template is used now; it mentions "hearth" rather than "loving memory".
+        assert "hearth" in mem.epitaph.lower()
         dest = world.get_location_by_id("loc_thornwood")
-        assert "Companion's Rest" in dest.aliases
+        # Spouse relation gets bond alias before rest alias.
+        assert "Companion's Oath" in dest.aliases
 
     def test_apply_world_memory_solo_death_uses_job_based_epitaph(self):
         world = _make_world()
