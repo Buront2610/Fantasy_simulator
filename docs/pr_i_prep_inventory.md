@@ -55,8 +55,47 @@ PR-I の前提整備として、「今すぐ直すべき漏れ」と「今は触
 - relation tags / reports / rumors / world memory を narrative 入力へ広げる最小接続 ✅
 - `SettingBundle` の era 文脈と template cooldown を memorial / alias 選択へ最小接続 ✅
 - relation tags の「誰が誰をどう見ているか」をテンプレート分岐へ増やす ✅
-  (spouse / family / savior 専用テンプレート + alias_bond_site を追加)
+  (spouse / family / savior 専用テンプレート + alias_oath_site を追加)
 - PR-J の authoring に備え、bundle の実データ整理はまだ始めない ✅（PR-J へ委譲済み）
+
+## 5. PR-J に持ち越す設計負債: relation ブランチの宣言化
+
+`narrative/context.py` の `epitaph_for_character()` と `alias_for_event()` は、
+relation tag ごとの優先テンプレートを現在 Python の `if/elif` に直接埋めている。
+
+```python
+if active_relation == "spouse":
+    candidates.append("memorial_epitaph_spouse")
+elif active_relation == "family":
+    candidates.append("memorial_epitaph_family")
+elif active_relation in ("savior", "rescued"):
+    candidates.append("memorial_epitaph_savior")
+```
+
+PR-I のスコープ（3タグ）ではこれで十分だが、`Character.relation_tags` はすでに
+`friend / rival / spouse / savior / rescued / mentor / disciple / betrayer / family`
+と増えており、PR-J 以降では `SettingBundle` authoring と並走して relation 定義が
+さらに増える見込みがある。このまま Python 側で `if/elif` を足し続けると、
+
+- 世界観 authoring（bundle 側）と narrative 分岐ロジック（Python 側）が二重管理になる
+- relation を追加するたびにコード修正が必要になり、authoring サイクルが重くなる
+
+### PR-J での対処方針
+
+`epitaph_for_character()` / `alias_for_event()` が参照する
+**relation tag → ordered candidate list** の対応表を、Python コードの外に宣言的に持たせる。
+
+具体的な選択肢:
+
+1. `narrative/context.py` 内のモジュールレベル定数として dict に抽出する
+   （最小コスト。コード修正は残るが、対応表が一箇所に集まる）
+2. `SettingBundle` または別の narrative config bundle に埋め込み、
+   `NarrativeContext` 構築時に注入する
+   （PR-J の bundle authoring と自然に合流できる。外部 JSON から差し替え可能になる）
+
+PR-J では方式 2 を目標としつつ、移行コストが高ければ方式 1 を中間ステップとして
+経由することを許容する。いずれにせよ **PR-J 完了時点では `if/elif` 連鎖が残らない**
+状態にすることを完了条件に含める。
 
 ## 3. 当面 legacy のまま扱うもの
 
