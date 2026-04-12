@@ -295,11 +295,11 @@ def alias_for_event(
     active_relation = relation_hint or (context.primary_relation_tag if context else None)
     if event_kind in EVENT_KINDS_FATAL:
         if active_relation in _CLOSE_RELATION_TAGS:
+            # Most specific tie comes first: spouse/family oath beats group vigil.
+            if active_relation in ("spouse", "family"):
+                candidates.append("alias_oath_site")
             if context is not None and context.observer_count >= 2:
                 candidates.append("alias_vigil_site")
-            # Closest ties (spouse / family) get a bond alias before the generic rest alias.
-            if active_relation in ("spouse", "family"):
-                candidates.append("alias_bond_site")
             candidates.append("alias_rest_site")
         elif active_relation in _ADVERSARIAL_RELATION_TAGS:
             candidates.append("alias_fall_site")

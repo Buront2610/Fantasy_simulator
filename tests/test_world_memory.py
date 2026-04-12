@@ -12,6 +12,9 @@ import random
 from unittest.mock import MagicMock
 from typing import Any
 
+import pytest
+
+from fantasy_simulator.i18n.engine import set_locale
 from fantasy_simulator.adventure import AdventureRun
 from fantasy_simulator.character import Character
 from fantasy_simulator.content.setting_bundle import default_aethoria_bundle
@@ -33,6 +36,20 @@ from fantasy_simulator.narrative.template_history import TemplateHistory
 # ---------------------------------------------------------------------------
 # Helpers / fixtures
 # ---------------------------------------------------------------------------
+
+@pytest.fixture(autouse=True)
+def _reset_locale():
+    """Ensure every test in this module runs with the English locale.
+
+    i18n/_LOCALE is module-global.  Tests that change the locale (e.g.
+    test_i18n.py) can bleed state into this module when the test suite is
+    run in a non-deterministic order.  Resetting here keeps all
+    string-fragment assertions stable regardless of execution order.
+    """
+    set_locale("en")
+    yield
+    set_locale("en")
+
 
 def _make_world() -> World:
     """Return a fresh world with the default Aethoria map."""
@@ -616,17 +633,18 @@ class TestAliasForEvent:
 
     def test_spouse_relation_uses_bond_alias(self):
         result = alias_for_event("adventure_death", "Aldric", "Thornwood", relation_hint="spouse")
-        assert "Bond" in result
+        assert "Oath" in result
 
     def test_family_relation_uses_bond_alias(self):
         result = alias_for_event("adventure_death", "Aldric", "Thornwood", relation_hint="family")
-        assert "Bond" in result
+        assert "Oath" in result
 
     def test_friend_relation_still_uses_rest_alias(self):
         result = alias_for_event("adventure_death", "Aldric", "Thornwood", relation_hint="friend")
         assert "Rest" in result
 
-    def test_bond_alias_falls_through_to_rest_on_cooldown(self):
+    def test_oath_alias_falls_through_to_rest_on_cooldown(self):
+        # No multiple observers: oath -> rest (no vigil in pool).
         history = TemplateHistory(cooldown_size=1)
         first = alias_for_event(
             "adventure_death", "Aldric", "Thornwood",
@@ -636,8 +654,43 @@ class TestAliasForEvent:
             "adventure_death", "Aldric", "Thornwood",
             relation_hint="spouse", template_history=history,
         )
-        assert "Bond" in first
+        assert "Oath" in first
         assert "Rest" in second
+
+    def test_spouse_with_multiple_observers_oath_beats_vigil(self):
+        # spouse + observer_count >= 2: Oath must come before Vigil.
+        result = alias_for_event(
+            "adventure_death",
+            "Aldric",
+            "Thornwood",
+            context=NarrativeContext(relation_tags=("spouse",), observer_count=2),
+        )
+        assert "Oath" in result
+
+    def test_family_with_multiple_observers_oath_beats_vigil(self):
+        result = alias_for_event(
+            "adventure_death",
+            "Aldric",
+            "Thornwood",
+            context=NarrativeContext(relation_tags=("family",), observer_count=2),
+        )
+        assert "Oath" in result
+
+    def test_spouse_with_multiple_observers_oath_then_vigil_on_cooldown(self):
+        # Oath on cooldown: next candidate should be Vigil (multiple observers present).
+        history = TemplateHistory(cooldown_size=1)
+        first = alias_for_event(
+            "adventure_death", "Aldric", "Thornwood",
+            template_history=history,
+            context=NarrativeContext(relation_tags=("spouse",), observer_count=2),
+        )
+        second = alias_for_event(
+            "adventure_death", "Aldric", "Thornwood",
+            template_history=history,
+            context=NarrativeContext(relation_tags=("spouse",), observer_count=2),
+        )
+        assert "Oath" in first
+        assert "Vigil" in second
 
 
 class TestDeriveRelationHint:
@@ -1009,7 +1062,7 @@ class TestApplyWorldMemory:
         assert "hearth" in mem.epitaph.lower()
         dest = world.get_location_by_id("loc_thornwood")
         # Spouse relation gets bond alias before rest alias.
-        assert "Companion's Bond" in dest.aliases
+        assert "Companion's Oath" in dest.aliases
 
     def test_apply_world_memory_solo_death_uses_job_based_epitaph(self):
         world = _make_world()

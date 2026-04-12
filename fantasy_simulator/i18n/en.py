@@ -457,7 +457,7 @@ TEXT_EN: Dict[str, str] = {
     ),
     # Location aliases generated from significant events
     'alias_death_site': "Site of {name}'s Demise",
-    'alias_bond_site': "{name}'s Bond",
+    'alias_oath_site': "{name}'s Oath",
     'alias_rest_site': "{name}'s Rest",
     'alias_vigil_site': "{name}'s Vigil",
     'alias_fall_site': "{name}'s Fall",
