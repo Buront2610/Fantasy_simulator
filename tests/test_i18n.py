@@ -2,7 +2,16 @@
 tests/test_i18n.py - Unit tests for CLI localization helpers.
 """
 
+import pytest
+
 from fantasy_simulator.i18n import get_locale, set_locale, tr, tr_term
+
+
+@pytest.fixture(autouse=True)
+def _reset_locale():
+    set_locale("en")
+    yield
+    set_locale("en")
 
 
 class TestI18n:
@@ -83,3 +92,23 @@ class TestI18n:
         assert tr("auto_pause_years_elapsed") == "時間が経過しました"
         set_locale("en")
         assert tr("auto_pause_years_elapsed") == "Time has passed"
+
+    @pytest.mark.parametrize("locale", ["en", "ja"])
+    @pytest.mark.parametrize(
+        "key",
+        [
+            "memorial_epitaph_spouse",
+            "memorial_epitaph_family",
+            "memorial_epitaph_savior",
+            "alias_spouse_site",
+            "alias_family_site",
+            "alias_savior_site",
+            "alias_rescued_site",
+        ],
+    )
+    def test_relation_specific_templates_render_without_placeholder_leaks(self, locale: str, key: str):
+        set_locale(locale)
+        result = tr(key, name="Aldric", year=1005, location="Thornwood", era="Age of Embers")
+        assert result
+        assert "Aldric" in result
+        assert "{" not in result

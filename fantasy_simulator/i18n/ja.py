@@ -427,6 +427,18 @@ TEXT_JA: Dict[str, str] = {
     'memorial_epitaph_companions': (
         '{year}年、{location} から戻った仲間たちは、失われた {name} を今も語り継ぐ。'
     ),
+    'memorial_epitaph_spouse': (
+        '{name} と誓いを交わした者にとって、{year}年の {location} は決して忘れられない。'
+        '共に生きるはずだった者が、ここで逝った。'
+    ),
+    'memorial_epitaph_family': (
+        '{name} は血を分けた者たちに惜しまれながら、{year}年に {location} で倒れた。'
+        'その喪失は一族の心に残り続ける。'
+    ),
+    'memorial_epitaph_savior': (
+        '{year}年、{location} にて {name} は他者の命を護るために戦い、命を落とした。'
+        'その犠牲は生き残った者たちが語り継ぐ。'
+    ),
     'memorial_epitaph_rival': (
         '{year}年、{location} にて倒れた {name}。宿敵ですらその最期を忘れない。'
     ),
@@ -441,6 +453,10 @@ TEXT_JA: Dict[str, str] = {
     ),
     # 重大イベントによって生成される地名の別名
     'alias_death_site': '{name} 終焉の地',
+    'alias_spouse_site': '{name} の契りの地',
+    'alias_family_site': '{name} の縁の地',
+    'alias_savior_site': '{name} の救いの地',
+    'alias_rescued_site': '{name} の感謝の地',
     'alias_rest_site': '{name} の眠る地',
     'alias_vigil_site': '{name} を悼む地',
     'alias_fall_site': '{name} の倒れし地',

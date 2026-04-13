@@ -50,12 +50,14 @@ PR-I の前提整備として、「今すぐ直すべき漏れ」と「今は触
   `SettingBundle` dataclass と JSON loader を追加した
 - `World.setting_bundle` と `screen_world_lore()` の参照経路を接続した
 
-### まだ残る PR-I 本体
+### PR-I 本体 — 完了
 
-- relation tags / reports / rumors / world memory を narrative 入力へ広げる最小接続は実施済み
-- `SettingBundle` の era 文脈と template cooldown を memorial / alias 選択へ最小接続した
-- relation tags の「誰が誰をどう見ているか」をテンプレート分岐へ増やす
-- PR-J の authoring に備え、bundle の実データ整理はまだ始めない
+- relation tags / reports / rumors / world memory を narrative 入力へ広げる最小接続 ✅
+- `SettingBundle` の era 文脈と template cooldown を memorial / alias 選択へ最小接続 ✅
+- relation tags の「誰が誰をどう見ているか」をテンプレート分岐へ増やす ✅
+  （spouse / family / savior / rescued の relation candidate map と選択 helper を追加し、
+  alias_spouse_site / alias_family_site / alias_savior_site / alias_rescued_site まで分離）
+- PR-J の authoring に備え、bundle の実データ整理はまだ始めない ✅（PR-J へ委譲済み）
 
 ## 3. 当面 legacy のまま扱うもの
 

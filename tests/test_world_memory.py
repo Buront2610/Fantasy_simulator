@@ -12,6 +12,9 @@ import random
 from unittest.mock import MagicMock
 from typing import Any
 
+import pytest
+
+from fantasy_simulator.i18n.engine import set_locale
 from fantasy_simulator.adventure import AdventureRun
 from fantasy_simulator.character import Character
 from fantasy_simulator.content.setting_bundle import default_aethoria_bundle
@@ -20,6 +23,8 @@ from fantasy_simulator.narrative.context import (
     NarrativeContext,
     alias_for_event,
     build_narrative_context,
+    choose_alias_template_key,
+    choose_epitaph_template_key,
     derive_relation_hint,
     epitaph_for_character,
 )
@@ -34,6 +39,20 @@ from fantasy_simulator.narrative.template_history import TemplateHistory
 # Helpers / fixtures
 # ---------------------------------------------------------------------------
 
+@pytest.fixture(autouse=True)
+def _reset_locale():
+    """Ensure every test in this module runs with the English locale.
+
+    i18n/_LOCALE is module-global.  Tests that change the locale (e.g.
+    test_i18n.py) can bleed state into this module when the test suite is
+    run in a non-deterministic order.  Resetting here keeps all
+    string-fragment assertions stable regardless of execution order.
+    """
+    set_locale("en")
+    yield
+    set_locale("en")
+
+
 def _make_world() -> World:
     """Return a fresh world with the default Aethoria map."""
     return World()
@@ -47,6 +66,42 @@ def _first_loc_id(world: World) -> str:
 def _make_char_stub(name: str = "Hero", job: str = "Warrior", char_id: str = "c1"):
     """Return a minimal Character-like object for narrative context tests."""
     return Character(name=name, age=30, gender="Male", race="Human", job=job, char_id=char_id)
+
+
+def _choose_epitaph_template_key(
+    cause: str = "adventure_death",
+    *,
+    char: Character | None = None,
+    template_history: TemplateHistory | None = None,
+    relation_hint: str | None = None,
+    title_hint: str | None = None,
+    favorite: bool = False,
+    context: NarrativeContext | None = None,
+) -> str:
+    return choose_epitaph_template_key(
+        cause,
+        char=char,
+        template_history=template_history,
+        relation_hint=relation_hint,
+        title_hint=title_hint,
+        favorite=favorite,
+        context=context,
+    )
+
+
+def _choose_alias_template_key(
+    event_kind: str = "adventure_death",
+    *,
+    template_history: TemplateHistory | None = None,
+    relation_hint: str | None = None,
+    context: NarrativeContext | None = None,
+) -> str:
+    return choose_alias_template_key(
+        event_kind,
+        template_history=template_history,
+        relation_hint=relation_hint,
+        context=context,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -345,12 +400,13 @@ class TestEpitaphForCharacter:
         assert "Thornwood Forest" in result
 
     def test_close_relation_context_uses_beloved_template(self):
+        # Generic close relation (friend) still falls through to the beloved template.
         result = epitaph_for_character(
             "Aldric",
             1005,
             "Thornwood",
             "adventure_death",
-            context=NarrativeContext(relation_tags=("spouse",)),
+            context=NarrativeContext(relation_tags=("friend",)),
         )
         assert "loving memory" in result.lower()
 
@@ -435,6 +491,44 @@ class TestEpitaphForCharacter:
         )
         assert "age of embers" in result.lower()
 
+    # --- PR-I: fine-grained relation tag branching ---
+
+    @pytest.mark.parametrize(
+        ("relation_tag", "expected_key"),
+        [
+            ("spouse", "memorial_epitaph_spouse"),
+            ("family", "memorial_epitaph_family"),
+            ("savior", "memorial_epitaph_savior"),
+            ("rescued", "memorial_epitaph_savior"),
+        ],
+    )
+    def test_relation_specific_epitaph_keys(self, relation_tag: str, expected_key: str):
+        assert _choose_epitaph_template_key(context=NarrativeContext(relation_tags=(relation_tag,))) == expected_key
+
+    @pytest.mark.parametrize(
+        ("relation_tag", "expected_first"),
+        [
+            ("spouse", "memorial_epitaph_spouse"),
+            ("family", "memorial_epitaph_family"),
+            ("savior", "memorial_epitaph_savior"),
+        ],
+    )
+    def test_specific_epitaph_keys_fall_through_to_companions_then_beloved(
+        self,
+        relation_tag: str,
+        expected_first: str,
+    ):
+        history = TemplateHistory(cooldown_size=2)
+        context = NarrativeContext(relation_tags=(relation_tag,), observer_count=2)
+
+        first = _choose_epitaph_template_key(context=context, template_history=history)
+        second = _choose_epitaph_template_key(context=context, template_history=history)
+        third = _choose_epitaph_template_key(context=context, template_history=history)
+
+        assert first == expected_first
+        assert second == "memorial_epitaph_companions"
+        assert third == "memorial_epitaph_beloved"
+
 
 # ---------------------------------------------------------------------------
 # narrative/context.py — alias_for_event
@@ -442,12 +536,11 @@ class TestEpitaphForCharacter:
 
 class TestAliasForEvent:
     def test_relation_hint_uses_rest_alias_for_death(self):
-        result = alias_for_event("adventure_death", "Aldric", "Thornwood", relation_hint="spouse")
-        assert "Rest" in result
+        # Generic close relation (friend) still gets the rest alias.
+        assert _choose_alias_template_key(relation_hint="friend") == "alias_rest_site"
 
     def test_relation_hint_uses_fall_alias_for_death(self):
-        result = alias_for_event("adventure_death", "Aldric", "Thornwood", relation_hint="rival")
-        assert "Fall" in result
+        assert _choose_alias_template_key(relation_hint="rival") == "alias_fall_site"
 
     def test_adventure_death_returns_death_alias(self):
         result = alias_for_event("adventure_death", "Aldric", "Thornwood")
@@ -502,53 +595,69 @@ class TestAliasForEvent:
         assert "whisper" not in result.lower()
 
     def test_alias_relation_priority_beats_subject_rumors(self):
-        result = alias_for_event(
-            "adventure_death",
-            "Aldric",
-            "Thornwood",
+        key = _choose_alias_template_key(
             context=NarrativeContext(relation_tags=("friend",), subject_rumor_count=2),
         )
-        assert "rest" in result.lower()
-        assert "whisper" not in result.lower()
+        assert key == "alias_rest_site"
 
     def test_alias_uses_vigil_variant_when_multiple_survivors_mourn(self):
-        result = alias_for_event(
-            "adventure_death",
-            "Aldric",
-            "Thornwood",
-            context=NarrativeContext(relation_tags=("friend",), observer_count=2),
-        )
-        assert "vigil" in result.lower()
+        context = NarrativeContext(relation_tags=("friend",), observer_count=2)
+        assert _choose_alias_template_key(context=context) == "alias_vigil_site"
 
     def test_alias_uses_echo_variant_for_era_marked_sites(self):
-        result = alias_for_event(
-            "adventure_death",
-            "Aldric",
-            "Thornwood",
-            context=NarrativeContext(world_era="Age of Embers", location_alias_count=1),
-        )
-        assert "echo" in result.lower()
+        context = NarrativeContext(world_era="Age of Embers", location_alias_count=1)
+        assert _choose_alias_template_key(context=context) == "alias_echo_site"
 
     def test_template_history_rotates_alias_variants(self):
         history = TemplateHistory(cooldown_size=2)
+        context = NarrativeContext(relation_tags=("friend",), observer_count=2)
 
-        first = alias_for_event(
-            "adventure_death",
-            "Aldric",
-            "Thornwood",
-            template_history=history,
-            context=NarrativeContext(relation_tags=("friend",), observer_count=2),
-        )
-        second = alias_for_event(
-            "adventure_death",
-            "Aldric",
-            "Thornwood",
-            template_history=history,
-            context=NarrativeContext(relation_tags=("friend",), observer_count=2),
-        )
+        first = _choose_alias_template_key(template_history=history, context=context)
+        second = _choose_alias_template_key(template_history=history, context=context)
 
-        assert "vigil" in first.lower()
-        assert "rest" in second.lower()
+        assert first == "alias_vigil_site"
+        assert second == "alias_rest_site"
+
+    # --- PR-I: fine-grained relation tag branching ---
+
+    @pytest.mark.parametrize(
+        ("relation_tag", "expected_key"),
+        [
+            ("spouse", "alias_spouse_site"),
+            ("family", "alias_family_site"),
+            ("savior", "alias_savior_site"),
+            ("rescued", "alias_rescued_site"),
+        ],
+    )
+    def test_relation_specific_alias_keys(self, relation_tag: str, expected_key: str):
+        assert _choose_alias_template_key(relation_hint=relation_tag) == expected_key
+
+    def test_friend_relation_still_uses_rest_alias(self):
+        assert _choose_alias_template_key(relation_hint="friend") == "alias_rest_site"
+
+    @pytest.mark.parametrize(
+        ("relation_tag", "expected_first"),
+        [
+            ("spouse", "alias_spouse_site"),
+            ("family", "alias_family_site"),
+            ("savior", "alias_savior_site"),
+        ],
+    )
+    def test_specific_alias_keys_fall_through_to_vigil_then_rest(
+        self,
+        relation_tag: str,
+        expected_first: str,
+    ):
+        history = TemplateHistory(cooldown_size=2)
+        context = NarrativeContext(relation_tags=(relation_tag,), observer_count=2)
+
+        first = _choose_alias_template_key(template_history=history, context=context)
+        second = _choose_alias_template_key(template_history=history, context=context)
+        third = _choose_alias_template_key(template_history=history, context=context)
+
+        assert first == expected_first
+        assert second == "alias_vigil_site"
+        assert third == "alias_rest_site"
 
 
 class TestDeriveRelationHint:
@@ -916,9 +1025,11 @@ class TestApplyWorldMemory:
         mixin._apply_world_memory(run)
 
         mem = next(iter(world.memorials.values()))
-        assert "loving memory" in mem.epitaph.lower()
+        # Spouse-specific template is used now; it mentions "hearth" rather than "loving memory".
+        assert "hearth" in mem.epitaph.lower()
         dest = world.get_location_by_id("loc_thornwood")
-        assert "Companion's Rest" in dest.aliases
+        # Spouse relation gets the dedicated spouse alias before the rest alias.
+        assert "Companion's Vow" in dest.aliases
 
     def test_apply_world_memory_solo_death_uses_job_based_epitaph(self):
         world = _make_world()
