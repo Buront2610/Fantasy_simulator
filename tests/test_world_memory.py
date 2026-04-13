@@ -68,7 +68,7 @@ def _make_char_stub(name: str = "Hero", job: str = "Warrior", char_id: str = "c1
     return Character(name=name, age=30, gender="Male", race="Human", job=job, char_id=char_id)
 
 
-def _choose_epitaph_key(
+def _choose_epitaph_template_key(
     cause: str = "adventure_death",
     *,
     char: Character | None = None,
@@ -89,7 +89,7 @@ def _choose_epitaph_key(
     )
 
 
-def _choose_alias_key(
+def _choose_alias_template_key(
     event_kind: str = "adventure_death",
     *,
     template_history: TemplateHistory | None = None,
@@ -503,7 +503,7 @@ class TestEpitaphForCharacter:
         ],
     )
     def test_relation_specific_epitaph_keys(self, relation_tag: str, expected_key: str):
-        assert _choose_epitaph_key(context=NarrativeContext(relation_tags=(relation_tag,))) == expected_key
+        assert _choose_epitaph_template_key(context=NarrativeContext(relation_tags=(relation_tag,))) == expected_key
 
     @pytest.mark.parametrize(
         ("relation_tag", "expected_first"),
@@ -521,9 +521,9 @@ class TestEpitaphForCharacter:
         history = TemplateHistory(cooldown_size=2)
         context = NarrativeContext(relation_tags=(relation_tag,), observer_count=2)
 
-        first = _choose_epitaph_key(context=context, template_history=history)
-        second = _choose_epitaph_key(context=context, template_history=history)
-        third = _choose_epitaph_key(context=context, template_history=history)
+        first = _choose_epitaph_template_key(context=context, template_history=history)
+        second = _choose_epitaph_template_key(context=context, template_history=history)
+        third = _choose_epitaph_template_key(context=context, template_history=history)
 
         assert first == expected_first
         assert second == "memorial_epitaph_companions"
@@ -537,10 +537,10 @@ class TestEpitaphForCharacter:
 class TestAliasForEvent:
     def test_relation_hint_uses_rest_alias_for_death(self):
         # Generic close relation (friend) still gets the rest alias.
-        assert _choose_alias_key(relation_hint="friend") == "alias_rest_site"
+        assert _choose_alias_template_key(relation_hint="friend") == "alias_rest_site"
 
     def test_relation_hint_uses_fall_alias_for_death(self):
-        assert _choose_alias_key(relation_hint="rival") == "alias_fall_site"
+        assert _choose_alias_template_key(relation_hint="rival") == "alias_fall_site"
 
     def test_adventure_death_returns_death_alias(self):
         result = alias_for_event("adventure_death", "Aldric", "Thornwood")
@@ -595,25 +595,25 @@ class TestAliasForEvent:
         assert "whisper" not in result.lower()
 
     def test_alias_relation_priority_beats_subject_rumors(self):
-        key = _choose_alias_key(
+        key = _choose_alias_template_key(
             context=NarrativeContext(relation_tags=("friend",), subject_rumor_count=2),
         )
         assert key == "alias_rest_site"
 
     def test_alias_uses_vigil_variant_when_multiple_survivors_mourn(self):
         context = NarrativeContext(relation_tags=("friend",), observer_count=2)
-        assert _choose_alias_key(context=context) == "alias_vigil_site"
+        assert _choose_alias_template_key(context=context) == "alias_vigil_site"
 
     def test_alias_uses_echo_variant_for_era_marked_sites(self):
         context = NarrativeContext(world_era="Age of Embers", location_alias_count=1)
-        assert _choose_alias_key(context=context) == "alias_echo_site"
+        assert _choose_alias_template_key(context=context) == "alias_echo_site"
 
     def test_template_history_rotates_alias_variants(self):
         history = TemplateHistory(cooldown_size=2)
         context = NarrativeContext(relation_tags=("friend",), observer_count=2)
 
-        first = _choose_alias_key(template_history=history, context=context)
-        second = _choose_alias_key(template_history=history, context=context)
+        first = _choose_alias_template_key(template_history=history, context=context)
+        second = _choose_alias_template_key(template_history=history, context=context)
 
         assert first == "alias_vigil_site"
         assert second == "alias_rest_site"
@@ -630,10 +630,10 @@ class TestAliasForEvent:
         ],
     )
     def test_relation_specific_alias_keys(self, relation_tag: str, expected_key: str):
-        assert _choose_alias_key(relation_hint=relation_tag) == expected_key
+        assert _choose_alias_template_key(relation_hint=relation_tag) == expected_key
 
     def test_friend_relation_still_uses_rest_alias(self):
-        assert _choose_alias_key(relation_hint="friend") == "alias_rest_site"
+        assert _choose_alias_template_key(relation_hint="friend") == "alias_rest_site"
 
     @pytest.mark.parametrize(
         ("relation_tag", "expected_first"),
@@ -651,9 +651,9 @@ class TestAliasForEvent:
         history = TemplateHistory(cooldown_size=2)
         context = NarrativeContext(relation_tags=(relation_tag,), observer_count=2)
 
-        first = _choose_alias_key(template_history=history, context=context)
-        second = _choose_alias_key(template_history=history, context=context)
-        third = _choose_alias_key(template_history=history, context=context)
+        first = _choose_alias_template_key(template_history=history, context=context)
+        second = _choose_alias_template_key(template_history=history, context=context)
+        third = _choose_alias_template_key(template_history=history, context=context)
 
         assert first == expected_first
         assert second == "alias_vigil_site"
