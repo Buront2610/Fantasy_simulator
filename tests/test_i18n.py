@@ -7,6 +7,13 @@ import pytest
 from fantasy_simulator.i18n import get_locale, set_locale, tr, tr_term
 
 
+@pytest.fixture(autouse=True)
+def _reset_locale():
+    set_locale("en")
+    yield
+    set_locale("en")
+
+
 class TestI18n:
     def test_set_locale_to_japanese(self):
         set_locale("ja")
