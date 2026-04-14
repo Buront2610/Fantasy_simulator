@@ -4,6 +4,7 @@ tests/test_world.py - Unit tests for the World class.
 
 import unicodedata
 
+from fantasy_simulator.adventure import AdventureRun
 from fantasy_simulator.character import Character
 from fantasy_simulator.content.setting_bundle import (
     CalendarDefinition,
@@ -14,7 +15,8 @@ from fantasy_simulator.content.setting_bundle import (
     WorldDefinition,
 )
 from fantasy_simulator.i18n import set_locale
-from fantasy_simulator.world import LocationState, World
+from fantasy_simulator.rumor import Rumor
+from fantasy_simulator.world import LocationState, MemorialRecord, World
 from fantasy_simulator.content.world_data import get_location_state_defaults
 
 
@@ -342,6 +344,81 @@ class TestWorld:
 
         assert world.characters[0].location_id == ""
         assert world.location_ids == []
+
+    def test_setting_bundle_assignment_repairs_rumor_adventure_and_memorial_locations(self):
+        world = World(name="Custom")
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="hub_primary",
+                        name="Clockwork Hub",
+                        description="Primary site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                    ),
+                    SiteSeedDefinition(
+                        location_id="hub_secondary",
+                        name="Second Hub",
+                        description="Secondary site.",
+                        region_type="city",
+                        x=1,
+                        y=0,
+                    ),
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+        world.rumors.append(Rumor(source_location_id="hub_secondary", description="Old rumor"))
+        world.active_adventures.append(
+            AdventureRun(
+                character_id="char_1",
+                character_name="Aldric",
+                origin="hub_secondary",
+                destination="hub_secondary",
+                year_started=world.year,
+            )
+        )
+        world.memorials["mem_1"] = MemorialRecord(
+            memorial_id="mem_1",
+            character_id="char_1",
+            character_name="Aldric",
+            location_id="hub_secondary",
+            year=world.year,
+            cause="battle_fatal",
+            epitaph="Fell in battle.",
+        )
+
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="hub_primary",
+                        name="Clockwork Hub",
+                        description="Primary site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                    ),
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+
+        assert world.rumors[0].source_location_id is None
+        assert world.active_adventures[0].origin == "hub_primary"
+        assert world.active_adventures[0].destination == "hub_primary"
+        assert world.memorials["mem_1"].location_id == "hub_primary"
+        assert world.get_location_by_id("hub_primary").memorial_ids == ["mem_1"]
 
     def test_random_location_raises_clear_error_for_empty_world(self):
         world = World()

@@ -1,31 +1,10 @@
-"""Event recording across all transitional event stores.
+"""Event recording with ``world.event_records`` as the sole write model.
 
 ``world.event_records`` is the canonical structured store by policy.
 All new read-paths should consume ``world.event_records`` exclusively.
 
-However, the persistence layer still serializes all three stores:
-
-- ``world.event_records`` — canonical structured store (read + write)
-- ``world.event_log`` — display-derived formatted text buffer (persisted
-  for CLI compatibility; derived from ``event_records`` at write-time)
-- ``simulator.history`` — legacy ``EventResult`` cache (persisted for
-  save/load compatibility; only populated via ``_record_event()``, **not**
-  via ``_record_world_event()`` — see note below)
-
-.. important::
-   ``_record_world_event()`` writes to ``event_records`` and refreshes the
-   compatibility ``event_log`` cache indirectly via ``World.record_event()``,
-   but does **not** append to ``history``.  Only ``_record_event()`` (which
-   wraps ``_record_world_event()``) also writes to ``history``.  Events
-   such as ``adventure_started``, ``adventure_choice``, and
-   ``injury_recovery`` go through ``_record_world_event()`` directly,
-   so they are visible in ``event_records`` and ``event_log`` but **not**
-   in ``history``.  ``events_by_type()`` therefore cannot see those events.
-   Use ``events_by_kind()`` on ``event_records`` instead.
-
-Sunset condition:
-   ``event_log`` and ``history`` remain persisted only until save/load
-   compatibility no longer needs legacy display/EventResult adapters.
+``world.event_log`` and ``simulator.history`` survive only as compatibility
+adapters projected from canonical records for save/load and legacy query paths.
 """
 
 from __future__ import annotations
@@ -46,7 +25,6 @@ class EventRecorderMixin:
     - ``elapsed_days``: absolute in-world days elapsed since simulation start
     - ``id_rng``: RNG for generating record IDs
     - ``pending_notifications``: list of records that passed notification threshold
-    - ``history``: legacy EventResult list (compatibility adapter)
     """
 
     # Severity scale: 1=minor, 2=notable, 3=significant, 4=major, 5=critical
@@ -73,15 +51,8 @@ class EventRecorderMixin:
     ) -> WorldEventRecord:
         """Record a structured world event to canonical ``event_records``.
 
-        This method does **not** append to ``self.history``.  Events that
-        originate from an ``EventResult`` (random events, natural death,
-        dying resolution) are routed through ``_record_event()`` instead,
-        which calls this method *and* appends to ``history``.
-
-        Events created directly by the simulation loop (adventure lifecycle,
-        injury recovery, etc.) call this method only, so they appear in
-        ``event_records`` and the compatibility ``event_log`` projection but
-        not in ``history``.
+        Legacy ``event_log`` / ``history`` adapters are projected later from
+        the stored canonical records.
         """
         effective_month = self.current_month if month is None else month
         effective_day = self.current_day
@@ -148,25 +119,22 @@ class EventRecorderMixin:
         return "adventure_update", run.destination, 1
 
     def _record_event(self, result: EventResult, location_id: Optional[str] = None) -> None:
-        """Mirror an EventResult into **all three** transitional event stores.
-
-        This is the only code path that writes to ``history``:
-
-        - ``history`` — appends the raw ``EventResult`` (legacy adapter;
-          only events routed through this method are visible to
-          ``events_by_type()``)
-        - ``world.event_log`` — refreshes the formatted compatibility cache
-        - ``world.event_records`` — appends a ``WorldEventRecord`` (canonical)
-        """
-        self.history.append(result)
+        """Mirror an EventResult into the canonical structured store."""
         severity = self._SEVERITY_MAP.get(result.event_type, 1)
-        record = self._record_world_event(
-            result.description,
-            kind=result.event_type,
-            year=result.year,
+        record = WorldEventRecord.from_event_result(
+            result,
             location_id=location_id,
-            primary_actor_id=result.affected_characters[0] if result.affected_characters else None,
-            secondary_actor_ids=result.affected_characters[1:],
             severity=severity,
+            rng=self.id_rng,
+            month=self.current_month,
+            day=self.current_day,
+            absolute_day=self.elapsed_days + 1,
+            calendar_key=self.world.calendar_definition.calendar_key,
         )
+        self.world.record_event(record)
+        impacts = self.world.apply_event_impact(result.event_type, record.location_id)
+        if impacts:
+            record.impacts = impacts
+        if self.should_notify(record):
+            self.pending_notifications.append(record)
         self._link_relation_tag_source_from_record(result, record.record_id)

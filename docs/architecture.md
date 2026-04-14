@@ -34,8 +34,8 @@ form that tests can enforce.
 - `World.event_records` is the canonical structured event store.
 - `World.event_log` is a compatibility display buffer derived from canonical
   events.
-- `Simulator.history` is a legacy `EventResult` cache retained for
-  compatibility and save/load continuity.
+- `Simulator.history` is a legacy `EventResult` adapter projected from
+  canonical records for compatibility and save/load continuity.
 - `World.get_compatibility_event_log()` and `QueryMixin.events_by_type()` are
   the explicit adapter paths for legacy reads.
 
@@ -43,8 +43,7 @@ form that tests can enforce.
 
 - New reporting, rumor, presenter, and view-model code must read from
   `event_records`.
-- `events_by_type()` is legacy and incomplete by design. New production code
-  must not call it.
+- `events_by_type()` is legacy. New production code must not call it.
 - Direct `event_log` reads should stay inside compatibility-oriented query/UI
   paths, not spread into new gameplay or reporting logic.
 

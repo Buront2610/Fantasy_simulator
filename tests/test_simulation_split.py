@@ -1,4 +1,4 @@
-"""Tests for PR-C: simulation/ sub-package split and event store normalization.
+"""Tests for simulation/ sub-package split and canonical event store behavior.
 
 Verifies:
 - simulation/ sub-package imports work correctly
@@ -6,7 +6,7 @@ Verifies:
 - WorldEventRecord.impacts field is populated by event recording
 - events_by_kind() reads from event_records (canonical source)
 - World.apply_event_impact() returns impact data
-- _record_world_event() vs _record_event() store-coverage gap
+- legacy adapters project from canonical event records
 - Old save data without impacts field loads safely
 """
 
@@ -184,12 +184,7 @@ class TestImpactTracking:
 
 
 class TestEventStoreStoreCoverage:
-    """Verify which stores are written by _record_world_event vs _record_event.
-
-    This is the critical gap documented in PR-C review:
-    - _record_world_event() -> event_records + event_log, but NOT history
-    - _record_event() -> event_records + event_log + history
-    """
+    """Verify all writes converge on canonical ``event_records``."""
 
     def test_record_world_event_writes_event_records_and_event_log(self):
         """_record_world_event populates event_records and event_log."""
@@ -205,8 +200,8 @@ class TestEventStoreStoreCoverage:
         assert len(sim.world.event_log) == 1
         assert "adventure" in sim.world.event_log[0].lower() or len(sim.world.event_log[0]) > 0
 
-    def test_record_world_event_does_NOT_write_history(self):
-        """_record_world_event must NOT populate history — this is intentional."""
+    def test_record_world_event_updates_history_adapter(self):
+        """Legacy history must project the same canonical event."""
         sim = _make_sim()
         loc_id = _first_location_id(sim.world)
         sim._record_world_event(
@@ -214,13 +209,11 @@ class TestEventStoreStoreCoverage:
             kind="injury_recovery",
             location_id=loc_id,
         )
-        assert len(sim.history) == 0, (
-            "_record_world_event should not write to history; "
-            "only _record_event does"
-        )
+        assert len(sim.history) == 1
+        assert sim.history[0].event_type == "injury_recovery"
 
-    def test_record_event_writes_to_all_three_stores(self):
-        """_record_event populates history, event_records, AND event_log."""
+    def test_record_event_updates_canonical_store_and_adapters(self):
+        """_record_event must still surface through legacy adapters."""
         from fantasy_simulator.events import EventResult
         sim = _make_sim()
         result = EventResult(
@@ -236,23 +229,16 @@ class TestEventStoreStoreCoverage:
         assert sim.world.event_records[0].kind == "battle"
         assert len(sim.world.event_log) == 1
 
-    def test_events_by_type_excludes_record_world_event_entries(self):
-        """events_by_type() only sees events that went through _record_event().
-
-        Events created via _record_world_event() directly (adventure lifecycle,
-        injury recovery) are invisible to events_by_type() — this is a known
-        limitation documented in the docstring.
-        """
+    def test_events_by_type_reads_canonical_world_events_too(self):
+        """events_by_type() should project the full canonical event set."""
         sim = _make_sim()
         loc_id = _first_location_id(sim.world)
-        # This goes through _record_world_event only -> not in history
         sim._record_world_event(
             "Adventure started",
             kind="adventure_started",
             location_id=loc_id,
         )
-        assert sim.events_by_type("adventure_started") == []
-        # But events_by_kind CAN see it
+        assert len(sim.events_by_type("adventure_started")) == 1
         assert len(sim.events_by_kind("adventure_started")) == 1
 
 
@@ -286,20 +272,16 @@ class TestEventStoreUnification:
         assert len(matches) > 0
         assert all(ev.event_type == first_type for ev in matches)
 
-    def test_event_records_is_superset_of_history_types(self):
-        """event_records should contain all event types from history, plus more."""
+    def test_event_records_and_history_adapters_cover_same_types(self):
+        """The history adapter should mirror canonical kinds."""
         sim = _make_sim_with_characters(n_chars=6, seed=42)
         sim.advance_months(12)
         history_types = {ev.event_type for ev in sim.history}
         record_kinds = {rec.kind for rec in sim.world.event_records}
-        # Everything in history must be in event_records
-        assert history_types.issubset(record_kinds), (
-            f"history types {history_types - record_kinds} not in event_records"
-        )
-        # event_records may have MORE kinds than history (adventure_started, etc.)
+        assert history_types == record_kinds
 
-    def test_history_and_event_records_both_populated(self):
-        """Both stores should be populated during simulation."""
+    def test_history_adapter_and_event_records_both_populated(self):
+        """Legacy history remains available through projection."""
         sim = _make_sim_with_characters(n_chars=6, seed=42)
         sim.advance_months(12)
         assert len(sim.history) > 0

@@ -87,6 +87,8 @@ class WorldEventRecord:
     calendar_key: str = ""
     tags: List[str] = field(default_factory=list)
     impacts: List[Dict[str, Any]] = field(default_factory=list)
+    legacy_event_result: Optional[Dict[str, Any]] = None
+    legacy_event_log_entry: Optional[str] = None
 
     def __post_init__(self) -> None:
         self.severity = max(1, min(5, self.severity))
@@ -111,6 +113,8 @@ class WorldEventRecord:
             "calendar_key": self.calendar_key,
             "tags": list(self.tags),
             "impacts": list(self.impacts),
+            "legacy_event_result": dict(self.legacy_event_result) if self.legacy_event_result is not None else None,
+            "legacy_event_log_entry": self.legacy_event_log_entry,
         }
 
     @classmethod
@@ -131,6 +135,12 @@ class WorldEventRecord:
             calendar_key=data.get("calendar_key", ""),
             tags=list(data.get("tags", [])),
             impacts=list(data.get("impacts", [])),
+            legacy_event_result=(
+                dict(data["legacy_event_result"])
+                if data.get("legacy_event_result") is not None
+                else None
+            ),
+            legacy_event_log_entry=data.get("legacy_event_log_entry"),
         )
 
     @classmethod
@@ -161,6 +171,22 @@ class WorldEventRecord:
             description=result.description,
             severity=severity,
             calendar_key=calendar_key,
+            legacy_event_result=result.to_dict(),
+        )
+
+    def to_event_result(self) -> EventResult:
+        """Project a legacy EventResult adapter from the canonical record."""
+        if self.legacy_event_result is not None:
+            return EventResult.from_dict(self.legacy_event_result)
+        affected_characters: List[str] = []
+        if self.primary_actor_id is not None:
+            affected_characters.append(self.primary_actor_id)
+        affected_characters.extend(self.secondary_actor_ids)
+        return EventResult(
+            description=self.description,
+            affected_characters=affected_characters,
+            event_type=self.kind,
+            year=self.year,
         )
 
 

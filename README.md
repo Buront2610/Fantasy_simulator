@@ -34,7 +34,7 @@ influence.
   - region drill-down
   - location detail panels
 - Save/load support for simulation snapshots
-- Schema-versioned save migration support for older data (`schema_version = 7`)
+- Schema-versioned save migration support for older data (`schema_version = 8`)
 - Structured world event records with causal impact tracking and rumors
 - UI abstraction through input/render backends plus lightweight presenter/view-model layers
 - CLI localization support for Japanese and English

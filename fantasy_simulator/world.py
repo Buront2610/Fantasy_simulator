@@ -565,24 +565,75 @@ class World:
             return self.resolve_location_id_from_name(location_name)
         return location_id
 
-    def _normalize_references_after_bundle_change(self) -> None:
-        """Repair references after replacing the active setting bundle."""
+    def _repair_location_reference(
+        self,
+        location_id: Optional[str],
+        *,
+        location_name: str | None = None,
+        required: bool = False,
+        fallback_location_id: str | None = None,
+    ) -> Optional[str]:
+        """Resolve a location reference to a valid current-world location."""
+        normalized = self.normalize_location_id(location_id, location_name=location_name)
+        if normalized in self._location_id_index:
+            return normalized
+        if required:
+            if fallback_location_id is not None:
+                return fallback_location_id
+            if self._location_id_index:
+                return self._default_resident_location_id()
+            return ""
+        return None
+
+    def _repair_location_references(self) -> None:
+        """Repair persisted location references against the active world structure."""
+        fallback_location_id = None
+        if self._location_id_index:
+            fallback_location_id = self._default_resident_location_id()
         for character in self.characters:
             character.location_id = (
-                self.normalize_location_id(character.location_id) or character.location_id
+                self._repair_location_reference(
+                    character.location_id,
+                    required=True,
+                    fallback_location_id=fallback_location_id,
+                )
+                or ""
             )
         for record in self.event_records:
-            record.location_id = self.normalize_location_id(record.location_id)
+            record.location_id = self._repair_location_reference(record.location_id)
         for rumor in self.rumors:
-            rumor.source_location_id = self.normalize_location_id(rumor.source_location_id)
+            rumor.source_location_id = self._repair_location_reference(rumor.source_location_id)
         for rumor in self.rumor_archive:
-            rumor.source_location_id = self.normalize_location_id(rumor.source_location_id)
+            rumor.source_location_id = self._repair_location_reference(rumor.source_location_id)
         for run in self.active_adventures + self.completed_adventures:
-            run.origin = self.normalize_location_id(run.origin) or run.origin
-            run.destination = self.normalize_location_id(run.destination) or run.destination
+            run.origin = (
+                self._repair_location_reference(
+                    run.origin,
+                    required=True,
+                    fallback_location_id=fallback_location_id,
+                )
+                or ""
+            )
+            run.destination = (
+                self._repair_location_reference(
+                    run.destination,
+                    required=True,
+                    fallback_location_id=fallback_location_id,
+                )
+                or ""
+            )
         for memorial in self.memorials.values():
-            memorial.location_id = self.normalize_location_id(memorial.location_id) or memorial.location_id
+            memorial.location_id = (
+                self._repair_location_reference(
+                    memorial.location_id,
+                    required=True,
+                    fallback_location_id=fallback_location_id,
+                )
+                or ""
+            )
 
+    def _rebuild_location_memorial_ids(self) -> None:
+        """Rebuild per-location memorial indices from canonical memorial records."""
         for location in self.grid.values():
             location.memorial_ids = []
         for memorial in self.memorials.values():
@@ -590,6 +641,10 @@ class World:
             if location is not None and memorial.memorial_id not in location.memorial_ids:
                 location.memorial_ids.append(memorial.memorial_id)
 
+    def _normalize_references_after_bundle_change(self) -> None:
+        """Repair references after replacing the active setting bundle."""
+        self._repair_location_references()
+        self._rebuild_location_memorial_ids()
         self.rebuild_char_index()
         self.ensure_valid_character_locations()
         self.rebuild_adventure_index()
@@ -783,10 +838,12 @@ class World:
 
     def normalize_after_load(self) -> None:
         """Rebuild derived indexes and repair invariants after deserialization."""
+        self._repair_location_references()
         self.rebuild_char_index()
         self.ensure_valid_character_locations()
         self.rebuild_adventure_index()
         self.rebuild_recent_event_ids()
+        self._rebuild_location_memorial_ids()
         if self.event_records:
             self.rebuild_compatibility_event_log()
 
@@ -1146,11 +1203,15 @@ class World:
     def _project_compatibility_event_log(self) -> List[str]:
         """Project the compatibility display buffer from canonical event records."""
         return [
-            self._format_event_log_entry(
-                record.description,
-                year=record.year,
-                month=record.month,
-                day=record.day,
+            (
+                record.legacy_event_log_entry
+                if record.legacy_event_log_entry is not None
+                else self._format_event_log_entry(
+                    record.description,
+                    year=record.year,
+                    month=record.month,
+                    day=record.day,
+                )
             )
             for record in self.event_records[-self.MAX_EVENT_LOG:]
         ]

@@ -20,7 +20,7 @@ from ..terrain import (
     build_default_atlas_layout,
 )
 
-CURRENT_VERSION = 7
+CURRENT_VERSION = 8
 
 
 def _embedded_setting_bundle(data: Dict[str, Any]):
@@ -65,6 +65,76 @@ def _resolve_location_id(data: Dict[str, Any], name: str) -> str:
     return _location_name_to_id(data).get(name, fallback_location_id(name))
 
 
+def _calendar_key_for_data(data: Dict[str, Any]) -> str:
+    bundle = _embedded_setting_bundle(data)
+    if bundle is not None:
+        return bundle.world_definition.calendar.calendar_key
+    return ""
+
+
+def _record_from_legacy_history_item(
+    item: Dict[str, Any],
+    *,
+    index: int,
+    calendar_key: str,
+) -> Dict[str, Any]:
+    affected = list(item.get("affected_characters", []))
+    return {
+        "record_id": f"legacy_history_{index:06d}",
+        "kind": item.get("event_type", "generic"),
+        "year": item.get("year", 0),
+        "month": 1,
+        "day": 1,
+        "absolute_day": 0,
+        "location_id": None,
+        "primary_actor_id": affected[0] if affected else None,
+        "secondary_actor_ids": affected[1:],
+        "description": item.get("description", ""),
+        "severity": 1,
+        "visibility": "public",
+        "calendar_key": calendar_key,
+        "tags": [],
+        "impacts": [],
+        "legacy_event_result": dict(item),
+        "legacy_event_log_entry": None,
+    }
+
+
+def _record_from_legacy_event_log_entry(
+    entry: str,
+    *,
+    index: int,
+    year: int,
+    calendar_key: str,
+) -> Dict[str, Any]:
+    return {
+        "record_id": f"legacy_event_log_{index:06d}",
+        "kind": "legacy_event_log",
+        "year": year,
+        "month": 1,
+        "day": 1,
+        "absolute_day": 0,
+        "location_id": None,
+        "primary_actor_id": None,
+        "secondary_actor_ids": [],
+        "description": entry,
+        "severity": 1,
+        "visibility": "public",
+        "calendar_key": calendar_key,
+        "tags": ["legacy_event_log"],
+        "impacts": [],
+        "legacy_event_result": {
+            "description": entry,
+            "affected_characters": [],
+            "stat_changes": {},
+            "event_type": "legacy_event_log",
+            "year": year,
+            "metadata": {"legacy_event_log_entry": True},
+        },
+        "legacy_event_log_entry": entry,
+    }
+
+
 def migrate(data: Dict[str, Any]) -> Dict[str, Any]:
     """Apply all necessary migrations to bring data to CURRENT_VERSION."""
     version = data.get("schema_version", 0)
@@ -82,6 +152,7 @@ def migrate(data: Dict[str, Any]) -> Dict[str, Any]:
         5: _migrate_v4_to_v5,
         6: _migrate_v5_to_v6,
         7: _migrate_v6_to_v7,
+        8: _migrate_v7_to_v8,
     }
     for target_version in range(version + 1, CURRENT_VERSION + 1):
         data = migrations[target_version](data)
@@ -387,4 +458,28 @@ def _migrate_v6_to_v7(data: Dict[str, Any]) -> Dict[str, Any]:
     world_data["atlas_layout"] = build_default_atlas_layout(inputs).to_dict()
 
     data["schema_version"] = 7
+    return data
+
+
+def _migrate_v7_to_v8(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Canonicalize legacy event adapters into ``world.event_records``."""
+    world_data = data.setdefault("world", {})
+    event_records = world_data.setdefault("event_records", [])
+    history = list(data.get("history", []))
+    event_log = list(world_data.get("event_log", []))
+    calendar_key = _calendar_key_for_data(data)
+
+    if not event_records and history:
+        world_data["event_records"] = [
+            _record_from_legacy_history_item(item, index=index, calendar_key=calendar_key)
+            for index, item in enumerate(history, start=1)
+        ]
+    elif not event_records and event_log:
+        year = int(world_data.get("year", 0))
+        world_data["event_records"] = [
+            _record_from_legacy_event_log_entry(entry, index=index, year=year, calendar_key=calendar_key)
+            for index, entry in enumerate(event_log, start=1)
+        ]
+
+    data["schema_version"] = 8
     return data

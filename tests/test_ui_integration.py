@@ -410,6 +410,25 @@ class TestWorldLoreUsesBackends(unittest.TestCase):
         self.assertTrue(any("Readers of lost signs." in call[1] for call in wrapped))
         self.assertTrue(any("Preserves old memory." in call[1] for call in wrapped))
 
+    def test_lore_output_uses_same_race_job_fallbacks_as_character_creator(self) -> None:
+        from fantasy_simulator.content.setting_bundle import default_aethoria_bundle
+        from fantasy_simulator.ui.screens import screen_world_lore
+
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend()
+        ctx = UIContext(inp=inp, out=out)
+        world = World()
+        bundle = default_aethoria_bundle(lore_text="Fallback lore text.")
+        bundle.world_definition.races = []
+        bundle.world_definition.jobs = []
+        world.setting_bundle = bundle
+
+        screen_world_lore(world=world, ctx=ctx)
+
+        highlighted = [call[1] for call in out.calls if call[0] == "print_highlighted"]
+        self.assertTrue(any("Human" in entry for entry in highlighted))
+        self.assertTrue(any("Warrior" in entry for entry in highlighted))
+
     def test_lore_output_accepts_ctx_as_first_positional_argument(self) -> None:
         from fantasy_simulator.ui.screens import screen_world_lore
 

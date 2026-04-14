@@ -14,6 +14,7 @@ from fantasy_simulator.content.setting_bundle import (
 from fantasy_simulator.persistence.migrations import CURRENT_VERSION
 from fantasy_simulator.persistence.save_load import load_simulation, save_simulation
 from fantasy_simulator.simulator import Simulator
+from fantasy_simulator.events import WorldEventRecord
 from fantasy_simulator.world import World
 
 
@@ -427,3 +428,67 @@ class TestLoadSimulation:
         assert restored.world.active_adventures[0].origin == "hub_primary"
         assert restored.world.sites[0].location_id == "hub_primary"
         assert restored.world.routes[0].from_site_id == "hub_primary"
+
+    def test_migration_lifts_text_only_legacy_event_log_into_canonical_event_records(self, tmp_path):
+        path = tmp_path / "legacy-event-log-only.json"
+        world = World()
+        payload = {
+            "schema_version": CURRENT_VERSION - 1,
+            "world": world.to_dict(),
+            "characters": [],
+            "history": [],
+        }
+        payload["world"]["event_records"] = []
+        payload["world"]["event_log"] = ["Year 1000: A legacy omen spread through the capital."]
+        path.write_text(json.dumps(payload), encoding="utf-8")
+
+        restored = load_simulation(str(path))
+
+        assert restored is not None
+        assert len(restored.world.event_records) == 1
+        assert restored.world.event_records[0].legacy_event_log_entry == payload["world"]["event_log"][0]
+        restored.world.record_event(
+            WorldEventRecord(
+                record_id="rec_new",
+                kind="meeting",
+                year=restored.world.year,
+                month=1,
+                day=1,
+                description="A new structured event.",
+            )
+        )
+        compatibility_log = restored.world.get_compatibility_event_log()
+        assert payload["world"]["event_log"][0] in compatibility_log
+        assert any("A new structured event." in entry for entry in compatibility_log)
+
+    def test_migration_lifts_legacy_history_into_canonical_event_records(self, tmp_path):
+        path = tmp_path / "legacy-history-only.json"
+        world = World()
+        payload = {
+            "schema_version": CURRENT_VERSION - 1,
+            "world": world.to_dict(),
+            "characters": [],
+            "history": [
+                {
+                    "description": "A legacy battle occurred.",
+                    "affected_characters": ["char_1"],
+                    "stat_changes": {},
+                    "event_type": "battle",
+                    "year": 1000,
+                    "metadata": {"source": "legacy"},
+                }
+            ],
+        }
+        payload["world"]["event_records"] = []
+        payload["world"]["event_log"] = []
+        path.write_text(json.dumps(payload), encoding="utf-8")
+
+        restored = load_simulation(str(path))
+
+        assert restored is not None
+        assert len(restored.world.event_records) == 1
+        assert restored.world.event_records[0].kind == "battle"
+        assert restored.world.event_records[0].legacy_event_result is not None
+        assert len(restored.history) == 1
+        assert restored.history[0].event_type == "battle"
+        assert restored.history[0].metadata == {"source": "legacy"}

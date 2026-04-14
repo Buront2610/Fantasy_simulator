@@ -998,6 +998,7 @@ def screen_world_lore(ctx: UIContext | None = None, *, world: World | None = Non
     out = ctx.out
     bundle = world.setting_bundle if world is not None else default_aethoria_bundle()
     world_definition = bundle.world_definition
+    creator = CharacterCreator(setting_bundle=bundle)
     lore_text = world_definition.lore_text
 
     out.print_line()
@@ -1008,24 +1009,24 @@ def screen_world_lore(ctx: UIContext | None = None, *, world: World | None = Non
     out.print_line()
     out.print_heading(f"  {tr('races_of_aethoria')}")
     out.print_separator()
-    for race in world_definition.races:
+    for race_name, race_description, stat_bonuses in creator.race_entries:
         bonus_str = ", ".join(
             f"{stat} {'+' if value >= 0 else ''}{value}"
-            for stat, value in race.stat_bonuses.items()
+            for stat, value in stat_bonuses.items()
             if value != 0
         )
-        out.print_highlighted(f"  {tr_term(race.name)}")
-        out.print_wrapped(race.description)
+        out.print_highlighted(f"  {tr_term(race_name)}")
+        out.print_wrapped(race_description)
         if bonus_str:
             out.print_dim(f"    {tr('bonuses')}: {bonus_str}")
         out.print_line()
     out.print_heading(f"  {tr('jobs_classes')}")
     out.print_separator()
-    for job in world_definition.jobs:
-        skills_str = ', '.join(tr_term(skill) for skill in job.primary_skills)
-        out.print_highlighted(f"  {tr_term(job.name)}")
+    for job_name, job_description, primary_skills in creator.job_entries:
+        skills_str = ', '.join(tr_term(skill) for skill in primary_skills)
+        out.print_highlighted(f"  {tr_term(job_name)}")
         out.print_line(f"    {tr('primary_skills_label')}: {skills_str}")
-        out.print_wrapped(job.description)
+        out.print_wrapped(job_description)
         out.print_line()
     ctx.inp.pause()
 

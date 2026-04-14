@@ -74,13 +74,6 @@ class Simulator(
         self.events_per_year = events_per_year
         self.adventure_steps_per_year = adventure_steps_per_year
         self.event_system = EventSystem()
-        # Compatibility cache of EventResult objects.  Only populated via
-        # _record_event(); events that go directly through _record_world_event()
-        # (adventure lifecycle, injury recovery) do NOT appear here.  The
-        # canonical structured history lives in world.event_records.  This
-        # list is still persisted for save/load compatibility but should be
-        # treated as an incomplete, gradually-retiring adapter.
-        self.history: List[EventResult] = []
         # Mutable progress marker for structured event timestamps within the
         # current simulated year. This value is serialized and restored as-is
         # to preserve in-progress context across save/load.
@@ -145,6 +138,11 @@ class Simulator(
                 return True
         except (ValueError, SyntaxError, TypeError):
             return False
+
+    @property
+    def history(self) -> List[EventResult]:
+        """Project the legacy EventResult adapter from canonical world records."""
+        return [record.to_event_result() for record in self.world.event_records]
         return False
 
     # ------------------------------------------------------------------
@@ -397,9 +395,6 @@ class Simulator(
         )
         sim.elapsed_days = max(0, int(data.get("elapsed_days", 0)))
         sim.start_year = data.get("start_year", sim.world.year)
-        sim.history = [
-            EventResult.from_dict(ev) for ev in data.get("history", [])
-        ]
         sim.memorial_template_history = TemplateHistory.from_dict(
             data.get("memorial_template_history", {})
         )
