@@ -486,7 +486,7 @@ class TestWorld:
             if seed.x < 2 and seed.y < 1
         ]
 
-        assert world.default_location_entries()[:len(expected_entries)] == expected_entries
+        assert world.default_location_entries() == expected_entries
         assert sorted((loc.id, loc.x, loc.y) for loc in world.grid.values()) == sorted(
             (loc_id, x, y) for loc_id, _name, _desc, _rtype, x, y in expected_entries
         )
@@ -534,6 +534,44 @@ class TestWorld:
         restored = World.from_dict(world.to_dict())
         assert restored.name == "Renamed Realm"
         assert restored.setting_bundle.world_definition.display_name == "Renamed Realm"
+
+    def test_lore_is_bundle_backed_source_of_truth(self):
+        world = World()
+
+        world.lore = "Custom lore"
+
+        assert world.setting_bundle.world_definition.lore_text == "Custom lore"
+        payload = world.to_dict()
+        assert payload["lore"] == "Custom lore"
+        restored = World.from_dict(payload)
+        assert restored.lore == "Custom lore"
+        assert restored.setting_bundle.world_definition.lore_text == "Custom lore"
+
+    def test_from_dict_rebuilds_bundle_backed_world_structure_when_grid_is_missing_entries(self):
+        world = World(width=2, height=1)
+        payload = world.to_dict()
+        payload["grid"] = []
+
+        restored = World.from_dict(payload)
+
+        assert restored.default_location_entries() == world.default_location_entries()
+        assert restored.location_ids == world.location_ids
+
+    def test_from_dict_uses_bundle_structure_and_overlays_runtime_state(self):
+        world = World(width=2, height=1)
+        location = next(iter(world.grid.values()))
+        location.danger = 42
+        location.visited = True
+        payload = world.to_dict()
+        next(loc for loc in payload["grid"] if loc["id"] == location.id)["id"] = "stale_id"
+
+        restored = World.from_dict(payload)
+
+        restored_location = restored.get_location_by_id(location.id)
+        assert restored_location is not None
+        assert restored_location.danger == 42
+        assert restored_location.visited is True
+        assert restored.get_location_by_id("stale_id") is None
 
     def test_from_dict_rejects_embedded_bundle_with_duplicate_site_ids(self):
         payload = World().to_dict()

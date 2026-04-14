@@ -361,7 +361,6 @@ class World:
             display_name=name,
             lore_text=lore,
         )
-        self.lore: str = self._setting_bundle.world_definition.lore_text
         self.calendar_baseline: CalendarDefinition = _clone_calendar(
             self._setting_bundle.world_definition.calendar
         )
@@ -406,6 +405,15 @@ class World:
     @name.setter
     def name(self, value: str) -> None:
         self._setting_bundle.world_definition.display_name = value
+
+    @property
+    def lore(self) -> str:
+        """Compatibility alias for the bundle-backed world lore."""
+        return self._setting_bundle.world_definition.lore_text
+
+    @lore.setter
+    def lore(self, value: str) -> None:
+        self._setting_bundle.world_definition.lore_text = value
 
     @property
     def setting_bundle(self) -> SettingBundle:
@@ -511,11 +519,20 @@ class World:
         self._build_terrain_from_grid()
 
     def default_location_entries(self) -> List[Tuple[str, str, str, str, int, int]]:
-        """Return bundle-backed site seeds in the legacy tuple format."""
+        """Return in-bounds bundle-backed site seeds in the legacy tuple format."""
         return [
             seed.as_world_data_entry()
             for seed in self._setting_bundle.world_definition.site_seeds
+            if 0 <= seed.x < self.width and 0 <= seed.y < self.height
         ]
+
+    def _overlay_location_runtime_state_from_dict(self, data: Dict[str, Any]) -> None:
+        """Overlay serialized runtime state onto an existing bundle-backed location."""
+        restored = self._location_state_from_dict(data)
+        current = self._location_id_index.get(restored.id)
+        if current is None:
+            return
+        self._copy_location_runtime_state(restored, current)
 
     def _site_seed_tags(self, location_id: str) -> List[str]:
         """Return semantic tags for a location from the active setting bundle."""
@@ -1465,15 +1482,12 @@ class World:
     def from_dict(cls, data: Dict[str, Any]) -> "World":
         """Restore a World from a serialised dict.
 
-        Uses ``_skip_defaults=True`` so that no default Aethoria map
-        is generated.  The world is populated entirely from the saved
-        data, avoiding contamination from the default 5×5 locations.
-
-        If the saved grid has fewer locations than the declared
-        ``width × height`` (e.g. a partial legacy save), missing
-        default locations are *not* injected — the data migration
-        chain (``persistence.migrations``) is responsible for filling
-        in any missing structure before this method is called.
+        Uses ``_skip_defaults=True`` so construction stays inert until
+        the active source of truth is known. If an embedded
+        ``setting_bundle`` is present, world structure is rebuilt from
+        its site seeds and the serialized grid is treated as runtime
+        state to overlay onto those locations. Otherwise, the serialized
+        grid remains the compatibility source for structure.
 
         If no terrain data is present in *data*, terrain/site/routes
         are derived from the loaded grid via ``_build_terrain_from_grid()``.
@@ -1497,8 +1511,12 @@ class World:
                     source="embedded world.setting_bundle",
                 )
             )
-        for loc_data in data.get("grid", []):
-            world._register_location(world._location_state_from_dict(loc_data))
+            world._build_default_map()
+            for loc_data in data.get("grid", []):
+                world._overlay_location_runtime_state_from_dict(loc_data)
+        else:
+            for loc_data in data.get("grid", []):
+                world._register_location(world._location_state_from_dict(loc_data))
         world.event_log = list(data.get("event_log", []))
         world.event_records = [
             WorldEventRecord.from_dict(r) for r in data.get("event_records", [])
