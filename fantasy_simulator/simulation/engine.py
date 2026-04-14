@@ -366,9 +366,20 @@ class Simulator(
         from ..world import World
 
         world = World.from_dict(data["world"])
-        characters = [
-            Character.from_dict(char_data) for char_data in data.get("characters", [])
-        ]
+        characters = []
+        for char_data in data.get("characters", []):
+            character = Character.from_dict(
+                char_data,
+                location_resolver=world.resolve_location_id_from_name,
+            )
+            character.location_id = (
+                world.normalize_location_id(
+                    character.location_id,
+                    location_name=char_data.get("location"),
+                )
+                or character.location_id
+            )
+            characters.append(character)
         world.characters = characters
         world.normalize_after_load()
         sim = cls(

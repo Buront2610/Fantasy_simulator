@@ -175,6 +175,48 @@ def test_load_setting_bundle_reports_duplicate_site_seed_ids(tmp_path):
         raise AssertionError("Expected ValueError for duplicate site seed ids")
 
 
+def test_load_setting_bundle_reports_duplicate_site_seed_names(tmp_path):
+    bundle_path = tmp_path / "invalid-duplicate-site-names.json"
+    bundle_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "world_definition": {
+                    "world_key": "dup",
+                    "display_name": "Dup",
+                    "lore_text": "Dup lore",
+                    "site_seeds": [
+                        {
+                            "location_id": "loc_dup_one",
+                            "name": "Duplicate",
+                            "description": "",
+                            "region_type": "city",
+                            "x": 0,
+                            "y": 0,
+                        },
+                        {
+                            "location_id": "loc_dup_two",
+                            "name": "Duplicate",
+                            "description": "",
+                            "region_type": "city",
+                            "x": 1,
+                            "y": 0,
+                        },
+                    ],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    try:
+        load_setting_bundle(bundle_path)
+    except ValueError as exc:
+        assert "duplicate site seed names" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError for duplicate site seed names")
+
+
 def test_load_setting_bundle_requires_gendered_name_pools(tmp_path):
     bundle_path = tmp_path / "invalid-naming.json"
     bundle_path.write_text(

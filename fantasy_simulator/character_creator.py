@@ -144,12 +144,9 @@ class CharacterCreator:
     def _supports_aethoria_templates(self) -> bool:
         if self.setting_bundle is None:
             return True
-        available = {
-            (race_name, job_name)
-            for race_name, _race_desc, _bonuses in self.race_entries
-            for job_name, _job_desc, _skills in self.job_entries
-        }
-        return _TEMPLATE_REQUIRED_IDENTITIES.issubset(available)
+        race_names = {race_name for race_name, _race_desc, _bonuses in self.race_entries}
+        job_names = {job_name for job_name, _job_desc, _skills in self.job_entries}
+        return all(race in race_names and job in job_names for race, job in _TEMPLATE_REQUIRED_IDENTITIES)
 
     def list_templates(self) -> List[str]:
         """Return templates supported by the current creator context."""

@@ -375,6 +375,10 @@ def _validate_setting_bundle(bundle: SettingBundle, *, source: str) -> None:
     if site_ids and len(site_ids) != len(set(site_ids)):
         raise ValueError(f"Setting bundle {source} contains duplicate site seed ids")
 
+    site_names = [seed.name for seed in world.site_seeds]
+    if site_names and len(site_names) != len(set(site_names)):
+        raise ValueError(f"Setting bundle {source} contains duplicate site seed names")
+
     site_coords = [(seed.x, seed.y) for seed in world.site_seeds]
     if site_coords and len(site_coords) != len(set(site_coords)):
         raise ValueError(f"Setting bundle {source} contains duplicate site seed coordinates")

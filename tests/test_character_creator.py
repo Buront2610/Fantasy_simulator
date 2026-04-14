@@ -163,6 +163,15 @@ class TestCreateFromTemplateReproducibility:
         else:
             raise AssertionError("Expected ValueError for unsupported template bundle")
 
+    def test_templates_remain_available_when_bundle_uses_legacy_race_job_fallbacks(self):
+        bundle = default_aethoria_bundle()
+        bundle.world_definition.races = []
+        bundle.world_definition.jobs = []
+
+        creator = CharacterCreator(setting_bundle=bundle)
+
+        assert "warrior" in creator.list_templates()
+
 
 class TestInteractiveStatAllocation:
     def test_manual_distribution_allows_values_above_ten(self):

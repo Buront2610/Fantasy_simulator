@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import random
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from .i18n import tr, tr_term
 from .content.world_data import NAME_TO_LOCATION_ID, fallback_location_id
@@ -215,7 +215,12 @@ class Character:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Character":
+    def from_dict(
+        cls,
+        data: Dict[str, Any],
+        *,
+        location_resolver: Callable[[str], str] | None = None,
+    ) -> "Character":
         # Clamp skill levels to [0, 10] and relationships to [-100, 100]
         raw_skills = data.get("skills", {})
         skills = {k: max(0, min(10, v)) for k, v in raw_skills.items()}
@@ -225,7 +230,10 @@ class Character:
         location_id = data.get("location_id")
         if location_id is None:
             old_name = data.get("location", "Aethoria Capital")
-            location_id = NAME_TO_LOCATION_ID.get(old_name, fallback_location_id(old_name))
+            if location_resolver is not None:
+                location_id = location_resolver(old_name)
+            else:
+                location_id = NAME_TO_LOCATION_ID.get(old_name, fallback_location_id(old_name))
         char = cls(
             name=data["name"],
             age=data["age"],

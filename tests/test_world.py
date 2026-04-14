@@ -368,7 +368,7 @@ class TestWorld:
 
     def test_custom_calendar_round_trips_with_world(self):
         world = World()
-        world.setting_bundle = SettingBundle(
+        custom_bundle = SettingBundle(
             schema_version=1,
             world_definition=WorldDefinition(
                 world_key="custom",
@@ -384,13 +384,16 @@ class TestWorld:
                 ),
             ),
         )
+        world.setting_bundle = custom_bundle
 
         restored = World.from_dict(world.to_dict())
 
+        assert world.calendar_baseline.calendar_key == "lunar_cycle"
         assert restored.months_per_year == 2
         assert restored.days_in_month(1) == 20
         assert restored.days_in_month(2) == 35
         assert restored.season_for_month(2) == "summer"
+        assert restored.calendar_baseline.calendar_key == "lunar_cycle"
 
     def test_advance_calendar_position_respects_variable_month_lengths(self):
         world = World()

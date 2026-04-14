@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Dict
 
+from ..content.setting_bundle import bundle_from_dict_validated
 from ..content.world_data import (
     DEFAULT_LOCATIONS,
     NAME_TO_LOCATION_ID,
@@ -20,6 +21,48 @@ from ..terrain import (
 )
 
 CURRENT_VERSION = 7
+
+
+def _embedded_setting_bundle(data: Dict[str, Any]):
+    world_data = data.get("world", {})
+    bundle_data = world_data.get("setting_bundle")
+    if bundle_data is None:
+        return None
+    return bundle_from_dict_validated(bundle_data, source="embedded world.setting_bundle during migration")
+
+
+def _location_name_to_id(data: Dict[str, Any]) -> Dict[str, str]:
+    bundle = _embedded_setting_bundle(data)
+    if bundle is None:
+        return dict(NAME_TO_LOCATION_ID)
+    return {
+        seed.name: seed.location_id
+        for seed in bundle.world_definition.site_seeds
+    }
+
+
+def _default_locations_for_data(data: Dict[str, Any]) -> list[tuple[str, str, str, str, int, int]]:
+    bundle = _embedded_setting_bundle(data)
+    if bundle is None:
+        return list(DEFAULT_LOCATIONS)
+    return [
+        seed.as_world_data_entry()
+        for seed in bundle.world_definition.site_seeds
+    ]
+
+
+def _site_tags_by_location_id(data: Dict[str, Any]) -> Dict[str, list[str]]:
+    bundle = _embedded_setting_bundle(data)
+    if bundle is None:
+        return {}
+    return {
+        seed.location_id: list(seed.tags)
+        for seed in bundle.world_definition.site_seeds
+    }
+
+
+def _resolve_location_id(data: Dict[str, Any], name: str) -> str:
+    return _location_name_to_id(data).get(name, fallback_location_id(name))
 
 
 def migrate(data: Dict[str, Any]) -> Dict[str, Any]:
@@ -56,26 +99,23 @@ def _migrate_v1_to_v2(data: Dict[str, Any]) -> Dict[str, Any]:
         if "location_id" in char_data:
             continue
         old_name = char_data.pop("location", "Aethoria Capital")
-        char_data["location_id"] = NAME_TO_LOCATION_ID.get(old_name, fallback_location_id(old_name))
+        char_data["location_id"] = _resolve_location_id(data, old_name)
 
     world_data = data.get("world", {})
     for loc_data in world_data.get("grid", []):
         if "id" in loc_data:
             continue
         name = loc_data.get("canonical_name") or loc_data.get("name", "")
-        loc_data["id"] = NAME_TO_LOCATION_ID.get(name, fallback_location_id(name))
+        loc_data["id"] = _resolve_location_id(data, name)
 
     for bucket in ("active_adventures", "completed_adventures"):
         for adventure in world_data.get(bucket, []):
             if "origin" in adventure:
                 origin = adventure["origin"]
-                adventure["origin"] = NAME_TO_LOCATION_ID.get(origin, fallback_location_id(origin))
+                adventure["origin"] = _resolve_location_id(data, origin)
             if "destination" in adventure:
                 destination = adventure["destination"]
-                adventure["destination"] = NAME_TO_LOCATION_ID.get(
-                    destination,
-                    fallback_location_id(destination),
-                )
+                adventure["destination"] = _resolve_location_id(data, destination)
 
     data["schema_version"] = 2
     return data
@@ -95,18 +135,23 @@ def _migrate_v2_to_v3(data: Dict[str, Any]) -> Dict[str, Any]:
     # Fill in missing default locations for partial legacy saves
     width = world_data.get("width", 5)
     height = world_data.get("height", 5)
+    site_tags_by_location_id = _site_tags_by_location_id(data)
     existing_ids = {
-        loc_data.get("id") or NAME_TO_LOCATION_ID.get(
+        loc_data.get("id") or _location_name_to_id(data).get(
             loc_data.get("canonical_name") or loc_data.get("name", ""), ""
         )
         for loc_data in grid
     }
-    for loc_id, name, desc, region_type, x, y in DEFAULT_LOCATIONS:
+    for loc_id, name, desc, region_type, x, y in _default_locations_for_data(data):
         if loc_id in existing_ids:
             continue
         if not (0 <= x < width and 0 <= y < height):
             continue
-        defaults = get_location_state_defaults(loc_id, region_type)
+        defaults = get_location_state_defaults(
+            loc_id,
+            region_type,
+            site_tags=site_tags_by_location_id.get(loc_id),
+        )
         grid.append({
             "id": loc_id,
             "canonical_name": name,
@@ -129,14 +174,18 @@ def _migrate_v2_to_v3(data: Dict[str, Any]) -> Dict[str, Any]:
         loc_id = loc_data.get("id")
         if not loc_id:
             name = loc_data.get("canonical_name") or loc_data.get("name", "")
-            loc_id = NAME_TO_LOCATION_ID.get(name, fallback_location_id(name))
+            loc_id = _resolve_location_id(data, name)
             loc_data["id"] = loc_id
         canonical_name = loc_data.get("canonical_name") or loc_data.get("name", "")
         loc_data["canonical_name"] = canonical_name
         loc_data.setdefault("name", canonical_name)
 
         region_type = loc_data.get("region_type", "city")
-        defaults = get_location_state_defaults(loc_id, region_type)
+        defaults = get_location_state_defaults(
+            loc_id,
+            region_type,
+            site_tags=site_tags_by_location_id.get(loc_id),
+        )
         for field_name, default_value in defaults.items():
             loc_data.setdefault(field_name, default_value)
         loc_data.setdefault("visited", False)

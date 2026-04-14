@@ -5,6 +5,13 @@ tests/test_save_load.py - Unit tests for save/load helpers.
 import json
 
 from fantasy_simulator.character_creator import CharacterCreator
+from fantasy_simulator.content.setting_bundle import (
+    NamingRulesDefinition,
+    SettingBundle,
+    SiteSeedDefinition,
+    WorldDefinition,
+)
+from fantasy_simulator.persistence.migrations import CURRENT_VERSION
 from fantasy_simulator.persistence.save_load import load_simulation, save_simulation
 from fantasy_simulator.simulator import Simulator
 from fantasy_simulator.world import World
@@ -193,3 +200,234 @@ class TestLoadSimulation:
         restored = load_simulation(str(path))
 
         assert restored is None
+
+    def test_load_custom_bundle_recovers_legacy_character_location_names_via_embedded_bundle(self, tmp_path):
+        path = tmp_path / "custom-bundle-location.json"
+        sim = Simulator(World(name="Custom"), seed=0)
+        sim.world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="hub_primary",
+                        name="Clockwork Hub",
+                        description="A custom site with a non-slug ID.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                    ),
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+        sim.world.grid.clear()
+        sim.world._location_id_index.clear()
+        sim.world._location_name_index.clear()
+        sim.world._build_default_map()
+        payload = sim.to_dict()
+        payload["schema_version"] = CURRENT_VERSION
+        payload["characters"] = [
+            {
+                "char_id": "char_1",
+                "name": "Aldric",
+                "age": 25,
+                "gender": "Male",
+                "race": "Human",
+                "job": "Warrior",
+                "location": "Clockwork Hub",
+            }
+        ]
+        path.write_text(json.dumps(payload), encoding="utf-8")
+
+        restored = load_simulation(str(path))
+
+        assert restored is not None
+        assert restored.world.characters[0].location_id == "hub_primary"
+
+    def test_migration_uses_embedded_custom_bundle_for_legacy_location_recovery(self, tmp_path):
+        path = tmp_path / "legacy-custom-bundle.json"
+        legacy_payload = {
+            "schema_version": 1,
+            "world": {
+                "name": "Custom",
+                "lore": "Custom lore",
+                "width": 1,
+                "height": 1,
+                "year": 1000,
+                "grid": [
+                    {
+                        "name": "Clockwork Hub",
+                        "description": "A custom site with a non-slug ID.",
+                        "region_type": "city",
+                        "x": 0,
+                        "y": 0,
+                    }
+                ],
+                "event_records": [],
+                "setting_bundle": {
+                    "schema_version": 1,
+                    "world_definition": {
+                        "world_key": "custom",
+                        "display_name": "Custom",
+                        "lore_text": "Custom lore",
+                        "site_seeds": [
+                            {
+                                "location_id": "hub_primary",
+                                "name": "Clockwork Hub",
+                                "description": "A custom site with a non-slug ID.",
+                                "region_type": "city",
+                                "x": 0,
+                                "y": 0,
+                            }
+                        ],
+                        "naming_rules": {
+                            "last_names": ["Fallback"],
+                        },
+                    },
+                },
+            },
+            "characters": [
+                {
+                    "char_id": "char_1",
+                    "name": "Aldric",
+                    "age": 25,
+                    "gender": "Male",
+                    "race": "Human",
+                    "job": "Warrior",
+                    "location": "Clockwork Hub",
+                }
+            ],
+            "history": [],
+        }
+        path.write_text(json.dumps(legacy_payload), encoding="utf-8")
+
+        restored = load_simulation(str(path))
+
+        assert restored is not None
+        assert restored.world.get_location_by_id("hub_primary") is not None
+        assert restored.world.get_location_by_id("loc_aethoria_capital") is None
+        assert restored.world.characters[0].location_id == "hub_primary"
+
+    def test_current_schema_load_remaps_legacy_fallback_slug_ids_to_bundle_ids(self, tmp_path):
+        path = tmp_path / "current-custom-bundle.json"
+        payload = {
+            "schema_version": CURRENT_VERSION,
+            "world": {
+                "name": "Custom",
+                "lore": "Custom lore",
+                "width": 1,
+                "height": 1,
+                "year": 1000,
+                "grid": [
+                    {
+                        "id": "loc_clockwork_hub",
+                        "name": "Clockwork Hub",
+                        "description": "A custom site with a non-slug ID.",
+                        "region_type": "city",
+                        "x": 0,
+                        "y": 0,
+                    }
+                ],
+                "event_log": [],
+                "event_records": [
+                    {
+                        "record_id": "rec_1",
+                        "kind": "meeting",
+                        "year": 1000,
+                        "month": 1,
+                        "day": 1,
+                        "location_id": "loc_clockwork_hub",
+                    }
+                ],
+                "active_adventures": [
+                    {
+                        "character_id": "char_1",
+                        "character_name": "Aldric",
+                        "origin": "loc_clockwork_hub",
+                        "destination": "loc_clockwork_hub",
+                        "year_started": 1000,
+                    }
+                ],
+                "completed_adventures": [],
+                "terrain_map": {
+                    "width": 1,
+                    "height": 1,
+                    "cells": [
+                        {
+                            "x": 0,
+                            "y": 0,
+                            "biome": "plains",
+                            "elevation": 128,
+                            "moisture": 128,
+                            "temperature": 128,
+                        }
+                    ],
+                },
+                "sites": [
+                    {
+                        "location_id": "loc_clockwork_hub",
+                        "x": 0,
+                        "y": 0,
+                        "site_type": "city",
+                        "importance": 50,
+                    }
+                ],
+                "routes": [
+                    {
+                        "route_id": "route_001",
+                        "from_site_id": "loc_clockwork_hub",
+                        "to_site_id": "loc_clockwork_hub",
+                        "route_type": "road",
+                        "distance": 1,
+                        "blocked": False,
+                    }
+                ],
+                "setting_bundle": {
+                    "schema_version": 1,
+                    "world_definition": {
+                        "world_key": "custom",
+                        "display_name": "Custom",
+                        "lore_text": "Custom lore",
+                        "site_seeds": [
+                            {
+                                "location_id": "hub_primary",
+                                "name": "Clockwork Hub",
+                                "description": "A custom site with a non-slug ID.",
+                                "region_type": "city",
+                                "x": 0,
+                                "y": 0,
+                            }
+                        ],
+                        "naming_rules": {
+                            "last_names": ["Fallback"],
+                        },
+                    },
+                },
+            },
+            "characters": [
+                {
+                    "char_id": "char_1",
+                    "name": "Aldric",
+                    "age": 25,
+                    "gender": "Male",
+                    "race": "Human",
+                    "job": "Warrior",
+                    "location_id": "loc_clockwork_hub",
+                }
+            ],
+            "history": [],
+        }
+        path.write_text(json.dumps(payload), encoding="utf-8")
+
+        restored = load_simulation(str(path))
+
+        assert restored is not None
+        assert restored.world.get_location_by_id("hub_primary") is not None
+        assert restored.world.characters[0].location_id == "hub_primary"
+        assert restored.world.event_records[0].location_id == "hub_primary"
+        assert restored.world.active_adventures[0].origin == "hub_primary"
+        assert restored.world.sites[0].location_id == "hub_primary"
+        assert restored.world.routes[0].from_site_id == "hub_primary"
