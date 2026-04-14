@@ -815,11 +815,14 @@ class World:
 
     def add_character(self, character: Character, rng: Any = random) -> None:
         if character.location_id not in self._location_id_index:
-            options = [loc.id for loc in self.grid.values() if loc.region_type != "dungeon"]
-            if options:
-                character.location_id = rng.choice(options)
-            else:
+            if not character.location_id:
                 character.location_id = self._default_resident_location_id()
+            else:
+                options = [loc.id for loc in self.grid.values() if loc.region_type != "dungeon"]
+                if options:
+                    character.location_id = rng.choice(options)
+                else:
+                    character.location_id = self._default_resident_location_id()
         if character.char_id in self._char_index:
             raise ValueError(
                 f"Duplicate character ID: {character.char_id!r} "

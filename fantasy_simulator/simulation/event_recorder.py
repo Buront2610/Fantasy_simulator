@@ -125,6 +125,7 @@ class EventRecorderMixin:
             result,
             location_id=location_id,
             severity=severity,
+            record_id=result.metadata.get("record_id"),
             rng=self.id_rng,
             month=self.current_month,
             day=self.current_day,

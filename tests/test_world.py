@@ -85,6 +85,14 @@ class TestWorld:
         world.add_character(_make_char())
         assert capital.visited is True
 
+    def test_add_character_with_blank_location_uses_default_resident(self):
+        world = World()
+        character = Character("Wanderer", 25, "Male", "Human", "Warrior", location_id="")
+
+        world.add_character(character)
+
+        assert character.location_id == world._default_resident_location_id()
+
     def test_locations_have_state_defaults(self):
         world = World()
         capital = world.get_location_by_id("loc_aethoria_capital")
