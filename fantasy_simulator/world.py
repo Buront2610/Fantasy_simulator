@@ -9,9 +9,13 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from .i18n import tr
-from .content.setting_bundle import CalendarDefinition, SettingBundle, default_aethoria_bundle
+from .content.setting_bundle import (
+    CalendarDefinition,
+    SettingBundle,
+    bundle_from_dict_validated,
+    default_aethoria_bundle,
+)
 from .content.world_data import (
-    NAME_TO_LOCATION_ID,
     fallback_location_id,
     get_location_state_defaults,
 )
@@ -307,7 +311,7 @@ class LocationState:
         loc_id = data.get("id")
         if not loc_id:
             name = data.get("canonical_name") or data.get("name", "")
-            loc_id = NAME_TO_LOCATION_ID.get(name, fallback_location_id(name))
+            loc_id = fallback_location_id(name)
         canonical_name = data.get("canonical_name") or data.get("name", "")
         region_type = data["region_type"]
         defaults = get_location_state_defaults(loc_id, region_type)
@@ -438,6 +442,13 @@ class World:
             if seed.location_id == location_id:
                 return list(seed.tags)
         return []
+
+    def _bundle_location_id_for_name(self, name: str) -> str | None:
+        """Resolve a location name through the active setting bundle."""
+        for seed in self.setting_bundle.world_definition.site_seeds:
+            if seed.name == name:
+                return seed.location_id
+        return None
 
     def location_state_defaults(self, location_id: str, region_type: str) -> Dict[str, int]:
         """Return location defaults using the active bundle's site tags."""
@@ -1209,7 +1220,7 @@ class World:
         loc_id = data.get("id")
         if not loc_id:
             name = data.get("canonical_name") or data.get("name", "")
-            loc_id = NAME_TO_LOCATION_ID.get(name, fallback_location_id(name))
+            loc_id = self._bundle_location_id_for_name(name) or fallback_location_id(name)
         canonical_name = data.get("canonical_name") or data.get("name", "")
         region_type = data["region_type"]
         defaults = self.location_state_defaults(loc_id, region_type)
@@ -1265,7 +1276,10 @@ class World:
             _skip_defaults=True,
         )
         if "setting_bundle" in data:
-            world.setting_bundle = SettingBundle.from_dict(data["setting_bundle"])
+            world.setting_bundle = bundle_from_dict_validated(
+                data["setting_bundle"],
+                source="embedded world.setting_bundle",
+            )
             world.lore = world.setting_bundle.world_definition.lore_text
         for loc_data in data.get("grid", []):
             world._register_location(world._location_state_from_dict(loc_data))

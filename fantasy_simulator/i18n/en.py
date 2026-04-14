@@ -91,6 +91,7 @@ TEXT_EN: Dict[str, str] = {
     'character_added': '{name} added to the world.',
     'random_character_added': '{name} ({race} {job}) added randomly.',
     'available_templates': 'Available templates',
+    'no_templates_available': 'Templates are not available for this setting bundle.',
     'template_name': 'Template name',
     'character_name_optional': 'Character name (leave blank for random)',
     'template_character_added': '{name} ({race} {job}) added from template.',

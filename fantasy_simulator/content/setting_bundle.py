@@ -393,7 +393,8 @@ def _validate_setting_bundle(bundle: SettingBundle, *, source: str) -> None:
         raise ValueError(f"Setting bundle {source} must provide last_names when naming rules are defined")
 
 
-def _bundle_from_data(data: Dict[str, Any], *, source: str) -> SettingBundle:
+def bundle_from_dict_validated(data: Dict[str, Any], *, source: str) -> SettingBundle:
+    """Construct a SettingBundle and enforce bundle invariants."""
     try:
         bundle = SettingBundle.from_dict(data)
     except KeyError as exc:
@@ -410,7 +411,7 @@ def default_aethoria_bundle(
 ) -> SettingBundle:
     """Return the default bundled Aethoria setting as a mutable copy."""
 
-    bundle = _bundle_from_data(_default_aethoria_bundle_data(), source=str(DEFAULT_AETHORIA_BUNDLE_PATH))
+    bundle = bundle_from_dict_validated(_default_aethoria_bundle_data(), source=str(DEFAULT_AETHORIA_BUNDLE_PATH))
     if display_name is not None:
         bundle.world_definition.display_name = display_name
     if lore_text is not None:
@@ -428,4 +429,4 @@ def load_setting_bundle(path: str | Path) -> SettingBundle:
         raise FileNotFoundError(f"Setting bundle not found: {bundle_path}") from exc
     except json.JSONDecodeError as exc:
         raise ValueError(f"Invalid setting bundle JSON in {bundle_path}: {exc.msg}") from exc
-    return _bundle_from_data(data, source=str(bundle_path))
+    return bundle_from_dict_validated(data, source=str(bundle_path))

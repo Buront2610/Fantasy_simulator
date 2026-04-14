@@ -1,4 +1,9 @@
-"""Compatibility projections for bundled world-setting data plus legacy flavor tables."""
+"""Aethoria compatibility projections for bundled world-setting data plus legacy flavor tables.
+
+The module-level globals here are import-time snapshots of the bundled default
+Aethoria setting. New bundle-aware code should prefer ``SettingBundle`` data
+from the active world instead of importing these globals directly.
+"""
 
 from typing import Dict, List, Tuple
 

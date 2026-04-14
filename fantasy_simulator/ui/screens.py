@@ -953,7 +953,10 @@ def screen_custom_simulation(ctx: UIContext | None = None) -> None:
             out.print_line()
             out.print_success(f"  {msg}")
         elif action == "create_template":
-            templates = CharacterCreator.list_templates()
+            templates = creator.list_templates()
+            if not templates:
+                out.print_warning(f"  {tr('no_templates_available')}")
+                continue
             out.print_line(f"\n  {tr('available_templates')}: " + ", ".join(templates))
             tmpl_name = inp.read_line(f"  > {tr('template_name')}: ").strip()
             char_name = inp.read_line(f"  > {tr('character_name_optional')}: ").strip() or None

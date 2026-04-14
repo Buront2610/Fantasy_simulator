@@ -113,6 +113,15 @@ class TestCreateRandomReproducibility:
         assert character.race == "Clockfolk"
         assert character.job == "Scribe"
 
+    def test_empty_bundle_naming_rules_fall_back_to_default_names(self):
+        bundle = default_aethoria_bundle()
+        bundle.world_definition.naming_rules = bundle.world_definition.naming_rules.__class__()
+
+        default_name = CharacterCreator().create_random(rng=random.Random(7)).name
+        fallback_name = CharacterCreator(setting_bundle=bundle).create_random(rng=random.Random(7)).name
+
+        assert fallback_name == default_name
+
 
 class TestCreateFromTemplateReproducibility:
     def test_same_seed_produces_same_template_character(self):
@@ -127,6 +136,32 @@ class TestCreateFromTemplateReproducibility:
         assert c1.age == c2.age
         assert c1.strength == c2.strength
         assert c1.intelligence == c2.intelligence
+
+    def test_templates_are_unavailable_for_non_aethoria_compatible_bundles(self):
+        bundle = default_aethoria_bundle()
+        bundle.world_definition.races = [
+            RaceDefinition(
+                name="Clockfolk",
+                description="Precise and patient.",
+                stat_bonuses={"intelligence": 2},
+            )
+        ]
+        bundle.world_definition.jobs = [
+            JobDefinition(
+                name="Scribe",
+                description="Records the world.",
+                primary_skills=["Lore Mastery"],
+            )
+        ]
+        creator = CharacterCreator(setting_bundle=bundle)
+
+        assert creator.list_templates() == []
+        try:
+            creator.create_from_template("warrior", rng=random.Random(3))
+        except ValueError as exc:
+            assert "Aethoria-compatible bundles" in str(exc)
+        else:
+            raise AssertionError("Expected ValueError for unsupported template bundle")
 
 
 class TestInteractiveStatAllocation:

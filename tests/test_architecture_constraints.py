@@ -10,6 +10,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = PROJECT_ROOT / "fantasy_simulator"
 REPORTS_MODULE = "fantasy_simulator.reports"
+WORLD_DATA_MODULE = "fantasy_simulator.content.world_data"
 
 
 def _module_name(path: Path) -> str:
@@ -169,3 +170,23 @@ def test_core_ui_modules_do_not_import_reports_module() -> None:
             if target == REPORTS_MODULE or target.startswith(f"{REPORTS_MODULE}.")
         ]
         assert forbidden == [], f"{path} imports report modules: {forbidden}"
+
+
+def test_world_data_imports_stay_in_legacy_compatibility_modules() -> None:
+    allowed = {
+        PACKAGE_ROOT / "character.py",
+        PACKAGE_ROOT / "character_creator.py",
+        PACKAGE_ROOT / "events.py",
+        PACKAGE_ROOT / "terrain.py",
+        PACKAGE_ROOT / "world.py",
+        PACKAGE_ROOT / "persistence" / "migrations.py",
+    }
+    for path in _production_files():
+        if path in allowed:
+            continue
+        forbidden = [
+            target
+            for target in _iter_import_targets(path)
+            if target == WORLD_DATA_MODULE or target.startswith(f"{WORLD_DATA_MODULE}.")
+        ]
+        assert forbidden == [], f"{path} imports legacy world_data compatibility projections: {forbidden}"

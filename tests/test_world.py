@@ -135,6 +135,40 @@ class TestWorld:
         assert restored_capital is not None
         assert restored.location_state_defaults("loc_custom_capital", "city")["safety"] == 80
 
+    def test_from_dict_recovers_missing_location_id_from_active_bundle_site_seeds(self):
+        world = World(name="Custom")
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="hub_primary",
+                        name="Clockwork Hub",
+                        description="A custom site with a non-slug ID.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                    ),
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+        world.grid.clear()
+        world._location_id_index.clear()
+        world._location_name_index.clear()
+        world._build_default_map()
+        payload = world.to_dict()
+        payload["grid"][0].pop("id")
+
+        restored = World.from_dict(payload)
+
+        location = restored.get_location_by_id("hub_primary")
+        assert location is not None
+        assert location.canonical_name == "Clockwork Hub"
+
     def test_default_world_uses_bundle_site_seeds(self):
         world = World(width=2, height=1)
 
@@ -192,6 +226,48 @@ class TestWorld:
         restored = World.from_dict(world.to_dict())
         assert restored.name == "Renamed Realm"
         assert restored.setting_bundle.world_definition.display_name == "Renamed Realm"
+
+    def test_from_dict_rejects_embedded_bundle_with_duplicate_site_ids(self):
+        payload = World().to_dict()
+        payload["setting_bundle"]["world_definition"]["site_seeds"] = [
+            {
+                "location_id": "loc_dup",
+                "name": "One",
+                "description": "",
+                "region_type": "city",
+                "x": 0,
+                "y": 0,
+            },
+            {
+                "location_id": "loc_dup",
+                "name": "Two",
+                "description": "",
+                "region_type": "city",
+                "x": 1,
+                "y": 0,
+            },
+        ]
+
+        try:
+            World.from_dict(payload)
+        except ValueError as exc:
+            assert "duplicate site seed ids" in str(exc)
+        else:
+            raise AssertionError("Expected ValueError for invalid embedded setting_bundle")
+
+    def test_from_dict_rejects_embedded_bundle_with_incomplete_naming_rules(self):
+        payload = World().to_dict()
+        payload["setting_bundle"]["world_definition"]["naming_rules"] = {
+            "first_names_non_binary": ["Quill"],
+            "last_names": ["Ink"],
+        }
+
+        try:
+            World.from_dict(payload)
+        except ValueError as exc:
+            assert "first_names_male" in str(exc)
+        else:
+            raise AssertionError("Expected ValueError for invalid embedded naming rules")
 
     def test_get_characters_at_location_only_returns_alive(self):
         world = World()

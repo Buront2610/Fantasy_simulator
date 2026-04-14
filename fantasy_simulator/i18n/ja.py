@@ -91,6 +91,7 @@ TEXT_JA: Dict[str, str] = {
     'character_added': '{name} をワールドに追加しました。',
     'random_character_added': '{name}（{race} {job}）を追加しました。',
     'available_templates': '利用可能なテンプレート',
+    'no_templates_available': 'この設定バンドルではテンプレートを利用できません。',
     'template_name': 'テンプレート名',
     'character_name_optional': 'キャラクター名（空欄でランダム）',
     'template_character_added': '{name}（{race} {job}）をテンプレートから追加しました。',

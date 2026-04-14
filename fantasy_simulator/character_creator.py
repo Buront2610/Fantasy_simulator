@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from .ui.ui_context import UIContext
 
 
+# Compatibility fixtures for the default Aethoria bundle.
 _TEMPLATES: Dict[str, Dict] = {
     "warrior": {
         "race": "Human",
@@ -83,6 +84,10 @@ _TEMPLATES: Dict[str, Dict] = {
 }
 
 _GENDERS = ["Male", "Female", "Non-binary"]
+_TEMPLATE_REQUIRED_IDENTITIES = {
+    (template["race"], template["job"])
+    for template in _TEMPLATES.values()
+}
 
 
 def _random_name(gender: str, naming_rules: NamingRulesDefinition, rng: Any = random) -> str:
@@ -104,8 +109,19 @@ class CharacterCreator:
 
     @property
     def naming_rules(self) -> NamingRulesDefinition:
+        default_rules = default_aethoria_bundle().world_definition.naming_rules
         bundle = self.setting_bundle or default_aethoria_bundle()
-        return bundle.world_definition.naming_rules
+        rules = bundle.world_definition.naming_rules
+        male = list(rules.first_names_male or default_rules.first_names_male)
+        female = list(rules.first_names_female or default_rules.first_names_female)
+        non_binary = list(rules.first_names_non_binary or (male + female) or default_rules.first_names_non_binary)
+        last_names = list(rules.last_names or default_rules.last_names)
+        return NamingRulesDefinition(
+            first_names_male=male,
+            first_names_female=female,
+            first_names_non_binary=non_binary,
+            last_names=last_names,
+        )
 
     @property
     def race_entries(self) -> List[tuple[str, str, Dict[str, int]]]:
@@ -124,6 +140,22 @@ class CharacterCreator:
                 for job in self.setting_bundle.world_definition.jobs
             ]
         return JOBS
+
+    def _supports_aethoria_templates(self) -> bool:
+        if self.setting_bundle is None:
+            return True
+        available = {
+            (race_name, job_name)
+            for race_name, _race_desc, _bonuses in self.race_entries
+            for job_name, _job_desc, _skills in self.job_entries
+        }
+        return _TEMPLATE_REQUIRED_IDENTITIES.issubset(available)
+
+    def list_templates(self) -> List[str]:
+        """Return templates supported by the current creator context."""
+        if self._supports_aethoria_templates():
+            return list(_TEMPLATES.keys())
+        return []
 
     def create_interactive(self, ctx: "UIContext | None" = None) -> Character:
         from .ui.ui_context import _default_ctx
@@ -212,6 +244,8 @@ class CharacterCreator:
 
     def create_from_template(self, template_name: str, name: Optional[str] = None, rng: Any = random) -> Character:
         key = template_name.lower().strip()
+        if not self._supports_aethoria_templates():
+            raise ValueError("Character templates are only available for Aethoria-compatible bundles")
         if key not in _TEMPLATES:
             available = ", ".join(_TEMPLATES.keys())
             raise ValueError(f"Unknown template '{template_name}'. Available: {available}")
@@ -302,7 +336,3 @@ class CharacterCreator:
                 allocated[stat] = val
                 break
         return allocated
-
-    @staticmethod
-    def list_templates() -> List[str]:
-        return list(_TEMPLATES.keys())
