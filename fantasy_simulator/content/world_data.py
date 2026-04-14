@@ -79,6 +79,10 @@ DEFAULT_LOCATIONS = [
 ]
 
 NAME_TO_LOCATION_ID: Dict[str, str] = {entry[1]: entry[0] for entry in DEFAULT_LOCATIONS}
+_SITE_SEED_TAGS_BY_ID: Dict[str, List[str]] = {
+    seed.location_id: list(seed.tags)
+    for seed in _WORLD_DEFINITION.site_seeds
+}
 
 
 LOCATION_STATE_DEFAULTS: Dict[str, Dict[str, int]] = {
@@ -156,7 +160,11 @@ LOCATION_STATE_DEFAULTS: Dict[str, Dict[str, int]] = {
     },
 }
 
-CAPITAL_LOCATION_IDS = {"loc_aethoria_capital"}
+CAPITAL_LOCATION_IDS = {
+    seed.location_id
+    for seed in _WORLD_DEFINITION.site_seeds
+    if seed.has_tag("capital")
+}
 
 
 def fallback_location_id(name: str) -> str:
@@ -165,9 +173,14 @@ def fallback_location_id(name: str) -> str:
     return f"loc_{slug}"
 
 
-def get_location_state_defaults(loc_id: str, region_type: str) -> Dict[str, int]:
+def get_location_state_defaults(
+    loc_id: str,
+    region_type: str,
+    site_tags: List[str] | None = None,
+) -> Dict[str, int]:
     """Return initial state values for a location."""
-    profile = "capital" if loc_id in CAPITAL_LOCATION_IDS else region_type
+    effective_tags = site_tags if site_tags is not None else _SITE_SEED_TAGS_BY_ID.get(loc_id, [])
+    profile = "capital" if "capital" in effective_tags or loc_id in CAPITAL_LOCATION_IDS else region_type
     defaults = LOCATION_STATE_DEFAULTS.get(profile, LOCATION_STATE_DEFAULTS["city"])
     return dict(defaults)
 

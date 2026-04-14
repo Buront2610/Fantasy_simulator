@@ -13,7 +13,8 @@ However, the persistence layer still serializes all three stores:
   via ``_record_world_event()`` — see note below)
 
 .. important::
-   ``_record_world_event()`` writes to ``event_records`` and ``event_log``
+   ``_record_world_event()`` writes to ``event_records`` and refreshes the
+   compatibility ``event_log`` cache indirectly via ``World.record_event()``,
    but does **not** append to ``history``.  Only ``_record_event()`` (which
    wraps ``_record_world_event()``) also writes to ``history``.  Events
    such as ``adventure_started``, ``adventure_choice``, and
@@ -70,7 +71,7 @@ class EventRecorderMixin:
         severity: int = 1,
         visibility: str = "public",
     ) -> WorldEventRecord:
-        """Record a structured world event to ``event_records`` and ``event_log``.
+        """Record a structured world event to canonical ``event_records``.
 
         This method does **not** append to ``self.history``.  Events that
         originate from an ``EventResult`` (random events, natural death,
@@ -79,11 +80,11 @@ class EventRecorderMixin:
 
         Events created directly by the simulation loop (adventure lifecycle,
         injury recovery, etc.) call this method only, so they appear in
-        ``event_records`` and ``event_log`` but not in ``history``.
+        ``event_records`` and the compatibility ``event_log`` projection but
+        not in ``history``.
         """
         effective_month = self.current_month if month is None else month
         effective_day = self.current_day
-        self.world.log_event(description, month=effective_month, day=effective_day)
         record = WorldEventRecord(
             record_id=generate_record_id(self.id_rng),
             kind=kind,
@@ -154,7 +155,7 @@ class EventRecorderMixin:
         - ``history`` — appends the raw ``EventResult`` (legacy adapter;
           only events routed through this method are visible to
           ``events_by_type()``)
-        - ``world.event_log`` — appends a formatted text line (display-derived)
+        - ``world.event_log`` — refreshes the formatted compatibility cache
         - ``world.event_records`` — appends a ``WorldEventRecord`` (canonical)
         """
         self.history.append(result)

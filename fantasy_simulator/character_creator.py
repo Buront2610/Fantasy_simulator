@@ -8,7 +8,7 @@ import random
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from .character import Character, random_stats
-from .content.setting_bundle import default_aethoria_bundle
+from .content.setting_bundle import NamingRulesDefinition, SettingBundle, default_aethoria_bundle
 from .content.world_data import ALL_SKILLS, JOBS, RACES
 from .i18n import tr, tr_term
 
@@ -84,26 +84,27 @@ _TEMPLATES: Dict[str, Dict] = {
 
 _GENDERS = ["Male", "Female", "Non-binary"]
 
-_DEFAULT_NAMING_RULES = default_aethoria_bundle().world_definition.naming_rules
-_FIRST_NAMES_M = list(_DEFAULT_NAMING_RULES.first_names_male)
-_FIRST_NAMES_F = list(_DEFAULT_NAMING_RULES.first_names_female)
-_FIRST_NAMES_NB = list(_DEFAULT_NAMING_RULES.first_names_non_binary)
-_LAST_NAMES = list(_DEFAULT_NAMING_RULES.last_names)
-
-
-def _random_name(gender: str, rng: Any = random) -> str:
+def _random_name(gender: str, naming_rules: NamingRulesDefinition, rng: Any = random) -> str:
     if gender == "Male":
-        first = rng.choice(_FIRST_NAMES_M)
+        first = rng.choice(naming_rules.first_names_male)
     elif gender == "Female":
-        first = rng.choice(_FIRST_NAMES_F)
+        first = rng.choice(naming_rules.first_names_female)
     else:
-        first = rng.choice(_FIRST_NAMES_NB)
-    last = rng.choice(_LAST_NAMES)
+        first = rng.choice(naming_rules.first_names_non_binary)
+    last = rng.choice(naming_rules.last_names)
     return f"{first} {last}"
 
 
 class CharacterCreator:
     """Factory for creating Character instances."""
+
+    def __init__(self, setting_bundle: SettingBundle | None = None) -> None:
+        self.setting_bundle = setting_bundle
+
+    @property
+    def naming_rules(self) -> NamingRulesDefinition:
+        bundle = self.setting_bundle or default_aethoria_bundle()
+        return bundle.world_definition.naming_rules
 
     def create_interactive(self, ctx: "UIContext | None" = None) -> Character:
         from .ui.ui_context import _default_ctx
@@ -115,7 +116,11 @@ class CharacterCreator:
         out.print_line(f"  {tr('interactive_character_creation')}")
         out.print_separator("=", 50)
 
-        name = self._prompt(tr("enter_character_name"), default=_random_name("Non-binary"), ctx=ctx)
+        name = self._prompt(
+            tr("enter_character_name"),
+            default=_random_name("Non-binary", self.naming_rules),
+            ctx=ctx,
+        )
         gender = self._prompt_choice(tr("choose_gender"), _GENDERS, default="Non-binary", ctx=ctx)
 
         race_names = [r[0] for r in RACES]
@@ -165,7 +170,7 @@ class CharacterCreator:
         job_skills = job_entry[2]
 
         age = rng.randint(16, 55)
-        char_name = name or _random_name(gender, rng=rng)
+        char_name = name or _random_name(gender, self.naming_rules, rng=rng)
         stats = random_stats(base=25, spread=45, race_bonuses=race_bonuses, rng=rng)
 
         skills: Dict[str, int] = {}
@@ -194,7 +199,7 @@ class CharacterCreator:
         race = tmpl["race"]
         job = tmpl["job"]
         gender = rng.choice(_GENDERS)
-        char_name = name or _random_name(gender, rng=rng)
+        char_name = name or _random_name(gender, self.naming_rules, rng=rng)
         age = rng.randint(20, 40)
 
         stats = {k: max(1, min(100, v + rng.randint(-5, 5))) for k, v in tmpl["base_stats"].items()}

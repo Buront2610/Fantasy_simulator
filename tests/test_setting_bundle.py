@@ -55,6 +55,12 @@ def test_default_aethoria_bundle_has_minimal_phase_i_slots():
     assert bundle.world_definition.jobs
     assert bundle.world_definition.site_seeds
     assert bundle.world_definition.naming_rules.last_names
+    capital_seed = next(
+        seed for seed in bundle.world_definition.site_seeds
+        if seed.location_id == "loc_aethoria_capital"
+    )
+    assert "capital" in capital_seed.tags
+    assert "default_resident" in capital_seed.tags
 
 
 def test_load_setting_bundle_from_json(tmp_path):

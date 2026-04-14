@@ -376,7 +376,11 @@
         "description": "The grand capital — heart of trade, politics, and intrigue.",
         "region_type": "city",
         "x": 2,
-        "y": 2
+        "y": 2,
+        "tags": [
+          "capital",
+          "default_resident"
+        ]
       },
       {
         "location_id": "loc_sunken_ruins",

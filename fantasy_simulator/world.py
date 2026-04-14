@@ -351,7 +351,6 @@ class World:
             display_name=name,
             lore_text=lore,
         )
-        self.name: str = name
         self.lore: str = self.setting_bundle.world_definition.lore_text
         self.calendar_baseline: CalendarDefinition = _clone_calendar(
             self.setting_bundle.world_definition.calendar
@@ -389,6 +388,15 @@ class World:
         if not _skip_defaults:
             self._build_default_map()
 
+    @property
+    def name(self) -> str:
+        """Compatibility alias for the bundle-backed world display name."""
+        return self.setting_bundle.world_definition.display_name
+
+    @name.setter
+    def name(self, value: str) -> None:
+        self.setting_bundle.world_definition.display_name = value
+
     def _register_location(self, loc: LocationState) -> None:
         existing_at_coord = self.grid.get((loc.x, loc.y))
         if existing_at_coord is not None and existing_at_coord is not loc:
@@ -411,10 +419,10 @@ class World:
         self.height`` are registered.  This means ``World(width=3,
         height=3)`` will contain only the locations that fit.
         """
-        for entry in self.default_location_entries():
-            _loc_id, _name, _desc, _rtype, x, y = entry
+        for seed in self.setting_bundle.world_definition.site_seeds:
+            x, y = seed.x, seed.y
             if 0 <= x < self.width and 0 <= y < self.height:
-                self._register_location(LocationState.from_default_entry(entry))
+                self._register_location(self._location_state_from_site_seed(seed))
         self._build_terrain_from_grid()
 
     def default_location_entries(self) -> List[Tuple[str, str, str, str, int, int]]:
@@ -423,6 +431,23 @@ class World:
             seed.as_world_data_entry()
             for seed in self.setting_bundle.world_definition.site_seeds
         ]
+
+    def _location_state_from_site_seed(self, seed: Any) -> LocationState:
+        """Build a LocationState from a bundle site seed."""
+        defaults = get_location_state_defaults(
+            seed.location_id,
+            seed.region_type,
+            site_tags=list(seed.tags),
+        )
+        return LocationState(
+            id=seed.location_id,
+            canonical_name=seed.name,
+            description=seed.description,
+            region_type=seed.region_type,
+            x=seed.x,
+            y=seed.y,
+            **defaults,
+        )
 
     def _build_terrain_from_grid(self) -> None:
         """Generate terrain, sites, and routes from the current grid.
@@ -479,9 +504,21 @@ class World:
                 result.append(other)
         return result
 
+    def _location_ids_for_site_tag(self, tag: str) -> List[str]:
+        """Return in-bounds location_ids for bundle site seeds carrying *tag*."""
+        return [
+            seed.location_id
+            for seed in self.setting_bundle.world_definition.site_seeds
+            if tag in seed.tags and seed.location_id in self._location_id_index
+        ]
+
     def _default_resident_location_id(self) -> str:
-        if "loc_aethoria_capital" in self._location_id_index:
-            return "loc_aethoria_capital"
+        tagged_defaults = (
+            self._location_ids_for_site_tag("default_resident")
+            or self._location_ids_for_site_tag("capital")
+        )
+        if tagged_defaults:
+            return sorted(tagged_defaults)[0]
         non_dungeons = sorted(
             loc.id for loc in self.grid.values() if loc.region_type != "dungeon"
         )
@@ -575,7 +612,7 @@ class World:
         self.ensure_valid_character_locations()
         self.rebuild_adventure_index()
         self.rebuild_recent_event_ids()
-        if not self.event_log and self.event_records:
+        if self.event_records:
             self.rebuild_compatibility_event_log()
 
     def add_adventure(self, run: AdventureRun) -> None:
@@ -926,7 +963,12 @@ class World:
 
     def rebuild_compatibility_event_log(self) -> None:
         """Rebuild the legacy display buffer from canonical event records."""
-        self.event_log = [
+        if self.event_records:
+            self.event_log = self._project_compatibility_event_log()
+
+    def _project_compatibility_event_log(self) -> List[str]:
+        """Project the compatibility display buffer from canonical event records."""
+        return [
             self._format_event_log_entry(
                 record.description,
                 year=record.year,
@@ -938,15 +980,7 @@ class World:
 
     def get_compatibility_event_log(self, last_n: Optional[int] = None) -> List[str]:
         """Return the legacy event-log adapter, projecting from records if needed."""
-        log = self.event_log or [
-            self._format_event_log_entry(
-                record.description,
-                year=record.year,
-                month=record.month,
-                day=record.day,
-            )
-            for record in self.event_records[-self.MAX_EVENT_LOG:]
-        ]
+        log = self._project_compatibility_event_log() if self.event_records else list(self.event_log)
         if last_n is not None:
             return log[-last_n:]
         return list(log)
@@ -969,6 +1003,7 @@ class World:
                         record_id for record_id in location.recent_event_ids
                         if record_id in surviving_ids
                     ]
+        self.rebuild_compatibility_event_log()
 
     def apply_event_impact(self, kind: str, location_id: Optional[str]) -> List[Dict[str, Any]]:
         """Update location state quantities based on an event kind (design §5.5).
@@ -1134,7 +1169,7 @@ class World:
             "height": self.height,
             "year": self.year,
             "grid": [loc.to_dict() for loc in self.grid.values()],
-            "event_log": self.event_log,
+            "event_log": self.get_compatibility_event_log(),
             "event_records": [r.to_dict() for r in self.event_records],
             "rumors": [r.to_dict() for r in self.rumors],
             "rumor_archive": [r.to_dict() for r in self.rumor_archive],

@@ -164,6 +164,7 @@ class SiteSeedDefinition:
     region_type: str
     x: int
     y: int
+    tags: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -173,6 +174,7 @@ class SiteSeedDefinition:
             "region_type": self.region_type,
             "x": int(self.x),
             "y": int(self.y),
+            "tags": list(self.tags),
         }
 
     def as_world_data_entry(self) -> tuple[str, str, str, str, int, int]:
@@ -185,6 +187,10 @@ class SiteSeedDefinition:
             int(self.y),
         )
 
+    def has_tag(self, tag: str) -> bool:
+        """Return whether this seed carries the given semantic tag."""
+        return tag in self.tags
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "SiteSeedDefinition":
         return cls(
@@ -194,6 +200,7 @@ class SiteSeedDefinition:
             region_type=data.get("region_type", "plains"),
             x=int(data.get("x", 0)),
             y=int(data.get("y", 0)),
+            tags=list(data.get("tags", [])),
         )
 
 

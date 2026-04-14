@@ -6,6 +6,7 @@ import random
 from types import SimpleNamespace
 
 from fantasy_simulator.character_creator import CharacterCreator
+from fantasy_simulator.content.setting_bundle import default_aethoria_bundle
 from fantasy_simulator.i18n import get_locale, set_locale, tr, tr_term
 
 
@@ -83,6 +84,18 @@ class TestCreateRandomReproducibility:
             or c1.strength != c2.strength
         )
         assert differs
+
+    def test_custom_bundle_naming_rules_are_used_at_runtime(self):
+        bundle = default_aethoria_bundle()
+        bundle.world_definition.naming_rules.first_names_male = ["Custom"]
+        bundle.world_definition.naming_rules.first_names_female = ["Custom"]
+        bundle.world_definition.naming_rules.first_names_non_binary = ["Custom"]
+        bundle.world_definition.naming_rules.last_names = ["Name"]
+
+        creator = CharacterCreator(setting_bundle=bundle)
+        character = creator.create_random(rng=random.Random(1))
+
+        assert character.name == "Custom Name"
 
 
 class TestCreateFromTemplateReproducibility:

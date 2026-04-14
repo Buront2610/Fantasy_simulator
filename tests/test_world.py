@@ -8,7 +8,9 @@ from fantasy_simulator.character import Character
 from fantasy_simulator.content.setting_bundle import (
     CalendarDefinition,
     CalendarMonthDefinition,
+    NamingRulesDefinition,
     SettingBundle,
+    SiteSeedDefinition,
     WorldDefinition,
 )
 from fantasy_simulator.i18n import set_locale
@@ -90,6 +92,40 @@ class TestWorld:
         assert capital.safety == 80
         assert capital.danger == 15
 
+    def test_custom_bundle_capital_tag_drives_default_state_profile(self):
+        world = World(name="Custom")
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="loc_custom_capital",
+                        name="Custom Capital",
+                        description="The tagged capital.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                        tags=["capital", "default_resident"],
+                    ),
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+        world.grid.clear()
+        world._location_id_index.clear()
+        world._location_name_index.clear()
+        world._build_default_map()
+
+        capital = world.get_location_by_id("loc_custom_capital")
+
+        assert capital is not None
+        assert capital.safety == 80
+        assert capital.danger == 15
+        assert world._default_resident_location_id() == "loc_custom_capital"
+
     def test_default_world_uses_bundle_site_seeds(self):
         world = World(width=2, height=1)
 
@@ -137,6 +173,16 @@ class TestWorld:
         assert restored.year == world.year
         assert restored.active_adventures == []
         assert restored.completed_adventures == []
+
+    def test_name_is_bundle_backed_source_of_truth(self):
+        world = World(name="Aethoria")
+
+        world.name = "Renamed Realm"
+
+        assert world.setting_bundle.world_definition.display_name == "Renamed Realm"
+        restored = World.from_dict(world.to_dict())
+        assert restored.name == "Renamed Realm"
+        assert restored.setting_bundle.world_definition.display_name == "Renamed Realm"
 
     def test_get_characters_at_location_only_returns_alive(self):
         world = World()
@@ -370,7 +416,7 @@ class TestWorld:
         assert thornwood is not None
         assert thornwood.recent_event_ids == ["r1", "r2"]
 
-    def test_from_dict_rebuilds_compatibility_event_log_from_event_records_when_missing(self):
+    def test_from_dict_rebuilds_compatibility_event_log_from_event_records_even_when_stale(self):
         from fantasy_simulator.events import WorldEventRecord
 
         world = World()
@@ -378,11 +424,30 @@ class TestWorld:
         payload["event_records"] = [
             WorldEventRecord(record_id="r1", kind="battle", year=1001, month=2, day=3, description="A clash").to_dict()
         ]
-        payload["event_log"] = []
+        payload["event_log"] = ["stale cache entry"]
 
         restored = World.from_dict(payload)
 
         assert restored.get_compatibility_event_log() == ["[Year 1001, Month 2, Day 3] A clash"]
+
+    def test_compatibility_event_log_prefers_canonical_projection_over_stale_cache(self):
+        from fantasy_simulator.events import WorldEventRecord
+
+        world = World()
+        world.event_log = ["stale cache entry"]
+        world.record_event(
+            WorldEventRecord(
+                record_id="r1",
+                kind="battle",
+                year=1001,
+                month=2,
+                day=3,
+                description="Canonical clash",
+            )
+        )
+        world.event_log = ["stale cache entry"]
+
+        assert world.get_compatibility_event_log() == ["[Year 1001, Month 2, Day 3] Canonical clash"]
 
     def test_trimming_event_records_removes_dangling_recent_event_ids(self):
         from fantasy_simulator.events import WorldEventRecord
