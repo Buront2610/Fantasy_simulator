@@ -102,8 +102,6 @@ class TestRelationTagsFromEvents:
         event_system.event_battle(char1, char2, world, rng=rng)
         assert char1.has_relation_tag(char2.char_id, "rival")
         assert char2.has_relation_tag(char1.char_id, "rival")
-        assert f"{char2.char_id}:rival" in char1.relation_tag_sources
-        assert f"{char1.char_id}:rival" in char2.relation_tag_sources
 
     def test_marriage_creates_spouse_tags(self, world, event_system):
         char1 = _make_char("Bride", age=25, char_id="bride001")
@@ -118,8 +116,6 @@ class TestRelationTagsFromEvents:
         assert result.event_type == "marriage"
         assert char1.has_relation_tag(char2.char_id, "spouse")
         assert char2.has_relation_tag(char1.char_id, "spouse")
-        assert f"{char2.char_id}:spouse" in char1.relation_tag_sources
-        assert f"{char1.char_id}:spouse" in char2.relation_tag_sources
 
     def test_positive_meeting_creates_friend_tags(self, world, event_system):
         char1 = _make_char("Friendly1", char_id="frien001")
@@ -136,21 +132,19 @@ class TestRelationTagsFromEvents:
             event_system.event_meeting(char1, char2, world, rng=rng)
             if char1.has_relation_tag(char2.char_id, "friend"):
                 tagged = True
-                assert f"{char2.char_id}:friend" in char1.relation_tag_sources
-                assert f"{char1.char_id}:friend" in char2.relation_tag_sources
                 break
         assert tagged, "Expected friend tag after positive meetings"
 
-    def test_event_system_writes_source_ids_directly(self, world, event_system):
-        """Source IDs are written at event time so origin is always traceable (§7.4)."""
+    def test_event_system_defers_source_ids_until_event_is_recorded(self, world, event_system):
+        """Canonical relation-tag provenance is attached only when the event is recorded."""
         char1 = _make_char("Fighter1", strength=80, char_id="fight001")
         char2 = _make_char("Fighter2", strength=20, char_id="fight002")
         world.add_character(char1)
         world.add_character(char2)
         rng = random.Random(42)
         event_system.event_battle(char1, char2, world, rng=rng)
-        assert f"{char2.char_id}:rival" in char1.relation_tag_sources
-        assert f"{char1.char_id}:rival" in char2.relation_tag_sources
+        assert char1.relation_tag_sources == {}
+        assert char2.relation_tag_sources == {}
 
 
 class TestRelationTagSources:

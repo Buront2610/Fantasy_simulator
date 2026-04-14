@@ -18,6 +18,12 @@ from fantasy_simulator.adventure import (
 )
 from fantasy_simulator.character import Character
 from fantasy_simulator.character_creator import CharacterCreator
+from fantasy_simulator.content.setting_bundle import (
+    NamingRulesDefinition,
+    SettingBundle,
+    SiteSeedDefinition,
+    WorldDefinition,
+)
 from fantasy_simulator.i18n import get_locale, set_locale
 from fantasy_simulator.persistence.save_load import load_simulation, save_simulation
 from fantasy_simulator.simulator import Simulator
@@ -300,6 +306,36 @@ class TestGetCharacterStory:
 
         assert "Friend" in story
         assert friend.char_id[:8] not in story
+
+    def test_story_uses_world_location_names_for_custom_bundle_ids(self):
+        world = World(name="Clockwork")
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="clockwork",
+                display_name="Clockwork",
+                lore_text="Clockwork lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="hub_primary",
+                        name="Clockwork Hub",
+                        description="A central custom site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                    ),
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Gear"]),
+            ),
+        )
+        hero = Character("Hero", 25, "Male", "Human", "Warrior", location_id="hub_primary")
+        world.add_character(hero)
+
+        sim = Simulator(world, events_per_year=0, seed=1)
+        story = sim.get_character_story(hero.char_id)
+
+        assert "Clockwork Hub" in story
+        assert "Hub Primary" not in story
 
     def test_all_stories_no_crash(self, sim_small):
         sim_small.run(years=3)
@@ -872,8 +908,8 @@ class TestWorldEventRecordIntegration:
         record_id = sim.world.event_records[-1].record_id
         key1 = f"{char2.char_id}:rival"
         key2 = f"{char1.char_id}:rival"
-        assert record_id in char1.relation_tag_sources.get(key1, [])
-        assert record_id in char2.relation_tag_sources.get(key2, [])
+        assert char1.relation_tag_sources.get(key1) == [record_id]
+        assert char2.relation_tag_sources.get(key2) == [record_id]
 
 
 # ---------------------------------------------------------------------------

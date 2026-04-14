@@ -122,6 +122,13 @@ class TestCreateRandomReproducibility:
 
         assert fallback_name == default_name
 
+    def test_random_character_defaults_to_empty_location_until_added_to_world(self):
+        creator = CharacterCreator()
+
+        character = creator.create_random(rng=random.Random(7))
+
+        assert character.location_id == ""
+
 
 class TestCreateFromTemplateReproducibility:
     def test_same_seed_produces_same_template_character(self):
@@ -171,6 +178,13 @@ class TestCreateFromTemplateReproducibility:
         creator = CharacterCreator(setting_bundle=bundle)
 
         assert "warrior" in creator.list_templates()
+
+    def test_templates_are_unavailable_for_non_aethoria_world_key_even_with_matching_names(self):
+        bundle = default_aethoria_bundle()
+        bundle.world_definition.world_key = "clockwork"
+        creator = CharacterCreator(setting_bundle=bundle)
+
+        assert creator.list_templates() == []
 
 
 class TestInteractiveStatAllocation:

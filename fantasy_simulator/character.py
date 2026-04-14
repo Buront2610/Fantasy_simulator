@@ -35,7 +35,7 @@ class Character:
         skills: Optional[Dict[str, int]] = None,
         relationships: Optional[Dict[str, int]] = None,
         alive: bool = True,
-        location_id: str = "loc_aethoria_capital",
+        location_id: str = "",
         favorite: bool = False,
         spotlighted: bool = False,
         playable: bool = False,
@@ -181,6 +181,8 @@ class Character:
         Prefer ``world.location_name(char.location_id)`` when possible.
         """
         lid = self.location_id
+        if not lid:
+            return ""
         if lid.startswith("loc_"):
             lid = lid[4:]
         return lid.replace("_", " ").title()
@@ -274,12 +276,19 @@ class Character:
             f"job={self.job!r}, age={self.age}, status={status})"
         )
 
-    def stat_block(self, char_name_lookup: Optional[Dict[str, str]] = None) -> str:
+    def stat_block(
+        self,
+        char_name_lookup: Optional[Dict[str, str]] = None,
+        location_resolver: Callable[[str], str] | None = None,
+    ) -> str:
+        location_name = self.location_display_name
+        if location_resolver is not None and self.location_id:
+            location_name = location_resolver(self.location_id)
         lines = [
             f"  {tr('name_label'):<10}: {self.name}",
             f"  {tr('race_job_label'):<10}: {tr_term(self.race)} {tr_term(self.job)}",
             f"  {tr('age_gender_label'):<10}: {self.age}  |  {tr('gender_label')}: {tr_term(self.gender)}",
-            f"  {tr('location_label'):<10}: {self.location_display_name}",
+            f"  {tr('location_label'):<10}: {location_name}",
             f"  {tr('status_label'):<10}: {tr('status_alive') if self.alive else tr('status_dead')}",
             f"  {tr('stats_label')}",
             (

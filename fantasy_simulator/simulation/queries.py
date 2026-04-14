@@ -136,7 +136,12 @@ class QueryMixin:
 
         lines.append("")
         char_name_lookup = {world_char.char_id: world_char.name for world_char in self.world.characters}
-        lines.append(char.stat_block(char_name_lookup=char_name_lookup))
+        lines.append(
+            char.stat_block(
+                char_name_lookup=char_name_lookup,
+                location_resolver=self.world.location_name,
+            )
+        )
         lines.append("─" * 50)
         return "\n".join(lines)
 

@@ -144,6 +144,10 @@ class CharacterCreator:
     def _supports_aethoria_templates(self) -> bool:
         if self.setting_bundle is None:
             return True
+        if self.setting_bundle.world_definition.world_key != "aethoria":
+            return False
+        if not self.setting_bundle.world_definition.races and not self.setting_bundle.world_definition.jobs:
+            return True
         race_names = {race_name for race_name, _race_desc, _bonuses in self.race_entries}
         job_names = {job_name for job_name, _job_desc, _skills in self.job_entries}
         return all(race in race_names and job in job_names for race, job in _TEMPLATE_REQUIRED_IDENTITIES)

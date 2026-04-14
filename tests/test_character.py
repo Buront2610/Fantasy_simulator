@@ -81,7 +81,7 @@ class TestCharacterConstruction:
 
     def test_default_location(self):
         c = Character("Test", 20, "Male", "Human", "Warrior")
-        assert c.location_id == "loc_aethoria_capital"
+        assert c.location_id == ""
 
     def test_auto_generated_id(self, hero):
         assert hero.char_id is not None
@@ -240,6 +240,16 @@ class TestStatBlockRelations:
 
         assert mage.name in block
         assert mage.char_id[:8] not in block
+
+    def test_stat_block_resolves_location_name_when_resolver_provided(self, hero):
+        hero.location_id = "hub_primary"
+
+        block = hero.stat_block(location_resolver=lambda location_id: {
+            "hub_primary": "Clockwork Hub",
+        }.get(location_id, location_id))
+
+        assert "Clockwork Hub" in block
+        assert "Hub Primary" not in block
 
 
 # ---------------------------------------------------------------------------

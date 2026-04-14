@@ -260,9 +260,8 @@ class EventSystem:
         char1.spouse_id = char2.char_id
         char2.spouse_id = char1.char_id
         char1.update_mutual_relationship(char2, 20)
-        marriage_source_id = generate_record_id(rng)
-        char1.add_relation_tag(char2.char_id, "spouse", source_event_id=marriage_source_id)
-        char2.add_relation_tag(char1.char_id, "spouse", source_event_id=marriage_source_id)
+        char1.add_relation_tag(char2.char_id, "spouse")
+        char2.add_relation_tag(char1.char_id, "spouse")
         relation_tag_updates = [
             {"source": char1.char_id, "target": char2.char_id, "tag": "spouse"},
             {"source": char2.char_id, "target": char1.char_id, "tag": "spouse"},
@@ -318,9 +317,8 @@ class EventSystem:
         loser.apply_stat_delta(loser_losses)
         winner.update_mutual_relationship(loser, -20, delta_other=-30)
         # Relation tags: mark as rival with source tracking (§7.4)
-        event_source_id = generate_record_id(rng)
-        winner.add_relation_tag(loser.char_id, "rival", source_event_id=event_source_id)
-        loser.add_relation_tag(winner.char_id, "rival", source_event_id=event_source_id)
+        winner.add_relation_tag(loser.char_id, "rival")
+        loser.add_relation_tag(winner.char_id, "rival")
         relation_tag_updates = [
             {"source": winner.char_id, "target": loser.char_id, "tag": "rival"},
             {"source": loser.char_id, "target": winner.char_id, "tag": "rival"},
@@ -411,20 +409,16 @@ class EventSystem:
 
         # Relation tags based on affinity level with source tracking (§7.4)
         relation_tag_updates: List[Dict[str, str]] = []
-        if avg_after >= 50 or avg_after <= -50:
-            meeting_source_id = generate_record_id(rng)
-        else:
-            meeting_source_id = None
         if avg_after >= 50:
-            char1.add_relation_tag(char2.char_id, "friend", source_event_id=meeting_source_id)
-            char2.add_relation_tag(char1.char_id, "friend", source_event_id=meeting_source_id)
+            char1.add_relation_tag(char2.char_id, "friend")
+            char2.add_relation_tag(char1.char_id, "friend")
             relation_tag_updates = [
                 {"source": char1.char_id, "target": char2.char_id, "tag": "friend"},
                 {"source": char2.char_id, "target": char1.char_id, "tag": "friend"},
             ]
         elif avg_after <= -50:
-            char1.add_relation_tag(char2.char_id, "rival", source_event_id=meeting_source_id)
-            char2.add_relation_tag(char1.char_id, "rival", source_event_id=meeting_source_id)
+            char1.add_relation_tag(char2.char_id, "rival")
+            char2.add_relation_tag(char1.char_id, "rival")
             relation_tag_updates = [
                 {"source": char1.char_id, "target": char2.char_id, "tag": "rival"},
                 {"source": char2.char_id, "target": char1.char_id, "tag": "rival"},
@@ -758,9 +752,8 @@ class EventSystem:
             relation_tag_updates: List[Dict[str, str]] = []
             affected_characters = [char.char_id]
             if rescuer:
-                rescue_source_id = generate_record_id(rng)
-                char.add_relation_tag(rescuer.char_id, "savior", source_event_id=rescue_source_id)
-                rescuer.add_relation_tag(char.char_id, "rescued", source_event_id=rescue_source_id)
+                char.add_relation_tag(rescuer.char_id, "savior")
+                rescuer.add_relation_tag(char.char_id, "rescued")
                 relation_tag_updates = [
                     {"source": char.char_id, "target": rescuer.char_id, "tag": "savior"},
                     {"source": rescuer.char_id, "target": char.char_id, "tag": "rescued"},
