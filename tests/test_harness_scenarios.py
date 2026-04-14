@@ -293,7 +293,7 @@ EXPECTED_EN = {
     "month": 1,
     "event_record_count": 22,
     "event_log_count": 22,
-    "history_count": 20,
+    "history_count": 22,
     "kind_counts": {
         "adventure_arrived": 1,
         "adventure_started": 1,
@@ -355,7 +355,7 @@ EXPECTED_JA = {
     "month": 1,
     "event_record_count": 22,
     "event_log_count": 22,
-    "history_count": 20,
+    "history_count": 22,
     "kind_counts": {
         "adventure_arrived": 1,
         "adventure_started": 1,
