@@ -14,6 +14,8 @@ from .content.setting_bundle import (
     SettingBundle,
     bundle_from_dict_validated,
     default_aethoria_bundle,
+    legacy_location_id_alias,
+    validate_setting_bundle,
 )
 from .content.world_data import (
     fallback_location_id,
@@ -407,11 +409,20 @@ class World:
 
     @setting_bundle.setter
     def setting_bundle(self, value: SettingBundle) -> None:
-        self._setting_bundle = value
+        self.apply_setting_bundle(value)
+
+    def apply_setting_bundle(self, bundle: SettingBundle, *, rebuild_world: bool = True) -> None:
+        """Apply a bundle while keeping derived world structures consistent."""
+        validate_setting_bundle(bundle, source="World.setting_bundle")
+        previous_locations = list(getattr(self, "grid", {}).values())
+        self._setting_bundle = bundle
         if hasattr(self, "lore"):
-            self.lore = value.world_definition.lore_text
+            self.lore = bundle.world_definition.lore_text
         if hasattr(self, "calendar_baseline"):
-            self.calendar_baseline = _clone_calendar(value.world_definition.calendar)
+            self.calendar_baseline = _clone_calendar(bundle.world_definition.calendar)
+        if rebuild_world and hasattr(self, "grid"):
+            self._build_default_map(previous_locations=previous_locations)
+            self._normalize_references_after_bundle_change()
 
     def _register_location(self, loc: LocationState) -> None:
         existing_at_coord = self.grid.get((loc.x, loc.y))
@@ -428,17 +439,59 @@ class World:
         self._location_name_index[loc.canonical_name] = loc
         self._location_id_index[loc.id] = loc
 
-    def _build_default_map(self) -> None:
-        """Populate the world from the active setting bundle's site seeds.
+    def _clear_world_structure(self) -> None:
+        """Reset world structures derived from the active location grid."""
+        self.grid.clear()
+        self._location_id_index.clear()
+        self._location_name_index.clear()
+        self.terrain_map = None
+        self.sites = []
+        self.routes = []
+        self._site_index = {}
+        self.atlas_layout = None
+
+    def _copy_location_runtime_state(self, source: LocationState, target: LocationState) -> None:
+        """Preserve mutable location state across structural rebuilds."""
+        target.prosperity = source.prosperity
+        target.safety = source.safety
+        target.mood = source.mood
+        target.danger = source.danger
+        target.traffic = source.traffic
+        target.rumor_heat = source.rumor_heat
+        target.road_condition = source.road_condition
+        target.visited = source.visited
+        target.controlling_faction_id = source.controlling_faction_id
+        target.recent_event_ids = list(source.recent_event_ids)
+        target.aliases = list(source.aliases)
+        target.memorial_ids = list(source.memorial_ids)
+        target.live_traces = list(source.live_traces)
+
+    def _build_default_map(self, previous_locations: Optional[List[LocationState]] = None) -> None:
+        """Rebuild the world from the active setting bundle's site seeds.
 
         Only locations whose ``(x, y)`` fall within ``self.width x
         self.height`` are registered.  This means ``World(width=3,
         height=3)`` will contain only the locations that fit.
         """
+        if previous_locations is None:
+            previous_locations = list(self.grid.values())
+        preserved_by_id: Dict[str, LocationState] = {}
+        for location in previous_locations:
+            normalized_id = self.normalize_location_id(
+                location.id,
+                location_name=location.canonical_name,
+            )
+            if normalized_id is not None and normalized_id not in preserved_by_id:
+                preserved_by_id[normalized_id] = location
+        self._clear_world_structure()
         for seed in self.setting_bundle.world_definition.site_seeds:
             x, y = seed.x, seed.y
             if 0 <= x < self.width and 0 <= y < self.height:
-                self._register_location(self._location_state_from_site_seed(seed))
+                location = self._location_state_from_site_seed(seed)
+                previous = preserved_by_id.get(location.id)
+                if previous is not None:
+                    self._copy_location_runtime_state(previous, location)
+                self._register_location(location)
         self._build_terrain_from_grid()
 
     def default_location_entries(self) -> List[Tuple[str, str, str, str, int, int]]:
@@ -470,7 +523,7 @@ class World:
         """Return legacy fallback-slug IDs that should map to canonical bundle IDs."""
         aliases: Dict[str, str] = {}
         for seed in self.setting_bundle.world_definition.site_seeds:
-            legacy_id = fallback_location_id(seed.name)
+            legacy_id = legacy_location_id_alias(seed.name)
             if legacy_id != seed.location_id:
                 aliases[legacy_id] = seed.location_id
         return aliases
@@ -487,6 +540,39 @@ class World:
         if location_name is not None:
             return self.resolve_location_id_from_name(location_name)
         return location_id
+
+    def _normalize_references_after_bundle_change(self) -> None:
+        """Repair references after replacing the active setting bundle."""
+        for character in self.characters:
+            character.location_id = (
+                self.normalize_location_id(character.location_id) or character.location_id
+            )
+        for record in self.event_records:
+            record.location_id = self.normalize_location_id(record.location_id)
+        for rumor in self.rumors:
+            rumor.source_location_id = self.normalize_location_id(rumor.source_location_id)
+        for rumor in self.rumor_archive:
+            rumor.source_location_id = self.normalize_location_id(rumor.source_location_id)
+        for run in self.active_adventures + self.completed_adventures:
+            run.origin = self.normalize_location_id(run.origin) or run.origin
+            run.destination = self.normalize_location_id(run.destination) or run.destination
+        for memorial in self.memorials.values():
+            memorial.location_id = self.normalize_location_id(memorial.location_id) or memorial.location_id
+
+        for location in self.grid.values():
+            location.memorial_ids = []
+        for memorial in self.memorials.values():
+            location = self._location_id_index.get(memorial.location_id)
+            if location is not None and memorial.memorial_id not in location.memorial_ids:
+                location.memorial_ids.append(memorial.memorial_id)
+
+        self.rebuild_char_index()
+        if self._location_id_index:
+            self.ensure_valid_character_locations()
+        self.rebuild_adventure_index()
+        self.rebuild_recent_event_ids()
+        if self.event_records:
+            self.rebuild_compatibility_event_log()
 
     def location_state_defaults(self, location_id: str, region_type: str) -> Dict[str, int]:
         """Return location defaults using the active bundle's site tags."""
@@ -597,6 +683,8 @@ class World:
 
     def ensure_valid_character_locations(self) -> None:
         """Repair invalid location references after loading legacy data."""
+        if not self.characters:
+            return
         fallback = self._default_resident_location_id()
         for character in self.characters:
             if character.location_id not in self._location_id_index:
@@ -1312,11 +1400,13 @@ class World:
             _skip_defaults=True,
         )
         if "setting_bundle" in data:
-            world.setting_bundle = bundle_from_dict_validated(
-                data["setting_bundle"],
-                source="embedded world.setting_bundle",
+            world.apply_setting_bundle(
+                bundle_from_dict_validated(
+                    data["setting_bundle"],
+                    source="embedded world.setting_bundle",
+                ),
+                rebuild_world=False,
             )
-            world.lore = world.setting_bundle.world_definition.lore_text
         for loc_data in data.get("grid", []):
             world._register_location(world._location_state_from_dict(loc_data))
         world.event_log = list(data.get("event_log", []))

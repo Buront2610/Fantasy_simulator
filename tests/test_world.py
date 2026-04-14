@@ -114,10 +114,6 @@ class TestWorld:
                 naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
             ),
         )
-        world.grid.clear()
-        world._location_id_index.clear()
-        world._location_name_index.clear()
-        world._build_default_map()
 
         capital = world.get_location_by_id("loc_custom_capital")
 
@@ -156,10 +152,6 @@ class TestWorld:
                 naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
             ),
         )
-        world.grid.clear()
-        world._location_id_index.clear()
-        world._location_name_index.clear()
-        world._build_default_map()
         payload = world.to_dict()
         payload["grid"][0].pop("id")
 
@@ -168,6 +160,85 @@ class TestWorld:
         location = restored.get_location_by_id("hub_primary")
         assert location is not None
         assert location.canonical_name == "Clockwork Hub"
+
+    def test_setting_bundle_assignment_rebuilds_world_structure(self):
+        world = World(name="Custom")
+        old_location_ids = set(world.location_ids)
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="hub_primary",
+                        name="Clockwork Hub",
+                        description="A custom site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                    ),
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+
+        assert world.location_ids == ["hub_primary"]
+        assert old_location_ids.isdisjoint(world.location_ids)
+        assert world.get_site_by_id("hub_primary") is not None
+        assert world.atlas_layout is not None
+
+    def test_setting_bundle_assignment_preserves_runtime_state_for_matching_location_ids(self):
+        world = World()
+        capital = world.get_location_by_id("loc_aethoria_capital")
+        assert capital is not None
+        capital.danger = 42
+        capital.visited = True
+
+        world.setting_bundle = SettingBundle.from_dict(world.setting_bundle.to_dict())
+
+        rebuilt = world.get_location_by_id("loc_aethoria_capital")
+        assert rebuilt is not None
+        assert rebuilt.danger == 42
+        assert rebuilt.visited is True
+
+    def test_build_default_map_rebuilds_instead_of_appending(self):
+        world = World(name="Custom")
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="hub_primary",
+                        name="Clockwork Hub",
+                        description="A custom site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                    ),
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+        world._register_location(
+            LocationState(
+                id="loc_stale",
+                canonical_name="Stale",
+                description="Should disappear.",
+                region_type="city",
+                x=1,
+                y=1,
+                **get_location_state_defaults("loc_stale", "city"),
+            )
+        )
+
+        world._build_default_map()
+
+        assert world.location_ids == ["hub_primary"]
 
     def test_default_world_uses_bundle_site_seeds(self):
         world = World(width=2, height=1)

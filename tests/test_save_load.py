@@ -223,10 +223,6 @@ class TestLoadSimulation:
                 naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
             ),
         )
-        sim.world.grid.clear()
-        sim.world._location_id_index.clear()
-        sim.world._location_name_index.clear()
-        sim.world._build_default_map()
         payload = sim.to_dict()
         payload["schema_version"] = CURRENT_VERSION
         payload["characters"] = [

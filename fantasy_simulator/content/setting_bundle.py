@@ -13,6 +13,12 @@ BUNDLES_DIR = Path(__file__).with_name("bundles")
 DEFAULT_AETHORIA_BUNDLE_PATH = BUNDLES_DIR / "aethoria.json"
 
 
+def legacy_location_id_alias(name: str) -> str:
+    """Generate the legacy fallback location-id alias for a site name."""
+    slug = name.lower().replace(" ", "_").replace("-", "_").replace("'", "")
+    return f"loc_{slug}"
+
+
 @dataclass
 class CalendarMonthDefinition:
     """One month entry in a world-specific calendar."""
@@ -352,7 +358,7 @@ def _default_aethoria_bundle_data() -> Dict[str, Any]:
         ) from exc
 
 
-def _validate_setting_bundle(bundle: SettingBundle, *, source: str) -> None:
+def validate_setting_bundle(bundle: SettingBundle, *, source: str) -> None:
     world = bundle.world_definition
     if bundle.schema_version < 1:
         raise ValueError(f"Setting bundle {source} has invalid schema_version: {bundle.schema_version}")
@@ -379,6 +385,17 @@ def _validate_setting_bundle(bundle: SettingBundle, *, source: str) -> None:
     if site_names and len(site_names) != len(set(site_names)):
         raise ValueError(f"Setting bundle {source} contains duplicate site seed names")
 
+    alias_to_canonical: Dict[str, str] = {}
+    canonical_ids = set(site_ids)
+    for seed in world.site_seeds:
+        alias = legacy_location_id_alias(seed.name)
+        previous = alias_to_canonical.get(alias)
+        if previous is not None and previous != seed.location_id:
+            raise ValueError(f"Setting bundle {source} contains ambiguous legacy location id aliases")
+        if alias in canonical_ids and alias != seed.location_id:
+            raise ValueError(f"Setting bundle {source} contains ambiguous legacy location id aliases")
+        alias_to_canonical[alias] = seed.location_id
+
     site_coords = [(seed.x, seed.y) for seed in world.site_seeds]
     if site_coords and len(site_coords) != len(set(site_coords)):
         raise ValueError(f"Setting bundle {source} contains duplicate site seed coordinates")
@@ -404,7 +421,7 @@ def bundle_from_dict_validated(data: Dict[str, Any], *, source: str) -> SettingB
     except KeyError as exc:
         missing = exc.args[0]
         raise ValueError(f"Setting bundle {source} is missing required field: {missing}") from exc
-    _validate_setting_bundle(bundle, source=source)
+    validate_setting_bundle(bundle, source=source)
     return bundle
 
 

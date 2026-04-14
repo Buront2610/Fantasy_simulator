@@ -7,7 +7,7 @@ from the active world instead of importing these globals directly.
 
 from typing import Dict, List, Tuple
 
-from .setting_bundle import default_aethoria_bundle
+from .setting_bundle import default_aethoria_bundle, legacy_location_id_alias
 
 
 _DEFAULT_AETHORIA_BUNDLE = default_aethoria_bundle()
@@ -174,8 +174,7 @@ CAPITAL_LOCATION_IDS = {
 
 def fallback_location_id(name: str) -> str:
     """Generate a location ID from a name when no canonical mapping exists."""
-    slug = name.lower().replace(' ', '_').replace('-', '_').replace("'", '')
-    return f"loc_{slug}"
+    return legacy_location_id_alias(name)
 
 
 def get_location_state_defaults(
