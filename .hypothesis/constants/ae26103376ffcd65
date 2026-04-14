@@ -1,4 +1,0 @@
-# file: /home/runner/work/Fantasy_simulator/Fantasy_simulator/scripts/quality_gate.py
-# hypothesis_version: 6.151.14
-
-[',', '--dry-run', '--jobs', '--pytest-target', '-m', '-q', '.claude', '1', '__main__', '__pycache__', 'append', 'fantasy_simulator', 'flake8', 'main.py', 'minimal', 'node_modules', 'profile', 'pytest', 'standard', 'store_true', 'strict', 'tests']

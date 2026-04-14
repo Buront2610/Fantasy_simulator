@@ -1,4 +1,0 @@
-# file: /home/runner/work/Fantasy_simulator/Fantasy_simulator/fantasy_simulator/simulation/engine.py
-# hypothesis_version: 6.151.14
-
-[100, 1000003, 1592614637, 'Simulator', 'active_adventures', 'character', 'characters', 'completed_adventures', 'current_day', 'current_month', 'days_advanced', 'dying', 'dying_any', 'dying_favorite', 'dying_spotlighted', 'elapsed_days', 'event_records', 'events_per_year', 'history', 'id_rng_state', 'locale', 'location', 'months_advanced', 'party_returned', 'pause_context', 'pause_priority', 'pause_reason', 'pending_decision', 'rng_state', 'start_year', 'supplemental_reasons', 'world', 'year', 'years_advanced', 'years_elapsed']

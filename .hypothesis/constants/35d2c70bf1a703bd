@@ -1,4 +1,0 @@
-# file: /home/runner/work/Fantasy_simulator/Fantasy_simulator/fantasy_simulator/simulation/event_recorder.py
-# hypothesis_version: 6.151.14
-
-['adventure_arrived', 'adventure_choice', 'adventure_death', 'adventure_discovery', 'adventure_injured', 'adventure_retreated', 'adventure_returned', 'adventure_update', 'aging', 'anniversary', 'battle', 'battle_fatal', 'condition_worsened', 'death', 'discovery', 'dying_rescued', 'exploring', 'injury', 'journey', 'marriage', 'meeting', 'none', 'public', 'relation_tag_updates', 'retreat', 'returning', 'romance', 'safe_return', 'skill_training', 'source', 'tag', 'target', 'traveling', 'waiting_for_choice']

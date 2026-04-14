@@ -1,4 +1,0 @@
-# file: /home/runner/work/Fantasy_simulator/Fantasy_simulator/fantasy_simulator/rumor.py
-# hypothesis_version: 6.151.14
-
-[0.0, 0.1, 0.2, 0.25, 0.3, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 'Rumor', 'adventure', 'adventure_death', 'adventure_discovery', 'adventure_returned', 'adventure_started', 'age_in_months', 'anniversary', 'battle', 'battle_fatal', 'category', 'certain', 'content_tags', 'created_absolute_day', 'created_calendar_key', 'death', 'description', 'discovery', 'doubtful', 'event', 'false', 'getrandbits', 'id', 'journey', 'major', 'marriage', 'month_created', 'movement', 'plausible', 'reliability', 'rumor_at_some_point', 'rumor_recently', 'rumor_someone', 'rumor_somewhere', 'rumor_vague_event', 'social', 'source_event_id', 'source_location_id', 'spread_level', 'target_subject', 'tragic', 'treasure', 'what', 'when', 'where', 'who', 'year_created']

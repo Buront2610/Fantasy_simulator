@@ -1,4 +1,0 @@
-# file: /home/runner/work/Fantasy_simulator/Fantasy_simulator/fantasy_simulator/persistence/__init__.py
-# hypothesis_version: 6.151.14
-
-['CURRENT_VERSION', 'load_simulation', 'migrate', 'save_simulation']
