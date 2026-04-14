@@ -418,13 +418,18 @@ class World:
 
     def _set_setting_bundle_metadata(self, bundle: SettingBundle) -> None:
         """Replace bundle-backed metadata without rebuilding world structure."""
+        previous_calendar = None
+        if hasattr(self, "_setting_bundle") and self._setting_bundle is not None:
+            previous_calendar = self._setting_bundle.world_definition.calendar.to_dict()
         self._setting_bundle = _clone_setting_bundle(bundle)
         if hasattr(self, "lore"):
             self.lore = self._setting_bundle.world_definition.lore_text
         if hasattr(self, "calendar_baseline"):
-            self.calendar_baseline = _clone_calendar(self._setting_bundle.world_definition.calendar)
-        if hasattr(self, "calendar_history"):
-            self.calendar_history = []
+            next_calendar = self._setting_bundle.world_definition.calendar
+            if previous_calendar is None or previous_calendar != next_calendar.to_dict():
+                self.calendar_baseline = _clone_calendar(next_calendar)
+                if hasattr(self, "calendar_history"):
+                    self.calendar_history = []
 
     def apply_setting_bundle(self, bundle: SettingBundle) -> None:
         """Apply a bundle while keeping derived world structures consistent."""

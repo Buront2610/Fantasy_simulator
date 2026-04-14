@@ -492,3 +492,34 @@ class TestLoadSimulation:
         assert len(restored.history) == 1
         assert restored.history[0].event_type == "battle"
         assert restored.history[0].metadata == {"source": "legacy"}
+
+    def test_migration_lifts_mixed_legacy_history_and_event_log_into_canonical_event_records(self, tmp_path):
+        path = tmp_path / "legacy-mixed-event-adapters.json"
+        world = World()
+        payload = {
+            "schema_version": CURRENT_VERSION - 1,
+            "world": world.to_dict(),
+            "characters": [],
+            "history": [
+                {
+                    "description": "A legacy battle occurred.",
+                    "affected_characters": ["char_1"],
+                    "stat_changes": {},
+                    "event_type": "battle",
+                    "year": 1000,
+                    "metadata": {"source": "legacy"},
+                }
+            ],
+        }
+        payload["world"]["event_records"] = []
+        payload["world"]["event_log"] = ["Year 1000: A legacy omen spread through the capital."]
+        path.write_text(json.dumps(payload), encoding="utf-8")
+
+        restored = load_simulation(str(path))
+
+        assert restored is not None
+        assert len(restored.world.event_records) == 2
+        assert {record.kind for record in restored.world.event_records} == {"battle", "legacy_event_log"}
+        assert len(restored.history) == 2
+        assert {event.event_type for event in restored.history} == {"battle", "legacy_event_log"}
+        assert payload["world"]["event_log"][0] in restored.world.get_compatibility_event_log()

@@ -469,17 +469,21 @@ def _migrate_v7_to_v8(data: Dict[str, Any]) -> Dict[str, Any]:
     event_log = list(world_data.get("event_log", []))
     calendar_key = _calendar_key_for_data(data)
 
-    if not event_records and history:
-        world_data["event_records"] = [
-            _record_from_legacy_history_item(item, index=index, calendar_key=calendar_key)
-            for index, item in enumerate(history, start=1)
-        ]
-    elif not event_records and event_log:
-        year = int(world_data.get("year", 0))
-        world_data["event_records"] = [
-            _record_from_legacy_event_log_entry(entry, index=index, year=year, calendar_key=calendar_key)
-            for index, entry in enumerate(event_log, start=1)
-        ]
+    if not event_records:
+        canonical_records = []
+        if history:
+            canonical_records.extend([
+                _record_from_legacy_history_item(item, index=index, calendar_key=calendar_key)
+                for index, item in enumerate(history, start=1)
+            ])
+        if event_log:
+            year = int(world_data.get("year", 0))
+            canonical_records.extend([
+                _record_from_legacy_event_log_entry(entry, index=index, year=year, calendar_key=calendar_key)
+                for index, entry in enumerate(event_log, start=1)
+            ])
+        if canonical_records:
+            world_data["event_records"] = canonical_records
 
     data["schema_version"] = 8
     return data

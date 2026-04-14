@@ -798,7 +798,7 @@ class TestWorld:
 
         assert world.calendar_definition.display_name == "Starfall Cycle"
 
-    def test_setting_bundle_assignment_resets_calendar_history(self):
+    def test_setting_bundle_assignment_preserves_calendar_history_when_calendar_is_unchanged(self):
         world = World(year=1234)
         world.apply_calendar_definition(
             CalendarDefinition(
@@ -813,7 +813,39 @@ class TestWorld:
 
         world.setting_bundle = SettingBundle.from_dict(world.setting_bundle.to_dict())
 
+        assert len(world.calendar_history) == 1
+        assert world.calendar_history[0].calendar.calendar_key == "history"
+
+    def test_setting_bundle_assignment_resets_calendar_history_when_calendar_changes(self):
+        world = World(year=1234)
+        world.apply_calendar_definition(
+            CalendarDefinition(
+                calendar_key="history",
+                display_name="History",
+                months=[CalendarMonthDefinition("beta", "Beta", 25, season="spring")],
+            ),
+            changed_year=1235,
+            changed_month=1,
+            changed_day=1,
+        )
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom World",
+                lore_text="Custom lore",
+                calendar=CalendarDefinition(
+                    calendar_key="moonstep",
+                    display_name="Moonstep",
+                    months=[
+                        CalendarMonthDefinition("arc", "Arc", 18, season="winter"),
+                    ],
+                ),
+            ),
+        )
+
         assert world.calendar_history == []
+        assert world.calendar_baseline.calendar_key == "moonstep"
 
     def test_calendar_definition_by_key_returns_snapshot_for_baseline_and_history(self):
         world = World(year=1234)

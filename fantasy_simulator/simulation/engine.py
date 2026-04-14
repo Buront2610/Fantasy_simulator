@@ -143,7 +143,6 @@ class Simulator(
     def history(self) -> List[EventResult]:
         """Project the legacy EventResult adapter from canonical world records."""
         return [record.to_event_result() for record in self.world.event_records]
-        return False
 
     # ------------------------------------------------------------------
     # Main simulation loop
