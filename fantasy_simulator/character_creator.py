@@ -84,6 +84,7 @@ _TEMPLATES: Dict[str, Dict] = {
 
 _GENDERS = ["Male", "Female", "Non-binary"]
 
+
 def _random_name(gender: str, naming_rules: NamingRulesDefinition, rng: Any = random) -> str:
     if gender == "Male":
         first = rng.choice(naming_rules.first_names_male)
@@ -106,6 +107,24 @@ class CharacterCreator:
         bundle = self.setting_bundle or default_aethoria_bundle()
         return bundle.world_definition.naming_rules
 
+    @property
+    def race_entries(self) -> List[tuple[str, str, Dict[str, int]]]:
+        if self.setting_bundle is not None and self.setting_bundle.world_definition.races:
+            return [
+                (race.name, race.description, dict(race.stat_bonuses))
+                for race in self.setting_bundle.world_definition.races
+            ]
+        return RACES
+
+    @property
+    def job_entries(self) -> List[tuple[str, str, List[str]]]:
+        if self.setting_bundle is not None and self.setting_bundle.world_definition.jobs:
+            return [
+                (job.name, job.description, list(job.primary_skills))
+                for job in self.setting_bundle.world_definition.jobs
+            ]
+        return JOBS
+
     def create_interactive(self, ctx: "UIContext | None" = None) -> Character:
         from .ui.ui_context import _default_ctx
         ctx = _default_ctx(ctx)
@@ -123,15 +142,17 @@ class CharacterCreator:
         )
         gender = self._prompt_choice(tr("choose_gender"), _GENDERS, default="Non-binary", ctx=ctx)
 
-        race_names = [r[0] for r in RACES]
+        race_entries = self.race_entries
+        race_names = [r[0] for r in race_entries]
         out.print_line(f"\n  {tr('available_races')}:")
-        for i, (rname, rdesc, _) in enumerate(RACES, 1):
+        for i, (rname, rdesc, _) in enumerate(race_entries, 1):
             out.print_line(f"  {i}. {rname:12s} - {rdesc[:60]}...")
         race = self._prompt_choice(tr("choose_race"), race_names, default=race_names[0], ctx=ctx)
 
-        job_names = [j[0] for j in JOBS]
+        job_entries = self.job_entries
+        job_names = [j[0] for j in job_entries]
         out.print_line(f"\n  {tr('available_jobs')}:")
-        for i, (jname, jdesc, _) in enumerate(JOBS, 1):
+        for i, (jname, jdesc, _) in enumerate(job_entries, 1):
             out.print_line(f"  {i}. {jname:12s} - {jdesc[:60]}...")
         job = self._prompt_choice(tr("choose_job"), job_names, default=job_names[0], ctx=ctx)
 
@@ -145,12 +166,12 @@ class CharacterCreator:
         out.print_line(f"  {tr('accept_default_stats')}")
         stats = self._allocate_stats(ctx=ctx)
 
-        race_bonuses = next((r[2] for r in RACES if r[0] == race), {})
+        race_bonuses = next((r[2] for r in race_entries if r[0] == race), {})
         for stat, bonus in race_bonuses.items():
             if stat in stats:
                 stats[stat] = Character._clamp(stats[stat] + bonus)
 
-        job_skills_raw = next((j[2] for j in JOBS if j[0] == job), [])
+        job_skills_raw = next((j[2] for j in job_entries if j[0] == job), [])
         skills = {s: 1 for s in job_skills_raw}
 
         char = Character(name=name, age=age, gender=gender, race=race, job=job, skills=skills, **stats)
@@ -161,11 +182,11 @@ class CharacterCreator:
 
     def create_random(self, name: Optional[str] = None, rng: Any = random) -> Character:
         gender = rng.choice(_GENDERS)
-        race_entry = rng.choice(RACES)
+        race_entry = rng.choice(self.race_entries)
         race = race_entry[0]
         race_bonuses = race_entry[2]
 
-        job_entry = rng.choice(JOBS)
+        job_entry = rng.choice(self.job_entries)
         job = job_entry[0]
         job_skills = job_entry[2]
 

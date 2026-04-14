@@ -6,7 +6,7 @@ import random
 from types import SimpleNamespace
 
 from fantasy_simulator.character_creator import CharacterCreator
-from fantasy_simulator.content.setting_bundle import default_aethoria_bundle
+from fantasy_simulator.content.setting_bundle import JobDefinition, RaceDefinition, default_aethoria_bundle
 from fantasy_simulator.i18n import get_locale, set_locale, tr, tr_term
 
 
@@ -87,6 +87,20 @@ class TestCreateRandomReproducibility:
 
     def test_custom_bundle_naming_rules_are_used_at_runtime(self):
         bundle = default_aethoria_bundle()
+        bundle.world_definition.races = [
+            RaceDefinition(
+                name="Clockfolk",
+                description="Precise and patient.",
+                stat_bonuses={"strength": 0, "intelligence": 2},
+            )
+        ]
+        bundle.world_definition.jobs = [
+            JobDefinition(
+                name="Scribe",
+                description="Records the world.",
+                primary_skills=["Lore Mastery"],
+            )
+        ]
         bundle.world_definition.naming_rules.first_names_male = ["Custom"]
         bundle.world_definition.naming_rules.first_names_female = ["Custom"]
         bundle.world_definition.naming_rules.first_names_non_binary = ["Custom"]
@@ -96,6 +110,8 @@ class TestCreateRandomReproducibility:
         character = creator.create_random(rng=random.Random(1))
 
         assert character.name == "Custom Name"
+        assert character.race == "Clockfolk"
+        assert character.job == "Scribe"
 
 
 class TestCreateFromTemplateReproducibility:

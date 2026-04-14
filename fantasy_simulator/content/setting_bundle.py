@@ -385,6 +385,10 @@ def _validate_setting_bundle(bundle: SettingBundle, *, source: str) -> None:
         or naming.first_names_female
         or naming.first_names_non_binary
     )
+    if has_first_name_rules and not naming.first_names_male:
+        raise ValueError(f"Setting bundle {source} must provide first_names_male when naming rules are defined")
+    if has_first_name_rules and not naming.first_names_female:
+        raise ValueError(f"Setting bundle {source} must provide first_names_female when naming rules are defined")
     if has_first_name_rules and not naming.last_names:
         raise ValueError(f"Setting bundle {source} must provide last_names when naming rules are defined")
 

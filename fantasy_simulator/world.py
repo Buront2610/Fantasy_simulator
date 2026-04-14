@@ -432,13 +432,24 @@ class World:
             for seed in self.setting_bundle.world_definition.site_seeds
         ]
 
+    def _site_seed_tags(self, location_id: str) -> List[str]:
+        """Return semantic tags for a location from the active setting bundle."""
+        for seed in self.setting_bundle.world_definition.site_seeds:
+            if seed.location_id == location_id:
+                return list(seed.tags)
+        return []
+
+    def location_state_defaults(self, location_id: str, region_type: str) -> Dict[str, int]:
+        """Return location defaults using the active bundle's site tags."""
+        return get_location_state_defaults(
+            location_id,
+            region_type,
+            site_tags=self._site_seed_tags(location_id),
+        )
+
     def _location_state_from_site_seed(self, seed: Any) -> LocationState:
         """Build a LocationState from a bundle site seed."""
-        defaults = get_location_state_defaults(
-            seed.location_id,
-            seed.region_type,
-            site_tags=list(seed.tags),
-        )
+        defaults = self.location_state_defaults(seed.location_id, seed.region_type)
         return LocationState(
             id=seed.location_id,
             canonical_name=seed.name,
@@ -1050,7 +1061,7 @@ class World:
         period_months = max(1, months)
         decay_rate = 1.0 - ((1.0 - self._STATE_DECAY_RATE) ** (period_months / self.months_per_year))
         for loc in self.grid.values():
-            defaults = get_location_state_defaults(loc.id, loc.region_type)
+            defaults = self.location_state_defaults(loc.id, loc.region_type)
             for attr in ("danger", "traffic", "mood", "safety", "rumor_heat"):
                 current = getattr(loc, attr)
                 baseline = defaults[attr]
@@ -1193,6 +1204,37 @@ class World:
             result["setting_bundle"] = self.setting_bundle.to_dict()
         return result
 
+    def _location_state_from_dict(self, data: Dict[str, Any]) -> LocationState:
+        """Restore LocationState using the active bundle for missing defaults."""
+        loc_id = data.get("id")
+        if not loc_id:
+            name = data.get("canonical_name") or data.get("name", "")
+            loc_id = NAME_TO_LOCATION_ID.get(name, fallback_location_id(name))
+        canonical_name = data.get("canonical_name") or data.get("name", "")
+        region_type = data["region_type"]
+        defaults = self.location_state_defaults(loc_id, region_type)
+        return LocationState(
+            id=loc_id,
+            canonical_name=canonical_name,
+            description=data["description"],
+            region_type=region_type,
+            x=data["x"],
+            y=data["y"],
+            prosperity=data.get("prosperity", defaults["prosperity"]),
+            safety=data.get("safety", defaults["safety"]),
+            mood=data.get("mood", defaults["mood"]),
+            danger=data.get("danger", defaults["danger"]),
+            traffic=data.get("traffic", defaults["traffic"]),
+            rumor_heat=data.get("rumor_heat", defaults["rumor_heat"]),
+            road_condition=data.get("road_condition", defaults["road_condition"]),
+            visited=data.get("visited", False),
+            controlling_faction_id=data.get("controlling_faction_id"),
+            recent_event_ids=list(data.get("recent_event_ids", [])),
+            aliases=list(data.get("aliases", [])),
+            memorial_ids=list(data.get("memorial_ids", [])),
+            live_traces=list(data.get("live_traces", [])),
+        )
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "World":
         """Restore a World from a serialised dict.
@@ -1222,8 +1264,11 @@ class World:
             year=data.get("year", 1000),
             _skip_defaults=True,
         )
+        if "setting_bundle" in data:
+            world.setting_bundle = SettingBundle.from_dict(data["setting_bundle"])
+            world.lore = world.setting_bundle.world_definition.lore_text
         for loc_data in data.get("grid", []):
-            world._register_location(LocationState.from_dict(loc_data))
+            world._register_location(world._location_state_from_dict(loc_data))
         world.event_log = list(data.get("event_log", []))
         world.event_records = [
             WorldEventRecord.from_dict(r) for r in data.get("event_records", [])
@@ -1272,9 +1317,6 @@ class World:
         else:
             world.atlas_layout = world._build_atlas_layout_from_current_state()
 
-        if "setting_bundle" in data:
-            world.setting_bundle = SettingBundle.from_dict(data["setting_bundle"])
-            world.lore = world.setting_bundle.world_definition.lore_text
         if "calendar_baseline" not in data:
             world.calendar_baseline = _clone_calendar(world.setting_bundle.world_definition.calendar)
 

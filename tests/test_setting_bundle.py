@@ -175,6 +175,34 @@ def test_load_setting_bundle_reports_duplicate_site_seed_ids(tmp_path):
         raise AssertionError("Expected ValueError for duplicate site seed ids")
 
 
+def test_load_setting_bundle_requires_gendered_name_pools(tmp_path):
+    bundle_path = tmp_path / "invalid-naming.json"
+    bundle_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "world_definition": {
+                    "world_key": "naming",
+                    "display_name": "Naming",
+                    "lore_text": "Naming lore",
+                    "naming_rules": {
+                        "first_names_non_binary": ["Quill"],
+                        "last_names": ["Ink"],
+                    },
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    try:
+        load_setting_bundle(bundle_path)
+    except ValueError as exc:
+        assert "first_names_male" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError for incomplete naming rules")
+
+
 def test_empty_calendar_definition_uses_consistent_30_day_fallback():
     calendar = CalendarDefinition(
         calendar_key="empty",

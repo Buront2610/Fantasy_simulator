@@ -126,6 +126,15 @@ class TestWorld:
         assert capital.danger == 15
         assert world._default_resident_location_id() == "loc_custom_capital"
 
+        capital.safety = 70
+        world._decay_toward_baseline()
+        assert capital.safety > 70
+
+        restored = World.from_dict(world.to_dict())
+        restored_capital = restored.get_location_by_id("loc_custom_capital")
+        assert restored_capital is not None
+        assert restored.location_state_defaults("loc_custom_capital", "city")["safety"] == 80
+
     def test_default_world_uses_bundle_site_seeds(self):
         world = World(width=2, height=1)
 
