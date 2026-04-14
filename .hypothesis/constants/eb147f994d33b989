@@ -1,0 +1,4 @@
+# file: /home/runner/work/Fantasy_simulator/Fantasy_simulator/fantasy_simulator/persistence/save_load.py
+# hypothesis_version: 6.151.14
+
+['r', 'schema_version', 'utf-8', 'w']

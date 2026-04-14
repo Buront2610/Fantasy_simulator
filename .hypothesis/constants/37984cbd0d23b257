@@ -1,0 +1,4 @@
+# file: /home/runner/work/Fantasy_simulator/Fantasy_simulator/fantasy_simulator/ui/map_renderer.py
+# hypothesis_version: 6.151.14
+
+[-120, 128, '     +', '   +', '  +', '  |', ' ? ???', '!', '$', '*', '+', ',', ', ', '-', '.', '/', '<->', '?', '@', 'AtlasLayout', 'O', 'Site', 'World', '\\', 'a', 'high', 'low', 'm', 'map_danger', 'map_detail_elevation', 'map_detail_markers', 'map_detail_moisture', 'map_detail_mood', 'map_legend_alias', 'map_legend_memorial', 'map_population', 'map_safety', 'map_terrain', 'map_traffic', 'medium', 'mountain_pass', 'o', 'plains', 'river', 'road', 'trail', 'x', 'x->', '|', '~']

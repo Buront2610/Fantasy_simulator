@@ -1,0 +1,4 @@
+# file: /home/runner/work/Fantasy_simulator/Fantasy_simulator/fantasy_simulator/narrative/context.py
+# hypothesis_version: 6.151.14
+
+['Bard', 'Character', 'Druid', 'Healer', 'Knight', 'Mage', 'Mercenary', 'NarrativeContext', 'Paladin', 'Ranger', 'Sage', 'Warrior', 'Witch', 'World', 'YearlyReport', 'alias_death_site', 'alias_echo_site', 'alias_fall_site', 'alias_fallen_path', 'alias_family_site', 'alias_memorial_site', 'alias_notable_site', 'alias_rescued_site', 'alias_rest_site', 'alias_savior_site', 'alias_spouse_site', 'alias_vigil_site', 'alias_whisper_site', 'betrayer', 'death_cause_dungeon', 'disciple', 'family', 'friend', 'get_relation_tags', 'job', 'memorial_epitaph_era', 'mentor', 'relation_tags', 'rescued', 'rival', 'savior', 'spouse']

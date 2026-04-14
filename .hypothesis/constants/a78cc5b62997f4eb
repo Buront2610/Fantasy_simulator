@@ -1,0 +1,4 @@
+# file: /home/runner/work/Fantasy_simulator/Fantasy_simulator/fantasy_simulator/i18n/__init__.py
+# hypothesis_version: 6.151.14
+
+['get_locale', 'set_locale', 'tr', 'tr_term']

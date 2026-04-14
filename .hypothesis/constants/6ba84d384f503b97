@@ -1,0 +1,4 @@
+# file: /home/runner/work/Fantasy_simulator/Fantasy_simulator/fantasy_simulator/character.py
+# hypothesis_version: 6.151.14
+
+[-100, 100, 130, 250, 600, '  |  ', ', ', '08x', 'Aethoria Capital', 'Character', 'Dragonborn', 'Dwarf', 'Elf', 'Halfling', 'Human', 'Orc', 'Tiefling', '_', 'active_adventure_id', 'age', 'alive', 'char_id', 'charisma', 'constitution', 'deceased', 'dexterity', 'dying', 'favorite', 'gender', 'history', 'injured', 'injury_status', 'intelligence', 'job', 'loc_', 'loc_aethoria_capital', 'location', 'location_id', 'name', 'none', 'playable', 'race', 'relation_tag_sources', 'relation_tags', 'relationships', 'serious', 'skill_already_max', 'skill_improved', 'skills', 'spotlighted', 'spouse_id', 'strength', 'wisdom']

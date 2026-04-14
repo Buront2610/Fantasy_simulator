@@ -295,7 +295,7 @@ class LocationState:
             "recent_event_ids": list(self.recent_event_ids),
             "aliases": list(self.aliases),
             "memorial_ids": list(self.memorial_ids),
-            "live_traces": list(self.live_traces),
+            "live_traces": [dict(trace) for trace in self.live_traces],
         }
 
     @classmethod
@@ -340,7 +340,7 @@ class LocationState:
             recent_event_ids=list(data.get("recent_event_ids", [])),
             aliases=list(data.get("aliases", [])),
             memorial_ids=list(data.get("memorial_ids", [])),
-            live_traces=list(data.get("live_traces", [])),
+            live_traces=[dict(trace) for trace in data.get("live_traces", [])],
         )
 
 
@@ -416,16 +416,22 @@ class World:
     def setting_bundle(self, value: SettingBundle) -> None:
         self.apply_setting_bundle(value)
 
-    def apply_setting_bundle(self, bundle: SettingBundle, *, rebuild_world: bool = True) -> None:
-        """Apply a bundle while keeping derived world structures consistent."""
-        validate_setting_bundle(bundle, source="World.setting_bundle")
-        previous_locations = list(getattr(self, "grid", {}).values())
+    def _set_setting_bundle_metadata(self, bundle: SettingBundle) -> None:
+        """Replace bundle-backed metadata without rebuilding world structure."""
         self._setting_bundle = _clone_setting_bundle(bundle)
         if hasattr(self, "lore"):
             self.lore = self._setting_bundle.world_definition.lore_text
         if hasattr(self, "calendar_baseline"):
             self.calendar_baseline = _clone_calendar(self._setting_bundle.world_definition.calendar)
-        if rebuild_world and hasattr(self, "grid"):
+        if hasattr(self, "calendar_history"):
+            self.calendar_history = []
+
+    def apply_setting_bundle(self, bundle: SettingBundle) -> None:
+        """Apply a bundle while keeping derived world structures consistent."""
+        validate_setting_bundle(bundle, source="World.setting_bundle")
+        previous_locations = list(getattr(self, "grid", {}).values())
+        self._set_setting_bundle_metadata(bundle)
+        if hasattr(self, "grid"):
             self._build_default_map(previous_locations=previous_locations)
             self._normalize_references_after_bundle_change()
 
@@ -469,7 +475,7 @@ class World:
         target.recent_event_ids = list(source.recent_event_ids)
         target.aliases = list(source.aliases)
         target.memorial_ids = list(source.memorial_ids)
-        target.live_traces = list(source.live_traces)
+        target.live_traces = [dict(trace) for trace in source.live_traces]
 
     def _build_default_map(self, previous_locations: Optional[List[LocationState]] = None) -> None:
         """Rebuild the world from the active setting bundle's site seeds.
@@ -541,7 +547,20 @@ class World:
     ) -> Optional[str]:
         """Normalize persisted location IDs against the active bundle."""
         if location_id:
-            return self._legacy_location_id_aliases().get(location_id, location_id)
+            aliased = self._legacy_location_id_aliases().get(location_id)
+            if aliased is not None:
+                return aliased
+            bundle_location_ids = {
+                seed.location_id
+                for seed in self._setting_bundle.world_definition.site_seeds
+            }
+            if location_id in bundle_location_ids:
+                return location_id
+            if location_name is not None:
+                bundle_location_id = self._bundle_location_id_for_name(location_name)
+                if bundle_location_id is not None:
+                    return bundle_location_id
+            return location_id
         if location_name is not None:
             return self.resolve_location_id_from_name(location_name)
         return location_id
@@ -905,11 +924,13 @@ class World:
         options = list(self.grid.values())
         if exclude_dungeon:
             options = [loc for loc in options if loc.region_type != "dungeon"]
+        if not options:
+            raise ValueError("World has no locations.")
         return rng.choice(options)
 
     @property
     def calendar_definition(self):
-        return self._setting_bundle.world_definition.calendar
+        return _clone_calendar(self._setting_bundle.world_definition.calendar)
 
     @property
     def months_per_year(self) -> int:
@@ -928,13 +949,13 @@ class World:
     def calendar_definition_by_key(self, calendar_key: str) -> CalendarDefinition:
         if not calendar_key:
             return self.calendar_definition
-        if self.calendar_definition.calendar_key == calendar_key:
-            return self.calendar_definition
+        if self._setting_bundle.world_definition.calendar.calendar_key == calendar_key:
+            return _clone_calendar(self._setting_bundle.world_definition.calendar)
         if self.calendar_baseline.calendar_key == calendar_key:
-            return self.calendar_baseline
+            return _clone_calendar(self.calendar_baseline)
         for entry in reversed(sorted(self.calendar_history, key=lambda item: (item.year, item.month, item.day))):
             if entry.calendar.calendar_key == calendar_key:
-                return entry.calendar
+                return _clone_calendar(entry.calendar)
         return self.calendar_definition
 
     def calendar_definition_for_date(
@@ -954,7 +975,7 @@ class World:
                 selected = entry.calendar
             else:
                 break
-        return selected
+        return _clone_calendar(selected)
 
     def months_per_year_for_date(
         self, year: int, month: int = 1, day: int = 1, *, calendar_key: str = ""
@@ -1028,7 +1049,7 @@ class World:
         imports, migrations, or timeline reconstruction can stamp the
         historical date of the transition in ``calendar_history``.
         """
-        self._setting_bundle.world_definition.calendar = calendar
+        self._setting_bundle.world_definition.calendar = _clone_calendar(calendar)
         month = max(1, min(calendar.months_per_year, int(changed_month)))
         day = max(1, min(calendar.days_in_month(month), int(changed_day)))
         self.calendar_history.append(CalendarChangeRecord(
@@ -1371,7 +1392,7 @@ class World:
             recent_event_ids=list(data.get("recent_event_ids", [])),
             aliases=list(data.get("aliases", [])),
             memorial_ids=list(data.get("memorial_ids", [])),
-            live_traces=list(data.get("live_traces", [])),
+            live_traces=[dict(trace) for trace in data.get("live_traces", [])],
         )
 
     @classmethod
@@ -1404,12 +1425,11 @@ class World:
             _skip_defaults=True,
         )
         if "setting_bundle" in data:
-            world.apply_setting_bundle(
+            world._set_setting_bundle_metadata(
                 bundle_from_dict_validated(
                     data["setting_bundle"],
                     source="embedded world.setting_bundle",
-                ),
-                rebuild_world=False,
+                )
             )
         for loc_data in data.get("grid", []):
             world._register_location(world._location_state_from_dict(loc_data))

@@ -1,0 +1,4 @@
+# file: /home/runner/work/Fantasy_simulator/Fantasy_simulator/fantasy_simulator/simulation/timeline.py
+# hypothesis_version: 6.151.14
+
+[0.3, 0.5, 1.0, 100, 'autumn', 'city', 'condition_improved', 'condition_worsened', 'danger', 'death', 'dungeon', 'dying', 'forest', 'injured', 'injury_recovery', 'mood', 'mountain', 'none', 'plains', 'road_condition', 'sea', 'serious', 'spring', 'summer', 'traffic', 'village', 'winter']

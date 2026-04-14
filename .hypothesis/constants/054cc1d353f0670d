@@ -1,0 +1,4 @@
+# file: /home/runner/work/Fantasy_simulator/Fantasy_simulator/fantasy_simulator/ui/view_models.py
+# hypothesis_version: 6.151.14
+
+['World', 'WorldEventRecord', 'adventure_choice', 'adventure_death', 'adventure_discovery', 'adventure_resolved', 'characters', 'death', 'event_records', 'location_name', 'none']
