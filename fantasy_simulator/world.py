@@ -534,6 +534,24 @@ class World:
             return
         self._copy_location_runtime_state(restored, current)
 
+    def _serialized_grid_is_compatible_with_active_bundle(self, grid_data: List[Dict[str, Any]]) -> bool:
+        """Return whether serialized locations can be mapped onto the active bundle."""
+        if not grid_data:
+            return True
+        bundle_location_ids = {
+            seed.location_id
+            for seed in self._setting_bundle.world_definition.site_seeds
+        }
+        for loc_data in grid_data:
+            canonical_name = loc_data.get("canonical_name") or loc_data.get("name", "")
+            normalized_id = self.normalize_location_id(
+                loc_data.get("id"),
+                location_name=canonical_name,
+            )
+            if normalized_id not in bundle_location_ids:
+                return False
+        return True
+
     def _site_seed_tags(self, location_id: str) -> List[str]:
         """Return semantic tags for a location from the active setting bundle."""
         for seed in self._setting_bundle.world_definition.site_seeds:
@@ -1504,6 +1522,7 @@ class World:
             year=data.get("year", 1000),
             _skip_defaults=True,
         )
+        serialized_grid = list(data.get("grid", []))
         if "setting_bundle" in data:
             world._set_setting_bundle_metadata(
                 bundle_from_dict_validated(
@@ -1511,11 +1530,15 @@ class World:
                     source="embedded world.setting_bundle",
                 )
             )
-            world._build_default_map()
-            for loc_data in data.get("grid", []):
-                world._overlay_location_runtime_state_from_dict(loc_data)
+            if world._serialized_grid_is_compatible_with_active_bundle(serialized_grid):
+                world._build_default_map()
+                for loc_data in serialized_grid:
+                    world._overlay_location_runtime_state_from_dict(loc_data)
+            else:
+                for loc_data in serialized_grid:
+                    world._register_location(world._location_state_from_dict(loc_data))
         else:
-            for loc_data in data.get("grid", []):
+            for loc_data in serialized_grid:
                 world._register_location(world._location_state_from_dict(loc_data))
         world.event_log = list(data.get("event_log", []))
         world.event_records = [
