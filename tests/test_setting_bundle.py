@@ -138,8 +138,22 @@ def test_load_setting_bundle_reports_duplicate_site_seed_ids(tmp_path):
                     "display_name": "Dup",
                     "lore_text": "Dup lore",
                     "site_seeds": [
-                        {"location_id": "loc_dup", "name": "One", "description": "", "region_type": "city", "x": 0, "y": 0},
-                        {"location_id": "loc_dup", "name": "Two", "description": "", "region_type": "city", "x": 1, "y": 0},
+                        {
+                            "location_id": "loc_dup",
+                            "name": "One",
+                            "description": "",
+                            "region_type": "city",
+                            "x": 0,
+                            "y": 0,
+                        },
+                        {
+                            "location_id": "loc_dup",
+                            "name": "Two",
+                            "description": "",
+                            "region_type": "city",
+                            "x": 1,
+                            "y": 0,
+                        },
                     ],
                 },
             }

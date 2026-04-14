@@ -382,7 +382,7 @@ class TestWorld:
 
         restored = World.from_dict(payload)
 
-        assert restored.get_compatibility_event_log() == ["Year 1001, Month 2, Day 3: A clash"]
+        assert restored.get_compatibility_event_log() == ["[Year 1001, Month 2, Day 3] A clash"]
 
     def test_trimming_event_records_removes_dangling_recent_event_ids(self):
         from fantasy_simulator.events import WorldEventRecord

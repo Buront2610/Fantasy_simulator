@@ -239,7 +239,7 @@ class WorldDefinition:
     era: str = ""
     cultures: List[str] = field(default_factory=list)
     factions: List[str] = field(default_factory=list)
-    calendar: CalendarDefinition = field(default_factory=lambda: default_aethoria_bundle().world_definition.calendar)
+    calendar: CalendarDefinition = field(default_factory=lambda: default_calendar_definition())
     races: List[RaceDefinition] = field(default_factory=list)
     jobs: List[JobDefinition] = field(default_factory=list)
     site_seeds: List[SiteSeedDefinition] = field(default_factory=list)
@@ -313,7 +313,24 @@ class SettingBundle:
 def default_calendar_definition() -> CalendarDefinition:
     """Return the bundled Aethorian default calendar."""
 
-    return default_aethoria_bundle().world_definition.calendar
+    return CalendarDefinition(
+        calendar_key="aethorian_reckoning",
+        display_name="Aethorian Reckoning",
+        months=[
+            CalendarMonthDefinition("embermorn", "Embermorn", 30, season="winter"),
+            CalendarMonthDefinition("frostwane", "Frostwane", 30, season="winter"),
+            CalendarMonthDefinition("raincall", "Raincall", 30, season="spring"),
+            CalendarMonthDefinition("bloomtide", "Bloomtide", 30, season="spring"),
+            CalendarMonthDefinition("suncrest", "Suncrest", 30, season="spring"),
+            CalendarMonthDefinition("highsun", "Highsun", 30, season="summer"),
+            CalendarMonthDefinition("goldleaf", "Goldleaf", 30, season="summer"),
+            CalendarMonthDefinition("hearthwane", "Hearthwane", 30, season="summer"),
+            CalendarMonthDefinition("duskmarch", "Duskmarch", 30, season="autumn"),
+            CalendarMonthDefinition("cinderfall", "Cinderfall", 30, season="autumn"),
+            CalendarMonthDefinition("longshade", "Longshade", 30, season="autumn"),
+            CalendarMonthDefinition("nightfrost", "Nightfrost", 30, season="winter"),
+        ],
+    )
 
 
 @lru_cache(maxsize=1)
@@ -356,7 +373,12 @@ def _validate_setting_bundle(bundle: SettingBundle, *, source: str) -> None:
         raise ValueError(f"Setting bundle {source} contains duplicate site seed coordinates")
 
     naming = world.naming_rules
-    if (naming.first_names_male or naming.first_names_female or naming.first_names_non_binary) and not naming.last_names:
+    has_first_name_rules = (
+        naming.first_names_male
+        or naming.first_names_female
+        or naming.first_names_non_binary
+    )
+    if has_first_name_rules and not naming.last_names:
         raise ValueError(f"Setting bundle {source} must provide last_names when naming rules are defined")
 
 
