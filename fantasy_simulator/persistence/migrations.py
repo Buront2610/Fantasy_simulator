@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Dict
 
+from ..content.setting_bundle import bundle_from_dict_validated
 from ..content.world_data import (
     DEFAULT_LOCATIONS,
     NAME_TO_LOCATION_ID,
@@ -19,7 +20,119 @@ from ..terrain import (
     build_default_atlas_layout,
 )
 
-CURRENT_VERSION = 7
+CURRENT_VERSION = 8
+
+
+def _embedded_setting_bundle(data: Dict[str, Any]):
+    world_data = data.get("world", {})
+    bundle_data = world_data.get("setting_bundle")
+    if bundle_data is None:
+        return None
+    return bundle_from_dict_validated(bundle_data, source="embedded world.setting_bundle during migration")
+
+
+def _location_name_to_id(data: Dict[str, Any]) -> Dict[str, str]:
+    bundle = _embedded_setting_bundle(data)
+    if bundle is None:
+        return dict(NAME_TO_LOCATION_ID)
+    return {
+        seed.name: seed.location_id
+        for seed in bundle.world_definition.site_seeds
+    }
+
+
+def _default_locations_for_data(data: Dict[str, Any]) -> list[tuple[str, str, str, str, int, int]]:
+    bundle = _embedded_setting_bundle(data)
+    if bundle is None:
+        return list(DEFAULT_LOCATIONS)
+    return [
+        seed.as_world_data_entry()
+        for seed in bundle.world_definition.site_seeds
+    ]
+
+
+def _site_tags_by_location_id(data: Dict[str, Any]) -> Dict[str, list[str]]:
+    bundle = _embedded_setting_bundle(data)
+    if bundle is None:
+        return {}
+    return {
+        seed.location_id: list(seed.tags)
+        for seed in bundle.world_definition.site_seeds
+    }
+
+
+def _resolve_location_id(data: Dict[str, Any], name: str) -> str:
+    return _location_name_to_id(data).get(name, fallback_location_id(name))
+
+
+def _calendar_key_for_data(data: Dict[str, Any]) -> str:
+    bundle = _embedded_setting_bundle(data)
+    if bundle is not None:
+        return bundle.world_definition.calendar.calendar_key
+    return ""
+
+
+def _record_from_legacy_history_item(
+    item: Dict[str, Any],
+    *,
+    index: int,
+    calendar_key: str,
+) -> Dict[str, Any]:
+    affected = list(item.get("affected_characters", []))
+    return {
+        "record_id": f"legacy_history_{index:06d}",
+        "kind": item.get("event_type", "generic"),
+        "year": item.get("year", 0),
+        "month": 1,
+        "day": 1,
+        "absolute_day": 0,
+        "location_id": None,
+        "primary_actor_id": affected[0] if affected else None,
+        "secondary_actor_ids": affected[1:],
+        "description": item.get("description", ""),
+        "severity": 1,
+        "visibility": "public",
+        "calendar_key": calendar_key,
+        "tags": [],
+        "impacts": [],
+        "legacy_event_result": dict(item),
+        "legacy_event_log_entry": None,
+    }
+
+
+def _record_from_legacy_event_log_entry(
+    entry: str,
+    *,
+    index: int,
+    year: int,
+    calendar_key: str,
+) -> Dict[str, Any]:
+    return {
+        "record_id": f"legacy_event_log_{index:06d}",
+        "kind": "legacy_event_log",
+        "year": year,
+        "month": 1,
+        "day": 1,
+        "absolute_day": 0,
+        "location_id": None,
+        "primary_actor_id": None,
+        "secondary_actor_ids": [],
+        "description": entry,
+        "severity": 1,
+        "visibility": "public",
+        "calendar_key": calendar_key,
+        "tags": ["legacy_event_log"],
+        "impacts": [],
+        "legacy_event_result": {
+            "description": entry,
+            "affected_characters": [],
+            "stat_changes": {},
+            "event_type": "legacy_event_log",
+            "year": year,
+            "metadata": {"legacy_event_log_entry": True},
+        },
+        "legacy_event_log_entry": entry,
+    }
 
 
 def migrate(data: Dict[str, Any]) -> Dict[str, Any]:
@@ -39,6 +152,7 @@ def migrate(data: Dict[str, Any]) -> Dict[str, Any]:
         5: _migrate_v4_to_v5,
         6: _migrate_v5_to_v6,
         7: _migrate_v6_to_v7,
+        8: _migrate_v7_to_v8,
     }
     for target_version in range(version + 1, CURRENT_VERSION + 1):
         data = migrations[target_version](data)
@@ -56,26 +170,23 @@ def _migrate_v1_to_v2(data: Dict[str, Any]) -> Dict[str, Any]:
         if "location_id" in char_data:
             continue
         old_name = char_data.pop("location", "Aethoria Capital")
-        char_data["location_id"] = NAME_TO_LOCATION_ID.get(old_name, fallback_location_id(old_name))
+        char_data["location_id"] = _resolve_location_id(data, old_name)
 
     world_data = data.get("world", {})
     for loc_data in world_data.get("grid", []):
         if "id" in loc_data:
             continue
         name = loc_data.get("canonical_name") or loc_data.get("name", "")
-        loc_data["id"] = NAME_TO_LOCATION_ID.get(name, fallback_location_id(name))
+        loc_data["id"] = _resolve_location_id(data, name)
 
     for bucket in ("active_adventures", "completed_adventures"):
         for adventure in world_data.get(bucket, []):
             if "origin" in adventure:
                 origin = adventure["origin"]
-                adventure["origin"] = NAME_TO_LOCATION_ID.get(origin, fallback_location_id(origin))
+                adventure["origin"] = _resolve_location_id(data, origin)
             if "destination" in adventure:
                 destination = adventure["destination"]
-                adventure["destination"] = NAME_TO_LOCATION_ID.get(
-                    destination,
-                    fallback_location_id(destination),
-                )
+                adventure["destination"] = _resolve_location_id(data, destination)
 
     data["schema_version"] = 2
     return data
@@ -95,18 +206,23 @@ def _migrate_v2_to_v3(data: Dict[str, Any]) -> Dict[str, Any]:
     # Fill in missing default locations for partial legacy saves
     width = world_data.get("width", 5)
     height = world_data.get("height", 5)
+    site_tags_by_location_id = _site_tags_by_location_id(data)
     existing_ids = {
-        loc_data.get("id") or NAME_TO_LOCATION_ID.get(
+        loc_data.get("id") or _location_name_to_id(data).get(
             loc_data.get("canonical_name") or loc_data.get("name", ""), ""
         )
         for loc_data in grid
     }
-    for loc_id, name, desc, region_type, x, y in DEFAULT_LOCATIONS:
+    for loc_id, name, desc, region_type, x, y in _default_locations_for_data(data):
         if loc_id in existing_ids:
             continue
         if not (0 <= x < width and 0 <= y < height):
             continue
-        defaults = get_location_state_defaults(loc_id, region_type)
+        defaults = get_location_state_defaults(
+            loc_id,
+            region_type,
+            site_tags=site_tags_by_location_id.get(loc_id),
+        )
         grid.append({
             "id": loc_id,
             "canonical_name": name,
@@ -129,14 +245,18 @@ def _migrate_v2_to_v3(data: Dict[str, Any]) -> Dict[str, Any]:
         loc_id = loc_data.get("id")
         if not loc_id:
             name = loc_data.get("canonical_name") or loc_data.get("name", "")
-            loc_id = NAME_TO_LOCATION_ID.get(name, fallback_location_id(name))
+            loc_id = _resolve_location_id(data, name)
             loc_data["id"] = loc_id
         canonical_name = loc_data.get("canonical_name") or loc_data.get("name", "")
         loc_data["canonical_name"] = canonical_name
         loc_data.setdefault("name", canonical_name)
 
         region_type = loc_data.get("region_type", "city")
-        defaults = get_location_state_defaults(loc_id, region_type)
+        defaults = get_location_state_defaults(
+            loc_id,
+            region_type,
+            site_tags=site_tags_by_location_id.get(loc_id),
+        )
         for field_name, default_value in defaults.items():
             loc_data.setdefault(field_name, default_value)
         loc_data.setdefault("visited", False)
@@ -338,4 +458,32 @@ def _migrate_v6_to_v7(data: Dict[str, Any]) -> Dict[str, Any]:
     world_data["atlas_layout"] = build_default_atlas_layout(inputs).to_dict()
 
     data["schema_version"] = 7
+    return data
+
+
+def _migrate_v7_to_v8(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Canonicalize legacy event adapters into ``world.event_records``."""
+    world_data = data.setdefault("world", {})
+    event_records = world_data.setdefault("event_records", [])
+    history = list(data.get("history", []))
+    event_log = list(world_data.get("event_log", []))
+    calendar_key = _calendar_key_for_data(data)
+
+    if not event_records:
+        canonical_records = []
+        if history:
+            canonical_records.extend([
+                _record_from_legacy_history_item(item, index=index, calendar_key=calendar_key)
+                for index, item in enumerate(history, start=1)
+            ])
+        if event_log:
+            year = int(world_data.get("year", 0))
+            canonical_records.extend([
+                _record_from_legacy_event_log_entry(entry, index=index, year=year, calendar_key=calendar_key)
+                for index, entry in enumerate(event_log, start=1)
+            ])
+        if canonical_records:
+            world_data["event_records"] = canonical_records
+
+    data["schema_version"] = 8
     return data

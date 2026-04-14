@@ -22,10 +22,9 @@ from ..content.setting_bundle import default_aethoria_bundle
 from ..i18n import set_locale, tr, tr_term
 from ..persistence.save_load import load_simulation, save_simulation
 from ..simulator import Simulator
-from .ui_helpers import fit_display_width
 from ..world import World
-from ..content.world_data import JOBS, RACES
 from .presenters import AdventurePresenter, LocationPresenter, ReportPresenter
+from .ui_helpers import fit_display_width
 from .view_models import AdventureSummaryView, LocationHistoryView, build_monthly_report_card_view
 
 from .ui_context import UIContext, _default_ctx
@@ -954,7 +953,10 @@ def screen_custom_simulation(ctx: UIContext | None = None) -> None:
             out.print_line()
             out.print_success(f"  {msg}")
         elif action == "create_template":
-            templates = CharacterCreator.list_templates()
+            templates = creator.list_templates()
+            if not templates:
+                out.print_warning(f"  {tr('no_templates_available')}")
+                continue
             out.print_line(f"\n  {tr('available_templates')}: " + ", ".join(templates))
             tmpl_name = inp.read_line(f"  > {tr('template_name')}: ").strip()
             char_name = inp.read_line(f"  > {tr('character_name_optional')}: ").strip() or None
@@ -995,7 +997,9 @@ def screen_world_lore(ctx: UIContext | None = None, *, world: World | None = Non
     ctx = _default_ctx(ctx)
     out = ctx.out
     bundle = world.setting_bundle if world is not None else default_aethoria_bundle()
-    lore_text = bundle.world_definition.lore_text
+    world_definition = bundle.world_definition
+    creator = CharacterCreator(setting_bundle=bundle)
+    lore_text = world_definition.lore_text
 
     out.print_line()
     out.print_separator("=")
@@ -1005,22 +1009,24 @@ def screen_world_lore(ctx: UIContext | None = None, *, world: World | None = Non
     out.print_line()
     out.print_heading(f"  {tr('races_of_aethoria')}")
     out.print_separator()
-    for rname, rdesc, bonuses in RACES:
+    for race_name, race_description, stat_bonuses in creator.race_entries:
         bonus_str = ", ".join(
-            f"{stat} {'+' if v >= 0 else ''}{v}" for stat, v in bonuses.items() if v != 0
+            f"{stat} {'+' if value >= 0 else ''}{value}"
+            for stat, value in stat_bonuses.items()
+            if value != 0
         )
-        out.print_highlighted(f"  {rname}")
-        out.print_wrapped(rdesc)
+        out.print_highlighted(f"  {tr_term(race_name)}")
+        out.print_wrapped(race_description)
         if bonus_str:
             out.print_dim(f"    {tr('bonuses')}: {bonus_str}")
         out.print_line()
     out.print_heading(f"  {tr('jobs_classes')}")
     out.print_separator()
-    for jname, jdesc, jskills in JOBS:
-        skills_str = ', '.join(tr_term(skill) for skill in jskills)
-        out.print_highlighted(f"  {tr_term(jname)}")
+    for job_name, job_description, primary_skills in creator.job_entries:
+        skills_str = ', '.join(tr_term(skill) for skill in primary_skills)
+        out.print_highlighted(f"  {tr_term(job_name)}")
         out.print_line(f"    {tr('primary_skills_label')}: {skills_str}")
-        out.print_wrapped(jdesc)
+        out.print_wrapped(job_description)
         out.print_line()
     ctx.inp.pause()
 

@@ -3,12 +3,8 @@
 ``world.event_records`` is the canonical data source by policy.  New
 read-paths should query ``event_records`` (via ``events_by_kind()``).
 
-``history`` and ``event_log`` remain as compatibility adapters.  Note that
-``history`` is only populated via ``_record_event()`` (not
-``_record_world_event()``), so ``events_by_type()`` sees a strict subset
-of what ``events_by_kind()`` can return.  All three stores are still
-persisted for save/load compatibility; the permanent reduction to a
-single persisted representation is a future task.
+``history`` and ``event_log`` remain as compatibility adapters projected
+from canonical records for legacy consumers and persisted save snapshots.
 """
 
 from __future__ import annotations
@@ -140,7 +136,12 @@ class QueryMixin:
 
         lines.append("")
         char_name_lookup = {world_char.char_id: world_char.name for world_char in self.world.characters}
-        lines.append(char.stat_block(char_name_lookup=char_name_lookup))
+        lines.append(
+            char.stat_block(
+                char_name_lookup=char_name_lookup,
+                location_resolver=self.world.location_name,
+            )
+        )
         lines.append("─" * 50)
         return "\n".join(lines)
 
@@ -158,28 +159,17 @@ class QueryMixin:
     def get_event_log(self, last_n: Optional[int] = None) -> List[str]:
         """Return the compatibility text log, optionally only the last *n*.
 
-        Reads from ``world.event_log`` (display-derived buffer) for backward
-        compatibility.  New features should query ``world.event_records``
+        Reads through ``World.get_compatibility_event_log()`` for backward
+        compatibility. New features should query ``world.event_records``
         directly instead.
         """
-        log = self.world.event_log
-        if last_n is not None:
-            return log[-last_n:]
-        return log
+        return self.world.get_compatibility_event_log(last_n=last_n)
 
     def events_by_type(self, event_type: str) -> List[EventResult]:
         """Return legacy EventResult entries of the given type.
 
-        .. warning:: Incomplete view
-            This method reads from ``self.history``, which is only populated
-            by ``_record_event()`` — that is, events originating from
-            ``EventResult`` objects (random events, natural death, dying
-            resolution).  Events created directly by the simulation loop
-            (e.g. ``adventure_started``, ``adventure_choice``,
-            ``injury_recovery``) go through ``_record_world_event()`` and
-            do **not** appear in ``history``.
-
-            Use ``events_by_kind()`` for a complete view of all event types.
+        This compatibility adapter returns projected ``EventResult`` objects
+        derived from the canonical store, so it now sees the full event set.
         """
         return [ev for ev in self.history if ev.event_type == event_type]
 

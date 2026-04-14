@@ -6,6 +6,7 @@ import random
 from types import SimpleNamespace
 
 from fantasy_simulator.character_creator import CharacterCreator
+from fantasy_simulator.content.setting_bundle import JobDefinition, RaceDefinition, default_aethoria_bundle
 from fantasy_simulator.i18n import get_locale, set_locale, tr, tr_term
 
 
@@ -84,6 +85,50 @@ class TestCreateRandomReproducibility:
         )
         assert differs
 
+    def test_custom_bundle_naming_rules_are_used_at_runtime(self):
+        bundle = default_aethoria_bundle()
+        bundle.world_definition.races = [
+            RaceDefinition(
+                name="Clockfolk",
+                description="Precise and patient.",
+                stat_bonuses={"strength": 0, "intelligence": 2},
+            )
+        ]
+        bundle.world_definition.jobs = [
+            JobDefinition(
+                name="Scribe",
+                description="Records the world.",
+                primary_skills=["Lore Mastery"],
+            )
+        ]
+        bundle.world_definition.naming_rules.first_names_male = ["Custom"]
+        bundle.world_definition.naming_rules.first_names_female = ["Custom"]
+        bundle.world_definition.naming_rules.first_names_non_binary = ["Custom"]
+        bundle.world_definition.naming_rules.last_names = ["Name"]
+
+        creator = CharacterCreator(setting_bundle=bundle)
+        character = creator.create_random(rng=random.Random(1))
+
+        assert character.name == "Custom Name"
+        assert character.race == "Clockfolk"
+        assert character.job == "Scribe"
+
+    def test_empty_bundle_naming_rules_fall_back_to_default_names(self):
+        bundle = default_aethoria_bundle()
+        bundle.world_definition.naming_rules = bundle.world_definition.naming_rules.__class__()
+
+        default_name = CharacterCreator().create_random(rng=random.Random(7)).name
+        fallback_name = CharacterCreator(setting_bundle=bundle).create_random(rng=random.Random(7)).name
+
+        assert fallback_name == default_name
+
+    def test_random_character_defaults_to_empty_location_until_added_to_world(self):
+        creator = CharacterCreator()
+
+        character = creator.create_random(rng=random.Random(7))
+
+        assert character.location_id == ""
+
 
 class TestCreateFromTemplateReproducibility:
     def test_same_seed_produces_same_template_character(self):
@@ -98,6 +143,48 @@ class TestCreateFromTemplateReproducibility:
         assert c1.age == c2.age
         assert c1.strength == c2.strength
         assert c1.intelligence == c2.intelligence
+
+    def test_templates_are_unavailable_for_non_aethoria_compatible_bundles(self):
+        bundle = default_aethoria_bundle()
+        bundle.world_definition.races = [
+            RaceDefinition(
+                name="Clockfolk",
+                description="Precise and patient.",
+                stat_bonuses={"intelligence": 2},
+            )
+        ]
+        bundle.world_definition.jobs = [
+            JobDefinition(
+                name="Scribe",
+                description="Records the world.",
+                primary_skills=["Lore Mastery"],
+            )
+        ]
+        creator = CharacterCreator(setting_bundle=bundle)
+
+        assert creator.list_templates() == []
+        try:
+            creator.create_from_template("warrior", rng=random.Random(3))
+        except ValueError as exc:
+            assert "Aethoria-compatible bundles" in str(exc)
+        else:
+            raise AssertionError("Expected ValueError for unsupported template bundle")
+
+    def test_templates_remain_available_when_bundle_uses_legacy_race_job_fallbacks(self):
+        bundle = default_aethoria_bundle()
+        bundle.world_definition.races = []
+        bundle.world_definition.jobs = []
+
+        creator = CharacterCreator(setting_bundle=bundle)
+
+        assert "warrior" in creator.list_templates()
+
+    def test_templates_are_unavailable_for_non_aethoria_world_key_even_with_matching_names(self):
+        bundle = default_aethoria_bundle()
+        bundle.world_definition.world_key = "clockwork"
+        creator = CharacterCreator(setting_bundle=bundle)
+
+        assert creator.list_templates() == []
 
 
 class TestInteractiveStatAllocation:

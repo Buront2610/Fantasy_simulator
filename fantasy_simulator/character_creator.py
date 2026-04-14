@@ -8,13 +8,15 @@ import random
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from .character import Character, random_stats
+from .content.setting_bundle import NamingRulesDefinition, SettingBundle, default_aethoria_bundle
+from .content.world_data import ALL_SKILLS, JOBS, RACES
 from .i18n import tr, tr_term
-from .content.world_data import JOBS, RACES, ALL_SKILLS
 
 if TYPE_CHECKING:
     from .ui.ui_context import UIContext
 
 
+# Compatibility fixtures for the default Aethoria bundle.
 _TEMPLATES: Dict[str, Dict] = {
     "warrior": {
         "race": "Human",
@@ -82,42 +84,79 @@ _TEMPLATES: Dict[str, Dict] = {
 }
 
 _GENDERS = ["Male", "Female", "Non-binary"]
-
-_FIRST_NAMES_M = [
-    "Aldric", "Bram", "Caius", "Dorian", "Eryn", "Faolan",
-    "Gareth", "Hadrin", "Ilyan", "Jorin", "Kaelen", "Lorcan",
-    "Marek", "Nolan", "Oswin", "Perrin", "Quinn", "Rodric",
-    "Soren", "Theron", "Ulric", "Varis", "Westan", "Xander", "Yoren", "Zephyr",
-]
-_FIRST_NAMES_F = [
-    "Aelindra", "Brynn", "Casia", "Dael", "Eira", "Feyra",
-    "Gwynne", "Halia", "Isara", "Jessa", "Kira", "Lyra",
-    "Mira", "Nissa", "Orla", "Petra", "Quellyn", "Rhea",
-    "Sable", "Talia", "Ursa", "Vela", "Wren", "Xara", "Ysmay", "Zara",
-]
-_FIRST_NAMES_NB = _FIRST_NAMES_M + _FIRST_NAMES_F
-_LAST_NAMES = [
-    "Ashwood", "Blackthorn", "Coldwater", "Dawnbringer", "Emberveil",
-    "Frostmantle", "Goldvein", "Hawkridge", "Ironforge", "Jadewood",
-    "Kindlewick", "Lightborn", "Moonwhisper", "Nightshade", "Oakheart",
-    "Proudmoor", "Quicksilver", "Riverstone", "Shadowmere", "Thornwall",
-    "Underhill", "Voidwalker", "Windmere", "Yarrow", "Zephyrhaven",
-]
+_TEMPLATE_REQUIRED_IDENTITIES = {
+    (template["race"], template["job"])
+    for template in _TEMPLATES.values()
+}
 
 
-def _random_name(gender: str, rng: Any = random) -> str:
+def _random_name(gender: str, naming_rules: NamingRulesDefinition, rng: Any = random) -> str:
     if gender == "Male":
-        first = rng.choice(_FIRST_NAMES_M)
+        first = rng.choice(naming_rules.first_names_male)
     elif gender == "Female":
-        first = rng.choice(_FIRST_NAMES_F)
+        first = rng.choice(naming_rules.first_names_female)
     else:
-        first = rng.choice(_FIRST_NAMES_NB)
-    last = rng.choice(_LAST_NAMES)
+        first = rng.choice(naming_rules.first_names_non_binary)
+    last = rng.choice(naming_rules.last_names)
     return f"{first} {last}"
 
 
 class CharacterCreator:
     """Factory for creating Character instances."""
+
+    def __init__(self, setting_bundle: SettingBundle | None = None) -> None:
+        self.setting_bundle = setting_bundle
+
+    @property
+    def naming_rules(self) -> NamingRulesDefinition:
+        default_rules = default_aethoria_bundle().world_definition.naming_rules
+        bundle = self.setting_bundle or default_aethoria_bundle()
+        rules = bundle.world_definition.naming_rules
+        male = list(rules.first_names_male or default_rules.first_names_male)
+        female = list(rules.first_names_female or default_rules.first_names_female)
+        non_binary = list(rules.first_names_non_binary or (male + female) or default_rules.first_names_non_binary)
+        last_names = list(rules.last_names or default_rules.last_names)
+        return NamingRulesDefinition(
+            first_names_male=male,
+            first_names_female=female,
+            first_names_non_binary=non_binary,
+            last_names=last_names,
+        )
+
+    @property
+    def race_entries(self) -> List[tuple[str, str, Dict[str, int]]]:
+        if self.setting_bundle is not None and self.setting_bundle.world_definition.races:
+            return [
+                (race.name, race.description, dict(race.stat_bonuses))
+                for race in self.setting_bundle.world_definition.races
+            ]
+        return RACES
+
+    @property
+    def job_entries(self) -> List[tuple[str, str, List[str]]]:
+        if self.setting_bundle is not None and self.setting_bundle.world_definition.jobs:
+            return [
+                (job.name, job.description, list(job.primary_skills))
+                for job in self.setting_bundle.world_definition.jobs
+            ]
+        return JOBS
+
+    def _supports_aethoria_templates(self) -> bool:
+        if self.setting_bundle is None:
+            return True
+        if self.setting_bundle.world_definition.world_key != "aethoria":
+            return False
+        if not self.setting_bundle.world_definition.races and not self.setting_bundle.world_definition.jobs:
+            return True
+        race_names = {race_name for race_name, _race_desc, _bonuses in self.race_entries}
+        job_names = {job_name for job_name, _job_desc, _skills in self.job_entries}
+        return all(race in race_names and job in job_names for race, job in _TEMPLATE_REQUIRED_IDENTITIES)
+
+    def list_templates(self) -> List[str]:
+        """Return templates supported by the current creator context."""
+        if self._supports_aethoria_templates():
+            return list(_TEMPLATES.keys())
+        return []
 
     def create_interactive(self, ctx: "UIContext | None" = None) -> Character:
         from .ui.ui_context import _default_ctx
@@ -129,18 +168,24 @@ class CharacterCreator:
         out.print_line(f"  {tr('interactive_character_creation')}")
         out.print_separator("=", 50)
 
-        name = self._prompt(tr("enter_character_name"), default=_random_name("Non-binary"), ctx=ctx)
+        name = self._prompt(
+            tr("enter_character_name"),
+            default=_random_name("Non-binary", self.naming_rules),
+            ctx=ctx,
+        )
         gender = self._prompt_choice(tr("choose_gender"), _GENDERS, default="Non-binary", ctx=ctx)
 
-        race_names = [r[0] for r in RACES]
+        race_entries = self.race_entries
+        race_names = [r[0] for r in race_entries]
         out.print_line(f"\n  {tr('available_races')}:")
-        for i, (rname, rdesc, _) in enumerate(RACES, 1):
+        for i, (rname, rdesc, _) in enumerate(race_entries, 1):
             out.print_line(f"  {i}. {rname:12s} - {rdesc[:60]}...")
         race = self._prompt_choice(tr("choose_race"), race_names, default=race_names[0], ctx=ctx)
 
-        job_names = [j[0] for j in JOBS]
+        job_entries = self.job_entries
+        job_names = [j[0] for j in job_entries]
         out.print_line(f"\n  {tr('available_jobs')}:")
-        for i, (jname, jdesc, _) in enumerate(JOBS, 1):
+        for i, (jname, jdesc, _) in enumerate(job_entries, 1):
             out.print_line(f"  {i}. {jname:12s} - {jdesc[:60]}...")
         job = self._prompt_choice(tr("choose_job"), job_names, default=job_names[0], ctx=ctx)
 
@@ -154,12 +199,12 @@ class CharacterCreator:
         out.print_line(f"  {tr('accept_default_stats')}")
         stats = self._allocate_stats(ctx=ctx)
 
-        race_bonuses = next((r[2] for r in RACES if r[0] == race), {})
+        race_bonuses = next((r[2] for r in race_entries if r[0] == race), {})
         for stat, bonus in race_bonuses.items():
             if stat in stats:
                 stats[stat] = Character._clamp(stats[stat] + bonus)
 
-        job_skills_raw = next((j[2] for j in JOBS if j[0] == job), [])
+        job_skills_raw = next((j[2] for j in job_entries if j[0] == job), [])
         skills = {s: 1 for s in job_skills_raw}
 
         char = Character(name=name, age=age, gender=gender, race=race, job=job, skills=skills, **stats)
@@ -170,16 +215,16 @@ class CharacterCreator:
 
     def create_random(self, name: Optional[str] = None, rng: Any = random) -> Character:
         gender = rng.choice(_GENDERS)
-        race_entry = rng.choice(RACES)
+        race_entry = rng.choice(self.race_entries)
         race = race_entry[0]
         race_bonuses = race_entry[2]
 
-        job_entry = rng.choice(JOBS)
+        job_entry = rng.choice(self.job_entries)
         job = job_entry[0]
         job_skills = job_entry[2]
 
         age = rng.randint(16, 55)
-        char_name = name or _random_name(gender, rng=rng)
+        char_name = name or _random_name(gender, self.naming_rules, rng=rng)
         stats = random_stats(base=25, spread=45, race_bonuses=race_bonuses, rng=rng)
 
         skills: Dict[str, int] = {}
@@ -200,6 +245,8 @@ class CharacterCreator:
 
     def create_from_template(self, template_name: str, name: Optional[str] = None, rng: Any = random) -> Character:
         key = template_name.lower().strip()
+        if not self._supports_aethoria_templates():
+            raise ValueError("Character templates are only available for Aethoria-compatible bundles")
         if key not in _TEMPLATES:
             available = ", ".join(_TEMPLATES.keys())
             raise ValueError(f"Unknown template '{template_name}'. Available: {available}")
@@ -208,7 +255,7 @@ class CharacterCreator:
         race = tmpl["race"]
         job = tmpl["job"]
         gender = rng.choice(_GENDERS)
-        char_name = name or _random_name(gender, rng=rng)
+        char_name = name or _random_name(gender, self.naming_rules, rng=rng)
         age = rng.randint(20, 40)
 
         stats = {k: max(1, min(100, v + rng.randint(-5, 5))) for k, v in tmpl["base_stats"].items()}
@@ -290,7 +337,3 @@ class CharacterCreator:
                 allocated[stat] = val
                 break
         return allocated
-
-    @staticmethod
-    def list_templates() -> List[str]:
-        return list(_TEMPLATES.keys())

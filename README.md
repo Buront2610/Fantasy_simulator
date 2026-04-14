@@ -34,7 +34,7 @@ influence.
   - region drill-down
   - location detail panels
 - Save/load support for simulation snapshots
-- Schema-versioned save migration support for older data (`schema_version = 7`)
+- Schema-versioned save migration support for older data (`schema_version = 8`)
 - Structured world event records with causal impact tracking and rumors
 - UI abstraction through input/render backends plus lightweight presenter/view-model layers
 - CLI localization support for Japanese and English
@@ -236,18 +236,18 @@ supports:
   grid, not a full worldgen pipeline.
 - NarrativeContext is still minimal and currently focused on memorial / alias
   text selection.
-- The base world setting is still largely hard-coded in
-  `content/world_data.py`; it is not yet loaded as an external setting bundle.
+- The default Aethoria setting now loads from bundled setting data, but broader
+  authoring / swapping workflows are still in progress.
 - The simulation is tuned for readability and experimentation rather than
   perfect realism.
 
 ## Near-Term Priorities
 
-- Continue PR-I after the first `NarrativeContext` slice that now feeds relation
-  tags, yearly reports, rumors, location memory, and setting-bundle era context
-  into memorial / alias text selection, with cooldown-backed template rotation
-- Continue world setting externalization work toward the first formal
-  `SettingBundle` authoring pass (PR-J)
+- Resolve the current technical-debt backlog (canonical event-store adapters,
+  bundle-owned world seeds, responsibility splits, and guardrail/doc sync)
+  before PR-J / PR-K
+- Continue world setting authoring work toward the first formal
+  `SettingBundle` pass (PR-J) once the debt cleanup lands
 - Treat worldgen PoC work as parallel technical validation, not the next
   blocking mainline milestone
 

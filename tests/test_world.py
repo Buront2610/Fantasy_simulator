@@ -4,15 +4,19 @@ tests/test_world.py - Unit tests for the World class.
 
 import unicodedata
 
+from fantasy_simulator.adventure import AdventureRun
 from fantasy_simulator.character import Character
 from fantasy_simulator.content.setting_bundle import (
     CalendarDefinition,
     CalendarMonthDefinition,
+    NamingRulesDefinition,
     SettingBundle,
+    SiteSeedDefinition,
     WorldDefinition,
 )
 from fantasy_simulator.i18n import set_locale
-from fantasy_simulator.world import LocationState, World
+from fantasy_simulator.rumor import Rumor
+from fantasy_simulator.world import LocationState, MemorialRecord, World
 from fantasy_simulator.content.world_data import get_location_state_defaults
 
 
@@ -81,6 +85,14 @@ class TestWorld:
         world.add_character(_make_char())
         assert capital.visited is True
 
+    def test_add_character_with_blank_location_uses_default_resident(self):
+        world = World()
+        character = Character("Wanderer", 25, "Male", "Human", "Warrior", location_id="")
+
+        world.add_character(character)
+
+        assert character.location_id == world._default_resident_location_id()
+
     def test_locations_have_state_defaults(self):
         world = World()
         capital = world.get_location_by_id("loc_aethoria_capital")
@@ -89,6 +101,403 @@ class TestWorld:
         assert capital.prosperity == 85
         assert capital.safety == 80
         assert capital.danger == 15
+
+    def test_custom_bundle_capital_tag_drives_default_state_profile(self):
+        world = World(name="Custom")
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="loc_custom_capital",
+                        name="Custom Capital",
+                        description="The tagged capital.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                        tags=["capital", "default_resident"],
+                    ),
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+
+        capital = world.get_location_by_id("loc_custom_capital")
+
+        assert capital is not None
+        assert capital.safety == 80
+        assert capital.danger == 15
+        assert world._default_resident_location_id() == "loc_custom_capital"
+
+        capital.safety = 70
+        world._decay_toward_baseline()
+        assert capital.safety > 70
+
+        restored = World.from_dict(world.to_dict())
+        restored_capital = restored.get_location_by_id("loc_custom_capital")
+        assert restored_capital is not None
+        assert restored.location_state_defaults("loc_custom_capital", "city")["safety"] == 80
+
+    def test_from_dict_recovers_missing_location_id_from_active_bundle_site_seeds(self):
+        world = World(name="Custom")
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="hub_primary",
+                        name="Clockwork Hub",
+                        description="A custom site with a non-slug ID.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                    ),
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+        payload = world.to_dict()
+        payload["grid"][0].pop("id")
+
+        restored = World.from_dict(payload)
+
+        location = restored.get_location_by_id("hub_primary")
+        assert location is not None
+        assert location.canonical_name == "Clockwork Hub"
+
+    def test_from_dict_prefers_bundle_name_mapping_when_stored_id_is_stale(self):
+        world = World(name="Custom")
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="hub_primary",
+                        name="Clockwork Hub",
+                        description="A custom site with a non-slug ID.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                    ),
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+        payload = world.to_dict()
+        payload["grid"][0]["id"] = "stale_id"
+
+        restored = World.from_dict(payload)
+
+        location = restored.get_location_by_id("hub_primary")
+        assert location is not None
+        assert restored.get_location_by_id("stale_id") is None
+
+    def test_normalize_location_id_keeps_recognized_current_id_even_if_name_differs(self):
+        world = World(name="Custom")
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="hub_primary",
+                        name="Clockwork Hub",
+                        description="Primary site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                    ),
+                    SiteSeedDefinition(
+                        location_id="hub_secondary",
+                        name="Second Hub",
+                        description="Secondary site.",
+                        region_type="city",
+                        x=1,
+                        y=0,
+                    ),
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+        assert world.normalize_location_id("hub_secondary", location_name="Clockwork Hub") == "hub_secondary"
+
+    def test_setting_bundle_assignment_rebuilds_world_structure(self):
+        world = World(name="Custom")
+        old_location_ids = set(world.location_ids)
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="hub_primary",
+                        name="Clockwork Hub",
+                        description="A custom site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                    ),
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+
+        assert world.location_ids == ["hub_primary"]
+        assert old_location_ids.isdisjoint(world.location_ids)
+        assert world.get_site_by_id("hub_primary") is not None
+        assert world.atlas_layout is not None
+
+    def test_setting_bundle_assignment_preserves_runtime_state_for_matching_location_ids(self):
+        world = World()
+        capital = world.get_location_by_id("loc_aethoria_capital")
+        assert capital is not None
+        capital.danger = 42
+        capital.visited = True
+
+        world.setting_bundle = SettingBundle.from_dict(world.setting_bundle.to_dict())
+
+        rebuilt = world.get_location_by_id("loc_aethoria_capital")
+        assert rebuilt is not None
+        assert rebuilt.danger == 42
+        assert rebuilt.visited is True
+
+    def test_setting_bundle_assignment_deep_copies_live_traces(self):
+        world = World()
+        capital = world.get_location_by_id("loc_aethoria_capital")
+        assert capital is not None
+        capital.live_traces.append({"kind": "omen", "value": 1})
+
+        world.setting_bundle = SettingBundle.from_dict(world.setting_bundle.to_dict())
+        rebuilt = world.get_location_by_id("loc_aethoria_capital")
+        assert rebuilt is not None
+
+        capital.live_traces[0]["value"] = 99
+
+        assert rebuilt.live_traces[0]["value"] == 1
+
+    def test_setting_bundle_getter_returns_snapshot_not_live_mutable_reference(self):
+        world = World()
+
+        bundle = world.setting_bundle
+        bundle.world_definition.display_name = "Mutated Elsewhere"
+
+        assert world.name == "Aethoria"
+
+    def test_setting_bundle_assignment_clones_source_bundle(self):
+        world = World()
+        bundle = world.setting_bundle
+
+        world.setting_bundle = bundle
+        bundle.world_definition.display_name = "Mutated Source Bundle"
+
+        assert world.name == "Aethoria"
+
+    def test_setting_bundle_assignment_does_not_alias_across_worlds(self):
+        shared_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="shared",
+                display_name="Shared",
+                lore_text="Shared lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="shared_hub",
+                        name="Shared Hub",
+                        description="A shared site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                    ),
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+        first = World(name="First")
+        second = World(name="Second")
+
+        first.setting_bundle = shared_bundle
+        second.setting_bundle = shared_bundle
+        shared_bundle.world_definition.display_name = "Mutated Shared"
+
+        assert first.name == "Shared"
+        assert second.name == "Shared"
+
+    def test_setting_bundle_assignment_with_no_sites_clears_invalid_character_locations(self):
+        world = World()
+        world.add_character(_make_char())
+
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="empty",
+                display_name="Empty",
+                lore_text="No sites here.",
+                site_seeds=[],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+
+        assert world.characters[0].location_id == ""
+        assert world.location_ids == []
+
+    def test_setting_bundle_assignment_repairs_rumor_adventure_and_memorial_locations(self):
+        world = World(name="Custom")
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="hub_primary",
+                        name="Clockwork Hub",
+                        description="Primary site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                    ),
+                    SiteSeedDefinition(
+                        location_id="hub_secondary",
+                        name="Second Hub",
+                        description="Secondary site.",
+                        region_type="city",
+                        x=1,
+                        y=0,
+                    ),
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+        world.rumors.append(Rumor(source_location_id="hub_secondary", description="Old rumor"))
+        world.active_adventures.append(
+            AdventureRun(
+                character_id="char_1",
+                character_name="Aldric",
+                origin="hub_secondary",
+                destination="hub_secondary",
+                year_started=world.year,
+            )
+        )
+        world.memorials["mem_1"] = MemorialRecord(
+            memorial_id="mem_1",
+            character_id="char_1",
+            character_name="Aldric",
+            location_id="hub_secondary",
+            year=world.year,
+            cause="battle_fatal",
+            epitaph="Fell in battle.",
+        )
+
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="hub_primary",
+                        name="Clockwork Hub",
+                        description="Primary site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                    ),
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+
+        assert world.rumors[0].source_location_id is None
+        assert world.active_adventures[0].origin == "hub_primary"
+        assert world.active_adventures[0].destination == "hub_primary"
+        assert world.memorials["mem_1"].location_id == "hub_primary"
+        assert world.get_location_by_id("hub_primary").memorial_ids == ["mem_1"]
+
+    def test_random_location_raises_clear_error_for_empty_world(self):
+        world = World()
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="empty",
+                display_name="Empty",
+                lore_text="No sites here.",
+                site_seeds=[],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+
+        try:
+            world.random_location()
+        except ValueError as exc:
+            assert "World has no locations." in str(exc)
+        else:
+            raise AssertionError("Expected ValueError for empty-world random_location")
+
+    def test_build_default_map_rebuilds_instead_of_appending(self):
+        world = World(name="Custom")
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="hub_primary",
+                        name="Clockwork Hub",
+                        description="A custom site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                    ),
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+        world._register_location(
+            LocationState(
+                id="loc_stale",
+                canonical_name="Stale",
+                description="Should disappear.",
+                region_type="city",
+                x=1,
+                y=1,
+                **get_location_state_defaults("loc_stale", "city"),
+            )
+        )
+
+        world._build_default_map()
+
+        assert world.location_ids == ["hub_primary"]
+
+    def test_default_world_uses_bundle_site_seeds(self):
+        world = World(width=2, height=1)
+
+        expected_entries = [
+            seed.as_world_data_entry()
+            for seed in world.setting_bundle.world_definition.site_seeds
+            if seed.x < 2 and seed.y < 1
+        ]
+
+        assert world.default_location_entries() == expected_entries
+        assert sorted((loc.id, loc.x, loc.y) for loc in world.grid.values()) == sorted(
+            (loc_id, x, y) for loc_id, _name, _desc, _rtype, x, y in expected_entries
+        )
 
     def test_location_state_constructor_sets_fields(self):
         defaults = get_location_state_defaults("loc_custom_city", "city")
@@ -123,6 +532,96 @@ class TestWorld:
         assert restored.year == world.year
         assert restored.active_adventures == []
         assert restored.completed_adventures == []
+
+    def test_name_is_bundle_backed_source_of_truth(self):
+        world = World(name="Aethoria")
+
+        world.name = "Renamed Realm"
+
+        assert world.setting_bundle.world_definition.display_name == "Renamed Realm"
+        restored = World.from_dict(world.to_dict())
+        assert restored.name == "Renamed Realm"
+        assert restored.setting_bundle.world_definition.display_name == "Renamed Realm"
+
+    def test_lore_is_bundle_backed_source_of_truth(self):
+        world = World()
+
+        world.lore = "Custom lore"
+
+        assert world.setting_bundle.world_definition.lore_text == "Custom lore"
+        payload = world.to_dict()
+        assert payload["lore"] == "Custom lore"
+        restored = World.from_dict(payload)
+        assert restored.lore == "Custom lore"
+        assert restored.setting_bundle.world_definition.lore_text == "Custom lore"
+
+    def test_from_dict_rebuilds_bundle_backed_world_structure_when_grid_is_missing_entries(self):
+        world = World(width=2, height=1)
+        payload = world.to_dict()
+        payload["grid"] = []
+
+        restored = World.from_dict(payload)
+
+        assert restored.default_location_entries() == world.default_location_entries()
+        assert restored.location_ids == world.location_ids
+
+    def test_from_dict_uses_bundle_structure_and_overlays_runtime_state(self):
+        world = World(width=2, height=1)
+        location = next(iter(world.grid.values()))
+        location.danger = 42
+        location.visited = True
+        payload = world.to_dict()
+        next(loc for loc in payload["grid"] if loc["id"] == location.id)["id"] = "stale_id"
+
+        restored = World.from_dict(payload)
+
+        restored_location = restored.get_location_by_id(location.id)
+        assert restored_location is not None
+        assert restored_location.danger == 42
+        assert restored_location.visited is True
+        assert restored.get_location_by_id("stale_id") is None
+
+    def test_from_dict_rejects_embedded_bundle_with_duplicate_site_ids(self):
+        payload = World().to_dict()
+        payload["setting_bundle"]["world_definition"]["site_seeds"] = [
+            {
+                "location_id": "loc_dup",
+                "name": "One",
+                "description": "",
+                "region_type": "city",
+                "x": 0,
+                "y": 0,
+            },
+            {
+                "location_id": "loc_dup",
+                "name": "Two",
+                "description": "",
+                "region_type": "city",
+                "x": 1,
+                "y": 0,
+            },
+        ]
+
+        try:
+            World.from_dict(payload)
+        except ValueError as exc:
+            assert "duplicate site seed ids" in str(exc)
+        else:
+            raise AssertionError("Expected ValueError for invalid embedded setting_bundle")
+
+    def test_from_dict_rejects_embedded_bundle_with_incomplete_naming_rules(self):
+        payload = World().to_dict()
+        payload["setting_bundle"]["world_definition"]["naming_rules"] = {
+            "first_names_non_binary": ["Quill"],
+            "last_names": ["Ink"],
+        }
+
+        try:
+            World.from_dict(payload)
+        except ValueError as exc:
+            assert "first_names_male" in str(exc)
+        else:
+            raise AssertionError("Expected ValueError for invalid embedded naming rules")
 
     def test_get_characters_at_location_only_returns_alive(self):
         world = World()
@@ -221,9 +720,36 @@ class TestWorld:
         assert restored_capital.danger == 42
         assert restored_capital.visited is True
 
+    def test_world_to_dict_deep_copies_live_traces(self):
+        world = World()
+        capital = world.get_location_by_id("loc_aethoria_capital")
+        assert capital is not None
+        capital.live_traces.append({"kind": "omen", "value": 1})
+
+        payload = world.to_dict()
+        capital_payload = next(loc for loc in payload["grid"] if loc["id"] == "loc_aethoria_capital")
+        capital_payload["live_traces"][0]["value"] = 99
+
+        assert capital.live_traces[0]["value"] == 1
+
+    def test_world_from_dict_deep_copies_live_traces(self):
+        world = World()
+        capital = world.get_location_by_id("loc_aethoria_capital")
+        assert capital is not None
+        capital.live_traces.append({"kind": "omen", "value": 1})
+        payload = world.to_dict()
+
+        restored = World.from_dict(payload)
+        capital_payload = next(loc for loc in payload["grid"] if loc["id"] == "loc_aethoria_capital")
+        capital_payload["live_traces"][0]["value"] = 99
+
+        restored_capital = restored.get_location_by_id("loc_aethoria_capital")
+        assert restored_capital is not None
+        assert restored_capital.live_traces[0]["value"] == 1
+
     def test_custom_calendar_round_trips_with_world(self):
         world = World()
-        world.setting_bundle = SettingBundle(
+        custom_bundle = SettingBundle(
             schema_version=1,
             world_definition=WorldDefinition(
                 world_key="custom",
@@ -239,13 +765,16 @@ class TestWorld:
                 ),
             ),
         )
+        world.setting_bundle = custom_bundle
 
         restored = World.from_dict(world.to_dict())
 
+        assert world.calendar_baseline.calendar_key == "lunar_cycle"
         assert restored.months_per_year == 2
         assert restored.days_in_month(1) == 20
         assert restored.days_in_month(2) == 35
         assert restored.season_for_month(2) == "summer"
+        assert restored.calendar_baseline.calendar_key == "lunar_cycle"
 
     def test_advance_calendar_position_respects_variable_month_lengths(self):
         world = World()
@@ -290,6 +819,122 @@ class TestWorld:
         assert world.calendar_history[0].year == 1235
         assert world.calendar_history[0].month == 2
         assert world.calendar_history[0].day == 25
+
+    def test_calendar_definition_getter_returns_snapshot_not_live_reference(self):
+        world = World()
+
+        calendar = world.calendar_definition
+        calendar.display_name = "Mutated Calendar"
+
+        assert world.calendar_definition.display_name != "Mutated Calendar"
+
+    def test_apply_calendar_definition_clones_input_calendar(self):
+        world = World(year=1234)
+        calendar = CalendarDefinition(
+            calendar_key="starfall",
+            display_name="Starfall Cycle",
+            months=[
+                CalendarMonthDefinition("wane", "Wane", 20, season="winter"),
+                CalendarMonthDefinition("wax", "Wax", 25, season="summer"),
+            ],
+        )
+
+        world.apply_calendar_definition(calendar)
+        calendar.display_name = "Mutated Elsewhere"
+
+        assert world.calendar_definition.display_name == "Starfall Cycle"
+
+    def test_setting_bundle_assignment_preserves_calendar_history_when_calendar_is_unchanged(self):
+        world = World(year=1234)
+        world.apply_calendar_definition(
+            CalendarDefinition(
+                calendar_key="history",
+                display_name="History",
+                months=[CalendarMonthDefinition("beta", "Beta", 25, season="spring")],
+            ),
+            changed_year=1235,
+            changed_month=1,
+            changed_day=1,
+        )
+
+        world.setting_bundle = SettingBundle.from_dict(world.setting_bundle.to_dict())
+
+        assert len(world.calendar_history) == 1
+        assert world.calendar_history[0].calendar.calendar_key == "history"
+
+    def test_setting_bundle_assignment_resets_calendar_history_when_calendar_changes(self):
+        world = World(year=1234)
+        world.apply_calendar_definition(
+            CalendarDefinition(
+                calendar_key="history",
+                display_name="History",
+                months=[CalendarMonthDefinition("beta", "Beta", 25, season="spring")],
+            ),
+            changed_year=1235,
+            changed_month=1,
+            changed_day=1,
+        )
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom World",
+                lore_text="Custom lore",
+                calendar=CalendarDefinition(
+                    calendar_key="moonstep",
+                    display_name="Moonstep",
+                    months=[
+                        CalendarMonthDefinition("arc", "Arc", 18, season="winter"),
+                    ],
+                ),
+            ),
+        )
+
+        assert world.calendar_history == []
+        assert world.calendar_baseline.calendar_key == "moonstep"
+
+    def test_calendar_definition_by_key_returns_snapshot_for_baseline_and_history(self):
+        world = World(year=1234)
+        baseline = CalendarDefinition(
+            calendar_key="baseline",
+            display_name="Baseline",
+            months=[
+                CalendarMonthDefinition("alpha", "Alpha", 20, season="winter"),
+            ],
+        )
+        history_calendar = CalendarDefinition(
+            calendar_key="history",
+            display_name="History",
+            months=[
+                CalendarMonthDefinition("beta", "Beta", 25, season="spring"),
+            ],
+        )
+        world.calendar_baseline = CalendarDefinition.from_dict(baseline.to_dict())
+        world.apply_calendar_definition(history_calendar, changed_year=1235, changed_month=1, changed_day=1)
+
+        baseline_snapshot = world.calendar_definition_by_key("baseline")
+        history_snapshot = world.calendar_definition_by_key("history")
+        baseline_snapshot.display_name = "Mutated Baseline"
+        history_snapshot.display_name = "Mutated History"
+
+        assert world.calendar_baseline.display_name == "Baseline"
+        assert world.calendar_history[0].calendar.display_name == "History"
+
+    def test_calendar_definition_for_date_returns_snapshot(self):
+        world = World(year=1234)
+        calendar = CalendarDefinition(
+            calendar_key="history",
+            display_name="History",
+            months=[
+                CalendarMonthDefinition("beta", "Beta", 25, season="spring"),
+            ],
+        )
+        world.apply_calendar_definition(calendar, changed_year=1235, changed_month=1, changed_day=1)
+
+        snapshot = world.calendar_definition_for_date(1235, 1, 1)
+        snapshot.display_name = "Mutated History"
+
+        assert world.calendar_history[0].calendar.display_name == "History"
 
     def test_calendar_history_round_trips_with_world(self):
         world = World(year=1234)
@@ -355,6 +1000,39 @@ class TestWorld:
         thornwood = restored.get_location_by_id("loc_thornwood")
         assert thornwood is not None
         assert thornwood.recent_event_ids == ["r1", "r2"]
+
+    def test_from_dict_rebuilds_compatibility_event_log_from_event_records_even_when_stale(self):
+        from fantasy_simulator.events import WorldEventRecord
+
+        world = World()
+        payload = world.to_dict()
+        payload["event_records"] = [
+            WorldEventRecord(record_id="r1", kind="battle", year=1001, month=2, day=3, description="A clash").to_dict()
+        ]
+        payload["event_log"] = ["stale cache entry"]
+
+        restored = World.from_dict(payload)
+
+        assert restored.get_compatibility_event_log() == ["[Year 1001, Month 2, Day 3] A clash"]
+
+    def test_compatibility_event_log_prefers_canonical_projection_over_stale_cache(self):
+        from fantasy_simulator.events import WorldEventRecord
+
+        world = World()
+        world.event_log = ["stale cache entry"]
+        world.record_event(
+            WorldEventRecord(
+                record_id="r1",
+                kind="battle",
+                year=1001,
+                month=2,
+                day=3,
+                description="Canonical clash",
+            )
+        )
+        world.event_log = ["stale cache entry"]
+
+        assert world.get_compatibility_event_log() == ["[Year 1001, Month 2, Day 3] Canonical clash"]
 
     def test_trimming_event_records_removes_dangling_recent_event_ids(self):
         from fantasy_simulator.events import WorldEventRecord

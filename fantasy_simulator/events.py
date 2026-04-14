@@ -87,6 +87,8 @@ class WorldEventRecord:
     calendar_key: str = ""
     tags: List[str] = field(default_factory=list)
     impacts: List[Dict[str, Any]] = field(default_factory=list)
+    legacy_event_result: Optional[Dict[str, Any]] = None
+    legacy_event_log_entry: Optional[str] = None
 
     def __post_init__(self) -> None:
         self.severity = max(1, min(5, self.severity))
@@ -111,6 +113,8 @@ class WorldEventRecord:
             "calendar_key": self.calendar_key,
             "tags": list(self.tags),
             "impacts": list(self.impacts),
+            "legacy_event_result": dict(self.legacy_event_result) if self.legacy_event_result is not None else None,
+            "legacy_event_log_entry": self.legacy_event_log_entry,
         }
 
     @classmethod
@@ -131,6 +135,12 @@ class WorldEventRecord:
             calendar_key=data.get("calendar_key", ""),
             tags=list(data.get("tags", [])),
             impacts=list(data.get("impacts", [])),
+            legacy_event_result=(
+                dict(data["legacy_event_result"])
+                if data.get("legacy_event_result") is not None
+                else None
+            ),
+            legacy_event_log_entry=data.get("legacy_event_log_entry"),
         )
 
     @classmethod
@@ -139,6 +149,7 @@ class WorldEventRecord:
         result: EventResult,
         location_id: Optional[str] = None,
         severity: int = 1,
+        record_id: Optional[str] = None,
         rng: Optional[Any] = None,
         month: int = 1,
         day: int = 1,
@@ -149,7 +160,7 @@ class WorldEventRecord:
         primary = result.affected_characters[0] if result.affected_characters else None
         secondary = result.affected_characters[1:] if len(result.affected_characters) > 1 else []
         return cls(
-            record_id=generate_record_id(rng),
+            record_id=record_id or generate_record_id(rng),
             kind=result.event_type,
             year=result.year,
             month=month,
@@ -161,6 +172,22 @@ class WorldEventRecord:
             description=result.description,
             severity=severity,
             calendar_key=calendar_key,
+            legacy_event_result=result.to_dict(),
+        )
+
+    def to_event_result(self) -> EventResult:
+        """Project a legacy EventResult adapter from the canonical record."""
+        if self.legacy_event_result is not None:
+            return EventResult.from_dict(self.legacy_event_result)
+        affected_characters: List[str] = []
+        if self.primary_actor_id is not None:
+            affected_characters.append(self.primary_actor_id)
+        affected_characters.extend(self.secondary_actor_ids)
+        return EventResult(
+            description=self.description,
+            affected_characters=affected_characters,
+            event_type=self.kind,
+            year=self.year,
         )
 
 
@@ -235,8 +262,8 @@ class EventSystem:
         char2.spouse_id = char1.char_id
         char1.update_mutual_relationship(char2, 20)
         marriage_source_id = generate_record_id(rng)
-        char1.add_relation_tag(char2.char_id, "spouse", source_event_id=marriage_source_id)
-        char2.add_relation_tag(char1.char_id, "spouse", source_event_id=marriage_source_id)
+        char1.add_relation_tag(char2.char_id, "spouse")
+        char2.add_relation_tag(char1.char_id, "spouse")
         relation_tag_updates = [
             {"source": char1.char_id, "target": char2.char_id, "tag": "spouse"},
             {"source": char2.char_id, "target": char1.char_id, "tag": "spouse"},
@@ -272,7 +299,7 @@ class EventSystem:
             stat_changes=stat_changes,
             event_type="marriage",
             year=world.year,
-            metadata={"relation_tag_updates": relation_tag_updates},
+            metadata={"relation_tag_updates": relation_tag_updates, "record_id": marriage_source_id},
         )
 
     def event_battle(self, char1: Character, char2: Character, world: World, rng: Any = random) -> EventResult:
@@ -293,8 +320,8 @@ class EventSystem:
         winner.update_mutual_relationship(loser, -20, delta_other=-30)
         # Relation tags: mark as rival with source tracking (§7.4)
         event_source_id = generate_record_id(rng)
-        winner.add_relation_tag(loser.char_id, "rival", source_event_id=event_source_id)
-        loser.add_relation_tag(winner.char_id, "rival", source_event_id=event_source_id)
+        winner.add_relation_tag(loser.char_id, "rival")
+        loser.add_relation_tag(winner.char_id, "rival")
         relation_tag_updates = [
             {"source": winner.char_id, "target": loser.char_id, "tag": "rival"},
             {"source": loser.char_id, "target": winner.char_id, "tag": "rival"},
@@ -318,7 +345,7 @@ class EventSystem:
                 stat_changes={winner.char_id: winner_gains, loser.char_id: loser_losses},
                 event_type="battle_fatal",
                 year=world.year,
-                metadata={"relation_tag_updates": relation_tag_updates},
+                metadata={"relation_tag_updates": relation_tag_updates, "record_id": event_source_id},
             )
 
         # Report injury worsening
@@ -340,7 +367,7 @@ class EventSystem:
             stat_changes={winner.char_id: winner_gains, loser.char_id: loser_losses},
             event_type="battle",
             year=world.year,
-            metadata={"relation_tag_updates": relation_tag_updates},
+            metadata={"relation_tag_updates": relation_tag_updates, "record_id": event_source_id},
         )
 
     def event_discovery(self, char: Character, world: World, rng: Any = random) -> EventResult:
@@ -385,20 +412,19 @@ class EventSystem:
 
         # Relation tags based on affinity level with source tracking (§7.4)
         relation_tag_updates: List[Dict[str, str]] = []
+        meeting_source_id = None
         if avg_after >= 50 or avg_after <= -50:
             meeting_source_id = generate_record_id(rng)
-        else:
-            meeting_source_id = None
         if avg_after >= 50:
-            char1.add_relation_tag(char2.char_id, "friend", source_event_id=meeting_source_id)
-            char2.add_relation_tag(char1.char_id, "friend", source_event_id=meeting_source_id)
+            char1.add_relation_tag(char2.char_id, "friend")
+            char2.add_relation_tag(char1.char_id, "friend")
             relation_tag_updates = [
                 {"source": char1.char_id, "target": char2.char_id, "tag": "friend"},
                 {"source": char2.char_id, "target": char1.char_id, "tag": "friend"},
             ]
         elif avg_after <= -50:
-            char1.add_relation_tag(char2.char_id, "rival", source_event_id=meeting_source_id)
-            char2.add_relation_tag(char1.char_id, "rival", source_event_id=meeting_source_id)
+            char1.add_relation_tag(char2.char_id, "rival")
+            char2.add_relation_tag(char1.char_id, "rival")
             relation_tag_updates = [
                 {"source": char1.char_id, "target": char2.char_id, "tag": "rival"},
                 {"source": char2.char_id, "target": char1.char_id, "tag": "rival"},
@@ -457,7 +483,10 @@ class EventSystem:
             affected_characters=[char1.char_id, char2.char_id],
             event_type="meeting",
             year=world.year,
-            metadata={"relation_tag_updates": relation_tag_updates},
+            metadata={
+                "relation_tag_updates": relation_tag_updates,
+                **({"record_id": meeting_source_id} if meeting_source_id is not None else {}),
+            },
         )
 
     def event_aging(self, char: Character, world: World, rng: Any = random) -> EventResult:
@@ -731,10 +760,11 @@ class EventSystem:
             rescuer = allies_at_loc[0] if allies_at_loc else None
             relation_tag_updates: List[Dict[str, str]] = []
             affected_characters = [char.char_id]
+            rescue_source_id = None
             if rescuer:
                 rescue_source_id = generate_record_id(rng)
-                char.add_relation_tag(rescuer.char_id, "savior", source_event_id=rescue_source_id)
-                rescuer.add_relation_tag(char.char_id, "rescued", source_event_id=rescue_source_id)
+                char.add_relation_tag(rescuer.char_id, "savior")
+                rescuer.add_relation_tag(char.char_id, "rescued")
                 relation_tag_updates = [
                     {"source": char.char_id, "target": rescuer.char_id, "tag": "savior"},
                     {"source": rescuer.char_id, "target": char.char_id, "tag": "rescued"},
@@ -760,7 +790,10 @@ class EventSystem:
                 affected_characters=affected_characters,
                 event_type="dying_rescued",
                 year=world.year,
-                metadata={"relation_tag_updates": relation_tag_updates},
+                metadata={
+                    "relation_tag_updates": relation_tag_updates,
+                    **({"record_id": rescue_source_id} if rescue_source_id is not None else {}),
+                },
             )
         if rescue_roll < rescue_chance + death_chance:
             return self.event_death(char, world, rng=rng)

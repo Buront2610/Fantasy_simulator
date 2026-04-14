@@ -1,151 +1,33 @@
-"""
-world_data.py - Predefined lore, races, jobs, locations, and skills for the fantasy world.
+"""Aethoria compatibility projections for bundled world-setting data plus legacy flavor tables.
+
+The module-level globals here are import-time snapshots of the bundled default
+Aethoria setting. New bundle-aware code should prefer ``SettingBundle`` data
+from the active world instead of importing these globals directly.
 """
 
 from typing import Dict, List, Tuple
 
+from .setting_bundle import default_aethoria_bundle, legacy_location_id_alias
+
+
+_DEFAULT_AETHORIA_BUNDLE = default_aethoria_bundle()
+_WORLD_DEFINITION = _DEFAULT_AETHORIA_BUNDLE.world_definition
+
 
 # ---------------------------------------------------------------------------
-# World lore
+# Bundle-backed compatibility projections
 # ---------------------------------------------------------------------------
 
-WORLD_LORE: str = """
-Welcome to AETHORIA — a continent shaped by ancient magic and forgotten wars.
-
-Long ago, the Arcane Cataclysm tore the sky open for seven days and seven nights,
-leaving behind ley-lines of wild mana that pulse through mountain, forest, and sea.
-The Great Kingdoms rose and fell atop these ley-lines, and the scars of those
-civilizations are still visible in crumbling ruins and cursed dungeons scattered
-across the land.
-
-Today, an uneasy peace holds among the city-states. Adventurers roam freely,
-seeking fortune and glory — or simply trying to survive in a world where the next
-monster, war, or natural disaster is never far away.
-
-The current era is called the Age of Embers: old powers are fading, new ones are
-rising, and destiny waits for those bold enough to seize it.
-"""
-
-# ---------------------------------------------------------------------------
-# Races: (name, description, stat_bonuses)
-# ---------------------------------------------------------------------------
+WORLD_LORE: str = _WORLD_DEFINITION.lore_text
 
 RACES: List[Tuple[str, str, Dict[str, int]]] = [
-    (
-        "Human",
-        "Adaptable and ambitious. Humans are found everywhere and excel at nothing — "
-        "except perseverance.",
-        {"strength": 0, "intelligence": 0, "dexterity": 0,
-         "wisdom": 0, "charisma": 5, "constitution": 0},
-    ),
-    (
-        "Elf",
-        "Long-lived and graceful. Elves carry centuries of wisdom in their eyes and "
-        "a quiet sadness in their hearts.",
-        {"strength": -2, "intelligence": 8, "dexterity": 6,
-         "wisdom": 5, "charisma": 3, "constitution": -3},
-    ),
-    (
-        "Dwarf",
-        "Stout and stubborn. Dwarves are master craftsmen who remember every grudge "
-        "ever dealt to their kin.",
-        {"strength": 6, "intelligence": 0, "dexterity": -3,
-         "wisdom": 3, "charisma": -2, "constitution": 10},
-    ),
-    (
-        "Halfling",
-        "Small but surprisingly resilient. Halflings have an almost supernatural "
-        "talent for finding comfort in chaos.",
-        {"strength": -5, "intelligence": 2, "dexterity": 8,
-         "wisdom": 2, "charisma": 6, "constitution": 0},
-    ),
-    (
-        "Orc",
-        "Fierce warriors shaped by harsh lands. Orcs value strength and loyalty "
-        "above all else.",
-        {"strength": 12, "intelligence": -4, "dexterity": 0,
-         "wisdom": -2, "charisma": -3, "constitution": 8},
-    ),
-    (
-        "Tiefling",
-        "Touched by infernal blood. Tieflings carry a stigma they did not choose "
-        "and often forge their own path despite it.",
-        {"strength": 0, "intelligence": 5, "dexterity": 3,
-         "wisdom": 0, "charisma": 7, "constitution": 0},
-    ),
-    (
-        "Dragonborn",
-        "Descendants of dragons. Proud and powerful, they carry a primal fire within.",
-        {"strength": 8, "intelligence": 2, "dexterity": 0,
-         "wisdom": 0, "charisma": 4, "constitution": 6},
-    ),
+    (race.name, race.description, dict(race.stat_bonuses))
+    for race in _WORLD_DEFINITION.races
 ]
 
-# ---------------------------------------------------------------------------
-# Jobs: (name, description, primary_skills)
-# ---------------------------------------------------------------------------
-
 JOBS: List[Tuple[str, str, List[str]]] = [
-    (
-        "Warrior",
-        "Masters of the blade and shield, warriors charge headlong into battle and "
-        "endure what others cannot.",
-        ["Swordsmanship", "Shield Block", "Battle Cry", "Endurance"],
-    ),
-    (
-        "Mage",
-        "Scholars of the arcane arts, mages wield reality-bending spells with "
-        "intellect and force of will.",
-        ["Fireball", "Arcane Shield", "Mana Control", "Spellcraft"],
-    ),
-    (
-        "Rogue",
-        "Shadows in the night. Rogues survive on wit, speed, and a healthy "
-        "disrespect for authority.",
-        ["Stealth", "Backstab", "Lockpicking", "Evasion"],
-    ),
-    (
-        "Healer",
-        "Channelers of divine or natural energy. Healers sustain their companions "
-        "and mend wounds that would fell lesser folk.",
-        ["Holy Light", "Regeneration", "Purify", "Blessing"],
-    ),
-    (
-        "Ranger",
-        "Children of the wild. Rangers read the land like a book and strike from "
-        "distances their enemies can't match.",
-        ["Archery", "Track", "Animal Bond", "Camouflage"],
-    ),
-    (
-        "Merchant",
-        "The lifeblood of civilisation. Merchants turn profit from chaos and know "
-        "the value of everything — and the price of everyone.",
-        ["Appraisal", "Bargaining", "Trade Routes", "Persuasion"],
-    ),
-    (
-        "Paladin",
-        "Holy warriors bound by oath. Paladins blend divine magic with martial "
-        "skill in service of a higher calling.",
-        ["Holy Strike", "Divine Shield", "Lay on Hands", "Aura of Courage"],
-    ),
-    (
-        "Bard",
-        "Wandering storytellers and musicians. Bards inspire allies, bewilder "
-        "enemies, and always have a song for the occasion.",
-        ["Inspire", "Charm Song", "Lore Mastery", "Quick Wit"],
-    ),
-    (
-        "Druid",
-        "Guardians of nature's balance. Druids command the elements and commune "
-        "with beasts and spirits.",
-        ["Nature's Wrath", "Wild Shape", "Commune", "Entangle"],
-    ),
-    (
-        "Alchemist",
-        "Half-scientist, half-wizard. Alchemists brew potions and explosive "
-        "concoctions that blur the line between art and danger.",
-        ["Brew Potion", "Transmute", "Elemental Analysis", "Explosive Flask"],
-    ),
+    (job.name, job.description, list(job.primary_skills))
+    for job in _WORLD_DEFINITION.jobs
 ]
 
 # ---------------------------------------------------------------------------
@@ -197,68 +79,15 @@ ALL_SKILLS: List[str] = [s for skills in SKILLS.values() for s in skills]
 # ---------------------------------------------------------------------------
 
 DEFAULT_LOCATIONS = [
-    # Row 0 (north)
-    ("loc_frostpeak_summit", "Frostpeak Summit",
-     "A jagged mountain crowned with eternal ice.", "mountain", 0, 0),
-    ("loc_the_grey_pass", "The Grey Pass",
-     "A treacherous alpine pass haunted by wind spirits.", "mountain", 1, 0),
-    ("loc_skyveil_monastery", "Skyveil Monastery",
-     "A cliffside monastery where monks study the ley-lines.", "village", 2, 0),
-    ("loc_ironvein_mine", "Ironvein Mine",
-     "A deep mine rich in enchanted ore — and old curses.", "dungeon", 3, 0),
-    ("loc_stormwatch_keep", "Stormwatch Keep",
-     "A fortress overlooking the northern sea.", "mountain", 4, 0),
-
-    # Row 1
-    ("loc_thornwood", "Thornwood",
-     "A dense forest that hums with restless magic.", "forest", 0, 1),
-    ("loc_ashenvale", "Ashenvale",
-     "Charred woodland recovering from a decade-old wildfire.", "forest", 1, 1),
-    ("loc_silverbrook", "Silverbrook",
-     "A prosperous trading town built on a swift silver river.", "city", 2, 1),
-    ("loc_goblin_warrens", "Goblin Warrens",
-     "A network of tunnels teeming with mischievous creatures.", "dungeon", 3, 1),
-    ("loc_eastwatch_tower", "Eastwatch Tower",
-     "A lone watchtower staffed by a rotating ranger garrison.", "village", 4, 1),
-
-    # Row 2 (middle)
-    ("loc_elderroot_forest", "Elderroot Forest",
-     "An ancient forest whose trees remember the Cataclysm.", "forest", 0, 2),
-    ("loc_millhaven", "Millhaven",
-     "A quiet farming village known for its legendary apple wine.", "village", 1, 2),
-    ("loc_aethoria_capital", "Aethoria Capital",
-     "The grand capital — heart of trade, politics, and intrigue.", "city", 2, 2),
-    ("loc_sunken_ruins", "Sunken Ruins",
-     "Ruins of a pre-Cataclysm city, half-swallowed by the earth.", "dungeon", 3, 2),
-    ("loc_saltmarsh", "Saltmarsh",
-     "A fishing village where sailors whisper of sea monsters.", "village", 4, 2),
-
-    # Row 3
-    ("loc_dragonbone_ridge", "Dragonbone Ridge",
-     "A ridge littered with the bones of ancient dragons.", "mountain", 0, 3),
-    ("loc_dusty_crossroads", "Dusty Crossroads",
-     "A well-worn junction where merchants rest and rumours spread.", "plains", 1, 3),
-    ("loc_hearthglow_town", "Hearthglow Town",
-     "A warm, welcoming town renowned for its healers' guild.", "city", 2, 3),
-    ("loc_mirefen_swamp", "Mirefen Swamp",
-     "A murky swamp hiding both treasure and terrible dangers.", "dungeon", 3, 3),
-    ("loc_dawnport", "Dawnport",
-     "A busy harbour city that never truly sleeps.", "city", 4, 3),
-
-    # Row 4 (south)
-    ("loc_sunbaked_plains", "Sunbaked Plains",
-     "Vast golden plains scorched by an unrelenting sun.", "plains", 0, 4),
-    ("loc_sandstone_outpost", "Sandstone Outpost",
-     "A small desert outpost at the edge of the known world.", "village", 1, 4),
-    ("loc_the_verdant_vale", "The Verdant Vale",
-     "A lush valley sheltered from harsh winds — a true paradise.", "village", 2, 4),
-    ("loc_obsidian_crater", "Obsidian Crater",
-     "A massive crater from the Cataclysm, still faintly glowing.", "dungeon", 3, 4),
-    ("loc_coral_cove", "Coral Cove",
-     "A hidden cove home to a secretive community of sea-mages.", "city", 4, 4),
+    seed.as_world_data_entry()
+    for seed in _WORLD_DEFINITION.site_seeds
 ]
 
 NAME_TO_LOCATION_ID: Dict[str, str] = {entry[1]: entry[0] for entry in DEFAULT_LOCATIONS}
+_SITE_SEED_TAGS_BY_ID: Dict[str, List[str]] = {
+    seed.location_id: list(seed.tags)
+    for seed in _WORLD_DEFINITION.site_seeds
+}
 
 
 LOCATION_STATE_DEFAULTS: Dict[str, Dict[str, int]] = {
@@ -336,18 +165,26 @@ LOCATION_STATE_DEFAULTS: Dict[str, Dict[str, int]] = {
     },
 }
 
-CAPITAL_LOCATION_IDS = {"loc_aethoria_capital"}
+CAPITAL_LOCATION_IDS = {
+    seed.location_id
+    for seed in _WORLD_DEFINITION.site_seeds
+    if seed.has_tag("capital")
+}
 
 
 def fallback_location_id(name: str) -> str:
     """Generate a location ID from a name when no canonical mapping exists."""
-    slug = name.lower().replace(' ', '_').replace('-', '_').replace("'", '')
-    return f"loc_{slug}"
+    return legacy_location_id_alias(name)
 
 
-def get_location_state_defaults(loc_id: str, region_type: str) -> Dict[str, int]:
+def get_location_state_defaults(
+    loc_id: str,
+    region_type: str,
+    site_tags: List[str] | None = None,
+) -> Dict[str, int]:
     """Return initial state values for a location."""
-    profile = "capital" if loc_id in CAPITAL_LOCATION_IDS else region_type
+    effective_tags = site_tags if site_tags is not None else _SITE_SEED_TAGS_BY_ID.get(loc_id, [])
+    profile = "capital" if "capital" in effective_tags or loc_id in CAPITAL_LOCATION_IDS else region_type
     defaults = LOCATION_STATE_DEFAULTS.get(profile, LOCATION_STATE_DEFAULTS["city"])
     return dict(defaults)
 

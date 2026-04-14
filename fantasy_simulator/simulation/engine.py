@@ -74,13 +74,6 @@ class Simulator(
         self.events_per_year = events_per_year
         self.adventure_steps_per_year = adventure_steps_per_year
         self.event_system = EventSystem()
-        # Compatibility cache of EventResult objects.  Only populated via
-        # _record_event(); events that go directly through _record_world_event()
-        # (adventure lifecycle, injury recovery) do NOT appear here.  The
-        # canonical structured history lives in world.event_records.  This
-        # list is still persisted for save/load compatibility but should be
-        # treated as an incomplete, gradually-retiring adapter.
-        self.history: List[EventResult] = []
         # Mutable progress marker for structured event timestamps within the
         # current simulated year. This value is serialized and restored as-is
         # to preserve in-progress context across save/load.
@@ -145,7 +138,11 @@ class Simulator(
                 return True
         except (ValueError, SyntaxError, TypeError):
             return False
-        return False
+
+    @property
+    def history(self) -> List[EventResult]:
+        """Project the legacy EventResult adapter from canonical world records."""
+        return [record.to_event_result() for record in self.world.event_records]
 
     # ------------------------------------------------------------------
     # Main simulation loop
@@ -339,8 +336,8 @@ class Simulator(
 
         ``event_records`` is the canonical store by policy, but ``history``
         and ``event_log`` (inside ``world.to_dict()``) are still persisted
-        for save/load backward compatibility.  Reducing to a single
-        persisted representation is a future task.
+        for save/load backward compatibility. They can sunset only after
+        compatibility no longer depends on legacy EventResult/display adapters.
         """
         return {
             "world": self.world.to_dict(),
@@ -366,9 +363,20 @@ class Simulator(
         from ..world import World
 
         world = World.from_dict(data["world"])
-        characters = [
-            Character.from_dict(char_data) for char_data in data.get("characters", [])
-        ]
+        characters = []
+        for char_data in data.get("characters", []):
+            character = Character.from_dict(
+                char_data,
+                location_resolver=world.resolve_location_id_from_name,
+            )
+            character.location_id = (
+                world.normalize_location_id(
+                    character.location_id,
+                    location_name=char_data.get("location"),
+                )
+                or character.location_id
+            )
+            characters.append(character)
         world.characters = characters
         world.normalize_after_load()
         sim = cls(
@@ -386,9 +394,6 @@ class Simulator(
         )
         sim.elapsed_days = max(0, int(data.get("elapsed_days", 0)))
         sim.start_year = data.get("start_year", sim.world.year)
-        sim.history = [
-            EventResult.from_dict(ev) for ev in data.get("history", [])
-        ]
         sim.memorial_template_history = TemplateHistory.from_dict(
             data.get("memorial_template_history", {})
         )
