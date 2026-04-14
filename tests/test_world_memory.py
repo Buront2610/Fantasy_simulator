@@ -296,8 +296,9 @@ class TestGetMemorialsForLocation:
 class TestWorldMemoryRoundTrip:
     def test_setting_bundle_survives_to_dict_from_dict(self):
         world = _make_world()
-        world.setting_bundle = default_aethoria_bundle(lore_text="Bundle lore for save/load.")
-        world.setting_bundle.world_definition.era = "Second Dawn"
+        bundle = default_aethoria_bundle(lore_text="Bundle lore for save/load.")
+        bundle.world_definition.era = "Second Dawn"
+        world.setting_bundle = bundle
 
         data = world.to_dict()
         restored = World.from_dict(data)

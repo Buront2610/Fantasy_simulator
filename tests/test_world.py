@@ -203,6 +203,71 @@ class TestWorld:
         assert rebuilt.danger == 42
         assert rebuilt.visited is True
 
+    def test_setting_bundle_getter_returns_snapshot_not_live_mutable_reference(self):
+        world = World()
+
+        bundle = world.setting_bundle
+        bundle.world_definition.display_name = "Mutated Elsewhere"
+
+        assert world.name == "Aethoria"
+
+    def test_setting_bundle_assignment_clones_source_bundle(self):
+        world = World()
+        bundle = world.setting_bundle
+
+        world.setting_bundle = bundle
+        bundle.world_definition.display_name = "Mutated Source Bundle"
+
+        assert world.name == "Aethoria"
+
+    def test_setting_bundle_assignment_does_not_alias_across_worlds(self):
+        shared_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="shared",
+                display_name="Shared",
+                lore_text="Shared lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="shared_hub",
+                        name="Shared Hub",
+                        description="A shared site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                    ),
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+        first = World(name="First")
+        second = World(name="Second")
+
+        first.setting_bundle = shared_bundle
+        second.setting_bundle = shared_bundle
+        shared_bundle.world_definition.display_name = "Mutated Shared"
+
+        assert first.name == "Shared"
+        assert second.name == "Shared"
+
+    def test_setting_bundle_assignment_with_no_sites_clears_invalid_character_locations(self):
+        world = World()
+        world.add_character(_make_char())
+
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="empty",
+                display_name="Empty",
+                lore_text="No sites here.",
+                site_seeds=[],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+
+        assert world.characters[0].location_id == ""
+        assert world.location_ids == []
+
     def test_build_default_map_rebuilds_instead_of_appending(self):
         world = World(name="Custom")
         world.setting_bundle = SettingBundle(

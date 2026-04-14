@@ -394,13 +394,14 @@ class TestWorldLoreUsesBackends(unittest.TestCase):
         inp = ScriptedInputBackend()
         ctx = UIContext(inp=inp, out=out)
         world = World()
-        world.setting_bundle = default_aethoria_bundle(lore_text="Bundle lore text for tests.")
-        world.setting_bundle.world_definition.races = [
+        bundle = default_aethoria_bundle(lore_text="Bundle lore text for tests.")
+        bundle.world_definition.races = [
             RaceDefinition(name="Scholar", description="Readers of lost signs.", stat_bonuses={"intelligence": 2})
         ]
-        world.setting_bundle.world_definition.jobs = [
+        bundle.world_definition.jobs = [
             JobDefinition(name="Archivist", description="Preserves old memory.", primary_skills=["Lore Mastery"])
         ]
+        world.setting_bundle = bundle
 
         screen_world_lore(world=world, ctx=ctx)
 

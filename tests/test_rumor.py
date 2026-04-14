@@ -616,8 +616,9 @@ def test_generate_rumor_uses_absolute_day_after_calendar_change():
             CalendarMonthDefinition("c", "C", 20, season="summer"),
         ],
     )
-    world.setting_bundle.world_definition.calendar = old_calendar
-    world.calendar_baseline = CalendarDefinition.from_dict(old_calendar.to_dict())
+    bundle = world.setting_bundle
+    bundle.world_definition.calendar = old_calendar
+    world.setting_bundle = bundle
     world.apply_calendar_definition(new_calendar, changed_year=1001, changed_month=1, changed_day=1)
 
     record = WorldEventRecord(

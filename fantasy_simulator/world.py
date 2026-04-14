@@ -46,6 +46,10 @@ def _clone_calendar(calendar: CalendarDefinition) -> CalendarDefinition:
     return CalendarDefinition.from_dict(calendar.to_dict())
 
 
+def _clone_setting_bundle(bundle: SettingBundle) -> SettingBundle:
+    return SettingBundle.from_dict(bundle.to_dict())
+
+
 @dataclass
 class MemorialRecord:
     """A permanent memorial created when a character dies at a location.
@@ -397,15 +401,16 @@ class World:
     @property
     def name(self) -> str:
         """Compatibility alias for the bundle-backed world display name."""
-        return self.setting_bundle.world_definition.display_name
+        return self._setting_bundle.world_definition.display_name
 
     @name.setter
     def name(self, value: str) -> None:
-        self.setting_bundle.world_definition.display_name = value
+        self._setting_bundle.world_definition.display_name = value
 
     @property
     def setting_bundle(self) -> SettingBundle:
-        return self._setting_bundle
+        """Return a defensive copy; use apply_setting_bundle() to replace it."""
+        return _clone_setting_bundle(self._setting_bundle)
 
     @setting_bundle.setter
     def setting_bundle(self, value: SettingBundle) -> None:
@@ -415,11 +420,11 @@ class World:
         """Apply a bundle while keeping derived world structures consistent."""
         validate_setting_bundle(bundle, source="World.setting_bundle")
         previous_locations = list(getattr(self, "grid", {}).values())
-        self._setting_bundle = bundle
+        self._setting_bundle = _clone_setting_bundle(bundle)
         if hasattr(self, "lore"):
-            self.lore = bundle.world_definition.lore_text
+            self.lore = self._setting_bundle.world_definition.lore_text
         if hasattr(self, "calendar_baseline"):
-            self.calendar_baseline = _clone_calendar(bundle.world_definition.calendar)
+            self.calendar_baseline = _clone_calendar(self._setting_bundle.world_definition.calendar)
         if rebuild_world and hasattr(self, "grid"):
             self._build_default_map(previous_locations=previous_locations)
             self._normalize_references_after_bundle_change()
@@ -484,7 +489,7 @@ class World:
             if normalized_id is not None and normalized_id not in preserved_by_id:
                 preserved_by_id[normalized_id] = location
         self._clear_world_structure()
-        for seed in self.setting_bundle.world_definition.site_seeds:
+        for seed in self._setting_bundle.world_definition.site_seeds:
             x, y = seed.x, seed.y
             if 0 <= x < self.width and 0 <= y < self.height:
                 location = self._location_state_from_site_seed(seed)
@@ -498,19 +503,19 @@ class World:
         """Return bundle-backed site seeds in the legacy tuple format."""
         return [
             seed.as_world_data_entry()
-            for seed in self.setting_bundle.world_definition.site_seeds
+            for seed in self._setting_bundle.world_definition.site_seeds
         ]
 
     def _site_seed_tags(self, location_id: str) -> List[str]:
         """Return semantic tags for a location from the active setting bundle."""
-        for seed in self.setting_bundle.world_definition.site_seeds:
+        for seed in self._setting_bundle.world_definition.site_seeds:
             if seed.location_id == location_id:
                 return list(seed.tags)
         return []
 
     def _bundle_location_id_for_name(self, name: str) -> str | None:
         """Resolve a location name through the active setting bundle."""
-        for seed in self.setting_bundle.world_definition.site_seeds:
+        for seed in self._setting_bundle.world_definition.site_seeds:
             if seed.name == name:
                 return seed.location_id
         return None
@@ -522,7 +527,7 @@ class World:
     def _legacy_location_id_aliases(self) -> Dict[str, str]:
         """Return legacy fallback-slug IDs that should map to canonical bundle IDs."""
         aliases: Dict[str, str] = {}
-        for seed in self.setting_bundle.world_definition.site_seeds:
+        for seed in self._setting_bundle.world_definition.site_seeds:
             legacy_id = legacy_location_id_alias(seed.name)
             if legacy_id != seed.location_id:
                 aliases[legacy_id] = seed.location_id
@@ -567,8 +572,7 @@ class World:
                 location.memorial_ids.append(memorial.memorial_id)
 
         self.rebuild_char_index()
-        if self._location_id_index:
-            self.ensure_valid_character_locations()
+        self.ensure_valid_character_locations()
         self.rebuild_adventure_index()
         self.rebuild_recent_event_ids()
         if self.event_records:
@@ -654,7 +658,7 @@ class World:
         """Return in-bounds location_ids for bundle site seeds carrying *tag*."""
         return [
             seed.location_id
-            for seed in self.setting_bundle.world_definition.site_seeds
+            for seed in self._setting_bundle.world_definition.site_seeds
             if tag in seed.tags and seed.location_id in self._location_id_index
         ]
 
@@ -684,6 +688,10 @@ class World:
     def ensure_valid_character_locations(self) -> None:
         """Repair invalid location references after loading legacy data."""
         if not self.characters:
+            return
+        if not self._location_id_index:
+            for character in self.characters:
+                character.location_id = ""
             return
         fallback = self._default_resident_location_id()
         for character in self.characters:
@@ -901,7 +909,7 @@ class World:
 
     @property
     def calendar_definition(self):
-        return self.setting_bundle.world_definition.calendar
+        return self._setting_bundle.world_definition.calendar
 
     @property
     def months_per_year(self) -> int:
@@ -1020,7 +1028,7 @@ class World:
         imports, migrations, or timeline reconstruction can stamp the
         historical date of the transition in ``calendar_history``.
         """
-        self.setting_bundle.world_definition.calendar = calendar
+        self._setting_bundle.world_definition.calendar = calendar
         month = max(1, min(calendar.months_per_year, int(changed_month)))
         day = max(1, min(calendar.days_in_month(month), int(changed_day)))
         self.calendar_history.append(CalendarChangeRecord(
@@ -1305,11 +1313,7 @@ class World:
         return render_map_ascii(info)
 
     def to_dict(self) -> Dict[str, Any]:
-        lore_text = (
-            self.setting_bundle.world_definition.lore_text
-            if self.setting_bundle is not None
-            else self.lore
-        )
+        lore_text = self._setting_bundle.world_definition.lore_text
         result: Dict[str, Any] = {
             "name": self.name,
             "lore": lore_text,
@@ -1337,8 +1341,8 @@ class World:
         # PR-G2: persist atlas layout
         if self.atlas_layout is not None:
             result["atlas_layout"] = self.atlas_layout.to_dict()
-        if self.setting_bundle is not None:
-            result["setting_bundle"] = self.setting_bundle.to_dict()
+        if self._setting_bundle is not None:
+            result["setting_bundle"] = self._setting_bundle.to_dict()
         return result
 
     def _location_state_from_dict(self, data: Dict[str, Any]) -> LocationState:

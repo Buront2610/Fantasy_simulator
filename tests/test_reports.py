@@ -230,8 +230,9 @@ class TestGenerateMonthlyReport:
                 CalendarMonthDefinition("storm", "Stormwake", 30, season="summer"),
             ],
         )
-        world_with_chars.setting_bundle.world_definition.calendar = old_calendar
-        world_with_chars.calendar_baseline = CalendarDefinition.from_dict(old_calendar.to_dict())
+        bundle = world_with_chars.setting_bundle
+        bundle.world_definition.calendar = old_calendar
+        world_with_chars.setting_bundle = bundle
         world_with_chars.record_event(WorldEventRecord(
             record_id="hist_1",
             kind="meeting",
