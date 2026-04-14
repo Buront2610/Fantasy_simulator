@@ -1,15 +1,15 @@
 # UI改造計画書
 
-**最終更新**: 2026-04-11（PR-H2 は完了　次の公式着手対象は PR-I）
+**最終更新**: 2026-04-14（PR-I は完了。PR-J / PR-K の前に TD-1〜TD-4 の負債解消を優先）
 
 この文書は、`Fantasy_simulator` のユーザインタフェース（UI）を現状の簡素な CLI から、物語生成ゲームにふさわしい魅力的な体験へ進化させるための計画書である。前半では現状の問題と目標を整理し、後半では5つの専門領域（世界シミュレーション、運営型シム、インタラクティブ叙述、4X設計、ソフトウェアアーキテクチャ）の視点から提案された改善策をまとめる。最後に採用するライブラリや段階的な実行計画を提示する。
 
 > **関連文書**: 本計画は `docs/implementation_plan.md`（公式な実装順・PR 分割・完了条件の正本）の `location_id` 移行・`WorldEventRecord` 導入・UI 連携規約、および `docs/next_version_plan.md` の `NarrativeContext` / `MapRenderInfo` 設計を前提としている。UI 改造の実装順や着手条件が他文書と衝突する場合は `docs/implementation_plan.md` を優先する。データモデルや migration の詳細はそれぞれの文書を参照のこと。
 >
 > **Textual vNext 詳細設計（RFCドラフト）**: `docs/aethoria_command_center_ui_renovation_plan_vnext.md` を参照。実装順序の正本は `docs/implementation_plan.md`。
-> **現時点の前提**: `docs/implementation_plan.md` 上では PR-0 から PR-H2 までが main に反映済みであり、
-> region mapの意味化は導入済みである。次の公式着手対象は
-> **PR-I** とする。本書もこの前提で読む。
+> **現時点の前提**: `docs/implementation_plan.md` 上では PR-I までが main に反映済みであり、
+> region mapの意味化と `NarrativeContext` の第一段は導入済みである。次の mainline 優先は
+> **TD-1〜TD-4 の負債解消** とする。本書もこの前提で読む。
 
 ---
 
@@ -267,7 +267,7 @@ map renderer は最低でも次のモードを持つ。
 
 短期的には **Rich + prompt_toolkit + wcwidth** の組み合わせが最も実用的で、既存 CLI を大きく壊さずに観測体験を改善できる。ただし順序は Rich 先行ではなく、**region map の意味論強化を主線、薄い Rich 化を補助線** とする。
 region map の意味論強化は PR-H1 で完了
-PR-H2 で薄い Rich 化は完了しており、次段は PR-I で叙述文脈の強化を進める
+PR-H2 と PR-I は完了しており、次段は TD-1〜TD-4 の負債解消で基盤を締め直す
 prompt_toolkit と将来の Textual は根本的に異なる入力モデルであるため、prompt_toolkit 依存コードは入力抽象の背後に隔離する。
 
 そのうえで、次段階の map UI は「5×5 地点盤面の豪華化」ではなく、**terrain を持つ world の上に site と route が重なり、さらに world memory が履歴として染み出す観測 UI** として設計する。  

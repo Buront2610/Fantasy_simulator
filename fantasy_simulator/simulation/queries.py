@@ -7,8 +7,8 @@ read-paths should query ``event_records`` (via ``events_by_kind()``).
 ``history`` is only populated via ``_record_event()`` (not
 ``_record_world_event()``), so ``events_by_type()`` sees a strict subset
 of what ``events_by_kind()`` can return.  All three stores are still
-persisted for save/load compatibility; the permanent reduction to a
-single persisted representation is a future task.
+persisted for save/load compatibility; the adapters can sunset only after
+legacy EventResult/display consumers are retired.
 """
 
 from __future__ import annotations
@@ -158,14 +158,11 @@ class QueryMixin:
     def get_event_log(self, last_n: Optional[int] = None) -> List[str]:
         """Return the compatibility text log, optionally only the last *n*.
 
-        Reads from ``world.event_log`` (display-derived buffer) for backward
-        compatibility.  New features should query ``world.event_records``
+        Reads through ``World.get_compatibility_event_log()`` for backward
+        compatibility. New features should query ``world.event_records``
         directly instead.
         """
-        log = self.world.event_log
-        if last_n is not None:
-            return log[-last_n:]
-        return log
+        return self.world.get_compatibility_event_log(last_n=last_n)
 
     def events_by_type(self, event_type: str) -> List[EventResult]:
         """Return legacy EventResult entries of the given type.

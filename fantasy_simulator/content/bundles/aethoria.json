@@ -1,0 +1,618 @@
+{
+  "schema_version": 1,
+  "world_definition": {
+    "world_key": "aethoria",
+    "display_name": "Aethoria",
+    "lore_text": "Welcome to AETHORIA — a continent shaped by ancient magic and forgotten wars.\n\nLong ago, the Arcane Cataclysm tore the sky open for seven days and seven nights,\nleaving behind ley-lines of wild mana that pulse through mountain, forest, and sea.\nThe Great Kingdoms rose and fell atop these ley-lines, and the scars of those\ncivilizations are still visible in crumbling ruins and cursed dungeons scattered\nacross the land.\n\nToday, an uneasy peace holds among the city-states. Adventurers roam freely,\nseeking fortune and glory — or simply trying to survive in a world where the next\nmonster, war, or natural disaster is never far away.\n\nThe current era is called the Age of Embers: old powers are fading, new ones are\nrising, and destiny waits for those bold enough to seize it.",
+    "era": "Age of Embers",
+    "cultures": [],
+    "factions": [],
+    "calendar": {
+      "calendar_key": "aethorian_reckoning",
+      "display_name": "Aethorian Reckoning",
+      "months": [
+        {
+          "month_key": "embermorn",
+          "display_name": "Embermorn",
+          "days": 30,
+          "season": "winter"
+        },
+        {
+          "month_key": "frostwane",
+          "display_name": "Frostwane",
+          "days": 30,
+          "season": "winter"
+        },
+        {
+          "month_key": "raincall",
+          "display_name": "Raincall",
+          "days": 30,
+          "season": "spring"
+        },
+        {
+          "month_key": "bloomtide",
+          "display_name": "Bloomtide",
+          "days": 30,
+          "season": "spring"
+        },
+        {
+          "month_key": "suncrest",
+          "display_name": "Suncrest",
+          "days": 30,
+          "season": "spring"
+        },
+        {
+          "month_key": "highsun",
+          "display_name": "Highsun",
+          "days": 30,
+          "season": "summer"
+        },
+        {
+          "month_key": "goldleaf",
+          "display_name": "Goldleaf",
+          "days": 30,
+          "season": "summer"
+        },
+        {
+          "month_key": "hearthwane",
+          "display_name": "Hearthwane",
+          "days": 30,
+          "season": "summer"
+        },
+        {
+          "month_key": "duskmarch",
+          "display_name": "Duskmarch",
+          "days": 30,
+          "season": "autumn"
+        },
+        {
+          "month_key": "cinderfall",
+          "display_name": "Cinderfall",
+          "days": 30,
+          "season": "autumn"
+        },
+        {
+          "month_key": "longshade",
+          "display_name": "Longshade",
+          "days": 30,
+          "season": "autumn"
+        },
+        {
+          "month_key": "nightfrost",
+          "display_name": "Nightfrost",
+          "days": 30,
+          "season": "winter"
+        }
+      ]
+    },
+    "races": [
+      {
+        "name": "Human",
+        "description": "Adaptable and ambitious. Humans are found everywhere and excel at nothing — except perseverance.",
+        "stat_bonuses": {
+          "strength": 0,
+          "intelligence": 0,
+          "dexterity": 0,
+          "wisdom": 0,
+          "charisma": 5,
+          "constitution": 0
+        }
+      },
+      {
+        "name": "Elf",
+        "description": "Long-lived and graceful. Elves carry centuries of wisdom in their eyes and a quiet sadness in their hearts.",
+        "stat_bonuses": {
+          "strength": -2,
+          "intelligence": 8,
+          "dexterity": 6,
+          "wisdom": 5,
+          "charisma": 3,
+          "constitution": -3
+        }
+      },
+      {
+        "name": "Dwarf",
+        "description": "Stout and stubborn. Dwarves are master craftsmen who remember every grudge ever dealt to their kin.",
+        "stat_bonuses": {
+          "strength": 6,
+          "intelligence": 0,
+          "dexterity": -3,
+          "wisdom": 3,
+          "charisma": -2,
+          "constitution": 10
+        }
+      },
+      {
+        "name": "Halfling",
+        "description": "Small but surprisingly resilient. Halflings have an almost supernatural talent for finding comfort in chaos.",
+        "stat_bonuses": {
+          "strength": -5,
+          "intelligence": 2,
+          "dexterity": 8,
+          "wisdom": 2,
+          "charisma": 6,
+          "constitution": 0
+        }
+      },
+      {
+        "name": "Orc",
+        "description": "Fierce warriors shaped by harsh lands. Orcs value strength and loyalty above all else.",
+        "stat_bonuses": {
+          "strength": 12,
+          "intelligence": -4,
+          "dexterity": 0,
+          "wisdom": -2,
+          "charisma": -3,
+          "constitution": 8
+        }
+      },
+      {
+        "name": "Tiefling",
+        "description": "Touched by infernal blood. Tieflings carry a stigma they did not choose and often forge their own path despite it.",
+        "stat_bonuses": {
+          "strength": 0,
+          "intelligence": 5,
+          "dexterity": 3,
+          "wisdom": 0,
+          "charisma": 7,
+          "constitution": 0
+        }
+      },
+      {
+        "name": "Dragonborn",
+        "description": "Descendants of dragons. Proud and powerful, they carry a primal fire within.",
+        "stat_bonuses": {
+          "strength": 8,
+          "intelligence": 2,
+          "dexterity": 0,
+          "wisdom": 0,
+          "charisma": 4,
+          "constitution": 6
+        }
+      }
+    ],
+    "jobs": [
+      {
+        "name": "Warrior",
+        "description": "Masters of the blade and shield, warriors charge headlong into battle and endure what others cannot.",
+        "primary_skills": [
+          "Swordsmanship",
+          "Shield Block",
+          "Battle Cry",
+          "Endurance"
+        ]
+      },
+      {
+        "name": "Mage",
+        "description": "Scholars of the arcane arts, mages wield reality-bending spells with intellect and force of will.",
+        "primary_skills": [
+          "Fireball",
+          "Arcane Shield",
+          "Mana Control",
+          "Spellcraft"
+        ]
+      },
+      {
+        "name": "Rogue",
+        "description": "Shadows in the night. Rogues survive on wit, speed, and a healthy disrespect for authority.",
+        "primary_skills": [
+          "Stealth",
+          "Backstab",
+          "Lockpicking",
+          "Evasion"
+        ]
+      },
+      {
+        "name": "Healer",
+        "description": "Channelers of divine or natural energy. Healers sustain their companions and mend wounds that would fell lesser folk.",
+        "primary_skills": [
+          "Holy Light",
+          "Regeneration",
+          "Purify",
+          "Blessing"
+        ]
+      },
+      {
+        "name": "Ranger",
+        "description": "Children of the wild. Rangers read the land like a book and strike from distances their enemies can't match.",
+        "primary_skills": [
+          "Archery",
+          "Track",
+          "Animal Bond",
+          "Camouflage"
+        ]
+      },
+      {
+        "name": "Merchant",
+        "description": "The lifeblood of civilisation. Merchants turn profit from chaos and know the value of everything — and the price of everyone.",
+        "primary_skills": [
+          "Appraisal",
+          "Bargaining",
+          "Trade Routes",
+          "Persuasion"
+        ]
+      },
+      {
+        "name": "Paladin",
+        "description": "Holy warriors bound by oath. Paladins blend divine magic with martial skill in service of a higher calling.",
+        "primary_skills": [
+          "Holy Strike",
+          "Divine Shield",
+          "Lay on Hands",
+          "Aura of Courage"
+        ]
+      },
+      {
+        "name": "Bard",
+        "description": "Wandering storytellers and musicians. Bards inspire allies, bewilder enemies, and always have a song for the occasion.",
+        "primary_skills": [
+          "Inspire",
+          "Charm Song",
+          "Lore Mastery",
+          "Quick Wit"
+        ]
+      },
+      {
+        "name": "Druid",
+        "description": "Guardians of nature's balance. Druids command the elements and commune with beasts and spirits.",
+        "primary_skills": [
+          "Nature's Wrath",
+          "Wild Shape",
+          "Commune",
+          "Entangle"
+        ]
+      },
+      {
+        "name": "Alchemist",
+        "description": "Half-scientist, half-wizard. Alchemists brew potions and explosive concoctions that blur the line between art and danger.",
+        "primary_skills": [
+          "Brew Potion",
+          "Transmute",
+          "Elemental Analysis",
+          "Explosive Flask"
+        ]
+      }
+    ],
+    "site_seeds": [
+      {
+        "location_id": "loc_frostpeak_summit",
+        "name": "Frostpeak Summit",
+        "description": "A jagged mountain crowned with eternal ice.",
+        "region_type": "mountain",
+        "x": 0,
+        "y": 0
+      },
+      {
+        "location_id": "loc_the_grey_pass",
+        "name": "The Grey Pass",
+        "description": "A treacherous alpine pass haunted by wind spirits.",
+        "region_type": "mountain",
+        "x": 1,
+        "y": 0
+      },
+      {
+        "location_id": "loc_skyveil_monastery",
+        "name": "Skyveil Monastery",
+        "description": "A cliffside monastery where monks study the ley-lines.",
+        "region_type": "village",
+        "x": 2,
+        "y": 0
+      },
+      {
+        "location_id": "loc_ironvein_mine",
+        "name": "Ironvein Mine",
+        "description": "A deep mine rich in enchanted ore — and old curses.",
+        "region_type": "dungeon",
+        "x": 3,
+        "y": 0
+      },
+      {
+        "location_id": "loc_stormwatch_keep",
+        "name": "Stormwatch Keep",
+        "description": "A fortress overlooking the northern sea.",
+        "region_type": "mountain",
+        "x": 4,
+        "y": 0
+      },
+      {
+        "location_id": "loc_thornwood",
+        "name": "Thornwood",
+        "description": "A dense forest that hums with restless magic.",
+        "region_type": "forest",
+        "x": 0,
+        "y": 1
+      },
+      {
+        "location_id": "loc_ashenvale",
+        "name": "Ashenvale",
+        "description": "Charred woodland recovering from a decade-old wildfire.",
+        "region_type": "forest",
+        "x": 1,
+        "y": 1
+      },
+      {
+        "location_id": "loc_silverbrook",
+        "name": "Silverbrook",
+        "description": "A prosperous trading town built on a swift silver river.",
+        "region_type": "city",
+        "x": 2,
+        "y": 1
+      },
+      {
+        "location_id": "loc_goblin_warrens",
+        "name": "Goblin Warrens",
+        "description": "A network of tunnels teeming with mischievous creatures.",
+        "region_type": "dungeon",
+        "x": 3,
+        "y": 1
+      },
+      {
+        "location_id": "loc_eastwatch_tower",
+        "name": "Eastwatch Tower",
+        "description": "A lone watchtower staffed by a rotating ranger garrison.",
+        "region_type": "village",
+        "x": 4,
+        "y": 1
+      },
+      {
+        "location_id": "loc_elderroot_forest",
+        "name": "Elderroot Forest",
+        "description": "An ancient forest whose trees remember the Cataclysm.",
+        "region_type": "forest",
+        "x": 0,
+        "y": 2
+      },
+      {
+        "location_id": "loc_millhaven",
+        "name": "Millhaven",
+        "description": "A quiet farming village known for its legendary apple wine.",
+        "region_type": "village",
+        "x": 1,
+        "y": 2
+      },
+      {
+        "location_id": "loc_aethoria_capital",
+        "name": "Aethoria Capital",
+        "description": "The grand capital — heart of trade, politics, and intrigue.",
+        "region_type": "city",
+        "x": 2,
+        "y": 2
+      },
+      {
+        "location_id": "loc_sunken_ruins",
+        "name": "Sunken Ruins",
+        "description": "Ruins of a pre-Cataclysm city, half-swallowed by the earth.",
+        "region_type": "dungeon",
+        "x": 3,
+        "y": 2
+      },
+      {
+        "location_id": "loc_saltmarsh",
+        "name": "Saltmarsh",
+        "description": "A fishing village where sailors whisper of sea monsters.",
+        "region_type": "village",
+        "x": 4,
+        "y": 2
+      },
+      {
+        "location_id": "loc_dragonbone_ridge",
+        "name": "Dragonbone Ridge",
+        "description": "A ridge littered with the bones of ancient dragons.",
+        "region_type": "mountain",
+        "x": 0,
+        "y": 3
+      },
+      {
+        "location_id": "loc_dusty_crossroads",
+        "name": "Dusty Crossroads",
+        "description": "A well-worn junction where merchants rest and rumours spread.",
+        "region_type": "plains",
+        "x": 1,
+        "y": 3
+      },
+      {
+        "location_id": "loc_hearthglow_town",
+        "name": "Hearthglow Town",
+        "description": "A warm, welcoming town renowned for its healers' guild.",
+        "region_type": "city",
+        "x": 2,
+        "y": 3
+      },
+      {
+        "location_id": "loc_mirefen_swamp",
+        "name": "Mirefen Swamp",
+        "description": "A murky swamp hiding both treasure and terrible dangers.",
+        "region_type": "dungeon",
+        "x": 3,
+        "y": 3
+      },
+      {
+        "location_id": "loc_dawnport",
+        "name": "Dawnport",
+        "description": "A busy harbour city that never truly sleeps.",
+        "region_type": "city",
+        "x": 4,
+        "y": 3
+      },
+      {
+        "location_id": "loc_sunbaked_plains",
+        "name": "Sunbaked Plains",
+        "description": "Vast golden plains scorched by an unrelenting sun.",
+        "region_type": "plains",
+        "x": 0,
+        "y": 4
+      },
+      {
+        "location_id": "loc_sandstone_outpost",
+        "name": "Sandstone Outpost",
+        "description": "A small desert outpost at the edge of the known world.",
+        "region_type": "village",
+        "x": 1,
+        "y": 4
+      },
+      {
+        "location_id": "loc_the_verdant_vale",
+        "name": "The Verdant Vale",
+        "description": "A lush valley sheltered from harsh winds — a true paradise.",
+        "region_type": "village",
+        "x": 2,
+        "y": 4
+      },
+      {
+        "location_id": "loc_obsidian_crater",
+        "name": "Obsidian Crater",
+        "description": "A massive crater from the Cataclysm, still faintly glowing.",
+        "region_type": "dungeon",
+        "x": 3,
+        "y": 4
+      },
+      {
+        "location_id": "loc_coral_cove",
+        "name": "Coral Cove",
+        "description": "A hidden cove home to a secretive community of sea-mages.",
+        "region_type": "city",
+        "x": 4,
+        "y": 4
+      }
+    ],
+    "naming_rules": {
+      "first_names_male": [
+        "Aldric",
+        "Bram",
+        "Caius",
+        "Dorian",
+        "Eryn",
+        "Faolan",
+        "Gareth",
+        "Hadrin",
+        "Ilyan",
+        "Jorin",
+        "Kaelen",
+        "Lorcan",
+        "Marek",
+        "Nolan",
+        "Oswin",
+        "Perrin",
+        "Quinn",
+        "Rodric",
+        "Soren",
+        "Theron",
+        "Ulric",
+        "Varis",
+        "Westan",
+        "Xander",
+        "Yoren",
+        "Zephyr"
+      ],
+      "first_names_female": [
+        "Aelindra",
+        "Brynn",
+        "Casia",
+        "Dael",
+        "Eira",
+        "Feyra",
+        "Gwynne",
+        "Halia",
+        "Isara",
+        "Jessa",
+        "Kira",
+        "Lyra",
+        "Mira",
+        "Nissa",
+        "Orla",
+        "Petra",
+        "Quellyn",
+        "Rhea",
+        "Sable",
+        "Talia",
+        "Ursa",
+        "Vela",
+        "Wren",
+        "Xara",
+        "Ysmay",
+        "Zara"
+      ],
+      "first_names_non_binary": [
+        "Aldric",
+        "Bram",
+        "Caius",
+        "Dorian",
+        "Eryn",
+        "Faolan",
+        "Gareth",
+        "Hadrin",
+        "Ilyan",
+        "Jorin",
+        "Kaelen",
+        "Lorcan",
+        "Marek",
+        "Nolan",
+        "Oswin",
+        "Perrin",
+        "Quinn",
+        "Rodric",
+        "Soren",
+        "Theron",
+        "Ulric",
+        "Varis",
+        "Westan",
+        "Xander",
+        "Yoren",
+        "Zephyr",
+        "Aelindra",
+        "Brynn",
+        "Casia",
+        "Dael",
+        "Eira",
+        "Feyra",
+        "Gwynne",
+        "Halia",
+        "Isara",
+        "Jessa",
+        "Kira",
+        "Lyra",
+        "Mira",
+        "Nissa",
+        "Orla",
+        "Petra",
+        "Quellyn",
+        "Rhea",
+        "Sable",
+        "Talia",
+        "Ursa",
+        "Vela",
+        "Wren",
+        "Xara",
+        "Ysmay",
+        "Zara"
+      ],
+      "last_names": [
+        "Ashwood",
+        "Blackthorn",
+        "Coldwater",
+        "Dawnbringer",
+        "Emberveil",
+        "Frostmantle",
+        "Goldvein",
+        "Hawkridge",
+        "Ironforge",
+        "Jadewood",
+        "Kindlewick",
+        "Lightborn",
+        "Moonwhisper",
+        "Nightshade",
+        "Oakheart",
+        "Proudmoor",
+        "Quicksilver",
+        "Riverstone",
+        "Shadowmere",
+        "Thornwall",
+        "Underhill",
+        "Voidwalker",
+        "Windmere",
+        "Yarrow",
+        "Zephyrhaven"
+      ]
+    }
+  }
+}

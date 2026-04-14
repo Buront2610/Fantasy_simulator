@@ -90,6 +90,20 @@ class TestWorld:
         assert capital.safety == 80
         assert capital.danger == 15
 
+    def test_default_world_uses_bundle_site_seeds(self):
+        world = World(width=2, height=1)
+
+        expected_entries = [
+            seed.as_world_data_entry()
+            for seed in world.setting_bundle.world_definition.site_seeds
+            if seed.x < 2 and seed.y < 1
+        ]
+
+        assert world.default_location_entries()[:len(expected_entries)] == expected_entries
+        assert sorted((loc.id, loc.x, loc.y) for loc in world.grid.values()) == sorted(
+            (loc_id, x, y) for loc_id, _name, _desc, _rtype, x, y in expected_entries
+        )
+
     def test_location_state_constructor_sets_fields(self):
         defaults = get_location_state_defaults("loc_custom_city", "city")
         location = LocationState(
@@ -355,6 +369,20 @@ class TestWorld:
         thornwood = restored.get_location_by_id("loc_thornwood")
         assert thornwood is not None
         assert thornwood.recent_event_ids == ["r1", "r2"]
+
+    def test_from_dict_rebuilds_compatibility_event_log_from_event_records_when_missing(self):
+        from fantasy_simulator.events import WorldEventRecord
+
+        world = World()
+        payload = world.to_dict()
+        payload["event_records"] = [
+            WorldEventRecord(record_id="r1", kind="battle", year=1001, month=2, day=3, description="A clash").to_dict()
+        ]
+        payload["event_log"] = []
+
+        restored = World.from_dict(payload)
+
+        assert restored.get_compatibility_event_log() == ["Year 1001, Month 2, Day 3: A clash"]
 
     def test_trimming_event_records_removes_dangling_recent_event_ids(self):
         from fantasy_simulator.events import WorldEventRecord

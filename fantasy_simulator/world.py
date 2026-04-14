@@ -11,9 +11,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 from .i18n import tr
 from .content.setting_bundle import CalendarDefinition, SettingBundle, default_aethoria_bundle
 from .content.world_data import (
-    DEFAULT_LOCATIONS,
     NAME_TO_LOCATION_ID,
-    WORLD_LORE,
     fallback_location_id,
     get_location_state_defaults,
 )
@@ -342,19 +340,19 @@ class World:
     def __init__(
         self,
         name: str = "Aethoria",
-        lore: str = WORLD_LORE,
+        lore: str | None = None,
         width: int = 5,
         height: int = 5,
         year: int = 1000,
         *,
         _skip_defaults: bool = False,
     ) -> None:
-        self.name: str = name
-        self.lore: str = lore
         self.setting_bundle: SettingBundle = default_aethoria_bundle(
             display_name=name,
             lore_text=lore,
         )
+        self.name: str = name
+        self.lore: str = self.setting_bundle.world_definition.lore_text
         self.calendar_baseline: CalendarDefinition = _clone_calendar(
             self.setting_bundle.world_definition.calendar
         )
@@ -367,9 +365,10 @@ class World:
         self._adventure_index: Dict[str, AdventureRun] = {}
         self._location_name_index: Dict[str, LocationState] = {}
         self._location_id_index: Dict[str, LocationState] = {}
-        # Transitional event storage during the Phase 1 -> Phase 2 migration:
-        # - event_records is the canonical structured history for new features.
-        # - event_log is a CLI-facing formatted buffer kept for compatibility.
+        # Transitional event storage during the event-store sunset:
+        # - event_records is the canonical structured history for all new reads.
+        # - event_log is a CLI-facing display adapter retained for compatibility
+        #   until save/load no longer needs the legacy buffer.
         self.event_log: List[str] = []
         self.event_records: List[WorldEventRecord] = []
         self.rumors: List[Rumor] = []
@@ -406,17 +405,24 @@ class World:
         self._location_id_index[loc.id] = loc
 
     def _build_default_map(self) -> None:
-        """Populate the world with default Aethoria locations and terrain.
+        """Populate the world from the active setting bundle's site seeds.
 
         Only locations whose ``(x, y)`` fall within ``self.width x
         self.height`` are registered.  This means ``World(width=3,
         height=3)`` will contain only the locations that fit.
         """
-        for entry in DEFAULT_LOCATIONS:
+        for entry in self.default_location_entries():
             _loc_id, _name, _desc, _rtype, x, y = entry
             if 0 <= x < self.width and 0 <= y < self.height:
                 self._register_location(LocationState.from_default_entry(entry))
         self._build_terrain_from_grid()
+
+    def default_location_entries(self) -> List[Tuple[str, str, str, str, int, int]]:
+        """Return bundle-backed site seeds in the legacy tuple format."""
+        return [
+            seed.as_world_data_entry()
+            for seed in self.setting_bundle.world_definition.site_seeds
+        ]
 
     def _build_terrain_from_grid(self) -> None:
         """Generate terrain, sites, and routes from the current grid.
@@ -569,6 +575,8 @@ class World:
         self.ensure_valid_character_locations()
         self.rebuild_adventure_index()
         self.rebuild_recent_event_ids()
+        if not self.event_log and self.event_records:
+            self.rebuild_compatibility_event_log()
 
     def add_adventure(self, run: AdventureRun) -> None:
         self.active_adventures.append(run)
@@ -901,10 +909,11 @@ class World:
     ) -> None:
         """Append a formatted compatibility log entry for legacy CLI consumers.
 
-        This buffer is intentionally separate from ``event_records`` during the
-        Phase 1 -> Phase 2 migration. New gameplay/report features should treat
+        This buffer is intentionally separate from ``event_records`` as a
+        compatibility adapter. New gameplay/report features should treat
         ``event_records`` as the canonical history and view this method as a
-        presentation-layer compatibility path.
+        presentation-layer projection path. The adapter can sunset once save/load
+        compatibility no longer needs a persisted legacy display buffer.
 
         When *month*/*day* are provided, the prefix includes intra-year date
         information so that the player-visible log reflects finer causality.
@@ -914,6 +923,33 @@ class World:
             self.event_log = self.event_log[-self.MAX_EVENT_LOG:]
 
     MAX_EVENT_RECORDS = 5000
+
+    def rebuild_compatibility_event_log(self) -> None:
+        """Rebuild the legacy display buffer from canonical event records."""
+        self.event_log = [
+            self._format_event_log_entry(
+                record.description,
+                year=record.year,
+                month=record.month,
+                day=record.day,
+            )
+            for record in self.event_records[-self.MAX_EVENT_LOG:]
+        ]
+
+    def get_compatibility_event_log(self, last_n: Optional[int] = None) -> List[str]:
+        """Return the legacy event-log adapter, projecting from records if needed."""
+        log = self.event_log or [
+            self._format_event_log_entry(
+                record.description,
+                year=record.year,
+                month=record.month,
+                day=record.day,
+            )
+            for record in self.event_records[-self.MAX_EVENT_LOG:]
+        ]
+        if last_n is not None:
+            return log[-last_n:]
+        return list(log)
 
     def record_event(self, record: WorldEventRecord) -> None:
         """Store a structured event record in the canonical world history."""
@@ -1145,7 +1181,7 @@ class World:
 
         world = cls(
             name=data["name"],
-            lore=data.get("lore", WORLD_LORE),
+            lore=data.get("lore"),
             width=data.get("width", 5),
             height=data.get("height", 5),
             year=data.get("year", 1000),
@@ -1153,7 +1189,7 @@ class World:
         )
         for loc_data in data.get("grid", []):
             world._register_location(LocationState.from_dict(loc_data))
-        world.event_log = data.get("event_log", [])
+        world.event_log = list(data.get("event_log", []))
         world.event_records = [
             WorldEventRecord.from_dict(r) for r in data.get("event_records", [])
         ]

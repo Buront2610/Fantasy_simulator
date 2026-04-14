@@ -21,6 +21,10 @@ However, the persistence layer still serializes all three stores:
    so they are visible in ``event_records`` and ``event_log`` but **not**
    in ``history``.  ``events_by_type()`` therefore cannot see those events.
    Use ``events_by_kind()`` on ``event_records`` instead.
+
+Sunset condition:
+   ``event_log`` and ``history`` remain persisted only until save/load
+   compatibility no longer needs legacy display/EventResult adapters.
 """
 
 from __future__ import annotations

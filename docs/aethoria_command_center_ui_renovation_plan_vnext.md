@@ -8,7 +8,7 @@
 
 > **整合性ルール**: 実装順序・公式着手対象・完了条件は `docs/implementation_plan.md` を正本とする。本書は UI 詳細設計であり、計画上の優先順位と衝突する場合は `docs/implementation_plan.md` を優先する。
 >
-> **現時点での適用範囲**: `docs/implementation_plan.md`（2026-03-31 時点）で次の公式着手対象は PR-I（NarrativeContext 拡張）。本書は PR-I 以降に段階適用する Textual UI 契約案として扱う。
+> **現時点での適用範囲**: `docs/implementation_plan.md` では PR-I 完了後、PR-J / PR-K の前に TD-1〜TD-4 の負債解消を優先する。本書はその負債解消後に段階適用する Textual UI 契約案として扱う。
 >
 > **採用判断**: Textual は現時点で「評価候補」であり、正式採用は PoC と pilot テスト結果をもって別 PR / 別文書で決定する。
 

@@ -36,6 +36,8 @@ form that tests can enforce.
   events.
 - `Simulator.history` is a legacy `EventResult` cache retained for
   compatibility and save/load continuity.
+- `World.get_compatibility_event_log()` and `QueryMixin.events_by_type()` are
+  the explicit adapter paths for legacy reads.
 
 ## Read-Path Rules
 
@@ -45,6 +47,14 @@ form that tests can enforce.
   must not call it.
 - Direct `event_log` reads should stay inside compatibility-oriented query/UI
   paths, not spread into new gameplay or reporting logic.
+
+## Sunset Conditions
+
+- `event_log` persistence may be removed only after save/load compatibility no
+  longer depends on a stored display buffer and observer-facing projections are
+  verified against `event_records`.
+- `history` persistence may be removed only after legacy `EventResult` consumers
+  are retired or migrated behind canonical adapters.
 
 ## Deterministic Harness Expectations
 

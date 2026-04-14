@@ -8,8 +8,9 @@ import random
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from .character import Character, random_stats
+from .content.setting_bundle import default_aethoria_bundle
+from .content.world_data import ALL_SKILLS, JOBS, RACES
 from .i18n import tr, tr_term
-from .content.world_data import JOBS, RACES, ALL_SKILLS
 
 if TYPE_CHECKING:
     from .ui.ui_context import UIContext
@@ -83,26 +84,11 @@ _TEMPLATES: Dict[str, Dict] = {
 
 _GENDERS = ["Male", "Female", "Non-binary"]
 
-_FIRST_NAMES_M = [
-    "Aldric", "Bram", "Caius", "Dorian", "Eryn", "Faolan",
-    "Gareth", "Hadrin", "Ilyan", "Jorin", "Kaelen", "Lorcan",
-    "Marek", "Nolan", "Oswin", "Perrin", "Quinn", "Rodric",
-    "Soren", "Theron", "Ulric", "Varis", "Westan", "Xander", "Yoren", "Zephyr",
-]
-_FIRST_NAMES_F = [
-    "Aelindra", "Brynn", "Casia", "Dael", "Eira", "Feyra",
-    "Gwynne", "Halia", "Isara", "Jessa", "Kira", "Lyra",
-    "Mira", "Nissa", "Orla", "Petra", "Quellyn", "Rhea",
-    "Sable", "Talia", "Ursa", "Vela", "Wren", "Xara", "Ysmay", "Zara",
-]
-_FIRST_NAMES_NB = _FIRST_NAMES_M + _FIRST_NAMES_F
-_LAST_NAMES = [
-    "Ashwood", "Blackthorn", "Coldwater", "Dawnbringer", "Emberveil",
-    "Frostmantle", "Goldvein", "Hawkridge", "Ironforge", "Jadewood",
-    "Kindlewick", "Lightborn", "Moonwhisper", "Nightshade", "Oakheart",
-    "Proudmoor", "Quicksilver", "Riverstone", "Shadowmere", "Thornwall",
-    "Underhill", "Voidwalker", "Windmere", "Yarrow", "Zephyrhaven",
-]
+_DEFAULT_NAMING_RULES = default_aethoria_bundle().world_definition.naming_rules
+_FIRST_NAMES_M = list(_DEFAULT_NAMING_RULES.first_names_male)
+_FIRST_NAMES_F = list(_DEFAULT_NAMING_RULES.first_names_female)
+_FIRST_NAMES_NB = list(_DEFAULT_NAMING_RULES.first_names_non_binary)
+_LAST_NAMES = list(_DEFAULT_NAMING_RULES.last_names)
 
 
 def _random_name(gender: str, rng: Any = random) -> str:

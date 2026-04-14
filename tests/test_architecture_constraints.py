@@ -133,6 +133,20 @@ def test_production_code_does_not_call_legacy_events_by_type() -> None:
         )
 
 
+def test_simulation_history_access_stays_in_legacy_adapter_files() -> None:
+    allowed = {
+        PACKAGE_ROOT / "simulation" / "engine.py",
+        PACKAGE_ROOT / "simulation" / "event_recorder.py",
+        PACKAGE_ROOT / "simulation" / "queries.py",
+    }
+    for path in sorted((PACKAGE_ROOT / "simulation").glob("*.py")):
+        if path in allowed:
+            continue
+        assert "self.history" not in path.read_text(encoding="utf-8"), (
+            f"Simulator.history access escaped legacy adapter files in {path}"
+        )
+
+
 def test_reports_module_does_not_import_ui_layers() -> None:
     path = PACKAGE_ROOT / "reports.py"
     forbidden = [

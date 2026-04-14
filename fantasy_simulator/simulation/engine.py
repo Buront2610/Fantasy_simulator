@@ -339,8 +339,8 @@ class Simulator(
 
         ``event_records`` is the canonical store by policy, but ``history``
         and ``event_log`` (inside ``world.to_dict()``) are still persisted
-        for save/load backward compatibility.  Reducing to a single
-        persisted representation is a future task.
+        for save/load backward compatibility. They can sunset only after
+        compatibility no longer depends on legacy EventResult/display adapters.
         """
         return {
             "world": self.world.to_dict(),

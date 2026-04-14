@@ -1,13 +1,16 @@
-"""Minimal setting bundle schema and loader for PR-I foundation work."""
+"""Serializable setting-bundle schema and loader for static world data."""
 
 from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List
 
-from .world_data import WORLD_LORE
+
+BUNDLES_DIR = Path(__file__).with_name("bundles")
+DEFAULT_AETHORIA_BUNDLE_PATH = BUNDLES_DIR / "aethoria.json"
 
 
 @dataclass
@@ -100,27 +103,130 @@ class CalendarDefinition:
         )
 
 
-def default_calendar_definition() -> CalendarDefinition:
-    """Return the bundled Aethorian default calendar."""
+@dataclass
+class RaceDefinition:
+    """Static race metadata for a setting bundle."""
 
-    return CalendarDefinition(
-        calendar_key="aethorian_reckoning",
-        display_name="Aethorian Reckoning",
-        months=[
-            CalendarMonthDefinition("embermorn", "Embermorn", 30, season="winter"),
-            CalendarMonthDefinition("frostwane", "Frostwane", 30, season="winter"),
-            CalendarMonthDefinition("raincall", "Raincall", 30, season="spring"),
-            CalendarMonthDefinition("bloomtide", "Bloomtide", 30, season="spring"),
-            CalendarMonthDefinition("suncrest", "Suncrest", 30, season="spring"),
-            CalendarMonthDefinition("highsun", "Highsun", 30, season="summer"),
-            CalendarMonthDefinition("goldleaf", "Goldleaf", 30, season="summer"),
-            CalendarMonthDefinition("hearthwane", "Hearthwane", 30, season="summer"),
-            CalendarMonthDefinition("duskmarch", "Duskmarch", 30, season="autumn"),
-            CalendarMonthDefinition("cinderfall", "Cinderfall", 30, season="autumn"),
-            CalendarMonthDefinition("longshade", "Longshade", 30, season="autumn"),
-            CalendarMonthDefinition("nightfrost", "Nightfrost", 30, season="winter"),
-        ],
-    )
+    name: str
+    description: str
+    stat_bonuses: Dict[str, int] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "name": self.name,
+            "description": self.description,
+            "stat_bonuses": {key: int(value) for key, value in self.stat_bonuses.items()},
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "RaceDefinition":
+        return cls(
+            name=data["name"],
+            description=data.get("description", ""),
+            stat_bonuses={
+                key: int(value)
+                for key, value in dict(data.get("stat_bonuses", {})).items()
+            },
+        )
+
+
+@dataclass
+class JobDefinition:
+    """Static job metadata for a setting bundle."""
+
+    name: str
+    description: str
+    primary_skills: List[str] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "name": self.name,
+            "description": self.description,
+            "primary_skills": list(self.primary_skills),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "JobDefinition":
+        return cls(
+            name=data["name"],
+            description=data.get("description", ""),
+            primary_skills=list(data.get("primary_skills", [])),
+        )
+
+
+@dataclass
+class SiteSeedDefinition:
+    """A default location/site seed for bundle-driven world bootstrapping."""
+
+    location_id: str
+    name: str
+    description: str
+    region_type: str
+    x: int
+    y: int
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "location_id": self.location_id,
+            "name": self.name,
+            "description": self.description,
+            "region_type": self.region_type,
+            "x": int(self.x),
+            "y": int(self.y),
+        }
+
+    def as_world_data_entry(self) -> tuple[str, str, str, str, int, int]:
+        return (
+            self.location_id,
+            self.name,
+            self.description,
+            self.region_type,
+            int(self.x),
+            int(self.y),
+        )
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SiteSeedDefinition":
+        return cls(
+            location_id=data["location_id"],
+            name=data["name"],
+            description=data.get("description", ""),
+            region_type=data.get("region_type", "plains"),
+            x=int(data.get("x", 0)),
+            y=int(data.get("y", 0)),
+        )
+
+
+@dataclass
+class NamingRulesDefinition:
+    """Simple name pools for default character generation."""
+
+    first_names_male: List[str] = field(default_factory=list)
+    first_names_female: List[str] = field(default_factory=list)
+    first_names_non_binary: List[str] = field(default_factory=list)
+    last_names: List[str] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "first_names_male": list(self.first_names_male),
+            "first_names_female": list(self.first_names_female),
+            "first_names_non_binary": list(self.first_names_non_binary),
+            "last_names": list(self.last_names),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "NamingRulesDefinition":
+        male = list(data.get("first_names_male", []))
+        female = list(data.get("first_names_female", []))
+        non_binary = list(data.get("first_names_non_binary", []))
+        if not non_binary:
+            non_binary = male + female
+        return cls(
+            first_names_male=male,
+            first_names_female=female,
+            first_names_non_binary=non_binary,
+            last_names=list(data.get("last_names", [])),
+        )
 
 
 @dataclass
@@ -133,7 +239,11 @@ class WorldDefinition:
     era: str = ""
     cultures: List[str] = field(default_factory=list)
     factions: List[str] = field(default_factory=list)
-    calendar: CalendarDefinition = field(default_factory=default_calendar_definition)
+    calendar: CalendarDefinition = field(default_factory=lambda: default_aethoria_bundle().world_definition.calendar)
+    races: List[RaceDefinition] = field(default_factory=list)
+    jobs: List[JobDefinition] = field(default_factory=list)
+    site_seeds: List[SiteSeedDefinition] = field(default_factory=list)
+    naming_rules: NamingRulesDefinition = field(default_factory=NamingRulesDefinition)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -144,10 +254,17 @@ class WorldDefinition:
             "cultures": list(self.cultures),
             "factions": list(self.factions),
             "calendar": self.calendar.to_dict(),
+            "races": [race.to_dict() for race in self.races],
+            "jobs": [job.to_dict() for job in self.jobs],
+            "site_seeds": [seed.to_dict() for seed in self.site_seeds],
+            "naming_rules": self.naming_rules.to_dict(),
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "WorldDefinition":
+        calendar = CalendarDefinition.from_dict(
+            data.get("calendar", default_calendar_definition().to_dict())
+        )
         return cls(
             world_key=data["world_key"],
             display_name=data["display_name"],
@@ -155,15 +272,26 @@ class WorldDefinition:
             era=data.get("era", ""),
             cultures=list(data.get("cultures", [])),
             factions=list(data.get("factions", [])),
-            calendar=CalendarDefinition.from_dict(
-                data.get("calendar", default_calendar_definition().to_dict())
-            ),
+            calendar=calendar,
+            races=[
+                RaceDefinition.from_dict(item)
+                for item in data.get("races", [])
+            ],
+            jobs=[
+                JobDefinition.from_dict(item)
+                for item in data.get("jobs", [])
+            ],
+            site_seeds=[
+                SiteSeedDefinition.from_dict(item)
+                for item in data.get("site_seeds", [])
+            ],
+            naming_rules=NamingRulesDefinition.from_dict(data.get("naming_rules", {})),
         )
 
 
 @dataclass
 class SettingBundle:
-    """Minimal serializable container for static world-definition data."""
+    """Serializable container for static world-definition data."""
 
     schema_version: int
     world_definition: WorldDefinition
@@ -182,22 +310,79 @@ class SettingBundle:
         )
 
 
+def default_calendar_definition() -> CalendarDefinition:
+    """Return the bundled Aethorian default calendar."""
+
+    return default_aethoria_bundle().world_definition.calendar
+
+
+@lru_cache(maxsize=1)
+def _default_aethoria_bundle_data() -> Dict[str, Any]:
+    try:
+        return json.loads(DEFAULT_AETHORIA_BUNDLE_PATH.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(f"Bundled Aethoria setting not found: {DEFAULT_AETHORIA_BUNDLE_PATH}") from exc
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            f"Bundled Aethoria setting JSON is invalid: {DEFAULT_AETHORIA_BUNDLE_PATH}: {exc.msg}"
+        ) from exc
+
+
+def _validate_setting_bundle(bundle: SettingBundle, *, source: str) -> None:
+    world = bundle.world_definition
+    if bundle.schema_version < 1:
+        raise ValueError(f"Setting bundle {source} has invalid schema_version: {bundle.schema_version}")
+    if not world.world_key:
+        raise ValueError(f"Setting bundle {source} must define world_definition.world_key")
+    if not world.display_name:
+        raise ValueError(f"Setting bundle {source} must define world_definition.display_name")
+    if not world.lore_text:
+        raise ValueError(f"Setting bundle {source} must define world_definition.lore_text")
+
+    race_names = [race.name for race in world.races]
+    if race_names and len(race_names) != len(set(race_names)):
+        raise ValueError(f"Setting bundle {source} contains duplicate race names")
+
+    job_names = [job.name for job in world.jobs]
+    if job_names and len(job_names) != len(set(job_names)):
+        raise ValueError(f"Setting bundle {source} contains duplicate job names")
+
+    site_ids = [seed.location_id for seed in world.site_seeds]
+    if site_ids and len(site_ids) != len(set(site_ids)):
+        raise ValueError(f"Setting bundle {source} contains duplicate site seed ids")
+
+    site_coords = [(seed.x, seed.y) for seed in world.site_seeds]
+    if site_coords and len(site_coords) != len(set(site_coords)):
+        raise ValueError(f"Setting bundle {source} contains duplicate site seed coordinates")
+
+    naming = world.naming_rules
+    if (naming.first_names_male or naming.first_names_female or naming.first_names_non_binary) and not naming.last_names:
+        raise ValueError(f"Setting bundle {source} must provide last_names when naming rules are defined")
+
+
+def _bundle_from_data(data: Dict[str, Any], *, source: str) -> SettingBundle:
+    try:
+        bundle = SettingBundle.from_dict(data)
+    except KeyError as exc:
+        missing = exc.args[0]
+        raise ValueError(f"Setting bundle {source} is missing required field: {missing}") from exc
+    _validate_setting_bundle(bundle, source=source)
+    return bundle
+
+
 def default_aethoria_bundle(
     *,
-    display_name: str = "Aethoria",
-    lore_text: str = WORLD_LORE,
+    display_name: str | None = None,
+    lore_text: str | None = None,
 ) -> SettingBundle:
-    """Return the default in-repo bundle until PR-J authors external data."""
+    """Return the default bundled Aethoria setting as a mutable copy."""
 
-    return SettingBundle(
-        schema_version=1,
-        world_definition=WorldDefinition(
-            world_key="aethoria",
-            display_name=display_name,
-            lore_text=lore_text,
-            era="Age of Embers",
-        ),
-    )
+    bundle = _bundle_from_data(_default_aethoria_bundle_data(), source=str(DEFAULT_AETHORIA_BUNDLE_PATH))
+    if display_name is not None:
+        bundle.world_definition.display_name = display_name
+    if lore_text is not None:
+        bundle.world_definition.lore_text = lore_text
+    return bundle
 
 
 def load_setting_bundle(path: str | Path) -> SettingBundle:
@@ -210,9 +395,4 @@ def load_setting_bundle(path: str | Path) -> SettingBundle:
         raise FileNotFoundError(f"Setting bundle not found: {bundle_path}") from exc
     except json.JSONDecodeError as exc:
         raise ValueError(f"Invalid setting bundle JSON in {bundle_path}: {exc.msg}") from exc
-
-    try:
-        return SettingBundle.from_dict(data)
-    except KeyError as exc:
-        missing = exc.args[0]
-        raise ValueError(f"Setting bundle {bundle_path} is missing required field: {missing}") from exc
+    return _bundle_from_data(data, source=str(bundle_path))
