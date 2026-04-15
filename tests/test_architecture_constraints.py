@@ -188,6 +188,7 @@ def test_core_ui_modules_do_not_import_reports_module() -> None:
         ]
         assert forbidden == [], f"{path} imports report modules: {forbidden}"
 
+
 def test_world_data_legacy_projection_symbol_imports_are_scoped() -> None:
     projection_names = {"WORLD_LORE", "RACES", "JOBS", "DEFAULT_LOCATIONS"}
     allowed = {

@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from .i18n import tr
+from .world_event_log import format_event_log_entry, project_compatibility_event_log
+from .world_event_state import apply_event_impact_to_location, append_canonical_event_record
 from .content.setting_bundle import (
     CalendarDefinition,
     SettingBundle,
@@ -142,23 +144,6 @@ PROPAGATION_RULES: Dict[str, Dict[str, Any]] = {
         "danger_threshold": 70,
         "road_penalty": 8,
     },
-}
-
-# Event kind -> location state impact (design doc §5.5)
-_EVENT_IMPACT: Dict[str, Dict[str, int]] = {
-    "death":              {"safety": -3, "mood": -5, "rumor_heat": +10},
-    "battle_fatal":       {"safety": -5, "mood": -8, "danger": +5, "rumor_heat": +15},
-    "battle":             {"safety": -2, "mood": -3, "danger": +3, "rumor_heat": +5},
-    "discovery":          {"rumor_heat": +5, "traffic": +3},
-    "marriage":           {"mood": +3},
-    "adventure_death":    {"danger": +5, "mood": -5, "rumor_heat": +10},
-    "adventure_discovery": {"rumor_heat": +5, "traffic": +2, "prosperity": +2},
-    "adventure_started":  {"traffic": +2},
-    "adventure_returned": {"mood": +2, "traffic": +1},
-    "journey":            {"traffic": +1},
-    "injury_recovery":    {"mood": +1},
-    "condition_worsened": {"mood": -2, "rumor_heat": +3},
-    "dying_rescued":      {"mood": +3, "rumor_heat": +5},
 }
 
 
@@ -1206,13 +1191,13 @@ class World:
     ) -> str:
         """Format a compatibility event-log line from canonical event data."""
         effective_year = self.year if year is None else year
-        if month is not None and day is not None:
-            prefix = tr("event_log_prefix_day", year=effective_year, month=month, day=day)
-        elif month is not None:
-            prefix = tr("event_log_prefix_month", year=effective_year, month=month)
-        else:
-            prefix = tr("event_log_prefix", year=effective_year)
-        return f"{prefix} {event_text}"
+        return format_event_log_entry(
+            event_text,
+            translate=tr,
+            year=effective_year,
+            month=month,
+            day=day,
+        )
 
     def log_event(
         self,
@@ -1245,19 +1230,11 @@ class World:
 
     def _project_compatibility_event_log(self) -> List[str]:
         """Project the compatibility display buffer from canonical event records."""
-        return [
-            (
-                record.legacy_event_log_entry
-                if record.legacy_event_log_entry is not None
-                else self._format_event_log_entry(
-                    record.description,
-                    year=record.year,
-                    month=record.month,
-                    day=record.day,
-                )
-            )
-            for record in self.event_records[-self.MAX_EVENT_LOG:]
-        ]
+        return project_compatibility_event_log(
+            self.event_records,
+            max_event_log=self.MAX_EVENT_LOG,
+            translate=tr,
+        )
 
     def get_compatibility_event_log(self, last_n: Optional[int] = None) -> List[str]:
         """Return the legacy event-log adapter, projecting from records if needed."""
@@ -1268,22 +1245,13 @@ class World:
 
     def record_event(self, record: WorldEventRecord) -> None:
         """Store a structured event record in the canonical world history."""
-        if record.location_id not in self._location_id_index:
-            record.location_id = None
-        self.event_records.append(record)
-        if record.location_id is not None:
-            location = self._location_id_index[record.location_id]
-            location.recent_event_ids.append(record.record_id)
-            location.recent_event_ids = location.recent_event_ids[-12:]
-        if len(self.event_records) > self.MAX_EVENT_RECORDS:
-            self.event_records = self.event_records[-self.MAX_EVENT_RECORDS:]
-            surviving_ids = {item.record_id for item in self.event_records}
-            for location in self.grid.values():
-                if location.recent_event_ids:
-                    location.recent_event_ids = [
-                        record_id for record_id in location.recent_event_ids
-                        if record_id in surviving_ids
-                    ]
+        append_canonical_event_record(
+            record=record,
+            event_records=self.event_records,
+            location_index=self._location_id_index,
+            grid=self.grid,
+            max_event_records=self.MAX_EVENT_RECORDS,
+        )
         self.rebuild_compatibility_event_log()
 
     def apply_event_impact(self, kind: str, location_id: Optional[str]) -> List[Dict[str, Any]]:
@@ -1293,27 +1261,12 @@ class World:
         each containing ``target_type``, ``target_id``, ``attribute``,
         ``old_value``, ``new_value``, and ``delta``.
         """
-        impacts: List[Dict[str, Any]] = []
-        if location_id is None:
-            return impacts
-        loc = self._location_id_index.get(location_id)
-        if loc is None:
-            return impacts
-        deltas = _EVENT_IMPACT.get(kind, {})
-        for attr, delta in deltas.items():
-            old = getattr(loc, attr, None)
-            if old is not None:
-                new_val = _clamp_state(old + delta)
-                setattr(loc, attr, new_val)
-                impacts.append({
-                    "target_type": "location",
-                    "target_id": location_id,
-                    "attribute": attr,
-                    "old_value": old,
-                    "new_value": new_val,
-                    "delta": new_val - old,
-                })
-        return impacts
+        return apply_event_impact_to_location(
+            kind=kind,
+            location_id=location_id,
+            location_index=self._location_id_index,
+            clamp_state=_clamp_state,
+        )
 
     # Annual decay rate: each year, event-driven deviations from baseline
     # decay by this fraction toward the region-type default, preventing
