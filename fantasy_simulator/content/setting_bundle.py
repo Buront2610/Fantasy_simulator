@@ -19,6 +19,17 @@ def legacy_location_id_alias(name: str) -> str:
     return f"loc_{slug}"
 
 
+def _duplicate_values(items: List[str]) -> List[str]:
+    """Return duplicate string values while preserving first duplicate order."""
+    seen: set[str] = set()
+    duplicates: list[str] = []
+    for item in items:
+        if item in seen and item not in duplicates:
+            duplicates.append(item)
+        seen.add(item)
+    return duplicates
+
+
 @dataclass
 class CalendarMonthDefinition:
     """One month entry in a world-specific calendar."""
@@ -370,20 +381,32 @@ def validate_setting_bundle(bundle: SettingBundle, *, source: str) -> None:
         raise ValueError(f"Setting bundle {source} must define world_definition.lore_text")
 
     race_names = [race.name for race in world.races]
-    if race_names and len(race_names) != len(set(race_names)):
-        raise ValueError(f"Setting bundle {source} contains duplicate race names")
+    duplicate_races = _duplicate_values(race_names)
+    if duplicate_races:
+        raise ValueError(
+            f"Setting bundle {source} contains duplicate race names: {', '.join(duplicate_races)}"
+        )
 
     job_names = [job.name for job in world.jobs]
-    if job_names and len(job_names) != len(set(job_names)):
-        raise ValueError(f"Setting bundle {source} contains duplicate job names")
+    duplicate_jobs = _duplicate_values(job_names)
+    if duplicate_jobs:
+        raise ValueError(
+            f"Setting bundle {source} contains duplicate job names: {', '.join(duplicate_jobs)}"
+        )
 
     site_ids = [seed.location_id for seed in world.site_seeds]
-    if site_ids and len(site_ids) != len(set(site_ids)):
-        raise ValueError(f"Setting bundle {source} contains duplicate site seed ids")
+    duplicate_site_ids = _duplicate_values(site_ids)
+    if duplicate_site_ids:
+        raise ValueError(
+            f"Setting bundle {source} contains duplicate site seed ids: {', '.join(duplicate_site_ids)}"
+        )
 
     site_names = [seed.name for seed in world.site_seeds]
-    if site_names and len(site_names) != len(set(site_names)):
-        raise ValueError(f"Setting bundle {source} contains duplicate site seed names")
+    duplicate_site_names = _duplicate_values(site_names)
+    if duplicate_site_names:
+        raise ValueError(
+            f"Setting bundle {source} contains duplicate site seed names: {', '.join(duplicate_site_names)}"
+        )
 
     alias_to_canonical: Dict[str, str] = {}
     canonical_ids = set(site_ids)

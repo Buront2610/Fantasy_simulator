@@ -179,6 +179,18 @@ class TestCreateFromTemplateReproducibility:
 
         assert "warrior" in creator.list_templates()
 
+    def test_empty_bundle_race_job_lists_fall_back_to_default_bundle_entries(self):
+        bundle = default_aethoria_bundle()
+        bundle.world_definition.races = []
+        bundle.world_definition.jobs = []
+
+        creator = CharacterCreator(setting_bundle=bundle)
+
+        assert creator.race_entries
+        assert creator.job_entries
+        assert "Human" in {name for name, _desc, _bonus in creator.race_entries}
+        assert "Warrior" in {name for name, _desc, _skills in creator.job_entries}
+
     def test_templates_are_unavailable_for_non_aethoria_world_key_even_with_matching_names(self):
         bundle = default_aethoria_bundle()
         bundle.world_definition.world_key = "clockwork"

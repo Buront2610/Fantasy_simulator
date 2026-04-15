@@ -171,6 +171,44 @@ def test_core_ui_modules_do_not_import_reports_module() -> None:
         ]
         assert forbidden == [], f"{path} imports report modules: {forbidden}"
 
+def test_simulator_history_attribute_access_is_explicitly_scoped() -> None:
+    allowed = {
+        PACKAGE_ROOT / "simulation" / "engine.py",
+        PACKAGE_ROOT / "simulation" / "event_recorder.py",
+        PACKAGE_ROOT / "simulation" / "queries.py",
+    }
+
+    for path in sorted((PACKAGE_ROOT / "simulation").glob("*.py")):
+        if path in allowed:
+            continue
+        text = path.read_text(encoding="utf-8")
+        assert "self.history" not in text
+        assert "sim.history" not in text
+        assert "simulator.history" not in text
+
+
+def test_world_data_legacy_projection_symbol_imports_are_scoped() -> None:
+    projection_names = {"WORLD_LORE", "RACES", "JOBS", "DEFAULT_LOCATIONS"}
+    allowed = {
+        PACKAGE_ROOT / "terrain.py",
+        PACKAGE_ROOT / "persistence" / "migrations.py",
+    }
+
+    for path in _production_files():
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ImportFrom):
+                continue
+            if node.module != WORLD_DATA_MODULE:
+                continue
+            imported = {alias.name for alias in node.names}
+            if imported.isdisjoint(projection_names):
+                continue
+            assert path in allowed, (
+                f"Legacy world_data projections imported outside allowed modules in {path}: "
+                f"{sorted(imported & projection_names)}"
+            )
+
 
 def test_world_data_imports_stay_in_legacy_compatibility_modules() -> None:
     allowed = {

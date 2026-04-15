@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from .character import Character, random_stats
 from .content.setting_bundle import NamingRulesDefinition, SettingBundle, default_aethoria_bundle
-from .content.world_data import ALL_SKILLS, JOBS, RACES
+from .content.world_data import ALL_SKILLS
 from .i18n import tr, tr_term
 
 if TYPE_CHECKING:
@@ -107,10 +107,19 @@ class CharacterCreator:
     def __init__(self, setting_bundle: SettingBundle | None = None) -> None:
         self.setting_bundle = setting_bundle
 
+    @staticmethod
+    def _default_bundle() -> SettingBundle:
+        """Return a fresh default bundle snapshot for compatibility fallbacks."""
+        return default_aethoria_bundle()
+
+    def _effective_bundle(self) -> SettingBundle:
+        """Return the active bundle for race/job/name lookup."""
+        return self.setting_bundle if self.setting_bundle is not None else self._default_bundle()
+
     @property
     def naming_rules(self) -> NamingRulesDefinition:
-        default_rules = default_aethoria_bundle().world_definition.naming_rules
-        bundle = self.setting_bundle or default_aethoria_bundle()
+        default_rules = self._default_bundle().world_definition.naming_rules
+        bundle = self._effective_bundle()
         rules = bundle.world_definition.naming_rules
         male = list(rules.first_names_male or default_rules.first_names_male)
         female = list(rules.first_names_female or default_rules.first_names_female)
@@ -125,21 +134,23 @@ class CharacterCreator:
 
     @property
     def race_entries(self) -> List[tuple[str, str, Dict[str, int]]]:
-        if self.setting_bundle is not None and self.setting_bundle.world_definition.races:
-            return [
-                (race.name, race.description, dict(race.stat_bonuses))
-                for race in self.setting_bundle.world_definition.races
-            ]
-        return RACES
+        races = self._effective_bundle().world_definition.races
+        if not races:
+            races = self._default_bundle().world_definition.races
+        return [
+            (race.name, race.description, dict(race.stat_bonuses))
+            for race in races
+        ]
 
     @property
     def job_entries(self) -> List[tuple[str, str, List[str]]]:
-        if self.setting_bundle is not None and self.setting_bundle.world_definition.jobs:
-            return [
-                (job.name, job.description, list(job.primary_skills))
-                for job in self.setting_bundle.world_definition.jobs
-            ]
-        return JOBS
+        jobs = self._effective_bundle().world_definition.jobs
+        if not jobs:
+            jobs = self._default_bundle().world_definition.jobs
+        return [
+            (job.name, job.description, list(job.primary_skills))
+            for job in jobs
+        ]
 
     def _supports_aethoria_templates(self) -> bool:
         if self.setting_bundle is None:
