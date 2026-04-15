@@ -5,6 +5,7 @@ tests/test_character_creator.py - Unit tests for CharacterCreator.
 import random
 from types import SimpleNamespace
 
+import fantasy_simulator.character_creator as character_creator_module
 from fantasy_simulator.character_creator import CharacterCreator
 from fantasy_simulator.content.setting_bundle import JobDefinition, RaceDefinition, default_aethoria_bundle
 from fantasy_simulator.i18n import get_locale, set_locale, tr, tr_term
@@ -179,12 +180,57 @@ class TestCreateFromTemplateReproducibility:
 
         assert "warrior" in creator.list_templates()
 
+    def test_empty_bundle_race_job_lists_fall_back_to_default_bundle_entries(self):
+        bundle = default_aethoria_bundle()
+        bundle.world_definition.races = []
+        bundle.world_definition.jobs = []
+
+        creator = CharacterCreator(setting_bundle=bundle)
+
+        assert creator.race_entries
+        assert creator.job_entries
+        assert "Human" in {name for name, _desc, _bonus in creator.race_entries}
+        assert "Warrior" in {name for name, _desc, _skills in creator.job_entries}
+
     def test_templates_are_unavailable_for_non_aethoria_world_key_even_with_matching_names(self):
         bundle = default_aethoria_bundle()
         bundle.world_definition.world_key = "clockwork"
         creator = CharacterCreator(setting_bundle=bundle)
 
         assert creator.list_templates() == []
+
+    def test_non_aethoria_empty_race_job_catalogs_do_not_fallback_to_aethoria_defaults(self):
+        bundle = default_aethoria_bundle()
+        bundle.world_definition.world_key = "clockwork"
+        bundle.world_definition.races = []
+        bundle.world_definition.jobs = []
+        creator = CharacterCreator(setting_bundle=bundle)
+
+        assert creator.race_entries == []
+        assert creator.job_entries == []
+        try:
+            creator.create_random(rng=random.Random(1))
+        except ValueError as exc:
+            assert "at least one race" in str(exc)
+        else:
+            raise AssertionError("Expected ValueError when non-Aethoria bundle has empty race/job catalogs")
+
+    def test_default_bundle_fallback_is_cached_per_creator_instance(self, monkeypatch):
+        call_count = {"count": 0}
+        original = character_creator_module.default_aethoria_bundle
+
+        def _counted_default_bundle():
+            call_count["count"] += 1
+            return original()
+
+        monkeypatch.setattr(character_creator_module, "default_aethoria_bundle", _counted_default_bundle)
+        creator = CharacterCreator()
+
+        _ = creator.naming_rules
+        _ = creator.race_entries
+        _ = creator.job_entries
+
+        assert call_count["count"] == 1
 
 
 class TestInteractiveStatAllocation:

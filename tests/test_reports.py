@@ -212,6 +212,19 @@ class TestGenerateMonthlyReport:
         assert report.total_events == 1
         assert "March event" in report.notable_events
 
+    def test_monthly_report_reads_canonical_records_not_legacy_event_log(self, world_with_chars):
+        world_with_chars.record_event(WorldEventRecord(
+            record_id="r6c", kind="battle", year=1000, month=3,
+            description="Canonical monthly event", severity=3,
+        ))
+        world_with_chars.event_log = ["stale compatibility buffer"]
+
+        report = generate_monthly_report(world_with_chars, 1000, 3)
+
+        assert report.total_events == 1
+        assert "Canonical monthly event" in report.notable_events
+        assert "stale compatibility buffer" not in report.notable_events
+
     def test_month_label_uses_historical_calendar_after_calendar_change(self, world_with_chars):
         old_calendar = CalendarDefinition(
             calendar_key="old_reckoning",
@@ -274,6 +287,18 @@ class TestGenerateYearlyReport:
         ))
         report = generate_yearly_report(world_with_chars, 1001)
         assert "Tragic death" in report.notable_events
+
+    def test_yearly_report_reads_canonical_records_not_legacy_event_log(self, world_with_chars):
+        world_with_chars.record_event(WorldEventRecord(
+            record_id="y1c", kind="death", year=1001, month=6,
+            description="Canonical death", severity=5,
+        ))
+        world_with_chars.event_log = ["stale compatibility buffer"]
+
+        report = generate_yearly_report(world_with_chars, 1001)
+
+        assert "Canonical death" in report.notable_events
+        assert "stale compatibility buffer" not in report.notable_events
 
     def test_deaths_counted_from_events(self, world_with_chars):
         """deaths_this_year must come from event records, not world state."""

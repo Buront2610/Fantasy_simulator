@@ -103,10 +103,10 @@
 - 特に region map は、terrain の近傍切り出し・route 線・nearby sites・landmarks を読める段階までは到達したが、
   設計書が目指す「導線、峠、門、市場、掲示板、墓碑、事故地点、封鎖道、先行パーティの痕跡が判断できる局所地図」
   としては未完成である
-- 基礎世界設定はまだ `content/world_data.py` の単一ハードコード構成に強く依存しており、
-  `World.lore` を持っていても `screen_world_lore()` は依然として `WORLD_LORE` 定数を直接読む。
-  Aethoria 自体が暫定設定である以上、基礎世界の lore / race / job / location は
-  後から外部データとして差し替え・挿入できる構造へ寄せる必要がある
+- 基礎世界設定の bundle 移行は進行中であり、`screen_world_lore()` は bundle source
+  へ移行済み。いっぽう `content/world_data.py` は互換 projection を引き続き保持しているため、
+  lore / race / job / location seed の新規参照は bundle 側に寄せ、legacy projection の
+  許可先を段階的に縮退する必要がある
 - worldgen PoC（seed 固定 terrain generation、外部比較、generated world importer）は未着手であるが、
   これは mainline の観測 UI 改善とは切り分けて進める
 

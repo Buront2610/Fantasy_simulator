@@ -170,6 +170,8 @@ class QueryMixin:
 
         This compatibility adapter returns projected ``EventResult`` objects
         derived from the canonical store, so it now sees the full event set.
+        Keep this only for migration-era callers; new code should call
+        ``events_by_kind()``.
         """
         return [ev for ev in self.history if ev.event_type == event_type]
 

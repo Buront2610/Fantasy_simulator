@@ -47,6 +47,15 @@ form that tests can enforce.
 - Direct `event_log` reads should stay inside compatibility-oriented query/UI
   paths, not spread into new gameplay or reporting logic.
 
+## Compatibility Adapter Inventory
+
+- `World.get_compatibility_event_log()`: read adapter for CLI/event-log
+  compatibility consumers while canonical reads migrate to `event_records`.
+- `QueryMixin.events_by_type()`: legacy adapter returning `EventResult`
+  projections for callers not yet migrated to `events_by_kind()`.
+- `Simulator.history`: persisted compatibility projection retained for save/load
+  continuity and staged migration away from legacy `EventResult` pathways.
+
 ## Sunset Conditions
 
 - `event_log` persistence may be removed only after save/load compatibility no

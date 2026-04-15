@@ -171,6 +171,7 @@ def test_load_setting_bundle_reports_duplicate_site_seed_ids(tmp_path):
         load_setting_bundle(bundle_path)
     except ValueError as exc:
         assert "duplicate site seed ids" in str(exc)
+        assert "loc_dup" in str(exc)
     else:
         raise AssertionError("Expected ValueError for duplicate site seed ids")
 
@@ -213,8 +214,67 @@ def test_load_setting_bundle_reports_duplicate_site_seed_names(tmp_path):
         load_setting_bundle(bundle_path)
     except ValueError as exc:
         assert "duplicate site seed names" in str(exc)
+        assert "Duplicate" in str(exc)
     else:
         raise AssertionError("Expected ValueError for duplicate site seed names")
+
+
+def test_load_setting_bundle_reports_duplicate_race_names(tmp_path):
+    bundle_path = tmp_path / "invalid-duplicate-races.json"
+    bundle_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "world_definition": {
+                    "world_key": "dup",
+                    "display_name": "Dup",
+                    "lore_text": "Dup lore",
+                    "races": [
+                        {"name": "Mirrorkin", "description": "A", "stat_bonuses": {}},
+                        {"name": "Mirrorkin", "description": "B", "stat_bonuses": {}},
+                    ],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    try:
+        load_setting_bundle(bundle_path)
+    except ValueError as exc:
+        assert "duplicate race names" in str(exc)
+        assert "Mirrorkin" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError for duplicate race names")
+
+
+def test_load_setting_bundle_reports_duplicate_job_names(tmp_path):
+    bundle_path = tmp_path / "invalid-duplicate-jobs.json"
+    bundle_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "world_definition": {
+                    "world_key": "dup",
+                    "display_name": "Dup",
+                    "lore_text": "Dup lore",
+                    "jobs": [
+                        {"name": "Binder", "description": "A", "primary_skills": []},
+                        {"name": "Binder", "description": "B", "primary_skills": []},
+                    ],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    try:
+        load_setting_bundle(bundle_path)
+    except ValueError as exc:
+        assert "duplicate job names" in str(exc)
+        assert "Binder" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError for duplicate job names")
 
 
 def test_load_setting_bundle_reports_ambiguous_legacy_location_aliases(tmp_path):

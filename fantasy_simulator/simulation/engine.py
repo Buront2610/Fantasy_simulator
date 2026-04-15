@@ -141,7 +141,13 @@ class Simulator(
 
     @property
     def history(self) -> List[EventResult]:
-        """Project the legacy EventResult adapter from canonical world records."""
+        """Project the legacy EventResult adapter from canonical world records.
+
+        Compatibility note:
+        This property intentionally survives until save/load and legacy callers
+        no longer require `EventResult` snapshots. New logic must consume
+        `world.event_records` instead of this adapter.
+        """
         return [record.to_event_result() for record in self.world.event_records]
 
     # ------------------------------------------------------------------
@@ -351,6 +357,7 @@ class Simulator(
             "locale": get_locale(),
             "rng_state": repr(self.rng.getstate()),
             "id_rng_state": repr(self.id_rng.getstate()),
+            # Legacy snapshot compatibility field (projected from canonical records).
             "history": [ev.to_dict() for ev in self.history],
             "memorial_template_history": self.memorial_template_history.to_dict(),
             "alias_template_history": self.alias_template_history.to_dict(),

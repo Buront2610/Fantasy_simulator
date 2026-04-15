@@ -173,7 +173,7 @@ fantasy_simulator/          # Main package
     context.py              # Minimal NarrativeContext helpers for memorials / aliases
     template_history.py     # Template cooldown / selection helper
   content/
-    world_data.py           # Races, jobs, locations, skills, lore definitions
+    world_data.py           # Legacy compatibility projections + shared skill catalog
   i18n/
     engine.py               # Localization helpers (tr, tr_term, set_locale)
     ja.py                   # Japanese text and terms
@@ -183,6 +183,7 @@ tests/                      # Automated tests
 docs/
   implementation_plan.md    # Implementation roadmap and phase order
   architecture.md           # Current architectural guardrails and canonical data rules
+  td_backlog_status.md      # TD-1〜TD-4 audit snapshot (done/remaining)
   contexts/                 # Short task-mode context docs for implementation/review
   session_handoffs/         # Template + latest repo-local handoff notes
   subagent_contract.md      # Delegation format for subagent tasks
