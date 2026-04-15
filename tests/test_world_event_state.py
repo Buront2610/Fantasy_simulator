@@ -96,7 +96,7 @@ def test_append_canonical_event_record_prunes_records_and_indexes() -> None:
     r2 = WorldEventRecord(record_id="r2", kind="battle", year=1000, location_id="loc_thornwood")
     r3 = WorldEventRecord(record_id="r3", kind="battle", year=1000, location_id="loc_thornwood")
 
-    append_canonical_event_record(
+    stored = append_canonical_event_record(
         record=r1,
         event_records=world.event_records,
         location_index=world._location_id_index,
@@ -118,6 +118,7 @@ def test_append_canonical_event_record_prunes_records_and_indexes() -> None:
         max_event_records=max_records,
     )
 
+    assert stored.record_id == "r1"
     assert [record.record_id for record in world.event_records] == ["r2", "r3"]
     recent_ids = world.get_location_by_id("loc_thornwood").recent_event_ids
     assert recent_ids == ["r2", "r3"]
@@ -127,7 +128,7 @@ def test_append_canonical_event_record_normalizes_invalid_location_id() -> None:
     world = World()
     record = WorldEventRecord(record_id="r1", kind="battle", year=1000, location_id="invalid")
 
-    append_canonical_event_record(
+    stored = append_canonical_event_record(
         record=record,
         event_records=world.event_records,
         location_index=world._location_id_index,
@@ -135,6 +136,7 @@ def test_append_canonical_event_record_normalizes_invalid_location_id() -> None:
         max_event_records=world.MAX_EVENT_RECORDS,
     )
 
+    assert stored.location_id is None
     assert record.location_id == "invalid"
     assert world.event_records[-1].location_id is None
 

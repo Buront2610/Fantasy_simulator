@@ -94,12 +94,14 @@ def append_canonical_event_record(
     location_index: MutableMapping[str, SupportsEventIndex],
     grid: MutableMapping[object, SupportsEventIndex],
     max_event_records: int,
-) -> None:
+) -> WorldEventRecord:
     """Append an event record and maintain related per-location indexes.
 
     Contract:
     - Mutates ``event_records`` and location ``recent_event_ids`` in place.
     - If ``record.location_id`` is unknown, a normalized copy (``location_id=None``) is stored.
+
+    Returns the canonical record instance actually stored in ``event_records``.
     """
     stored_record = record
     if record.location_id not in location_index:
@@ -113,7 +115,7 @@ def append_canonical_event_record(
         location.recent_event_ids = location.recent_event_ids[-12:]
 
     if len(event_records) <= max_event_records:
-        return
+        return stored_record
 
     del event_records[:-max_event_records]
     surviving_ids = {item.record_id for item in event_records}
@@ -124,3 +126,5 @@ def append_canonical_event_record(
                 for record_id in location.recent_event_ids
                 if record_id in surviving_ids
             ]
+
+    return stored_record

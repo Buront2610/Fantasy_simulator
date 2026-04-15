@@ -57,3 +57,27 @@ def test_simulator_record_event_from_event_result_preserves_projection() -> None
     assert projected.description == result.description
     assert projected.event_type == result.event_type
     assert projected.affected_characters == result.affected_characters
+
+
+def test_invalid_location_event_roundtrip_through_report_and_save_load() -> None:
+    world = World()
+    sim = Simulator(world, seed=42)
+
+    rec = sim._record_world_event(  # noqa: SLF001 - characterization seam
+        "Invalid location event",
+        kind="meeting",
+        location_id="loc_invalid",
+    )
+
+    assert rec.location_id is None
+    assert world.event_records[-1].location_id is None
+    assert any("Invalid location event" in line for line in world.get_compatibility_event_log())
+
+    monthly = sim.get_monthly_report(world.year, sim.current_month)
+    yearly = sim.get_yearly_report(world.year)
+    assert "Total events: 1" in monthly
+    assert "Total events recorded: 1" in yearly
+
+    restored = Simulator.from_dict(sim.to_dict())
+    assert restored.world.event_records[-1].location_id is None
+    assert any("Invalid location event" in line for line in restored.world.get_compatibility_event_log())

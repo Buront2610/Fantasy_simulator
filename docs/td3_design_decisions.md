@@ -37,3 +37,22 @@
 
 - nested dict/list を shallow 共有せず、`deepcopy` で返却。
 - 呼び出し側の破壊的編集がモデル内部へ漏れないことをテストで保証する。
+
+
+## 5) Legacy concern retreat plan
+
+**Decision**: `WorldEventRecord` に残した legacy fields は移行期間の ACL として扱う。
+
+**Boundary prep**:
+- canonical path は `kind/year/month/day/...` + `impacts/tags` を正とする。
+- legacy payload は adapter 専用領域として扱い、新規機能は依存しない。
+- sunset 時は adapter module へ移管し、record 本体から段階的に除去する。
+
+## 6) Impact / propagation rule externalization prep
+
+**Decision**: 現在の static table は維持しつつ、bundle-driven 化を前提に境界を固定する。
+
+**Prep TODO (PR-J/PR-K 前提)**:
+- `EVENT_IMPACT_RULES` / `PROPAGATION_RULES` を setting schema へ持ち上げるための型スロットを追加。
+- era/faction modifier を rule evaluator の入力として注入可能にする。
+- 現在の helper API を `rules` 引数受け取り対応へ拡張し、static default を fallback とする。

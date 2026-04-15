@@ -1217,9 +1217,12 @@ class World:
             return log[-last_n:]
         return list(log)
 
-    def record_event(self, record: WorldEventRecord) -> None:
-        """Store a structured event record in the canonical world history."""
-        append_canonical_event_record(
+    def record_event(self, record: WorldEventRecord) -> WorldEventRecord:
+        """Store a structured event record in the canonical world history.
+
+        Returns the canonical stored record (may be a normalized copy).
+        """
+        stored_record = append_canonical_event_record(
             record=record,
             event_records=self.event_records,
             location_index=self._location_id_index,
@@ -1227,6 +1230,7 @@ class World:
             max_event_records=self.MAX_EVENT_RECORDS,
         )
         self.rebuild_compatibility_event_log()
+        return stored_record
 
     def apply_event_impact(self, kind: str, location_id: Optional[str]) -> List[Dict[str, Any]]:
         """Update location state quantities based on an event kind (design §5.5).

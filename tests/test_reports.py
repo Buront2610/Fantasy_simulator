@@ -68,7 +68,7 @@ def world_with_chars(world) -> World:
 
 
 # ---------------------------------------------------------------------------
-# WorldEventRecord time field tests — SI-9: month/day must be in range
+# WorldEventRecord time field tests — SI-9: model層では month/day 下限のみ正規化
 # ---------------------------------------------------------------------------
 
 class TestWorldEventRecordMonth:

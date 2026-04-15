@@ -71,9 +71,9 @@ class EventRecorderMixin:
             visibility=visibility,
             calendar_key=self.world.calendar_definition.calendar_key,
         )
-        self.world.record_event(record)
+        record = self.world.record_event(record)
         # Apply event impact on location state and record causal impacts
-        impacts = self.world.apply_event_impact(kind, location_id)
+        impacts = self.world.apply_event_impact(kind, record.location_id)
         if impacts:
             record.impacts = impacts
         # Surface notable events to the UI layer via notification thresholds
@@ -132,7 +132,7 @@ class EventRecorderMixin:
             absolute_day=self.elapsed_days + 1,
             calendar_key=self.world.calendar_definition.calendar_key,
         )
-        self.world.record_event(record)
+        record = self.world.record_event(record)
         impacts = self.world.apply_event_impact(result.event_type, record.location_id)
         if impacts:
             record.impacts = impacts

@@ -71,6 +71,7 @@
 - architecture constraints: legacy adapter read-path と legacy projection import 制約を強化。
 - doc freshness: implementation/architecture/readme の整合監視を追加。
 - quality gate `standard`: architecture/doc/harness 系を routine 実行。
+- invalid location_id の統合経路（record -> report -> save/load）を characterization test で固定。
 
 ### Remaining
 
