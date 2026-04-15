@@ -95,3 +95,24 @@ def test_world_event_record_normalization_policy_is_lenient_not_fail_fast() -> N
     assert record.day == 1
     assert record.severity == 5
     assert record.absolute_day == 0
+
+
+def test_world_event_record_legacy_event_result_is_defensively_copied() -> None:
+    record = WorldEventRecord(
+        record_id="r1",
+        legacy_event_result={"metadata": {"nested": {"value": 1}}},
+    )
+
+    dumped = record.to_dict()
+    dumped["legacy_event_result"]["metadata"]["nested"]["value"] = 9
+    assert record.legacy_event_result["metadata"]["nested"]["value"] == 1
+
+    loaded = WorldEventRecord.from_dict(record.to_dict())
+    loaded.legacy_event_result["metadata"]["nested"]["value"] = 5
+    assert record.legacy_event_result["metadata"]["nested"]["value"] == 1
+
+
+def test_world_event_record_month_day_policy_is_lower_bound_normalization_only() -> None:
+    record = WorldEventRecord(month=99, day=999)
+    assert record.month == 99
+    assert record.day == 999

@@ -19,7 +19,8 @@ import random
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from ..adventure import AdventureRun
-from ..events import EventResult, EventSystem, WorldEventRecord
+from ..event_models import EventResult, WorldEventRecord
+from ..events import EventSystem
 from ..i18n import get_locale, set_locale
 from ..narrative.template_history import TemplateHistory
 

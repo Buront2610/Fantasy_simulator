@@ -6,6 +6,7 @@ side effects implemented in ``events.py``.
 Contract policy:
 - structural requirements may fail fast (e.g. missing required keys)
 - value ranges are normalized for persistence compatibility
+  (month/day are lower-bound normalized only in this model layer)
 - ``to_dict`` / ``from_dict`` defensively copy mutable nested payloads
 """
 
@@ -112,7 +113,7 @@ class WorldEventRecord:
             "calendar_key": self.calendar_key,
             "tags": list(self.tags),
             "impacts": deepcopy(self.impacts),
-            "legacy_event_result": dict(self.legacy_event_result) if self.legacy_event_result is not None else None,
+            "legacy_event_result": deepcopy(self.legacy_event_result) if self.legacy_event_result is not None else None,
             "legacy_event_log_entry": self.legacy_event_log_entry,
         }
 
@@ -135,7 +136,7 @@ class WorldEventRecord:
             tags=list(data.get("tags", [])),
             impacts=deepcopy(data.get("impacts", [])),
             legacy_event_result=(
-                dict(data["legacy_event_result"])
+                deepcopy(data["legacy_event_result"])
                 if data.get("legacy_event_result") is not None
                 else None
             ),

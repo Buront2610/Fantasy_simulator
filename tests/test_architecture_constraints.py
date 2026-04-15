@@ -245,3 +245,24 @@ def test_td3_split_modules_import_event_models_directly_not_events_facade() -> N
         assert any(target.startswith("fantasy_simulator.event_models") for target in imports), (
             f"{path} must import canonical event model module"
         )
+
+
+def test_simulation_modules_import_event_models_for_event_contract_types() -> None:
+    targets = {
+        PACKAGE_ROOT / "simulation" / "engine.py",
+        PACKAGE_ROOT / "simulation" / "event_recorder.py",
+        PACKAGE_ROOT / "simulation" / "queries.py",
+    }
+    forbidden_names = {"EventResult", "WorldEventRecord", "generate_record_id"}
+
+    for path in targets:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ImportFrom):
+                continue
+            module_name = ".".join(_resolve_import(_module_name(path), node)[0].split(".")[:-1]) if node.names else ""
+            imported_names = {alias.name for alias in node.names}
+            if module_name == "fantasy_simulator.events":
+                assert forbidden_names.isdisjoint(imported_names), (
+                    f"{path} must import event contract types from event_models, not events facade"
+                )

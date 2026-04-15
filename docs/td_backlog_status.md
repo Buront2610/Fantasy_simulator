@@ -62,7 +62,8 @@
 
 ### Remaining
 
-- なし（TD-3 バッチの責務分離は完了）。
+- 主要責務分離は完了。ただし canonical model からの legacy field 切り離しは
+  TD-1 sunset バッチで継続対応する。
 
 ## TD-4 Guardrails / Harness / Docs
 

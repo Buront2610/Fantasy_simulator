@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import Dict, List, Optional, Tuple
 
 from ..adventure import AdventureRun
-from ..events import EventResult, WorldEventRecord, generate_record_id
+from ..event_models import EventResult, WorldEventRecord, generate_record_id
 
 
 class EventRecorderMixin:

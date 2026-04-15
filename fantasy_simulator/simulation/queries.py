@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
-from ..events import EventResult, WorldEventRecord
+from ..event_models import EventResult, WorldEventRecord
 from ..i18n import tr, tr_term
 from ..narrative.constants import EVENT_KINDS_FATAL
 from ..reports import (
