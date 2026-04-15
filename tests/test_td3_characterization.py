@@ -81,3 +81,33 @@ def test_invalid_location_event_roundtrip_through_report_and_save_load() -> None
     restored = Simulator.from_dict(sim.to_dict())
     assert restored.world.event_records[-1].location_id is None
     assert any("Invalid location event" in line for line in restored.world.get_compatibility_event_log())
+
+
+def test_seeded_td3_external_outputs_are_reproducible() -> None:
+    def _snapshot(seed: int) -> tuple[str, list[str], str, str]:
+        world = World()
+        sim = Simulator(world, seed=seed)
+        kinds = ["meeting", "journey", "discovery", "battle"]
+        for index in range(12):
+            roll = sim.rng.randint(1000, 9999)
+            kind = kinds[sim.rng.randint(0, len(kinds) - 1)]
+            location_id = "loc_thornwood" if index % 2 == 0 else "loc_silverkeep"
+            sim._record_world_event(  # noqa: SLF001 - acceptance harness seam
+                f"seeded-{roll}-{kind}",
+                kind=kind,
+                location_id=location_id,
+                month=1,
+            )
+        return (
+            sim.get_summary(),
+            sim.get_event_log(last_n=20),
+            sim.get_monthly_report(sim.world.year, 1),
+            sim.get_yearly_report(sim.world.year),
+        )
+
+    snap1 = _snapshot(seed=20260415)
+    snap2 = _snapshot(seed=20260415)
+    snap3 = _snapshot(seed=20260416)
+
+    assert snap1 == snap2
+    assert snap1 != snap3

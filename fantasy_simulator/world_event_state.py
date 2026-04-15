@@ -6,7 +6,6 @@ TD-3 responsibility split: isolate event-driven world state mutations from
 
 from __future__ import annotations
 
-from dataclasses import replace
 from typing import Callable, Dict, List, Mapping, MutableMapping, Optional, Protocol
 
 from .event_models import WorldEventRecord
@@ -122,7 +121,9 @@ def append_canonical_event_record(
     """
     stored_record = record
     if record.location_id is not None and record.location_id not in location_index:
-        stored_record = replace(record, location_id=None)
+        cloned = record.to_dict()
+        cloned["location_id"] = None
+        stored_record = WorldEventRecord.from_dict(cloned)
 
     event_records.append(stored_record)
 

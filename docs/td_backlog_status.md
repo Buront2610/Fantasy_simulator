@@ -72,7 +72,9 @@
 - doc freshness: implementation/architecture/readme の整合監視を追加。
 - quality gate `standard`: architecture/doc/harness 系を routine 実行。
 - invalid location_id の統合経路（record -> report -> save/load）を characterization test で固定。
+- seeded reproducibility の acceptance として、summary / compatibility event log /
+  monthly report / yearly report を同一 seed で一致させる E2E characterization を追加。
 
 ### Remaining
 
-- TD-3 分割後の harness 期待値更新（責務分割後の acceptance contract 再調整）。
+- map-visible output を含む包括 golden harness（UI snapshot）整備は未完。

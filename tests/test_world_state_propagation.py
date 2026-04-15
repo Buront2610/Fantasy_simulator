@@ -2,8 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import pytest
+
 from fantasy_simulator.world import World
-from fantasy_simulator.world_state_propagation import decay_toward_baseline, propagate_state_changes
+from fantasy_simulator.world_state_propagation import (
+    decay_toward_baseline,
+    propagate_state_changes,
+)
 
 
 @dataclass
@@ -143,3 +148,28 @@ def test_mood_from_ruin_is_capped_by_max_neighbors() -> None:
 
     changed = [loc.id for loc in neighbors if loc.mood < 50]
     assert changed == ["n0", "n1", "n2", "n3"]
+
+
+def test_propagation_rules_fail_fast_on_invalid_delta_type(monkeypatch) -> None:
+    src = _FakeLoc(id="src", danger=40)
+    n1 = _FakeLoc(id="n1", danger=10)
+    index = {"src": src, "n1": n1}
+
+    def _neighbors(_loc_id: str) -> list[_FakeLoc]:
+        return [n1] if _loc_id == "src" else []
+
+    from fantasy_simulator import world_state_propagation as wsp
+
+    monkeypatch.setitem(wsp.PROPAGATION_RULES["danger"], "cap", "15")
+    try:
+        with pytest.raises(ValueError, match="must be int"):
+            propagate_state_changes(
+                locations=[src, n1],
+                location_index=index,
+                get_neighbors=_neighbors,
+                months=12,
+                months_per_year=12,
+                clamp_state=_clamp,
+            )
+    finally:
+        monkeypatch.setitem(wsp.PROPAGATION_RULES["danger"], "cap", 15)

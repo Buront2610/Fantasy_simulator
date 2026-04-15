@@ -126,7 +126,16 @@ def test_append_canonical_event_record_prunes_records_and_indexes() -> None:
 
 def test_append_canonical_event_record_normalizes_invalid_location_id() -> None:
     world = World()
-    record = WorldEventRecord(record_id="r1", kind="battle", year=1000, location_id="invalid")
+    record = WorldEventRecord(
+        record_id="r1",
+        kind="battle",
+        year=1000,
+        location_id="invalid",
+        secondary_actor_ids=["c1"],
+        tags=["t1"],
+        impacts=[{"k": "v"}],
+        legacy_event_result={"metadata": {"a": 1}},
+    )
 
     stored = append_canonical_event_record(
         record=record,
@@ -139,6 +148,17 @@ def test_append_canonical_event_record_normalizes_invalid_location_id() -> None:
     assert stored.location_id is None
     assert record.location_id == "invalid"
     assert world.event_records[-1].location_id is None
+    assert stored is not record
+
+    record.secondary_actor_ids.append("c2")
+    record.tags.append("t2")
+    record.impacts[0]["k"] = "mutated"
+    record.legacy_event_result["metadata"]["a"] = 2
+
+    assert world.event_records[-1].secondary_actor_ids == ["c1"]
+    assert world.event_records[-1].tags == ["t1"]
+    assert world.event_records[-1].impacts == [{"k": "v"}]
+    assert world.event_records[-1].legacy_event_result == {"metadata": {"a": 1}}
 
 
 def test_append_canonical_event_record_keeps_identity_when_location_is_none() -> None:
