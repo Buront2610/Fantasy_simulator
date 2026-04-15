@@ -6,6 +6,7 @@ TD-3 responsibility split: isolate event-driven world state mutations from
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Callable, Dict, List, MutableMapping, Optional, Protocol
 
 from .event_models import WorldEventRecord
@@ -24,6 +25,17 @@ class SupportsEventIndex(Protocol):
 
 
 # Event kind -> location state impact (design doc §5.5)
+
+_VALID_IMPACT_ATTRIBUTES = {
+    "prosperity",
+    "safety",
+    "mood",
+    "danger",
+    "traffic",
+    "rumor_heat",
+    "road_condition",
+}
+
 EVENT_IMPACT_RULES: Dict[str, Dict[str, int]] = {
     "death": {"safety": -3, "mood": -5, "rumor_heat": +10},
     "battle_fatal": {"safety": -5, "mood": -8, "danger": +5, "rumor_heat": +15},
@@ -59,9 +71,9 @@ def apply_event_impact_to_location(
 
     deltas = EVENT_IMPACT_RULES.get(kind, {})
     for attr, delta in deltas.items():
-        old = getattr(location, attr, None)
-        if old is None:
-            continue
+        if attr not in _VALID_IMPACT_ATTRIBUTES:
+            raise ValueError(f"Unsupported impact attribute in EVENT_IMPACT_RULES: {attr}")
+        old = getattr(location, attr)
         new_val = clamp_state(old + delta)
         setattr(location, attr, new_val)
         impacts.append({
@@ -87,16 +99,17 @@ def append_canonical_event_record(
 
     Contract:
     - Mutates ``event_records`` and location ``recent_event_ids`` in place.
-    - If ``record.location_id`` is unknown, it is normalized to ``None`` (destructive update).
+    - If ``record.location_id`` is unknown, a normalized copy (``location_id=None``) is stored.
     """
+    stored_record = record
     if record.location_id not in location_index:
-        record.location_id = None
+        stored_record = replace(record, location_id=None)
 
-    event_records.append(record)
+    event_records.append(stored_record)
 
-    if record.location_id is not None:
-        location = location_index[record.location_id]
-        location.recent_event_ids.append(record.record_id)
+    if stored_record.location_id is not None:
+        location = location_index[stored_record.location_id]
+        location.recent_event_ids.append(stored_record.record_id)
         location.recent_event_ids = location.recent_event_ids[-12:]
 
     if len(event_records) <= max_event_records:

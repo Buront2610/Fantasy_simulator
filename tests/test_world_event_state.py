@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from fantasy_simulator.event_models import WorldEventRecord
 from fantasy_simulator.world import World
 from fantasy_simulator.world_event_state import (
@@ -133,4 +135,22 @@ def test_append_canonical_event_record_normalizes_invalid_location_id() -> None:
         max_event_records=world.MAX_EVENT_RECORDS,
     )
 
-    assert record.location_id is None
+    assert record.location_id == "invalid"
+    assert world.event_records[-1].location_id is None
+
+
+def test_apply_event_impact_fails_fast_on_invalid_rule_attribute(monkeypatch) -> None:
+    world = World()
+    from fantasy_simulator import world_event_state as wes
+
+    monkeypatch.setitem(wes.EVENT_IMPACT_RULES, "broken_kind", {"unknown_attr": 1})
+    try:
+        with pytest.raises(ValueError, match="Unsupported impact attribute"):
+            apply_event_impact_to_location(
+                kind="broken_kind",
+                location_id="loc_thornwood",
+                location_index=world._location_id_index,
+                clamp_state=_clamp,
+            )
+    finally:
+        wes.EVENT_IMPACT_RULES.pop("broken_kind", None)
