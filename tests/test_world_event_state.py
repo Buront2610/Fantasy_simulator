@@ -141,6 +141,21 @@ def test_append_canonical_event_record_normalizes_invalid_location_id() -> None:
     assert world.event_records[-1].location_id is None
 
 
+def test_append_canonical_event_record_keeps_identity_when_location_is_none() -> None:
+    world = World()
+    record = WorldEventRecord(record_id="r1", kind="battle", year=1000, location_id=None)
+
+    stored = append_canonical_event_record(
+        record=record,
+        event_records=world.event_records,
+        location_index=world._location_id_index,
+        grid=world.grid,
+        max_event_records=world.MAX_EVENT_RECORDS,
+    )
+
+    assert stored is record
+
+
 def test_apply_event_impact_fails_fast_on_invalid_rule_attribute(monkeypatch) -> None:
     world = World()
     from fantasy_simulator import world_event_state as wes
@@ -148,6 +163,23 @@ def test_apply_event_impact_fails_fast_on_invalid_rule_attribute(monkeypatch) ->
     monkeypatch.setitem(wes.EVENT_IMPACT_RULES, "broken_kind", {"unknown_attr": 1})
     try:
         with pytest.raises(ValueError, match="Unsupported impact attribute"):
+            apply_event_impact_to_location(
+                kind="broken_kind",
+                location_id="loc_thornwood",
+                location_index=world._location_id_index,
+                clamp_state=_clamp,
+            )
+    finally:
+        wes.EVENT_IMPACT_RULES.pop("broken_kind", None)
+
+
+def test_apply_event_impact_fails_fast_on_invalid_rule_delta_type(monkeypatch) -> None:
+    world = World()
+    from fantasy_simulator import world_event_state as wes
+
+    monkeypatch.setitem(wes.EVENT_IMPACT_RULES, "broken_kind", {"danger": "1"})
+    try:
+        with pytest.raises(ValueError, match="Unsupported impact delta type"):
             apply_event_impact_to_location(
                 kind="broken_kind",
                 location_id="loc_thornwood",

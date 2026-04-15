@@ -7,7 +7,7 @@ TD-3 responsibility split: isolate event-driven world state mutations from
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import Callable, Dict, List, MutableMapping, Optional, Protocol
+from typing import Callable, Dict, List, Mapping, MutableMapping, Optional, Protocol
 
 from .event_models import WorldEventRecord
 
@@ -53,6 +53,21 @@ EVENT_IMPACT_RULES: Dict[str, Dict[str, int]] = {
 }
 
 
+def _validate_impact_rules(rules: Mapping[str, Mapping[str, int]]) -> None:
+    """Validate impact-rule schema (DbC fail-fast for developer errors)."""
+    for kind, deltas in rules.items():
+        for attr, delta in deltas.items():
+            if attr not in _VALID_IMPACT_ATTRIBUTES:
+                raise ValueError(f"Unsupported impact attribute in EVENT_IMPACT_RULES[{kind!r}]: {attr}")
+            if not isinstance(delta, int) or isinstance(delta, bool):
+                raise ValueError(
+                    f"Unsupported impact delta type in EVENT_IMPACT_RULES[{kind!r}][{attr!r}]: {type(delta)!r}"
+                )
+
+
+_validate_impact_rules(EVENT_IMPACT_RULES)
+
+
 def apply_event_impact_to_location(
     *,
     kind: str,
@@ -73,6 +88,8 @@ def apply_event_impact_to_location(
     for attr, delta in deltas.items():
         if attr not in _VALID_IMPACT_ATTRIBUTES:
             raise ValueError(f"Unsupported impact attribute in EVENT_IMPACT_RULES: {attr}")
+        if not isinstance(delta, int) or isinstance(delta, bool):
+            raise ValueError(f"Unsupported impact delta type in EVENT_IMPACT_RULES[{kind!r}][{attr!r}]")
         old = getattr(location, attr)
         new_val = clamp_state(old + delta)
         setattr(location, attr, new_val)
@@ -104,7 +121,7 @@ def append_canonical_event_record(
     Returns the canonical record instance actually stored in ``event_records``.
     """
     stored_record = record
-    if record.location_id not in location_index:
+    if record.location_id is not None and record.location_id not in location_index:
         stored_record = replace(record, location_id=None)
 
     event_records.append(stored_record)
