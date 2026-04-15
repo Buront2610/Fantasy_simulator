@@ -1,7 +1,22 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from fantasy_simulator.world import World
 from fantasy_simulator.world_state_propagation import decay_toward_baseline, propagate_state_changes
+
+
+@dataclass
+class _FakeLoc:
+    id: str
+    region_type: str = "plains"
+    prosperity: int = 50
+    danger: int = 0
+    traffic: int = 0
+    mood: int = 50
+    safety: int = 50
+    rumor_heat: int = 0
+    road_condition: int = 80
 
 
 def _clamp(value: int) -> int:
@@ -46,3 +61,85 @@ def test_propagate_state_changes_spreads_high_danger_to_neighbors() -> None:
     )
 
     assert any(neighbor.danger > 10 for neighbor in neighbors)
+
+
+def test_threshold_below_min_source_does_not_propagate_danger_or_traffic() -> None:
+    src = _FakeLoc(id="src", danger=39, traffic=34)
+    n1 = _FakeLoc(id="n1", danger=0, traffic=0)
+    index = {"src": src, "n1": n1}
+
+    def _neighbors(_loc_id: str) -> list[_FakeLoc]:
+        return [n1] if _loc_id == "src" else []
+
+    propagate_state_changes(
+        locations=[src, n1],
+        location_index=index,
+        get_neighbors=_neighbors,
+        months=12,
+        months_per_year=12,
+        clamp_state=_clamp,
+    )
+
+    assert n1.danger == 0
+    assert n1.traffic == 0
+
+
+def test_small_months_still_apply_minimum_non_zero_change() -> None:
+    src = _FakeLoc(id="src", danger=40)
+    n1 = _FakeLoc(id="n1", danger=39)
+    index = {"src": src, "n1": n1}
+
+    def _neighbors(_loc_id: str) -> list[_FakeLoc]:
+        return [n1] if _loc_id == "src" else []
+
+    propagate_state_changes(
+        locations=[src, n1],
+        location_index=index,
+        get_neighbors=_neighbors,
+        months=1,
+        months_per_year=12,
+        clamp_state=_clamp,
+    )
+
+    assert n1.danger == 40
+
+
+def test_road_condition_degrades_when_danger_threshold_crossed() -> None:
+    src = _FakeLoc(id="src", danger=70, road_condition=80)
+    n1 = _FakeLoc(id="n1")
+    index = {"src": src, "n1": n1}
+
+    def _neighbors(_loc_id: str) -> list[_FakeLoc]:
+        return [n1] if _loc_id == "src" else []
+
+    propagate_state_changes(
+        locations=[src, n1],
+        location_index=index,
+        get_neighbors=_neighbors,
+        months=12,
+        months_per_year=12,
+        clamp_state=_clamp,
+    )
+
+    assert src.road_condition == 72
+
+
+def test_mood_from_ruin_is_capped_by_max_neighbors() -> None:
+    src = _FakeLoc(id="src", prosperity=10)
+    neighbors = [_FakeLoc(id=f"n{i}", mood=50) for i in range(6)]
+    index = {"src": src, **{loc.id: loc for loc in neighbors}}
+
+    def _neighbors(_loc_id: str) -> list[_FakeLoc]:
+        return neighbors if _loc_id == "src" else []
+
+    propagate_state_changes(
+        locations=[src, *neighbors],
+        location_index=index,
+        get_neighbors=_neighbors,
+        months=12,
+        months_per_year=12,
+        clamp_state=_clamp,
+    )
+
+    changed = [loc.id for loc in neighbors if loc.mood < 50]
+    assert changed == ["n0", "n1", "n2", "n3"]

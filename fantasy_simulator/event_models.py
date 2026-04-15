@@ -2,16 +2,26 @@
 
 This module isolates pure data contracts (DbC-friendly) from event-generation
 side effects implemented in ``events.py``.
+
+Contract policy:
+- structural requirements may fail fast (e.g. missing required keys)
+- value ranges are normalized for persistence compatibility
+- ``to_dict`` / ``from_dict`` defensively copy mutable nested payloads
 """
 
 from __future__ import annotations
 
 import uuid
+from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Protocol
 
 
-def generate_record_id(rng: Optional[Any] = None) -> str:
+class SupportsGetRandBits(Protocol):
+    def getrandbits(self, k: int) -> int: ...
+
+
+def generate_record_id(rng: Optional[SupportsGetRandBits] = None) -> str:
     """Generate a stable-width hex record ID.
 
     Contract:
@@ -38,10 +48,10 @@ class EventResult:
         return {
             "description": self.description,
             "affected_characters": list(self.affected_characters),
-            "stat_changes": self.stat_changes,
+            "stat_changes": deepcopy(self.stat_changes),
             "event_type": self.event_type,
             "year": self.year,
-            "metadata": self.metadata,
+            "metadata": deepcopy(self.metadata),
         }
 
     @classmethod
@@ -49,10 +59,10 @@ class EventResult:
         return cls(
             description=data["description"],
             affected_characters=list(data.get("affected_characters", [])),
-            stat_changes=data.get("stat_changes", {}),
+            stat_changes=deepcopy(data.get("stat_changes", {})),
             event_type=data.get("event_type", "generic"),
             year=data.get("year", 0),
-            metadata=data.get("metadata", {}),
+            metadata=deepcopy(data.get("metadata", {})),
         )
 
 
@@ -101,7 +111,7 @@ class WorldEventRecord:
             "visibility": self.visibility,
             "calendar_key": self.calendar_key,
             "tags": list(self.tags),
-            "impacts": list(self.impacts),
+            "impacts": deepcopy(self.impacts),
             "legacy_event_result": dict(self.legacy_event_result) if self.legacy_event_result is not None else None,
             "legacy_event_log_entry": self.legacy_event_log_entry,
         }
@@ -123,7 +133,7 @@ class WorldEventRecord:
             visibility=data.get("visibility", "public"),
             calendar_key=data.get("calendar_key", ""),
             tags=list(data.get("tags", [])),
-            impacts=list(data.get("impacts", [])),
+            impacts=deepcopy(data.get("impacts", [])),
             legacy_event_result=(
                 dict(data["legacy_event_result"])
                 if data.get("legacy_event_result") is not None
@@ -139,7 +149,7 @@ class WorldEventRecord:
         location_id: Optional[str] = None,
         severity: int = 1,
         record_id: Optional[str] = None,
-        rng: Optional[Any] = None,
+        rng: Optional[SupportsGetRandBits] = None,
         month: int = 1,
         day: int = 1,
         absolute_day: int = 0,

@@ -58,6 +58,7 @@
 - decay / propagation（設計書 §5.6）を `world_state_propagation.py` へ抽出し、
   `World.propagate_state()` は orchestrator に縮約した。
 - 既存互換API（`from fantasy_simulator.events import ...`, `World.log_event()`, `World.record_event()`）は維持。
+- legacy field の扱い / import 正規ルート / mutable copy 方針は `docs/td3_design_decisions.md` に記録。
 
 ### Remaining
 

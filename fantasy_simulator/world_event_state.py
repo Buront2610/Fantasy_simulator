@@ -6,9 +6,21 @@ TD-3 responsibility split: isolate event-driven world state mutations from
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, MutableMapping, Optional
+from typing import Callable, Dict, List, MutableMapping, Optional, Protocol
 
 from .event_models import WorldEventRecord
+
+
+class SupportsEventIndex(Protocol):
+    id: str
+    safety: int
+    mood: int
+    danger: int
+    traffic: int
+    rumor_heat: int
+    prosperity: int
+    road_condition: int
+    recent_event_ids: List[str]
 
 
 # Event kind -> location state impact (design doc §5.5)
@@ -33,11 +45,11 @@ def apply_event_impact_to_location(
     *,
     kind: str,
     location_id: Optional[str],
-    location_index: MutableMapping[str, Any],
-    clamp_state: Any,
-) -> List[Dict[str, Any]]:
+    location_index: MutableMapping[str, SupportsEventIndex],
+    clamp_state: Callable[[int], int],
+) -> List[Dict[str, int | str]]:
     """Apply event impact rules to one location and return impact records."""
-    impacts: List[Dict[str, Any]] = []
+    impacts: List[Dict[str, int | str]] = []
     if location_id is None:
         return impacts
 
@@ -67,11 +79,16 @@ def append_canonical_event_record(
     *,
     record: WorldEventRecord,
     event_records: List[WorldEventRecord],
-    location_index: MutableMapping[str, Any],
-    grid: MutableMapping[Any, Any],
+    location_index: MutableMapping[str, SupportsEventIndex],
+    grid: MutableMapping[object, SupportsEventIndex],
     max_event_records: int,
 ) -> None:
-    """Append an event record and maintain related per-location indexes."""
+    """Append an event record and maintain related per-location indexes.
+
+    Contract:
+    - Mutates ``event_records`` and location ``recent_event_ids`` in place.
+    - If ``record.location_id`` is unknown, it is normalized to ``None`` (destructive update).
+    """
     if record.location_id not in location_index:
         record.location_id = None
 

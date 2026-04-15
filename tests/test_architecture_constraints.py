@@ -230,3 +230,18 @@ def test_world_data_imports_stay_in_legacy_compatibility_modules() -> None:
             if target == WORLD_DATA_MODULE or target.startswith(f"{WORLD_DATA_MODULE}.")
         ]
         assert forbidden == [], f"{path} imports legacy world_data compatibility projections: {forbidden}"
+
+
+def test_td3_split_modules_import_event_models_directly_not_events_facade() -> None:
+    targets = {
+        PACKAGE_ROOT / "world_event_log.py",
+        PACKAGE_ROOT / "world_event_state.py",
+    }
+    for path in targets:
+        imports = _iter_import_targets(path)
+        assert all(not target.startswith("fantasy_simulator.events") for target in imports), (
+            f"{path} should import event models directly, not events facade"
+        )
+        assert any(target.startswith("fantasy_simulator.event_models") for target in imports), (
+            f"{path} must import canonical event model module"
+        )

@@ -5,10 +5,22 @@ TD-3 split: isolate state propagation mechanics from world orchestration.
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Iterable, List, MutableMapping, Tuple
+from typing import Callable, Dict, Iterable, List, MutableMapping, Protocol, Tuple
 
 
-PROPAGATION_RULES: Dict[str, Dict[str, Any]] = {
+class SupportsPropagationLocation(Protocol):
+    id: str
+    region_type: str
+    prosperity: int
+    danger: int
+    traffic: int
+    mood: int
+    safety: int
+    rumor_heat: int
+    road_condition: int
+
+
+PROPAGATION_RULES: Dict[str, Dict[str, float | int]] = {
     "danger": {
         "decay": 0.30,
         "cap": 15,
@@ -33,7 +45,7 @@ PROPAGATION_RULES: Dict[str, Dict[str, Any]] = {
 
 def decay_toward_baseline(
     *,
-    locations: Iterable[Any],
+    locations: Iterable[SupportsPropagationLocation],
     months: int,
     months_per_year: int,
     state_decay_rate: float,
@@ -60,9 +72,9 @@ def decay_toward_baseline(
 
 def propagate_state_changes(
     *,
-    locations: Iterable[Any],
-    location_index: MutableMapping[str, Any],
-    get_neighbors: Callable[[str], List[Any]],
+    locations: Iterable[SupportsPropagationLocation],
+    location_index: MutableMapping[str, SupportsPropagationLocation],
+    get_neighbors: Callable[[str], List[SupportsPropagationLocation]],
     months: int,
     months_per_year: int,
     clamp_state: Callable[[int], int],

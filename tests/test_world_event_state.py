@@ -8,21 +8,32 @@ from fantasy_simulator.world_event_state import (
 )
 
 
-def test_apply_event_impact_to_location_updates_known_location() -> None:
+def _clamp(value: int) -> int:
+    return max(0, min(100, int(value)))
+
+
+def test_apply_event_impact_to_location_updates_all_battle_fields() -> None:
     world = World()
     loc = world.get_location_by_id("loc_thornwood")
-    before_safety = loc.safety
+    before = {
+        "safety": loc.safety,
+        "mood": loc.mood,
+        "danger": loc.danger,
+        "rumor_heat": loc.rumor_heat,
+    }
 
     impacts = apply_event_impact_to_location(
         kind="battle",
         location_id="loc_thornwood",
         location_index=world._location_id_index,
-        clamp_state=lambda value: max(0, min(100, int(value))),
+        clamp_state=_clamp,
     )
 
     assert impacts
-    assert loc.safety < before_safety
-    assert any(item["attribute"] == "safety" for item in impacts)
+    assert loc.safety == before["safety"] - 2
+    assert loc.mood == before["mood"] - 3
+    assert loc.danger == before["danger"] + 3
+    assert loc.rumor_heat == before["rumor_heat"] + 5
 
 
 def test_apply_event_impact_to_location_ignores_unknown_location() -> None:
@@ -32,10 +43,47 @@ def test_apply_event_impact_to_location_ignores_unknown_location() -> None:
         kind="battle",
         location_id="missing",
         location_index=world._location_id_index,
-        clamp_state=lambda value: max(0, min(100, int(value))),
+        clamp_state=_clamp,
     )
 
     assert impacts == []
+
+
+def test_apply_event_impact_to_location_unknown_kind_is_noop() -> None:
+    world = World()
+    loc = world.get_location_by_id("loc_thornwood")
+    before = (loc.safety, loc.mood, loc.danger, loc.rumor_heat)
+
+    impacts = apply_event_impact_to_location(
+        kind="unknown_kind",
+        location_id="loc_thornwood",
+        location_index=world._location_id_index,
+        clamp_state=_clamp,
+    )
+
+    assert impacts == []
+    assert (loc.safety, loc.mood, loc.danger, loc.rumor_heat) == before
+
+
+def test_apply_event_impact_to_location_clamps_low_and_high_bounds() -> None:
+    world = World()
+    loc = world.get_location_by_id("loc_thornwood")
+    loc.safety = 1
+    loc.mood = 1
+    loc.danger = 99
+    loc.rumor_heat = 99
+
+    apply_event_impact_to_location(
+        kind="battle",
+        location_id="loc_thornwood",
+        location_index=world._location_id_index,
+        clamp_state=_clamp,
+    )
+
+    assert loc.safety == 0
+    assert loc.mood == 0
+    assert loc.danger == 100
+    assert loc.rumor_heat == 100
 
 
 def test_append_canonical_event_record_prunes_records_and_indexes() -> None:
