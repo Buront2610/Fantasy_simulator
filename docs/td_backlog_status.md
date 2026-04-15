@@ -55,12 +55,13 @@
 - `world.py` の event log adapter は `world_event_log.py` へ抽出し、互換ログ整形/投影を純関数化した。
 - event-driven な location state mutation / canonical record append を `world_event_state.py`
   へ抽出し、`World` は orchestration と互換API維持に集中する構造へ再配置した。
+- decay / propagation（設計書 §5.6）を `world_state_propagation.py` へ抽出し、
+  `World.propagate_state()` は orchestrator に縮約した。
 - 既存互換API（`from fantasy_simulator.events import ...`, `World.log_event()`, `World.record_event()`）は維持。
 
 ### Remaining
 
-- `world.py` 全体の追加分割（calendar / propagation の段階的 module split）は
-  TD-3 完了後の保守性改善タスクとして別チケット化する。
+- なし（TD-3 バッチの責務分離は完了）。
 
 ## TD-4 Guardrails / Harness / Docs
 

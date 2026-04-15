@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 from .i18n import tr
 from .world_event_log import format_event_log_entry, project_compatibility_event_log
 from .world_event_state import apply_event_impact_to_location, append_canonical_event_record
+from .world_state_propagation import decay_toward_baseline, propagate_state_changes
 from .content.setting_bundle import (
     CalendarDefinition,
     SettingBundle,
@@ -118,33 +119,6 @@ class CalendarChangeRecord:
             day=max(1, int(data.get("day", 1))),
             calendar=CalendarDefinition.from_dict(data.get("calendar", {})),
         )
-
-
-# ------------------------------------------------------------------
-# Propagation rules (design doc §5.6)
-# ------------------------------------------------------------------
-
-PROPAGATION_RULES: Dict[str, Dict[str, Any]] = {
-    "danger": {
-        "decay": 0.30,
-        "cap": 15,
-        "min_source": 40,
-    },
-    "traffic": {
-        "decay": 0.20,
-        "cap": 10,
-        "min_source": 35,
-    },
-    "mood_from_ruin": {
-        "source_threshold": 20,
-        "neighbor_penalty": 5,
-        "max_neighbors": 4,
-    },
-    "road_damage_from_danger": {
-        "danger_threshold": 70,
-        "road_penalty": 8,
-    },
-}
 
 
 PROSPERITY_LABELS = [
@@ -1276,92 +1250,28 @@ class World:
     _STATE_DECAY_RATE = 0.30
 
     def _decay_toward_baseline(self, months: int = 12) -> None:
-        """Pull volatile state fields back toward their region-type defaults.
-
-        Without this, additive event impacts and neighbor propagation cause
-        states to drift monotonically toward 0 or 100 over long simulations.
-        """
-        period_months = max(1, months)
-        decay_rate = 1.0 - ((1.0 - self._STATE_DECAY_RATE) ** (period_months / self.months_per_year))
-        for loc in self.grid.values():
-            defaults = self.location_state_defaults(loc.id, loc.region_type)
-            for attr in ("danger", "traffic", "mood", "safety", "rumor_heat"):
-                current = getattr(loc, attr)
-                baseline = defaults[attr]
-                diff = baseline - current
-                if diff == 0:
-                    continue
-                # Move a fraction of the distance back toward baseline
-                adjustment = int(diff * decay_rate)
-                if adjustment == 0:
-                    adjustment = 1 if diff > 0 else -1
-                setattr(loc, attr, _clamp_state(current + adjustment))
+        """Pull volatile state fields back toward their region-type defaults."""
+        decay_toward_baseline(
+            locations=self.grid.values(),
+            months=months,
+            months_per_year=self.months_per_year,
+            state_decay_rate=self._STATE_DECAY_RATE,
+            location_defaults=self.location_state_defaults,
+            clamp_state=_clamp_state,
+        )
 
     def propagate_state(self, months: int = 12) -> None:
-        """Propagate location state to neighbors (design §5.6).
-
-        Called after a simulated period to diffuse location-state changes.
-        Applies natural decay toward baseline first, then propagation,
-        so that state quantities stabilise over time instead of
-        accumulating unboundedly.
-        """
+        """Propagate location state to neighbors (design §5.6)."""
         period_months = max(1, months)
-        period_fraction = period_months / self.months_per_year
-
-        def _scaled(value: int) -> int:
-            scaled = int(round(value * period_fraction))
-            if value != 0 and scaled == 0:
-                scaled = 1 if value > 0 else -1
-            return scaled
-
-        # Decay toward baseline before propagation
         self._decay_toward_baseline(months=period_months)
-
-        pending_changes: List[tuple] = []
-
-        for loc in self.grid.values():
-            neighbours = self.get_neighboring_locations(loc.id)
-            if not neighbours:
-                continue
-
-            # Danger propagation — only to neighbors whose danger is
-            # below the source's current level (prevents runaway upward drift)
-            rule = PROPAGATION_RULES["danger"]
-            if loc.danger >= rule["min_source"]:
-                spread = min(int(loc.danger * rule["decay"]), rule["cap"])
-                spread = _scaled(spread)
-                for n in neighbours:
-                    if n.danger < loc.danger:
-                        capped = min(spread, loc.danger - n.danger)
-                        pending_changes.append((n.id, "danger", capped))
-
-            # Traffic propagation — same directional cap
-            rule = PROPAGATION_RULES["traffic"]
-            if loc.traffic >= rule["min_source"]:
-                spread = min(int(loc.traffic * rule["decay"]), rule["cap"])
-                spread = _scaled(spread)
-                for n in neighbours:
-                    if n.traffic < loc.traffic:
-                        capped = min(spread, loc.traffic - n.traffic)
-                        pending_changes.append((n.id, "traffic", capped))
-
-            # Mood penalty from ruined neighbors
-            rule = PROPAGATION_RULES["mood_from_ruin"]
-            if loc.prosperity < rule["source_threshold"]:
-                penalty = _scaled(-rule["neighbor_penalty"])
-                for n in neighbours[:rule["max_neighbors"]]:
-                    pending_changes.append((n.id, "mood", penalty))
-
-            # Road damage from high danger
-            rule = PROPAGATION_RULES["road_damage_from_danger"]
-            if loc.danger >= rule["danger_threshold"]:
-                pending_changes.append((loc.id, "road_condition", _scaled(-rule["road_penalty"])))
-
-        for loc_id, attr, delta in pending_changes:
-            loc = self._location_id_index.get(loc_id)
-            if loc is not None:
-                old = getattr(loc, attr)
-                setattr(loc, attr, _clamp_state(old + delta))
+        propagate_state_changes(
+            locations=self.grid.values(),
+            location_index=self._location_id_index,
+            get_neighbors=self.get_neighboring_locations,
+            months=period_months,
+            months_per_year=self.months_per_year,
+            clamp_state=_clamp_state,
+        )
 
     def get_events_by_location(self, location_id: str) -> List[WorldEventRecord]:
         """Return all event records for a specific location."""
