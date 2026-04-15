@@ -106,15 +106,22 @@ class CharacterCreator:
 
     def __init__(self, setting_bundle: SettingBundle | None = None) -> None:
         self.setting_bundle = setting_bundle
+        self._fallback_bundle: SettingBundle | None = None
 
-    @staticmethod
-    def _default_bundle() -> SettingBundle:
-        """Return a fresh default bundle snapshot for compatibility fallbacks."""
-        return default_aethoria_bundle()
+    def _default_bundle(self) -> SettingBundle:
+        """Return a cached default bundle snapshot for compatibility fallbacks."""
+        if self._fallback_bundle is None:
+            self._fallback_bundle = default_aethoria_bundle()
+        return self._fallback_bundle
 
     def _effective_bundle(self) -> SettingBundle:
         """Return the active bundle for race/job/name lookup."""
         return self.setting_bundle if self.setting_bundle is not None else self._default_bundle()
+
+    @staticmethod
+    def _supports_aethoria_projection_fallback(bundle: SettingBundle) -> bool:
+        """Return whether empty race/job lists may fall back to Aethoria defaults."""
+        return bundle.world_definition.world_key == "aethoria"
 
     @property
     def naming_rules(self) -> NamingRulesDefinition:
@@ -134,8 +141,9 @@ class CharacterCreator:
 
     @property
     def race_entries(self) -> List[tuple[str, str, Dict[str, int]]]:
-        races = self._effective_bundle().world_definition.races
-        if not races:
+        bundle = self._effective_bundle()
+        races = bundle.world_definition.races
+        if not races and self._supports_aethoria_projection_fallback(bundle):
             races = self._default_bundle().world_definition.races
         return [
             (race.name, race.description, dict(race.stat_bonuses))
@@ -144,13 +152,23 @@ class CharacterCreator:
 
     @property
     def job_entries(self) -> List[tuple[str, str, List[str]]]:
-        jobs = self._effective_bundle().world_definition.jobs
-        if not jobs:
+        bundle = self._effective_bundle()
+        jobs = bundle.world_definition.jobs
+        if not jobs and self._supports_aethoria_projection_fallback(bundle):
             jobs = self._default_bundle().world_definition.jobs
         return [
             (job.name, job.description, list(job.primary_skills))
             for job in jobs
         ]
+
+    def _require_race_and_job_entries(self) -> tuple[List[tuple[str, str, Dict[str, int]]], List[tuple[str, str, List[str]]]]:
+        race_entries = self.race_entries
+        job_entries = self.job_entries
+        if not race_entries:
+            raise ValueError("Setting bundle must define at least one race for character creation")
+        if not job_entries:
+            raise ValueError("Setting bundle must define at least one job for character creation")
+        return race_entries, job_entries
 
     def _supports_aethoria_templates(self) -> bool:
         if self.setting_bundle is None:
@@ -186,14 +204,13 @@ class CharacterCreator:
         )
         gender = self._prompt_choice(tr("choose_gender"), _GENDERS, default="Non-binary", ctx=ctx)
 
-        race_entries = self.race_entries
+        race_entries, job_entries = self._require_race_and_job_entries()
         race_names = [r[0] for r in race_entries]
         out.print_line(f"\n  {tr('available_races')}:")
         for i, (rname, rdesc, _) in enumerate(race_entries, 1):
             out.print_line(f"  {i}. {rname:12s} - {rdesc[:60]}...")
         race = self._prompt_choice(tr("choose_race"), race_names, default=race_names[0], ctx=ctx)
 
-        job_entries = self.job_entries
         job_names = [j[0] for j in job_entries]
         out.print_line(f"\n  {tr('available_jobs')}:")
         for i, (jname, jdesc, _) in enumerate(job_entries, 1):
@@ -225,12 +242,13 @@ class CharacterCreator:
         return char
 
     def create_random(self, name: Optional[str] = None, rng: Any = random) -> Character:
+        race_entries, job_entries = self._require_race_and_job_entries()
         gender = rng.choice(_GENDERS)
-        race_entry = rng.choice(self.race_entries)
+        race_entry = rng.choice(race_entries)
         race = race_entry[0]
         race_bonuses = race_entry[2]
 
-        job_entry = rng.choice(self.job_entries)
+        job_entry = rng.choice(job_entries)
         job = job_entry[0]
         job_skills = job_entry[2]
 

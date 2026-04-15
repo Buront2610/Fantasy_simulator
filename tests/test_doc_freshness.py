@@ -62,3 +62,4 @@ def test_td_backlog_status_tracks_invariants_and_remaining_major_split() -> None
     assert "World.event_records" in TD_STATUS_TEXT
     assert "TD-3 Responsibility Split" in TD_STATUS_TEXT
     assert "未完" in TD_STATUS_TEXT
+    assert "world_key == \"aethoria\"" in TD_STATUS_TEXT

@@ -36,7 +36,9 @@
 ### Done in code
 
 - `screen_world_lore()` は bundle source 参照へ移行済み。
-- `CharacterCreator` の race/job 読み取りは bundle-first + default bundle fallback。
+- `CharacterCreator` の race/job 読み取りは bundle-first。fallback は
+  `world_key == "aethoria"` の互換ケースに限定し、非 Aethoria で空配列なら
+  明示エラーにする。
 - `world_data` の lore/race/job/default site seed は legacy projection として制約テストで管理。
 
 ### Remaining
@@ -62,4 +64,3 @@
 ### Remaining
 
 - TD-3 が進んだ後の harness 期待値更新（責務分割後の acceptance contract 再調整）。
-

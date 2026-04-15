@@ -71,6 +71,18 @@ def _iter_attribute_names(path: Path) -> list[str]:
     return [node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)]
 
 
+def _iter_history_attribute_accesses(path: Path) -> list[tuple[str, int]]:
+    """Return (base_name, lineno) for direct `*.history` attribute accesses."""
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    matches: list[tuple[str, int]] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Attribute) or node.attr != "history":
+            continue
+        if isinstance(node.value, ast.Name):
+            matches.append((node.value.id, int(getattr(node, "lineno", -1))))
+    return matches
+
+
 def _production_files() -> list[Path]:
     return sorted(path for path in PACKAGE_ROOT.rglob("*.py") if "__pycache__" not in path.parts)
 
@@ -141,10 +153,15 @@ def test_simulation_history_access_stays_in_legacy_adapter_files() -> None:
         PACKAGE_ROOT / "simulation" / "queries.py",
     }
     for path in sorted((PACKAGE_ROOT / "simulation").glob("*.py")):
+        accesses = [
+            (base, lineno)
+            for base, lineno in _iter_history_attribute_accesses(path)
+            if base in {"self", "sim", "simulator"}
+        ]
         if path in allowed:
             continue
-        assert "self.history" not in path.read_text(encoding="utf-8"), (
-            f"Simulator.history access escaped legacy adapter files in {path}"
+        assert accesses == [], (
+            f"Simulator.history access escaped legacy adapter files in {path}: {accesses}"
         )
 
 
@@ -170,22 +187,6 @@ def test_core_ui_modules_do_not_import_reports_module() -> None:
             if target == REPORTS_MODULE or target.startswith(f"{REPORTS_MODULE}.")
         ]
         assert forbidden == [], f"{path} imports report modules: {forbidden}"
-
-def test_simulator_history_attribute_access_is_explicitly_scoped() -> None:
-    allowed = {
-        PACKAGE_ROOT / "simulation" / "engine.py",
-        PACKAGE_ROOT / "simulation" / "event_recorder.py",
-        PACKAGE_ROOT / "simulation" / "queries.py",
-    }
-
-    for path in sorted((PACKAGE_ROOT / "simulation").glob("*.py")):
-        if path in allowed:
-            continue
-        text = path.read_text(encoding="utf-8")
-        assert "self.history" not in text
-        assert "sim.history" not in text
-        assert "simulator.history" not in text
-
 
 def test_world_data_legacy_projection_symbol_imports_are_scoped() -> None:
     projection_names = {"WORLD_LORE", "RACES", "JOBS", "DEFAULT_LOCATIONS"}
