@@ -220,3 +220,52 @@ def test_event_recorder_computes_impacts_before_canonical_append(monkeypatch) ->
 
     assert captured_impacts
     assert captured_impacts[0]
+
+
+def test_setting_bundle_rules_override_default_impact_and_propagation_tables() -> None:
+    world = World()
+    bundle = world.setting_bundle
+    bundle.world_definition.event_impact_rules = {"meeting": {"mood": 7}}
+    bundle.world_definition.propagation_rules = {"road_damage_from_danger": {"danger_threshold": 101, "road_penalty": 0}}
+    world.apply_setting_bundle(bundle)
+
+    loc = world.get_location_by_id("loc_thornwood")
+    neighbor = world.get_neighboring_locations("loc_thornwood")[0]
+    before_mood = loc.mood
+    world.apply_event_impact("meeting", "loc_thornwood")
+    assert loc.mood == before_mood + 7
+
+    default_world = World()
+    default_loc = default_world.get_location_by_id("loc_thornwood")
+    default_neighbor = default_world.get_neighboring_locations("loc_thornwood")[0]
+    loc.danger = 80
+    neighbor.danger = 0
+    default_loc.danger = 80
+    default_neighbor.danger = 0
+    custom_road_before = loc.road_condition
+    default_road_before = default_loc.road_condition
+    world.propagate_state(months=12)
+    default_world.propagate_state(months=12)
+    assert loc.road_condition == custom_road_before
+    assert neighbor.danger > 0
+    assert default_loc.road_condition < default_road_before
+    assert default_neighbor.danger == neighbor.danger
+
+
+def test_world_round_trip_preserves_bundle_rule_overrides() -> None:
+    world = World()
+    bundle = world.setting_bundle
+    bundle.world_definition.event_impact_rules = {"meeting": {"mood": 7}}
+    bundle.world_definition.propagation_rules = {"road_damage_from_danger": {"danger_threshold": 101, "road_penalty": 0}}
+    world.apply_setting_bundle(bundle)
+
+    restored = World.from_dict(world.to_dict())
+
+    assert restored.setting_bundle.world_definition.event_impact_rules == {"meeting": {"mood": 7}}
+    assert restored.setting_bundle.world_definition.propagation_rules == {
+        "road_damage_from_danger": {"danger_threshold": 101, "road_penalty": 0}
+    }
+    assert restored.event_impact_rules["meeting"]["mood"] == 7
+    assert restored.event_impact_rules["battle"]["danger"] == 3
+    assert restored.propagation_rules["road_damage_from_danger"]["danger_threshold"] == 101
+    assert restored.propagation_rules["danger"]["cap"] == 15

@@ -1,6 +1,6 @@
 # TD-1〜TD-4 Backlog Status (Audit)
 
-最終更新: 2026-04-15
+最終更新: 2026-04-16
 
 このメモは `docs/implementation_plan.md` の TD-1〜TD-4 について、
 「現時点で残っているもの」を先に確認してから実装を進めるための監査ログ。
@@ -62,11 +62,7 @@
 
 ### Remaining
 
-- 責務分離は完了したが、canonical domain model の純化は未完。
-  `WorldEventRecord.legacy_event_result` / `legacy_event_log_entry` は
-  移行期 ACL として残置されている。
-- `EVENT_IMPACT_RULES` / `PROPAGATION_RULES` は static module global のままで、
-  setting bundle / era / faction 差分を差し込む rules source abstraction は未着手。
+- era/faction modifier を rules evaluator に注入する仕組みは未完。
 
 ## TD-4 Guardrails / Harness / Docs
 
@@ -78,7 +74,10 @@
 - invalid location_id の統合経路（record -> report -> save/load）を characterization test で固定。
 - seeded reproducibility の acceptance として、summary / compatibility event log /
   monthly report / yearly report を同一 seed で一致させる E2E characterization を追加。
+- map-visible golden harness として、seeded overview / region / detail の snapshot、
+  memorial-heavy world memory snapshot を production の screen helper 経路で固定し、
+  save-load-midyear 後の map-visible 同値性も `tests/test_harness_scenarios.py` で固定。
 
 ### Remaining
 
-- map-visible output を含む包括 golden harness（UI snapshot）整備は未完。
+- なし。

@@ -6,7 +6,12 @@ import json
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Mapping
+
+from ..rule_override_resolution import (
+    resolve_event_impact_rule_overrides,
+    resolve_propagation_rule_overrides,
+)
 
 
 BUNDLES_DIR = Path(__file__).with_name("bundles")
@@ -28,6 +33,36 @@ def _duplicate_values(items: List[str]) -> List[str]:
             duplicates.append(item)
         seen.add(item)
     return duplicates
+
+
+def _copy_rule_overrides(raw_rules: Any, *, field_name: str) -> Dict[str, Dict[str, Any]]:
+    """Normalize nested override tables without coercing payload types."""
+    if raw_rules is None:
+        return {}
+    if not isinstance(raw_rules, Mapping):
+        raise ValueError(f"{field_name} must be an object")
+
+    normalized: Dict[str, Dict[str, Any]] = {}
+    for raw_section, raw_values in raw_rules.items():
+        section = str(raw_section)
+        if not isinstance(raw_values, Mapping):
+            raise ValueError(f"{field_name}[{section!r}] must be an object")
+        normalized[section] = {str(key): value for key, value in raw_values.items()}
+    return normalized
+
+
+def merge_event_impact_rule_overrides(
+    overrides: Mapping[str, Mapping[str, Any]] | None,
+) -> Dict[str, Dict[str, int]]:
+    """Backward-compatible wrapper around the domain-side rule resolver."""
+    return resolve_event_impact_rule_overrides(overrides)
+
+
+def merge_propagation_rule_overrides(
+    overrides: Mapping[str, Mapping[str, Any]] | None,
+) -> Dict[str, Dict[str, float | int]]:
+    """Backward-compatible wrapper around the domain-side rule resolver."""
+    return resolve_propagation_rule_overrides(overrides)
 
 
 @dataclass
@@ -268,6 +303,8 @@ class WorldDefinition:
     jobs: List[JobDefinition] = field(default_factory=list)
     site_seeds: List[SiteSeedDefinition] = field(default_factory=list)
     naming_rules: NamingRulesDefinition = field(default_factory=NamingRulesDefinition)
+    event_impact_rules: Dict[str, Dict[str, int]] = field(default_factory=dict)
+    propagation_rules: Dict[str, Dict[str, float | int]] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -282,6 +319,14 @@ class WorldDefinition:
             "jobs": [job.to_dict() for job in self.jobs],
             "site_seeds": [seed.to_dict() for seed in self.site_seeds],
             "naming_rules": self.naming_rules.to_dict(),
+            "event_impact_rules": {
+                kind: {attr: int(delta) for attr, delta in deltas.items()}
+                for kind, deltas in self.event_impact_rules.items()
+            },
+            "propagation_rules": {
+                kind: {attr: value for attr, value in deltas.items()}
+                for kind, deltas in self.propagation_rules.items()
+            },
         }
 
     @classmethod
@@ -310,6 +355,14 @@ class WorldDefinition:
                 for item in data.get("site_seeds", [])
             ],
             naming_rules=NamingRulesDefinition.from_dict(data.get("naming_rules", {})),
+            event_impact_rules=_copy_rule_overrides(
+                data.get("event_impact_rules", {}),
+                field_name="world_definition.event_impact_rules",
+            ),
+            propagation_rules=_copy_rule_overrides(
+                data.get("propagation_rules", {}),
+                field_name="world_definition.propagation_rules",
+            ),
         )
 
 
@@ -435,6 +488,24 @@ def validate_setting_bundle(bundle: SettingBundle, *, source: str) -> None:
         raise ValueError(f"Setting bundle {source} must provide first_names_female when naming rules are defined")
     if has_first_name_rules and not naming.last_names:
         raise ValueError(f"Setting bundle {source} must provide last_names when naming rules are defined")
+
+    event_impact_overrides = {
+        str(kind): {str(attr): delta for attr, delta in deltas.items()}
+        for kind, deltas in world.event_impact_rules.items()
+    }
+    try:
+        merge_event_impact_rule_overrides(event_impact_overrides)
+    except ValueError as exc:
+        raise ValueError(f"Setting bundle {source} has invalid world_definition.event_impact_rules: {exc}") from exc
+
+    propagation_overrides = {
+        str(section): {str(key): value for key, value in values.items()}
+        for section, values in world.propagation_rules.items()
+    }
+    try:
+        merge_propagation_rule_overrides(propagation_overrides)
+    except ValueError as exc:
+        raise ValueError(f"Setting bundle {source} has invalid world_definition.propagation_rules: {exc}") from exc
 
 
 def bundle_from_dict_validated(data: Dict[str, Any], *, source: str) -> SettingBundle:

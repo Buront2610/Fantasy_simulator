@@ -5,7 +5,13 @@ TD-3 split: isolate state propagation mechanics from world orchestration.
 
 from __future__ import annotations
 
-from typing import Callable, Dict, Iterable, List, Mapping, MutableMapping, Protocol, Tuple
+from typing import Callable, Dict, Iterable, List, Mapping, MutableMapping, Optional, Protocol, Tuple
+
+from .rule_override_resolution import (
+    DEFAULT_PROPAGATION_RULES,
+    clone_default_propagation_rules as _clone_default_propagation_rules,
+    validate_propagation_rules,
+)
 
 
 class SupportsPropagationLocation(Protocol):
@@ -18,68 +24,6 @@ class SupportsPropagationLocation(Protocol):
     safety: int
     rumor_heat: int
     road_condition: int
-
-
-PROPAGATION_RULES: Dict[str, Dict[str, float | int]] = {
-    "danger": {
-        "decay": 0.30,
-        "cap": 15,
-        "min_source": 40,
-    },
-    "traffic": {
-        "decay": 0.20,
-        "cap": 10,
-        "min_source": 35,
-    },
-    "mood_from_ruin": {
-        "source_threshold": 20,
-        "neighbor_penalty": 5,
-        "max_neighbors": 4,
-    },
-    "road_damage_from_danger": {
-        "danger_threshold": 70,
-        "road_penalty": 8,
-    },
-}
-
-
-def _validate_propagation_rules(rules: Mapping[str, Mapping[str, float | int]]) -> None:
-    """Validate propagation rule schema (DbC fail-fast for configuration errors)."""
-    required = {
-        "danger": ("decay", "cap", "min_source"),
-        "traffic": ("decay", "cap", "min_source"),
-        "mood_from_ruin": ("source_threshold", "neighbor_penalty", "max_neighbors"),
-        "road_damage_from_danger": ("danger_threshold", "road_penalty"),
-    }
-    expected_int = {
-        "danger": ("cap", "min_source"),
-        "traffic": ("cap", "min_source"),
-        "mood_from_ruin": ("source_threshold", "neighbor_penalty", "max_neighbors"),
-        "road_damage_from_danger": ("danger_threshold", "road_penalty"),
-    }
-    expected_numeric = {
-        "danger": ("decay",),
-        "traffic": ("decay",),
-    }
-
-    for section, keys in required.items():
-        if section not in rules:
-            raise ValueError(f"PROPAGATION_RULES missing section: {section}")
-        values = rules[section]
-        for key in keys:
-            if key not in values:
-                raise ValueError(f"PROPAGATION_RULES[{section!r}] missing key: {key}")
-        for key in expected_int.get(section, ()):
-            value = values[key]
-            if not isinstance(value, int) or isinstance(value, bool):
-                raise ValueError(f"PROPAGATION_RULES[{section!r}][{key!r}] must be int, got {type(value)!r}")
-        for key in expected_numeric.get(section, ()):
-            value = values[key]
-            if not isinstance(value, (int, float)) or isinstance(value, bool):
-                raise ValueError(f"PROPAGATION_RULES[{section!r}][{key!r}] must be numeric, got {type(value)!r}")
-
-
-_validate_propagation_rules(PROPAGATION_RULES)
 
 
 def decay_toward_baseline(
@@ -117,9 +61,11 @@ def propagate_state_changes(
     months: int,
     months_per_year: int,
     clamp_state: Callable[[int], int],
+    propagation_rules: Optional[Mapping[str, Mapping[str, float | int]]] = None,
 ) -> None:
     """Propagate danger/traffic/mood/road-condition across neighboring locations."""
-    _validate_propagation_rules(PROPAGATION_RULES)
+    rules = DEFAULT_PROPAGATION_RULES if propagation_rules is None else propagation_rules
+    validate_propagation_rules(rules)
     period_months = max(1, months)
     period_fraction = period_months / months_per_year
 
@@ -136,27 +82,27 @@ def propagate_state_changes(
         if not neighbors:
             continue
 
-        rule = PROPAGATION_RULES["danger"]
+        rule = rules["danger"]
         if loc.danger >= rule["min_source"]:
             spread = _scaled(min(int(loc.danger * rule["decay"]), rule["cap"]))
             for neighbor in neighbors:
                 if neighbor.danger < loc.danger:
                     pending_changes.append((neighbor.id, "danger", min(spread, loc.danger - neighbor.danger)))
 
-        rule = PROPAGATION_RULES["traffic"]
+        rule = rules["traffic"]
         if loc.traffic >= rule["min_source"]:
             spread = _scaled(min(int(loc.traffic * rule["decay"]), rule["cap"]))
             for neighbor in neighbors:
                 if neighbor.traffic < loc.traffic:
                     pending_changes.append((neighbor.id, "traffic", min(spread, loc.traffic - neighbor.traffic)))
 
-        rule = PROPAGATION_RULES["mood_from_ruin"]
+        rule = rules["mood_from_ruin"]
         if loc.prosperity < rule["source_threshold"]:
             penalty = _scaled(-rule["neighbor_penalty"])
             for neighbor in neighbors[:rule["max_neighbors"]]:
                 pending_changes.append((neighbor.id, "mood", penalty))
 
-        rule = PROPAGATION_RULES["road_damage_from_danger"]
+        rule = rules["road_damage_from_danger"]
         if loc.danger >= rule["danger_threshold"]:
             pending_changes.append((loc.id, "road_condition", _scaled(-rule["road_penalty"])))
 
@@ -166,3 +112,8 @@ def propagate_state_changes(
             continue
         old = getattr(location, attr)
         setattr(location, attr, clamp_state(old + delta))
+
+
+def clone_default_propagation_rules() -> Dict[str, Dict[str, float | int]]:
+    """Compatibility wrapper around the shared rule-table owner."""
+    return _clone_default_propagation_rules()

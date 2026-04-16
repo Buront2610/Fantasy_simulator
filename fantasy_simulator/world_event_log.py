@@ -45,16 +45,14 @@ def project_compatibility_event_log(
     """Project compatibility log lines from canonical records."""
     recent = list(records)[-max_event_log:]
     return [
-        (
-            record.legacy_event_log_entry
-            if record.legacy_event_log_entry is not None
-            else format_event_log_entry(
-                record.description,
-                translate=translate,
-                year=record.year,
-                month=record.month,
-                day=record.day,
-            )
+        record.legacy_event_log_entry
+        if record.legacy_event_log_entry is not None
+        else format_event_log_entry(
+            record.description,
+            translate=translate,
+            year=record.year,
+            month=record.month,
+            day=record.day,
         )
         for record in recent
     ]

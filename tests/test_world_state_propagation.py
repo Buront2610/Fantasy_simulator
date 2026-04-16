@@ -150,7 +150,7 @@ def test_mood_from_ruin_is_capped_by_max_neighbors() -> None:
     assert changed == ["n0", "n1", "n2", "n3"]
 
 
-def test_propagation_rules_fail_fast_on_invalid_delta_type(monkeypatch) -> None:
+def test_propagation_rules_fail_fast_on_invalid_delta_type() -> None:
     src = _FakeLoc(id="src", danger=40)
     n1 = _FakeLoc(id="n1", danger=10)
     index = {"src": src, "n1": n1}
@@ -160,7 +160,8 @@ def test_propagation_rules_fail_fast_on_invalid_delta_type(monkeypatch) -> None:
 
     from fantasy_simulator import world_state_propagation as wsp
 
-    monkeypatch.setitem(wsp.PROPAGATION_RULES["danger"], "cap", "15")
+    custom_rules = wsp.clone_default_propagation_rules()
+    custom_rules["danger"]["cap"] = "15"
     try:
         with pytest.raises(ValueError, match="must be int"):
             propagate_state_changes(
@@ -170,6 +171,7 @@ def test_propagation_rules_fail_fast_on_invalid_delta_type(monkeypatch) -> None:
                 months=12,
                 months_per_year=12,
                 clamp_state=_clamp,
+                propagation_rules=custom_rules,
             )
     finally:
-        monkeypatch.setitem(wsp.PROPAGATION_RULES["danger"], "cap", 15)
+        custom_rules["danger"]["cap"] = 15

@@ -9,6 +9,11 @@ from __future__ import annotations
 from typing import Callable, Dict, List, Mapping, MutableMapping, Optional, Protocol
 
 from .event_models import WorldEventRecord
+from .rule_override_resolution import (
+    DEFAULT_EVENT_IMPACT_RULES,
+    clone_default_event_impact_rules as _clone_default_event_impact_rules,
+    validate_event_impact_rules,
+)
 
 
 class SupportsEventIndex(Protocol):
@@ -23,56 +28,13 @@ class SupportsEventIndex(Protocol):
     recent_event_ids: List[str]
 
 
-# Event kind -> location state impact (design doc §5.5)
-
-_VALID_IMPACT_ATTRIBUTES = {
-    "prosperity",
-    "safety",
-    "mood",
-    "danger",
-    "traffic",
-    "rumor_heat",
-    "road_condition",
-}
-
-EVENT_IMPACT_RULES: Dict[str, Dict[str, int]] = {
-    "death": {"safety": -3, "mood": -5, "rumor_heat": +10},
-    "battle_fatal": {"safety": -5, "mood": -8, "danger": +5, "rumor_heat": +15},
-    "battle": {"safety": -2, "mood": -3, "danger": +3, "rumor_heat": +5},
-    "discovery": {"rumor_heat": +5, "traffic": +3},
-    "marriage": {"mood": +3},
-    "adventure_death": {"danger": +5, "mood": -5, "rumor_heat": +10},
-    "adventure_discovery": {"rumor_heat": +5, "traffic": +2, "prosperity": +2},
-    "adventure_started": {"traffic": +2},
-    "adventure_returned": {"mood": +2, "traffic": +1},
-    "journey": {"traffic": +1},
-    "injury_recovery": {"mood": +1},
-    "condition_worsened": {"mood": -2, "rumor_heat": +3},
-    "dying_rescued": {"mood": +3, "rumor_heat": +5},
-}
-
-
-def _validate_impact_rules(rules: Mapping[str, Mapping[str, int]]) -> None:
-    """Validate impact-rule schema (DbC fail-fast for developer errors)."""
-    for kind, deltas in rules.items():
-        for attr, delta in deltas.items():
-            if attr not in _VALID_IMPACT_ATTRIBUTES:
-                raise ValueError(f"Unsupported impact attribute in EVENT_IMPACT_RULES[{kind!r}]: {attr}")
-            if not isinstance(delta, int) or isinstance(delta, bool):
-                raise ValueError(
-                    f"Unsupported impact delta type in EVENT_IMPACT_RULES[{kind!r}][{attr!r}]: {type(delta)!r}"
-                )
-
-
-_validate_impact_rules(EVENT_IMPACT_RULES)
-
-
 def apply_event_impact_to_location(
     *,
     kind: str,
     location_id: Optional[str],
     location_index: MutableMapping[str, SupportsEventIndex],
     clamp_state: Callable[[int], int],
+    impact_rules: Optional[Mapping[str, Mapping[str, int]]] = None,
 ) -> List[Dict[str, int | str]]:
     """Apply event impact rules to one location and return impact records."""
     impacts: List[Dict[str, int | str]] = []
@@ -83,12 +45,10 @@ def apply_event_impact_to_location(
     if location is None:
         return impacts
 
-    deltas = EVENT_IMPACT_RULES.get(kind, {})
+    rules = DEFAULT_EVENT_IMPACT_RULES if impact_rules is None else impact_rules
+    validate_event_impact_rules(rules)
+    deltas = rules.get(kind, {})
     for attr, delta in deltas.items():
-        if attr not in _VALID_IMPACT_ATTRIBUTES:
-            raise ValueError(f"Unsupported impact attribute in EVENT_IMPACT_RULES: {attr}")
-        if not isinstance(delta, int) or isinstance(delta, bool):
-            raise ValueError(f"Unsupported impact delta type in EVENT_IMPACT_RULES[{kind!r}][{attr!r}]")
         old = getattr(location, attr)
         new_val = clamp_state(old + delta)
         setattr(location, attr, new_val)
@@ -146,3 +106,8 @@ def append_canonical_event_record(
             ]
 
     return stored_record
+
+
+def clone_default_event_impact_rules() -> Dict[str, Dict[str, int]]:
+    """Compatibility wrapper around the shared rule-table owner."""
+    return _clone_default_event_impact_rules()

@@ -10,9 +10,21 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from .event_models import WorldEventRecord
 from .i18n import tr
+from .rule_override_resolution import (
+    clone_default_event_impact_rules,
+    clone_default_propagation_rules,
+    resolve_event_impact_rule_overrides,
+    resolve_propagation_rule_overrides,
+)
 from .world_event_log import format_event_log_entry, project_compatibility_event_log
-from .world_event_state import apply_event_impact_to_location, append_canonical_event_record
-from .world_state_propagation import decay_toward_baseline, propagate_state_changes
+from .world_event_state import (
+    apply_event_impact_to_location,
+    append_canonical_event_record,
+)
+from .world_state_propagation import (
+    decay_toward_baseline,
+    propagate_state_changes,
+)
 from .content.setting_bundle import (
     CalendarDefinition,
     SettingBundle,
@@ -337,6 +349,8 @@ class World:
         # - event_log is an ephemeral CLI-facing compatibility display adapter.
         self.event_log: List[str] = []
         self.event_records: List[WorldEventRecord] = []
+        self.event_impact_rules: Dict[str, Dict[str, int]] = clone_default_event_impact_rules()
+        self.propagation_rules: Dict[str, Dict[str, float | int]] = clone_default_propagation_rules()
         self.rumors: List[Rumor] = []
         self.rumor_archive: List[Rumor] = []
         self.active_adventures: List[AdventureRun] = []
@@ -396,6 +410,12 @@ class World:
                 self.calendar_baseline = _clone_calendar(next_calendar)
                 if hasattr(self, "calendar_history"):
                     self.calendar_history = []
+        self.event_impact_rules = resolve_event_impact_rule_overrides(
+            self._setting_bundle.world_definition.event_impact_rules
+        )
+        self.propagation_rules = resolve_propagation_rule_overrides(
+            self._setting_bundle.world_definition.propagation_rules
+        )
 
     def apply_setting_bundle(self, bundle: SettingBundle) -> None:
         """Apply a bundle while keeping derived world structures consistent."""
@@ -1243,6 +1263,7 @@ class World:
             location_id=location_id,
             location_index=self._location_id_index,
             clamp_state=_clamp_state,
+            impact_rules=self.event_impact_rules,
         )
 
     # Annual decay rate: each year, event-driven deviations from baseline
@@ -1274,6 +1295,7 @@ class World:
             months=period_months,
             months_per_year=self.months_per_year,
             clamp_state=_clamp_state,
+            propagation_rules=self.propagation_rules,
         )
 
     def get_events_by_location(self, location_id: str) -> List[WorldEventRecord]:

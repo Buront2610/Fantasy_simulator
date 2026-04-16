@@ -11,6 +11,7 @@ from fantasy_simulator.content.setting_bundle import (
     SiteSeedDefinition,
     WorldDefinition,
 )
+from fantasy_simulator.event_models import EventResult
 from fantasy_simulator.persistence.migrations import CURRENT_VERSION
 from fantasy_simulator.persistence.save_load import load_simulation, save_simulation
 from fantasy_simulator.simulator import Simulator
@@ -27,6 +28,19 @@ def _make_world(n_chars: int = 3) -> World:
         char = creator.create_random(rng=rng)
         world.add_character(char, rng=rng)
     return world
+
+
+def _bundle_with_rule_overrides() -> SettingBundle:
+    return SettingBundle(
+        schema_version=1,
+        world_definition=WorldDefinition(
+            world_key="custom",
+            display_name="Custom Realm",
+            lore_text="Custom lore",
+            event_impact_rules={"meeting": {"mood": 7}},
+            propagation_rules={"road_damage_from_danger": {"danger_threshold": 101, "road_penalty": 0}},
+        ),
+    )
 
 
 class TestSaveSimulation:
@@ -449,6 +463,7 @@ class TestLoadSimulation:
         assert restored is not None
         assert len(restored.world.event_records) == 1
         assert restored.world.event_records[0].legacy_event_log_entry == payload["world"]["event_log"][0]
+        assert restored.world.event_records[0].description == payload["world"]["event_log"][0]
         restored.world.record_event(
             WorldEventRecord(
                 record_id="rec_new",
@@ -474,7 +489,7 @@ class TestLoadSimulation:
                 {
                     "description": "A legacy battle occurred.",
                     "affected_characters": ["char_1"],
-                    "stat_changes": {},
+                    "stat_changes": {"char_1": {"strength": -2}},
                     "event_type": "battle",
                     "year": 1000,
                     "metadata": {"source": "legacy"},
@@ -490,9 +505,9 @@ class TestLoadSimulation:
         assert restored is not None
         assert len(restored.world.event_records) == 1
         assert restored.world.event_records[0].kind == "battle"
-        assert restored.world.event_records[0].legacy_event_result is not None
         assert len(restored.history) == 1
         assert restored.history[0].event_type == "battle"
+        assert restored.history[0].stat_changes == {"char_1": {"strength": -2}}
         assert restored.history[0].metadata == {"source": "legacy"}
 
     def test_migration_lifts_mixed_legacy_history_and_event_log_into_canonical_event_records(self, tmp_path):
@@ -506,7 +521,7 @@ class TestLoadSimulation:
                 {
                     "description": "A legacy battle occurred.",
                     "affected_characters": ["char_1"],
-                    "stat_changes": {},
+                    "stat_changes": {"char_1": {"strength": -2}},
                     "event_type": "battle",
                     "year": 1000,
                     "metadata": {"source": "legacy"},
@@ -524,4 +539,52 @@ class TestLoadSimulation:
         assert {record.kind for record in restored.world.event_records} == {"battle", "legacy_event_log"}
         assert len(restored.history) == 2
         assert {event.event_type for event in restored.history} == {"battle", "legacy_event_log"}
+        battle_event = next(event for event in restored.history if event.event_type == "battle")
+        legacy_log_event = next(event for event in restored.history if event.event_type == "legacy_event_log")
+        assert battle_event.stat_changes == {"char_1": {"strength": -2}}
+        assert battle_event.metadata == {"source": "legacy"}
+        assert legacy_log_event.metadata == {"legacy_event_log_entry": True}
         assert payload["world"]["event_log"][0] in restored.world.get_compatibility_event_log()
+
+    def test_save_load_preserves_non_default_bundle_rule_overrides(self, tmp_path):
+        path = tmp_path / "custom-rules.json"
+        sim = Simulator(World(name="Custom"), seed=0)
+        sim.world.setting_bundle = _bundle_with_rule_overrides()
+
+        assert save_simulation(sim, str(path)) is True
+
+        restored = load_simulation(str(path))
+
+        assert restored is not None
+        assert restored.world.setting_bundle.world_definition.event_impact_rules == {"meeting": {"mood": 7}}
+        assert restored.world.setting_bundle.world_definition.propagation_rules == {
+            "road_damage_from_danger": {"danger_threshold": 101, "road_penalty": 0}
+        }
+        assert restored.world.event_impact_rules["meeting"]["mood"] == 7
+        assert restored.world.event_impact_rules["battle"]["danger"] == 3
+        assert restored.world.propagation_rules["road_damage_from_danger"]["danger_threshold"] == 101
+        assert restored.world.propagation_rules["danger"]["cap"] == 15
+
+    def test_save_load_round_trip_preserves_history_metadata_for_event_result_records(self, tmp_path):
+        path = tmp_path / "legacy-history-roundtrip.json"
+        sim = Simulator(_make_world(), seed=42)
+        sim._record_event(  # noqa: SLF001 - compatibility regression test seam
+            EventResult(
+                description="A modern event-result path still carries legacy metadata.",
+                affected_characters=["char_1", "char_2"],
+                stat_changes={"char_1": {"wisdom": 2}},
+                event_type="discovery",
+                year=sim.world.year,
+                metadata={"source": "runtime", "chain": {"step": 1}},
+            ),
+            location_id="loc_thornwood",
+        )
+        save_simulation(sim, str(path))
+
+        restored = load_simulation(str(path))
+
+        assert restored is not None
+        assert len(restored.history) == 1
+        assert restored.history[0].affected_characters == ["char_1", "char_2"]
+        assert restored.history[0].stat_changes == {"char_1": {"wisdom": 2}}
+        assert restored.history[0].metadata == {"source": "runtime", "chain": {"step": 1}}

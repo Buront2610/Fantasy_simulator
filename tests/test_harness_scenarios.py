@@ -2,45 +2,20 @@
 
 from __future__ import annotations
 
-import random
 from collections import Counter
 from typing import Any
 
 import pytest
 
-from fantasy_simulator.character_creator import CharacterCreator
 from fantasy_simulator.i18n import get_locale, set_locale
 from fantasy_simulator.persistence.save_load import load_simulation, save_simulation
 from fantasy_simulator.reports import generate_monthly_report, generate_yearly_report
 from fantasy_simulator.simulator import Simulator
-from fantasy_simulator.ui.map_renderer import build_map_info, render_location_detail
-from fantasy_simulator.world import World
-
-
-def _build_seeded_world(seed: int, n_chars: int = 6) -> World:
-    rng = random.Random(seed)
-    world = World()
-    creator = CharacterCreator()
-    location_ids = [loc.id for loc in world.grid.values() if loc.region_type != "dungeon"]
-    for _ in range(n_chars):
-        char = creator.create_random(rng=rng)
-        char.location_id = rng.choice(location_ids)
-        world.add_character(char)
-    return world
-
-
-def _content_lines(text: str) -> list[str]:
-    content: list[str] = []
-    for line in text.splitlines():
-        stripped = line.strip()
-        if not stripped:
-            continue
-        if set(stripped) <= {"="}:
-            continue
-        if stripped.startswith("+") and set(stripped) <= {"+", "-"}:
-            continue
-        content.append(line)
-    return content
+from fantasy_simulator.ui.map_renderer import (
+    build_map_info,
+    render_location_detail,
+)
+from tests.harness_test_utils import build_seeded_world, content_lines
 
 
 def _extract_section(text: str, header: str) -> list[str]:
@@ -61,7 +36,7 @@ def _extract_section(text: str, header: str) -> list[str]:
 
 def _capture_bundle(locale: str) -> dict[str, object]:
     set_locale(locale)
-    world = _build_seeded_world(7)
+    world = build_seeded_world(7)
     sim = Simulator(world, events_per_year=4, adventure_steps_per_year=2, seed=99)
     sim.advance_months(24)
     info = build_map_info(world)
@@ -92,14 +67,14 @@ def _capture_bundle(locale: str) -> dict[str, object]:
         "event_log_count": len(sim.world.event_log),
         "history_count": len(sim.history),
         "kind_counts": dict(sorted(Counter(r.kind for r in sim.world.event_records).items())),
-        "summary_lines": _content_lines(sim.get_summary()),
+        "summary_lines": content_lines(sim.get_summary()),
         "yearly_overview": _extract_section(yearly_report, yearly_overview_header),
         "yearly_notable": _extract_section(yearly_report, yearly_notable_header),
         "yearly_regions": _extract_section(yearly_report, yearly_region_header),
         "monthly_notable": _extract_section(monthly_report, monthly_notable_header),
         "monthly_world": _extract_section(monthly_report, monthly_world_header),
         "monthly_rumors": _extract_section(monthly_report, monthly_rumors_header),
-        "detail_lines": _content_lines(detail),
+        "detail_lines": content_lines(detail),
     }
 
 
@@ -275,7 +250,7 @@ def _projection_contract_for_sim(sim: Simulator) -> dict[str, Any]:
 def _capture_projection_contract(locale: str) -> dict[str, Any]:
     """Capture the seeded, locale-stable projection contract for report/detail selection."""
     set_locale(locale)
-    world = _build_seeded_world(7)
+    world = build_seeded_world(7)
     sim = Simulator(world, events_per_year=4, adventure_steps_per_year=2, seed=99)
     sim.advance_months(60)
     return _projection_contract_for_sim(sim)
@@ -535,7 +510,7 @@ def test_seeded_projection_contract_is_locale_stable() -> None:
 
 def test_midyear_save_load_preserves_projection_contract(tmp_path) -> None:
     set_locale("en")
-    sim = Simulator(_build_seeded_world(7), events_per_year=4, adventure_steps_per_year=2, seed=99)
+    sim = Simulator(build_seeded_world(7), events_per_year=4, adventure_steps_per_year=2, seed=99)
     sim.advance_months(30)
     save_path = tmp_path / "midyear-seeded.json"
     remaining_months = 18

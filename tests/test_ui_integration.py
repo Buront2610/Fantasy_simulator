@@ -13,106 +13,16 @@ import os
 import re
 import unittest
 from contextlib import redirect_stdout
-from typing import List, Optional, Tuple
 from unittest.mock import patch
 
 from fantasy_simulator.character import Character
 from fantasy_simulator.i18n import set_locale
-from fantasy_simulator.world import World
 from fantasy_simulator.ui.ui_context import UIContext
+from fantasy_simulator.world import World
+from tests.ui_test_doubles import RecordingRenderBackend, ScriptedInputBackend
 
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
-
-
-# ---------------------------------------------------------------------------
-# Recording backends — capture every call for assertions
-# ---------------------------------------------------------------------------
-
-class RecordingRenderBackend:
-    """Captures all output calls as structured records."""
-
-    def __init__(self) -> None:
-        self.calls: List[Tuple[str, ...]] = []
-
-    def print_line(self, text: str = "") -> None:
-        self.calls.append(("print_line", text))
-
-    def print_heading(self, text: str) -> None:
-        self.calls.append(("print_heading", text))
-
-    def print_separator(self, char: str = "=", width: int = 62) -> None:
-        self.calls.append(("print_separator", char, str(width)))
-
-    def print_error(self, text: str) -> None:
-        self.calls.append(("print_error", text))
-
-    def print_success(self, text: str) -> None:
-        self.calls.append(("print_success", text))
-
-    def print_warning(self, text: str) -> None:
-        self.calls.append(("print_warning", text))
-
-    def print_wrapped(self, text: str, indent: int = 4) -> None:
-        self.calls.append(("print_wrapped", text))
-
-    def print_dim(self, text: str) -> None:
-        self.calls.append(("print_dim", text))
-
-    def print_highlighted(self, text: str) -> None:
-        self.calls.append(("print_highlighted", text))
-
-    def format_status(self, text: str, positive: bool) -> str:
-        # Return plain text — no ANSI in tests
-        return text
-
-    def print_menu(self, prompt: str, key_label_pairs, default=None) -> None:
-        self.calls.append(("print_menu", prompt, len(key_label_pairs)))
-
-    def print_panel(self, title: str, text: str) -> None:
-        self.calls.append(("print_panel", title, text))
-
-    def get_terminal_width(self) -> int:
-        import shutil
-
-        return shutil.get_terminal_size(fallback=(80, 24)).columns
-
-    @property
-    def text(self) -> str:
-        """Concatenate all printed text for simple substring checks."""
-        return "\n".join(str(t) for (_, *rest) in self.calls for t in rest)
-
-
-class ScriptedInputBackend:
-    """Returns pre-scripted answers to read_line / choose_key / pause."""
-
-    def __init__(self, answers: List[str] | None = None,
-                 menu_keys: List[str] | None = None) -> None:
-        self._answers = list(answers or [])
-        self._menu_keys = list(menu_keys or [])
-        self._answer_idx = 0
-        self._menu_idx = 0
-
-    def read_line(self, prompt: str = "") -> str:
-        if self._answer_idx < len(self._answers):
-            val = self._answers[self._answer_idx]
-            self._answer_idx += 1
-            return val
-        return ""
-
-    def read_menu_key(
-        self,
-        key_label_pairs: List[Tuple[str, str]],
-        default: Optional[str] = None,
-    ) -> str:
-        if self._menu_idx < len(self._menu_keys):
-            val = self._menu_keys[self._menu_idx]
-            self._menu_idx += 1
-            return val
-        return key_label_pairs[-1][0]  # fallback: last option (usually "back")
-
-    def pause(self, message: str = "") -> None:
-        pass
 
 
 # ---------------------------------------------------------------------------
