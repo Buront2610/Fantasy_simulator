@@ -62,7 +62,11 @@
 
 ### Remaining
 
-- なし（TD-3 の責務分離・境界整理は完了）。
+- 責務分離は完了したが、canonical domain model の純化は未完。
+  `WorldEventRecord.legacy_event_result` / `legacy_event_log_entry` は
+  移行期 ACL として残置されている。
+- `EVENT_IMPACT_RULES` / `PROPAGATION_RULES` は static module global のままで、
+  setting bundle / era / faction 差分を差し込む rules source abstraction は未着手。
 
 ## TD-4 Guardrails / Harness / Docs
 

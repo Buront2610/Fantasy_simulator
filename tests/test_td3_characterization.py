@@ -146,6 +146,26 @@ def test_world_log_event_is_ephemeral_display_adapter_not_canonical_history() ->
     assert restored.get_compatibility_event_log() == []
 
 
+def test_world_log_event_line_is_hidden_when_canonical_projection_exists() -> None:
+    world = World()
+    world.log_event("display-only line")
+    world.record_event(
+        WorldEventRecord(
+            record_id="r1",
+            kind="battle",
+            year=1000,
+            month=1,
+            day=1,
+            location_id="loc_thornwood",
+            description="canonical line",
+        )
+    )
+
+    projected = world.get_compatibility_event_log()
+    assert any("canonical line" in line for line in projected)
+    assert all("display-only line" not in line for line in projected)
+
+
 def test_public_wrappers_propagate_and_save_load_keep_map_and_report_contract() -> None:
     world = World()
     src = world.get_location_by_id("loc_thornwood")
@@ -177,3 +197,26 @@ def test_public_wrappers_propagate_and_save_load_keep_map_and_report_contract() 
     assert restored.world.render_map() == map_before
     assert restored.world.atlas_layout.to_dict() == atlas_before
     assert restored.get_monthly_report(restored.world.year, 1) == monthly_before
+
+
+def test_event_recorder_computes_impacts_before_canonical_append(monkeypatch) -> None:
+    world = World()
+    sim = Simulator(world, seed=42)
+    captured_impacts: list[list[dict[str, int | str]]] = []
+    original_record_event = world.record_event
+
+    def _spy(record: WorldEventRecord) -> WorldEventRecord:
+        captured_impacts.append(list(record.impacts))
+        return original_record_event(record)
+
+    monkeypatch.setattr(world, "record_event", _spy)
+
+    sim._record_world_event(  # noqa: SLF001 - characterization seam
+        "impact-check",
+        kind="battle",
+        location_id="loc_thornwood",
+        month=1,
+    )
+
+    assert captured_impacts
+    assert captured_impacts[0]

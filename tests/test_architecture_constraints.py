@@ -287,3 +287,25 @@ def test_world_module_imports_event_models_not_events_facade_for_contract_types(
             saw_event_models_import = True
 
     assert saw_event_models_import, "world.py must import WorldEventRecord from event_models"
+
+
+def test_reports_module_imports_world_event_record_from_event_models() -> None:
+    path = PACKAGE_ROOT / "reports.py"
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    imported_from_events = False
+    imported_from_event_models = False
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ImportFrom):
+            continue
+        module_name = ".".join(_resolve_import(_module_name(path), node)[0].split(".")[:-1]) if node.names else ""
+        imported_names = {alias.name for alias in node.names}
+        if "WorldEventRecord" not in imported_names:
+            continue
+        if module_name == "fantasy_simulator.events":
+            imported_from_events = True
+        if module_name == "fantasy_simulator.event_models":
+            imported_from_event_models = True
+
+    assert not imported_from_events, "reports.py should not import WorldEventRecord from events facade"
+    assert imported_from_event_models, "reports.py should import WorldEventRecord from event_models"

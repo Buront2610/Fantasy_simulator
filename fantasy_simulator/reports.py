@@ -19,7 +19,7 @@ from .narrative.constants import EVENT_KINDS_FATAL
 from .rumor import RUMOR_MAX_AGE_MONTHS
 
 if TYPE_CHECKING:
-    from .events import WorldEventRecord
+    from .event_models import WorldEventRecord
     from .world import World
 
 
