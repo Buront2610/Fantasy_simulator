@@ -35,7 +35,7 @@ form that tests can enforce.
 - `World.event_log` is a compatibility display buffer derived from canonical
   events.
 - `Simulator.history` is a legacy `EventResult` adapter projected from
-  canonical records for compatibility and save/load continuity.
+  canonical records for compatibility.
 - `World.get_compatibility_event_log()` and `QueryMixin.events_by_type()` are
   the explicit adapter paths for legacy reads.
 
@@ -53,16 +53,17 @@ form that tests can enforce.
   compatibility consumers while canonical reads migrate to `event_records`.
 - `QueryMixin.events_by_type()`: legacy adapter returning `EventResult`
   projections for callers not yet migrated to `events_by_kind()`.
-- `Simulator.history`: persisted compatibility projection retained for save/load
-  continuity and staged migration away from legacy `EventResult` pathways.
+- `Simulator.history`: runtime compatibility projection retained for staged
+  migration away from legacy `EventResult` pathways.
+- `World.event_log`: runtime compatibility display projection/cache rebuilt from
+  canonical records; load paths still accept older snapshots that stored it.
 
 ## Sunset Conditions
 
-- `event_log` persistence may be removed only after save/load compatibility no
-  longer depends on a stored display buffer and observer-facing projections are
-  verified against `event_records`.
-- `history` persistence may be removed only after legacy `EventResult` consumers
-  are retired or migrated behind canonical adapters.
+- Keep backward-load compatibility for older snapshots that still contain
+  `history`/`event_log`.
+- New snapshots must persist canonical `event_records` as the event source of
+  truth.
 
 ## Deterministic Harness Expectations
 

@@ -1185,8 +1185,9 @@ class World:
         This buffer is intentionally separate from ``event_records`` as a
         compatibility adapter. New gameplay/report features should treat
         ``event_records`` as the canonical history and view this method as a
-        presentation-layer projection path. The adapter can sunset once save/load
-        compatibility no longer needs a persisted legacy display buffer.
+        presentation-layer projection path. Save/load keeps backward-load
+        compatibility for older snapshots that still stored this buffer, but
+        new snapshots persist canonical ``event_records`` only.
 
         When *month*/*day* are provided, the prefix includes intra-year date
         information so that the player-visible log reflects finer causality.

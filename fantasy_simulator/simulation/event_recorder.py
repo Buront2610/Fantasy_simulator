@@ -4,7 +4,9 @@
 All new read-paths should consume ``world.event_records`` exclusively.
 
 ``world.event_log`` and ``simulator.history`` survive only as compatibility
-adapters projected from canonical records for save/load and legacy query paths.
+adapters projected from canonical records for legacy query paths. Save/load
+keeps backward compatibility for older snapshots, but new snapshots persist
+canonical records only.
 """
 
 from __future__ import annotations

@@ -53,6 +53,20 @@ def test_architecture_doc_records_canonical_event_store_rules() -> None:
     assert "Simulator.history" in ARCHITECTURE_TEXT
     assert "Sunset Conditions" in ARCHITECTURE_TEXT
     assert "World.get_compatibility_event_log()" in ARCHITECTURE_TEXT
+    assert "runtime compatibility projection" in ARCHITECTURE_TEXT
+    assert "backward-load compatibility" in ARCHITECTURE_TEXT
+    assert "persisted compatibility projection" not in ARCHITECTURE_TEXT
+    assert "persisted save snapshots" not in ARCHITECTURE_TEXT
+
+
+def test_architecture_doc_rejects_legacy_persistence_wording_for_adapters() -> None:
+    forbidden = (
+        "history persistence may be removed",
+        "event_log persistence may be removed",
+        "persisted compatibility projection",
+    )
+    for phrase in forbidden:
+        assert phrase not in ARCHITECTURE_TEXT, f"Remove stale architecture wording: {phrase}"
 
 
 def test_td_backlog_status_tracks_invariants_and_remaining_major_split() -> None:
