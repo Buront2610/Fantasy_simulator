@@ -130,3 +130,50 @@ def test_save_payload_uses_canonical_event_records_without_legacy_duplication() 
 
     restored = Simulator.from_dict(payload)
     assert any("Canonical only" in line for line in restored.get_event_log())
+
+
+def test_world_log_event_is_ephemeral_display_adapter_not_canonical_history() -> None:
+    world = World()
+    world.log_event("display-only line")
+    assert any("display-only line" in line for line in world.event_log)
+    assert world.event_records == []
+
+    payload = world.to_dict()
+    assert "event_log" not in payload
+
+    restored = World.from_dict(payload)
+    assert restored.event_records == []
+    assert restored.get_compatibility_event_log() == []
+
+
+def test_public_wrappers_propagate_and_save_load_keep_map_and_report_contract() -> None:
+    world = World()
+    src = world.get_location_by_id("loc_thornwood")
+    neighbors = world.get_neighboring_locations(src.id)
+    assert neighbors
+
+    src.danger = 90
+    src.traffic = 90
+    for neighbor in neighbors:
+        neighbor.danger = 10
+        neighbor.traffic = 10
+
+    world.propagate_state(months=12)
+    assert any(neighbor.danger > 10 for neighbor in neighbors)
+    assert any(neighbor.traffic > 10 for neighbor in neighbors)
+
+    sim = Simulator(world, seed=42)
+    sim._record_world_event(  # noqa: SLF001 - characterization seam
+        "Wrapper contract event",
+        kind="discovery",
+        location_id="loc_thornwood",
+        month=1,
+    )
+    map_before = world.render_map()
+    atlas_before = world.atlas_layout.to_dict()
+    monthly_before = sim.get_monthly_report(world.year, 1)
+
+    restored = Simulator.from_dict(sim.to_dict())
+    assert restored.world.render_map() == map_before
+    assert restored.world.atlas_layout.to_dict() == atlas_before
+    assert restored.get_monthly_report(restored.world.year, 1) == monthly_before

@@ -266,3 +266,24 @@ def test_simulation_modules_import_event_models_for_event_contract_types() -> No
                 assert forbidden_names.isdisjoint(imported_names), (
                     f"{path} must import event contract types from event_models, not events facade"
                 )
+
+
+def test_world_module_imports_event_models_not_events_facade_for_contract_types() -> None:
+    path = PACKAGE_ROOT / "world.py"
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    forbidden_names = {"WorldEventRecord", "EventResult", "generate_record_id"}
+    saw_event_models_import = False
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ImportFrom):
+            continue
+        module_name = ".".join(_resolve_import(_module_name(path), node)[0].split(".")[:-1]) if node.names else ""
+        imported_names = {alias.name for alias in node.names}
+        if module_name == "fantasy_simulator.events":
+            assert forbidden_names.isdisjoint(imported_names), (
+                "world.py must import event contract types from event_models, not events facade"
+            )
+        if module_name == "fantasy_simulator.event_models" and "WorldEventRecord" in imported_names:
+            saw_event_models_import = True
+
+    assert saw_event_models_import, "world.py must import WorldEventRecord from event_models"

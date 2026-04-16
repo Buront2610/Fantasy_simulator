@@ -8,6 +8,7 @@ import random
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
+from .event_models import WorldEventRecord
 from .i18n import tr
 from .world_event_log import format_event_log_entry, project_compatibility_event_log
 from .world_event_state import apply_event_impact_to_location, append_canonical_event_record
@@ -37,7 +38,6 @@ from .terrain import (
 if TYPE_CHECKING:
     from .adventure import AdventureRun
     from .character import Character
-    from .events import WorldEventRecord
     from .rumor import Rumor
 
 
@@ -332,10 +332,9 @@ class World:
         self._adventure_index: Dict[str, AdventureRun] = {}
         self._location_name_index: Dict[str, LocationState] = {}
         self._location_id_index: Dict[str, LocationState] = {}
-        # Transitional event storage during the event-store sunset:
+        # Event storage contract:
         # - event_records is the canonical structured history for all new reads.
-        # - event_log is a CLI-facing display adapter retained for compatibility
-        #   until save/load no longer needs the legacy buffer.
+        # - event_log is an ephemeral CLI-facing compatibility display adapter.
         self.event_log: List[str] = []
         self.event_records: List[WorldEventRecord] = []
         self.rumors: List[Rumor] = []
@@ -1180,14 +1179,13 @@ class World:
         month: Optional[int] = None,
         day: Optional[int] = None,
     ) -> None:
-        """Append a formatted compatibility log entry for legacy CLI consumers.
+        """Append a formatted compatibility display line for legacy CLI consumers.
 
-        This buffer is intentionally separate from ``event_records`` as a
-        compatibility adapter. New gameplay/report features should treat
-        ``event_records`` as the canonical history and view this method as a
-        presentation-layer projection path. Save/load keeps backward-load
-        compatibility for older snapshots that still stored this buffer, but
-        new snapshots persist canonical ``event_records`` only.
+        Contract (important):
+        - This is a display-only runtime adapter and does **not** create
+          canonical ``event_records`` entries.
+        - New saves persist canonical ``event_records`` only.
+        - Therefore, callers must use ``record_event()`` for durable history.
 
         When *month*/*day* are provided, the prefix includes intra-year date
         information so that the player-visible log reflects finer causality.
@@ -1381,7 +1379,6 @@ class World:
         are derived from the loaded grid via ``_build_terrain_from_grid()``.
         """
         from .adventure import AdventureRun
-        from .events import WorldEventRecord
         from .rumor import Rumor
 
         world = cls(
