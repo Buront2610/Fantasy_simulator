@@ -161,7 +161,9 @@ class CharacterCreator:
             for job in jobs
         ]
 
-    def _require_race_and_job_entries(self) -> tuple[List[tuple[str, str, Dict[str, int]]], List[tuple[str, str, List[str]]]]:
+    def _require_race_and_job_entries(
+        self,
+    ) -> tuple[List[tuple[str, str, Dict[str, int]]], List[tuple[str, str, List[str]]]]:
         race_entries = self.race_entries
         job_entries = self.job_entries
         if not race_entries:

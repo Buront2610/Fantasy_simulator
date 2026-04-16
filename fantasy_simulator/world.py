@@ -8,7 +8,11 @@ import random
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
+from .event_models import WorldEventRecord
 from .i18n import tr
+from .world_event_log import format_event_log_entry, project_compatibility_event_log
+from .world_event_state import apply_event_impact_to_location, append_canonical_event_record
+from .world_state_propagation import decay_toward_baseline, propagate_state_changes
 from .content.setting_bundle import (
     CalendarDefinition,
     SettingBundle,
@@ -34,7 +38,6 @@ from .terrain import (
 if TYPE_CHECKING:
     from .adventure import AdventureRun
     from .character import Character
-    from .events import WorldEventRecord
     from .rumor import Rumor
 
 
@@ -116,50 +119,6 @@ class CalendarChangeRecord:
             day=max(1, int(data.get("day", 1))),
             calendar=CalendarDefinition.from_dict(data.get("calendar", {})),
         )
-
-
-# ------------------------------------------------------------------
-# Propagation rules (design doc §5.6)
-# ------------------------------------------------------------------
-
-PROPAGATION_RULES: Dict[str, Dict[str, Any]] = {
-    "danger": {
-        "decay": 0.30,
-        "cap": 15,
-        "min_source": 40,
-    },
-    "traffic": {
-        "decay": 0.20,
-        "cap": 10,
-        "min_source": 35,
-    },
-    "mood_from_ruin": {
-        "source_threshold": 20,
-        "neighbor_penalty": 5,
-        "max_neighbors": 4,
-    },
-    "road_damage_from_danger": {
-        "danger_threshold": 70,
-        "road_penalty": 8,
-    },
-}
-
-# Event kind -> location state impact (design doc §5.5)
-_EVENT_IMPACT: Dict[str, Dict[str, int]] = {
-    "death":              {"safety": -3, "mood": -5, "rumor_heat": +10},
-    "battle_fatal":       {"safety": -5, "mood": -8, "danger": +5, "rumor_heat": +15},
-    "battle":             {"safety": -2, "mood": -3, "danger": +3, "rumor_heat": +5},
-    "discovery":          {"rumor_heat": +5, "traffic": +3},
-    "marriage":           {"mood": +3},
-    "adventure_death":    {"danger": +5, "mood": -5, "rumor_heat": +10},
-    "adventure_discovery": {"rumor_heat": +5, "traffic": +2, "prosperity": +2},
-    "adventure_started":  {"traffic": +2},
-    "adventure_returned": {"mood": +2, "traffic": +1},
-    "journey":            {"traffic": +1},
-    "injury_recovery":    {"mood": +1},
-    "condition_worsened": {"mood": -2, "rumor_heat": +3},
-    "dying_rescued":      {"mood": +3, "rumor_heat": +5},
-}
 
 
 PROSPERITY_LABELS = [
@@ -373,10 +332,9 @@ class World:
         self._adventure_index: Dict[str, AdventureRun] = {}
         self._location_name_index: Dict[str, LocationState] = {}
         self._location_id_index: Dict[str, LocationState] = {}
-        # Transitional event storage during the event-store sunset:
+        # Event storage contract:
         # - event_records is the canonical structured history for all new reads.
-        # - event_log is a CLI-facing display adapter retained for compatibility
-        #   until save/load no longer needs the legacy buffer.
+        # - event_log is an ephemeral CLI-facing compatibility display adapter.
         self.event_log: List[str] = []
         self.event_records: List[WorldEventRecord] = []
         self.rumors: List[Rumor] = []
@@ -1206,13 +1164,13 @@ class World:
     ) -> str:
         """Format a compatibility event-log line from canonical event data."""
         effective_year = self.year if year is None else year
-        if month is not None and day is not None:
-            prefix = tr("event_log_prefix_day", year=effective_year, month=month, day=day)
-        elif month is not None:
-            prefix = tr("event_log_prefix_month", year=effective_year, month=month)
-        else:
-            prefix = tr("event_log_prefix", year=effective_year)
-        return f"{prefix} {event_text}"
+        return format_event_log_entry(
+            event_text,
+            translate=tr,
+            year=effective_year,
+            month=month,
+            day=day,
+        )
 
     def log_event(
         self,
@@ -1221,13 +1179,13 @@ class World:
         month: Optional[int] = None,
         day: Optional[int] = None,
     ) -> None:
-        """Append a formatted compatibility log entry for legacy CLI consumers.
+        """Append a formatted compatibility display line for legacy CLI consumers.
 
-        This buffer is intentionally separate from ``event_records`` as a
-        compatibility adapter. New gameplay/report features should treat
-        ``event_records`` as the canonical history and view this method as a
-        presentation-layer projection path. The adapter can sunset once save/load
-        compatibility no longer needs a persisted legacy display buffer.
+        Contract (important):
+        - This is a display-only runtime adapter and does **not** create
+          canonical ``event_records`` entries.
+        - New saves persist canonical ``event_records`` only.
+        - Therefore, callers must use ``record_event()`` for durable history.
 
         When *month*/*day* are provided, the prefix includes intra-year date
         information so that the player-visible log reflects finer causality.
@@ -1245,19 +1203,11 @@ class World:
 
     def _project_compatibility_event_log(self) -> List[str]:
         """Project the compatibility display buffer from canonical event records."""
-        return [
-            (
-                record.legacy_event_log_entry
-                if record.legacy_event_log_entry is not None
-                else self._format_event_log_entry(
-                    record.description,
-                    year=record.year,
-                    month=record.month,
-                    day=record.day,
-                )
-            )
-            for record in self.event_records[-self.MAX_EVENT_LOG:]
-        ]
+        return project_compatibility_event_log(
+            self.event_records,
+            max_event_log=self.MAX_EVENT_LOG,
+            translate=tr,
+        )
 
     def get_compatibility_event_log(self, last_n: Optional[int] = None) -> List[str]:
         """Return the legacy event-log adapter, projecting from records if needed."""
@@ -1266,25 +1216,20 @@ class World:
             return log[-last_n:]
         return list(log)
 
-    def record_event(self, record: WorldEventRecord) -> None:
-        """Store a structured event record in the canonical world history."""
-        if record.location_id not in self._location_id_index:
-            record.location_id = None
-        self.event_records.append(record)
-        if record.location_id is not None:
-            location = self._location_id_index[record.location_id]
-            location.recent_event_ids.append(record.record_id)
-            location.recent_event_ids = location.recent_event_ids[-12:]
-        if len(self.event_records) > self.MAX_EVENT_RECORDS:
-            self.event_records = self.event_records[-self.MAX_EVENT_RECORDS:]
-            surviving_ids = {item.record_id for item in self.event_records}
-            for location in self.grid.values():
-                if location.recent_event_ids:
-                    location.recent_event_ids = [
-                        record_id for record_id in location.recent_event_ids
-                        if record_id in surviving_ids
-                    ]
+    def record_event(self, record: WorldEventRecord) -> WorldEventRecord:
+        """Store a structured event record in the canonical world history.
+
+        Returns the canonical stored record (may be a normalized copy).
+        """
+        stored_record = append_canonical_event_record(
+            record=record,
+            event_records=self.event_records,
+            location_index=self._location_id_index,
+            grid=self.grid,
+            max_event_records=self.MAX_EVENT_RECORDS,
+        )
         self.rebuild_compatibility_event_log()
+        return stored_record
 
     def apply_event_impact(self, kind: str, location_id: Optional[str]) -> List[Dict[str, Any]]:
         """Update location state quantities based on an event kind (design §5.5).
@@ -1293,27 +1238,12 @@ class World:
         each containing ``target_type``, ``target_id``, ``attribute``,
         ``old_value``, ``new_value``, and ``delta``.
         """
-        impacts: List[Dict[str, Any]] = []
-        if location_id is None:
-            return impacts
-        loc = self._location_id_index.get(location_id)
-        if loc is None:
-            return impacts
-        deltas = _EVENT_IMPACT.get(kind, {})
-        for attr, delta in deltas.items():
-            old = getattr(loc, attr, None)
-            if old is not None:
-                new_val = _clamp_state(old + delta)
-                setattr(loc, attr, new_val)
-                impacts.append({
-                    "target_type": "location",
-                    "target_id": location_id,
-                    "attribute": attr,
-                    "old_value": old,
-                    "new_value": new_val,
-                    "delta": new_val - old,
-                })
-        return impacts
+        return apply_event_impact_to_location(
+            kind=kind,
+            location_id=location_id,
+            location_index=self._location_id_index,
+            clamp_state=_clamp_state,
+        )
 
     # Annual decay rate: each year, event-driven deviations from baseline
     # decay by this fraction toward the region-type default, preventing
@@ -1323,92 +1253,28 @@ class World:
     _STATE_DECAY_RATE = 0.30
 
     def _decay_toward_baseline(self, months: int = 12) -> None:
-        """Pull volatile state fields back toward their region-type defaults.
-
-        Without this, additive event impacts and neighbor propagation cause
-        states to drift monotonically toward 0 or 100 over long simulations.
-        """
-        period_months = max(1, months)
-        decay_rate = 1.0 - ((1.0 - self._STATE_DECAY_RATE) ** (period_months / self.months_per_year))
-        for loc in self.grid.values():
-            defaults = self.location_state_defaults(loc.id, loc.region_type)
-            for attr in ("danger", "traffic", "mood", "safety", "rumor_heat"):
-                current = getattr(loc, attr)
-                baseline = defaults[attr]
-                diff = baseline - current
-                if diff == 0:
-                    continue
-                # Move a fraction of the distance back toward baseline
-                adjustment = int(diff * decay_rate)
-                if adjustment == 0:
-                    adjustment = 1 if diff > 0 else -1
-                setattr(loc, attr, _clamp_state(current + adjustment))
+        """Pull volatile state fields back toward their region-type defaults."""
+        decay_toward_baseline(
+            locations=self.grid.values(),
+            months=months,
+            months_per_year=self.months_per_year,
+            state_decay_rate=self._STATE_DECAY_RATE,
+            location_defaults=self.location_state_defaults,
+            clamp_state=_clamp_state,
+        )
 
     def propagate_state(self, months: int = 12) -> None:
-        """Propagate location state to neighbors (design §5.6).
-
-        Called after a simulated period to diffuse location-state changes.
-        Applies natural decay toward baseline first, then propagation,
-        so that state quantities stabilise over time instead of
-        accumulating unboundedly.
-        """
+        """Propagate location state to neighbors (design §5.6)."""
         period_months = max(1, months)
-        period_fraction = period_months / self.months_per_year
-
-        def _scaled(value: int) -> int:
-            scaled = int(round(value * period_fraction))
-            if value != 0 and scaled == 0:
-                scaled = 1 if value > 0 else -1
-            return scaled
-
-        # Decay toward baseline before propagation
         self._decay_toward_baseline(months=period_months)
-
-        pending_changes: List[tuple] = []
-
-        for loc in self.grid.values():
-            neighbours = self.get_neighboring_locations(loc.id)
-            if not neighbours:
-                continue
-
-            # Danger propagation — only to neighbors whose danger is
-            # below the source's current level (prevents runaway upward drift)
-            rule = PROPAGATION_RULES["danger"]
-            if loc.danger >= rule["min_source"]:
-                spread = min(int(loc.danger * rule["decay"]), rule["cap"])
-                spread = _scaled(spread)
-                for n in neighbours:
-                    if n.danger < loc.danger:
-                        capped = min(spread, loc.danger - n.danger)
-                        pending_changes.append((n.id, "danger", capped))
-
-            # Traffic propagation — same directional cap
-            rule = PROPAGATION_RULES["traffic"]
-            if loc.traffic >= rule["min_source"]:
-                spread = min(int(loc.traffic * rule["decay"]), rule["cap"])
-                spread = _scaled(spread)
-                for n in neighbours:
-                    if n.traffic < loc.traffic:
-                        capped = min(spread, loc.traffic - n.traffic)
-                        pending_changes.append((n.id, "traffic", capped))
-
-            # Mood penalty from ruined neighbors
-            rule = PROPAGATION_RULES["mood_from_ruin"]
-            if loc.prosperity < rule["source_threshold"]:
-                penalty = _scaled(-rule["neighbor_penalty"])
-                for n in neighbours[:rule["max_neighbors"]]:
-                    pending_changes.append((n.id, "mood", penalty))
-
-            # Road damage from high danger
-            rule = PROPAGATION_RULES["road_damage_from_danger"]
-            if loc.danger >= rule["danger_threshold"]:
-                pending_changes.append((loc.id, "road_condition", _scaled(-rule["road_penalty"])))
-
-        for loc_id, attr, delta in pending_changes:
-            loc = self._location_id_index.get(loc_id)
-            if loc is not None:
-                old = getattr(loc, attr)
-                setattr(loc, attr, _clamp_state(old + delta))
+        propagate_state_changes(
+            locations=self.grid.values(),
+            location_index=self._location_id_index,
+            get_neighbors=self.get_neighboring_locations,
+            months=period_months,
+            months_per_year=self.months_per_year,
+            clamp_state=_clamp_state,
+        )
 
     def get_events_by_location(self, location_id: str) -> List[WorldEventRecord]:
         """Return all event records for a specific location."""
@@ -1446,7 +1312,6 @@ class World:
             "height": self.height,
             "year": self.year,
             "grid": [loc.to_dict() for loc in self.grid.values()],
-            "event_log": self.get_compatibility_event_log(),
             "event_records": [r.to_dict() for r in self.event_records],
             "rumors": [r.to_dict() for r in self.rumors],
             "rumor_archive": [r.to_dict() for r in self.rumor_archive],
@@ -1514,7 +1379,6 @@ class World:
         are derived from the loaded grid via ``_build_terrain_from_grid()``.
         """
         from .adventure import AdventureRun
-        from .events import WorldEventRecord
         from .rumor import Rumor
 
         world = cls(

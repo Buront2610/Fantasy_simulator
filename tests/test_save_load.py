@@ -45,7 +45,9 @@ class TestSaveSimulation:
             data = json.load(f)
         assert "world" in data
         assert "characters" in data
-        assert "history" in data
+        assert "history" not in data
+        assert "event_records" in data["world"]
+        assert "event_log" not in data["world"]
 
     def test_save_returns_false_on_bad_path(self, tmp_path):
         sim = Simulator(_make_world(), seed=0)

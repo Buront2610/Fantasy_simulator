@@ -142,7 +142,11 @@ fantasy_simulator/          # Main package
   character_creator.py      # Random, template, and interactive character creation
   world.py                  # World state, locations, memory, terrain hooks, serialization
   terrain.py                # Terrain / site / route / atlas layout models
-  events.py                 # Event generation, EventResult, WorldEventRecord
+  event_models.py           # Canonical EventResult / WorldEventRecord contracts
+  events.py                 # Event generation facade (re-exports event contracts)
+  world_event_log.py        # Compatibility event-log projection helpers
+  world_event_state.py      # Event-driven world-state mutation helpers
+  world_state_propagation.py # Location-state decay / propagation helpers
   adventure.py              # Multi-step adventure progression
   simulator.py              # Backward-compatible import path (delegates to simulation/)
   reports.py                # Monthly and yearly report view generation
@@ -153,7 +157,7 @@ fantasy_simulator/          # Main package
     timeline.py             # Day-by-day processing, seasonal modifiers, dying/injury
     calendar.py             # Shared calendar/rate helpers for time progression
     notifications.py        # Notification threshold evaluation
-    event_recorder.py       # Event recording across all event stores
+    event_recorder.py       # Canonical event recording + compatibility projections
     adventure_coordinator.py # Adventure lifecycle management
     queries.py              # Summary, report, story, and event-log access
   persistence/
@@ -227,6 +231,9 @@ supports:
   rare player choice points.
 - The world model is being expanded incrementally through terrain/site/route
   separation and atlas-scale observation UI.
+- Save snapshots persist canonical `world.event_records`; `Simulator.history`
+  and `World.event_log` are runtime compatibility projections with backward-load
+  support for older snapshots.
 - Changes are being kept incremental and modular.
 
 ## Current Limitations

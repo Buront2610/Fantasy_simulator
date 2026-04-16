@@ -3,15 +3,16 @@
 ``world.event_records`` is the canonical data source by policy.  New
 read-paths should query ``event_records`` (via ``events_by_kind()``).
 
-``history`` and ``event_log`` remain as compatibility adapters projected
-from canonical records for legacy consumers and persisted save snapshots.
+``history`` and ``event_log`` remain runtime compatibility adapters projected
+from canonical records for legacy consumers. Older snapshots that still carry
+legacy fields remain load-compatible.
 """
 
 from __future__ import annotations
 
 from typing import Dict, List, Optional
 
-from ..events import EventResult, WorldEventRecord
+from ..event_models import EventResult, WorldEventRecord
 from ..i18n import tr, tr_term
 from ..narrative.constants import EVENT_KINDS_FATAL
 from ..reports import (

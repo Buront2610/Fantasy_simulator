@@ -28,8 +28,8 @@
 
 ### Remaining
 
-- persistence 上の三重保持（`event_records` + `event_log` + `history`）は互換性のため残置。
-- sunset 実施（保存フォーマット縮退）は PR-J/K 前の別バッチで扱う。
+- なし（保存フォーマットは canonical `event_records` を正規保持し、
+  `event_log` / `history` は runtime projection へ縮退済み）。
 
 ## TD-2 SettingBundle Externalization
 
@@ -48,10 +48,25 @@
 
 ## TD-3 Responsibility Split (`world.py` / `events.py`)
 
-### Remaining (major)
+### Done in this repo state
 
-- `world.py` と `events.py` の内部責務分離（モジュール分割）は未完。
-- 互換APIを壊さない分割計画が必要なため、現バッチでは未着手。
+- `events.py` から純粋データ契約（`EventResult` / `WorldEventRecord` / `generate_record_id`）を
+  `event_models.py` へ抽出し、イベント生成の副作用ロジックと分離した。
+- `world.py` の event log adapter は `world_event_log.py` へ抽出し、互換ログ整形/投影を純関数化した。
+- event-driven な location state mutation / canonical record append を `world_event_state.py`
+  へ抽出し、`World` は orchestration と互換API維持に集中する構造へ再配置した。
+- decay / propagation（設計書 §5.6）を `world_state_propagation.py` へ抽出し、
+  `World.propagate_state()` は orchestrator に縮約した。
+- 既存互換API（`from fantasy_simulator.events import ...`, `World.log_event()`, `World.record_event()`）は維持。
+- legacy field の扱い / import 正規ルート / mutable copy 方針は `docs/td3_design_decisions.md` に記録。
+
+### Remaining
+
+- 責務分離は完了したが、canonical domain model の純化は未完。
+  `WorldEventRecord.legacy_event_result` / `legacy_event_log_entry` は
+  移行期 ACL として残置されている。
+- `EVENT_IMPACT_RULES` / `PROPAGATION_RULES` は static module global のままで、
+  setting bundle / era / faction 差分を差し込む rules source abstraction は未着手。
 
 ## TD-4 Guardrails / Harness / Docs
 
@@ -60,7 +75,10 @@
 - architecture constraints: legacy adapter read-path と legacy projection import 制約を強化。
 - doc freshness: implementation/architecture/readme の整合監視を追加。
 - quality gate `standard`: architecture/doc/harness 系を routine 実行。
+- invalid location_id の統合経路（record -> report -> save/load）を characterization test で固定。
+- seeded reproducibility の acceptance として、summary / compatibility event log /
+  monthly report / yearly report を同一 seed で一致させる E2E characterization を追加。
 
 ### Remaining
 
-- TD-3 が進んだ後の harness 期待値更新（責務分割後の acceptance contract 再調整）。
+- map-visible output を含む包括 golden harness（UI snapshot）整備は未完。

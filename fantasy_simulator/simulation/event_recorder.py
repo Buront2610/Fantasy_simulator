@@ -4,7 +4,9 @@
 All new read-paths should consume ``world.event_records`` exclusively.
 
 ``world.event_log`` and ``simulator.history`` survive only as compatibility
-adapters projected from canonical records for save/load and legacy query paths.
+adapters projected from canonical records for legacy query paths. Save/load
+keeps backward compatibility for older snapshots, but new snapshots persist
+canonical records only.
 """
 
 from __future__ import annotations
@@ -12,7 +14,7 @@ from __future__ import annotations
 from typing import Dict, List, Optional, Tuple
 
 from ..adventure import AdventureRun
-from ..events import EventResult, WorldEventRecord, generate_record_id
+from ..event_models import EventResult, WorldEventRecord, generate_record_id
 
 
 class EventRecorderMixin:
@@ -51,11 +53,20 @@ class EventRecorderMixin:
     ) -> WorldEventRecord:
         """Record a structured world event to canonical ``event_records``.
 
-        Legacy ``event_log`` / ``history`` adapters are projected later from
-        the stored canonical records.
+        Contract:
+        - location impacts are computed before append so the canonical record
+          is materially complete at storage time.
+        - legacy ``event_log`` / ``history`` adapters are projected later from
+          the stored canonical records.
         """
         effective_month = self.current_month if month is None else month
         effective_day = self.current_day
+        canonical_location_id = (
+            self.world.normalize_location_id(location_id)
+            if location_id is not None
+            else None
+        )
+        impacts = self.world.apply_event_impact(kind, canonical_location_id)
         record = WorldEventRecord(
             record_id=generate_record_id(self.id_rng),
             kind=kind,
@@ -63,19 +74,16 @@ class EventRecorderMixin:
             month=effective_month,
             day=effective_day,
             absolute_day=self.elapsed_days + 1,
-            location_id=location_id,
+            location_id=canonical_location_id,
             primary_actor_id=primary_actor_id,
             secondary_actor_ids=[] if secondary_actor_ids is None else list(secondary_actor_ids),
             description=description,
             severity=severity,
             visibility=visibility,
             calendar_key=self.world.calendar_definition.calendar_key,
+            impacts=[] if not impacts else list(impacts),
         )
-        self.world.record_event(record)
-        # Apply event impact on location state and record causal impacts
-        impacts = self.world.apply_event_impact(kind, location_id)
-        if impacts:
-            record.impacts = impacts
+        record = self.world.record_event(record)
         # Surface notable events to the UI layer via notification thresholds
         if self.should_notify(record):
             self.pending_notifications.append(record)
@@ -121,9 +129,15 @@ class EventRecorderMixin:
     def _record_event(self, result: EventResult, location_id: Optional[str] = None) -> None:
         """Mirror an EventResult into the canonical structured store."""
         severity = self._SEVERITY_MAP.get(result.event_type, 1)
+        canonical_location_id = (
+            self.world.normalize_location_id(location_id)
+            if location_id is not None
+            else None
+        )
+        impacts = self.world.apply_event_impact(result.event_type, canonical_location_id)
         record = WorldEventRecord.from_event_result(
             result,
-            location_id=location_id,
+            location_id=canonical_location_id,
             severity=severity,
             record_id=result.metadata.get("record_id"),
             rng=self.id_rng,
@@ -132,10 +146,9 @@ class EventRecorderMixin:
             absolute_day=self.elapsed_days + 1,
             calendar_key=self.world.calendar_definition.calendar_key,
         )
-        self.world.record_event(record)
-        impacts = self.world.apply_event_impact(result.event_type, record.location_id)
         if impacts:
-            record.impacts = impacts
+            record.impacts = list(impacts)
+        record = self.world.record_event(record)
         if self.should_notify(record):
             self.pending_notifications.append(record)
         self._link_relation_tag_source_from_record(result, record.record_id)

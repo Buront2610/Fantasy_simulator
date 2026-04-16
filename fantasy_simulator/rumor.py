@@ -25,7 +25,7 @@ from .i18n import tr
 from .narrative.constants import EVENT_KINDS_FATAL
 
 if TYPE_CHECKING:
-    from .events import WorldEventRecord
+    from .event_models import WorldEventRecord
     from .world import World
 
 # ------------------------------------------------------------------

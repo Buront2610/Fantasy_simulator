@@ -188,6 +188,7 @@ def test_core_ui_modules_do_not_import_reports_module() -> None:
         ]
         assert forbidden == [], f"{path} imports report modules: {forbidden}"
 
+
 def test_world_data_legacy_projection_symbol_imports_are_scoped() -> None:
     projection_names = {"WORLD_LORE", "RACES", "JOBS", "DEFAULT_LOCATIONS"}
     allowed = {
@@ -229,3 +230,104 @@ def test_world_data_imports_stay_in_legacy_compatibility_modules() -> None:
             if target == WORLD_DATA_MODULE or target.startswith(f"{WORLD_DATA_MODULE}.")
         ]
         assert forbidden == [], f"{path} imports legacy world_data compatibility projections: {forbidden}"
+
+
+def test_td3_split_modules_import_event_models_directly_not_events_facade() -> None:
+    targets = {
+        PACKAGE_ROOT / "world_event_log.py",
+        PACKAGE_ROOT / "world_event_state.py",
+    }
+    for path in targets:
+        imports = _iter_import_targets(path)
+        assert all(not target.startswith("fantasy_simulator.events") for target in imports), (
+            f"{path} should import event models directly, not events facade"
+        )
+        assert any(target.startswith("fantasy_simulator.event_models") for target in imports), (
+            f"{path} must import canonical event model module"
+        )
+
+
+def test_simulation_modules_import_event_models_for_event_contract_types() -> None:
+    targets = {
+        PACKAGE_ROOT / "simulation" / "engine.py",
+        PACKAGE_ROOT / "simulation" / "event_recorder.py",
+        PACKAGE_ROOT / "simulation" / "queries.py",
+    }
+    forbidden_names = {"EventResult", "WorldEventRecord", "generate_record_id"}
+
+    for path in targets:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ImportFrom):
+                continue
+            module_name = ".".join(_resolve_import(_module_name(path), node)[0].split(".")[:-1]) if node.names else ""
+            imported_names = {alias.name for alias in node.names}
+            if module_name == "fantasy_simulator.events":
+                assert forbidden_names.isdisjoint(imported_names), (
+                    f"{path} must import event contract types from event_models, not events facade"
+                )
+
+
+def test_world_module_imports_event_models_not_events_facade_for_contract_types() -> None:
+    path = PACKAGE_ROOT / "world.py"
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    forbidden_names = {"WorldEventRecord", "EventResult", "generate_record_id"}
+    saw_event_models_import = False
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ImportFrom):
+            continue
+        module_name = ".".join(_resolve_import(_module_name(path), node)[0].split(".")[:-1]) if node.names else ""
+        imported_names = {alias.name for alias in node.names}
+        if module_name == "fantasy_simulator.events":
+            assert forbidden_names.isdisjoint(imported_names), (
+                "world.py must import event contract types from event_models, not events facade"
+            )
+        if module_name == "fantasy_simulator.event_models" and "WorldEventRecord" in imported_names:
+            saw_event_models_import = True
+
+    assert saw_event_models_import, "world.py must import WorldEventRecord from event_models"
+
+
+def test_reports_module_imports_world_event_record_from_event_models() -> None:
+    path = PACKAGE_ROOT / "reports.py"
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    imported_from_events = False
+    imported_from_event_models = False
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ImportFrom):
+            continue
+        module_name = ".".join(_resolve_import(_module_name(path), node)[0].split(".")[:-1]) if node.names else ""
+        imported_names = {alias.name for alias in node.names}
+        if "WorldEventRecord" not in imported_names:
+            continue
+        if module_name == "fantasy_simulator.events":
+            imported_from_events = True
+        if module_name == "fantasy_simulator.event_models":
+            imported_from_event_models = True
+
+    assert not imported_from_events, "reports.py should not import WorldEventRecord from events facade"
+    assert imported_from_event_models, "reports.py should import WorldEventRecord from event_models"
+
+
+def test_rumor_module_imports_world_event_record_from_event_models() -> None:
+    path = PACKAGE_ROOT / "rumor.py"
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    imported_from_events = False
+    imported_from_event_models = False
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ImportFrom):
+            continue
+        module_name = ".".join(_resolve_import(_module_name(path), node)[0].split(".")[:-1]) if node.names else ""
+        imported_names = {alias.name for alias in node.names}
+        if "WorldEventRecord" not in imported_names:
+            continue
+        if module_name == "fantasy_simulator.events":
+            imported_from_events = True
+        if module_name == "fantasy_simulator.event_models":
+            imported_from_event_models = True
+
+    assert not imported_from_events, "rumor.py should not import WorldEventRecord from events facade"
+    assert imported_from_event_models, "rumor.py should import WorldEventRecord from event_models"
