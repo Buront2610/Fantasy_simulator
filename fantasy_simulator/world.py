@@ -1313,7 +1313,6 @@ class World:
             "height": self.height,
             "year": self.year,
             "grid": [loc.to_dict() for loc in self.grid.values()],
-            "event_log": self.get_compatibility_event_log(),
             "event_records": [r.to_dict() for r in self.event_records],
             "rumors": [r.to_dict() for r in self.rumors],
             "rumor_archive": [r.to_dict() for r in self.rumor_archive],

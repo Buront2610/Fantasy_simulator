@@ -111,3 +111,22 @@ def test_seeded_td3_external_outputs_are_reproducible() -> None:
 
     assert snap1 == snap2
     assert snap1 != snap3
+
+
+def test_save_payload_uses_canonical_event_records_without_legacy_duplication() -> None:
+    world = World()
+    sim = Simulator(world, seed=42)
+    sim._record_world_event(  # noqa: SLF001 - characterization seam
+        "Canonical only",
+        kind="meeting",
+        location_id="loc_thornwood",
+    )
+
+    payload = sim.to_dict()
+
+    assert "history" not in payload
+    assert "event_log" not in payload["world"]
+    assert payload["world"]["event_records"]
+
+    restored = Simulator.from_dict(payload)
+    assert any("Canonical only" in line for line in restored.get_event_log())

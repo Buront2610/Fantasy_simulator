@@ -341,10 +341,11 @@ class Simulator(
     def to_dict(self) -> Dict[str, Any]:
         """Serialise simulator state.
 
-        ``event_records`` is the canonical store by policy, but ``history``
-        and ``event_log`` (inside ``world.to_dict()``) are still persisted
-        for save/load backward compatibility. They can sunset only after
-        compatibility no longer depends on legacy EventResult/display adapters.
+        ``event_records`` is the canonical event store by policy.
+        Compatibility adapters (``history``/``event_log``) are projected at
+        runtime and are no longer serialized as first-class save payload fields.
+        Loader paths keep backward compatibility with older snapshots that still
+        contain the legacy fields.
         """
         return {
             "world": self.world.to_dict(),
@@ -358,8 +359,6 @@ class Simulator(
             "locale": get_locale(),
             "rng_state": repr(self.rng.getstate()),
             "id_rng_state": repr(self.id_rng.getstate()),
-            # Legacy snapshot compatibility field (projected from canonical records).
-            "history": [ev.to_dict() for ev in self.history],
             "memorial_template_history": self.memorial_template_history.to_dict(),
             "alias_template_history": self.alias_template_history.to_dict(),
         }

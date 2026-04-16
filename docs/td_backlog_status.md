@@ -28,8 +28,8 @@
 
 ### Remaining
 
-- persistence 上の三重保持（`event_records` + `event_log` + `history`）は互換性のため残置。
-- sunset 実施（保存フォーマット縮退）は PR-J/K 前の別バッチで扱う。
+- なし（保存フォーマットは canonical `event_records` を正規保持し、
+  `event_log` / `history` は runtime projection へ縮退済み）。
 
 ## TD-2 SettingBundle Externalization
 
