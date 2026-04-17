@@ -226,7 +226,12 @@ def test_setting_bundle_rules_override_default_impact_and_propagation_tables() -
     world = World()
     bundle = world.setting_bundle
     bundle.world_definition.event_impact_rules = {"meeting": {"mood": 7}}
-    bundle.world_definition.propagation_rules = {"road_damage_from_danger": {"danger_threshold": 101, "road_penalty": 0}}
+    bundle.world_definition.propagation_rules = {
+        "road_damage_from_danger": {
+            "danger_threshold": 101,
+            "road_penalty": 0,
+        }
+    }
     world.apply_setting_bundle(bundle)
 
     loc = world.get_location_by_id("loc_thornwood")
@@ -256,7 +261,12 @@ def test_world_round_trip_preserves_bundle_rule_overrides() -> None:
     world = World()
     bundle = world.setting_bundle
     bundle.world_definition.event_impact_rules = {"meeting": {"mood": 7}}
-    bundle.world_definition.propagation_rules = {"road_damage_from_danger": {"danger_threshold": 101, "road_penalty": 0}}
+    bundle.world_definition.propagation_rules = {
+        "road_damage_from_danger": {
+            "danger_threshold": 101,
+            "road_penalty": 0,
+        }
+    }
     world.apply_setting_bundle(bundle)
 
     restored = World.from_dict(world.to_dict())
