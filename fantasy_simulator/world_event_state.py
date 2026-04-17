@@ -85,6 +85,9 @@ def append_canonical_event_record(
         cloned["location_id"] = None
         stored_record = WorldEventRecord.from_dict(cloned)
 
+    if any(existing.record_id == stored_record.record_id for existing in event_records):
+        raise ValueError(f"Duplicate event record ID: {stored_record.record_id!r}")
+
     event_records.append(stored_record)
 
     if stored_record.location_id is not None:

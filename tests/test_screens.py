@@ -240,6 +240,7 @@ class TestAdventureAndLocationViews(unittest.TestCase):
         loc.aliases.append("The Crown City")
         loc.memorial_ids.append("m1")
         loc.live_traces.append({"year": 1001, "char_name": "Aldric", "text": "trace"})
+        loc.recent_event_ids.extend(["r1", "r2"])
 
         class PickFirstInputBackend:
             def __init__(self):
@@ -264,6 +265,7 @@ class TestAdventureAndLocationViews(unittest.TestCase):
         self.assertIn("1 memorial(s)", text)
         self.assertIn("1 alias(es)", text)
         self.assertIn("1 trace(s)", text)
+        self.assertIn("2 recent event(s)", text)
 
 
 if __name__ == "__main__":

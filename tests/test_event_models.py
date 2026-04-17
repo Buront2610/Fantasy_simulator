@@ -121,6 +121,39 @@ def test_world_event_record_rejects_non_dict_impacts_at_load_boundary() -> None:
         raise AssertionError("Expected malformed impacts to fail fast")
 
 
+def test_world_event_record_rejects_non_string_core_scalars_at_load_boundary() -> None:
+    malformed = {
+        "record_id": 123,
+        "kind": "battle",
+        "year": 1001,
+        "description": "Malformed id",
+    }
+
+    try:
+        WorldEventRecord.from_dict(malformed)
+    except ValueError as exc:
+        assert "record_id" in str(exc)
+    else:
+        raise AssertionError("Expected non-string record_id to fail fast")
+
+
+def test_world_event_record_rejects_non_string_optional_primary_actor_at_load_boundary() -> None:
+    malformed = {
+        "record_id": "r5",
+        "kind": "battle",
+        "year": 1001,
+        "description": "Malformed primary actor",
+        "primary_actor_id": 99,
+    }
+
+    try:
+        WorldEventRecord.from_dict(malformed)
+    except ValueError as exc:
+        assert "primary_actor_id" in str(exc)
+    else:
+        raise AssertionError("Expected non-string primary_actor_id to fail fast")
+
+
 def test_world_event_record_from_event_result_to_event_result_round_trip() -> None:
     source = EventResult(
         description="A battle happened",

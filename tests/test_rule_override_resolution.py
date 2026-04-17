@@ -26,6 +26,7 @@ def test_propagation_rule_resolution_layers_partial_overrides_onto_defaults() ->
 
     assert resolved["road_damage_from_danger"]["danger_threshold"] == 101
     assert resolved["danger"]["cap"] == 15
+    assert resolved["topology"]["mode"] == "travel"
 
 
 def test_clone_default_rule_tables_are_defensive_copies() -> None:
@@ -54,4 +55,35 @@ def test_validate_propagation_rules_rejects_missing_required_key() -> None:
     del rules["danger"]["cap"]
 
     with pytest.raises(ValueError, match="missing key: cap"):
+        validate_propagation_rules(rules)
+
+
+def test_validate_propagation_rules_rejects_decay_outside_probability_range() -> None:
+    rules = clone_default_propagation_rules()
+    rules["danger"]["decay"] = 1.5
+
+    with pytest.raises(ValueError, match="between 0 and 1"):
+        validate_propagation_rules(rules)
+
+
+def test_validate_propagation_rules_allows_disabled_road_damage_threshold_sentinel() -> None:
+    rules = clone_default_propagation_rules()
+    rules["road_damage_from_danger"]["danger_threshold"] = 101
+
+    validate_propagation_rules(rules)
+
+
+def test_validate_propagation_rules_rejects_negative_road_penalty() -> None:
+    rules = clone_default_propagation_rules()
+    rules["road_damage_from_danger"]["road_penalty"] = -1
+
+    with pytest.raises(ValueError, match="must be >= 0"):
+        validate_propagation_rules(rules)
+
+
+def test_validate_propagation_rules_rejects_unknown_topology_mode() -> None:
+    rules = clone_default_propagation_rules()
+    rules["topology"]["mode"] = "telepathy"
+
+    with pytest.raises(ValueError, match="must be one of"):
         validate_propagation_rules(rules)

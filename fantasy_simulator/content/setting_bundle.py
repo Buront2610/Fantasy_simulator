@@ -51,6 +51,14 @@ def _copy_rule_overrides(raw_rules: Any, *, field_name: str) -> Dict[str, Dict[s
     return normalized
 
 
+def _string_list_payload(payload: Any, *, field_name: str) -> List[str]:
+    if payload is None:
+        return []
+    if not isinstance(payload, list) or any(not isinstance(item, str) for item in payload):
+        raise ValueError(f"{field_name} must be a list of strings")
+    return list(payload)
+
+
 def merge_event_impact_rule_overrides(
     overrides: Mapping[str, Mapping[str, Any]] | None,
 ) -> Dict[str, Dict[str, int]]:
@@ -60,7 +68,7 @@ def merge_event_impact_rule_overrides(
 
 def merge_propagation_rule_overrides(
     overrides: Mapping[str, Mapping[str, Any]] | None,
-) -> Dict[str, Dict[str, float | int]]:
+) -> Dict[str, Dict[str, Any]]:
     """Backward-compatible wrapper around the domain-side rule resolver."""
     return resolve_propagation_rule_overrides(overrides)
 
@@ -202,7 +210,7 @@ class JobDefinition:
         return cls(
             name=data["name"],
             description=data.get("description", ""),
-            primary_skills=list(data.get("primary_skills", [])),
+            primary_skills=_string_list_payload(data.get("primary_skills", []), field_name="primary_skills"),
         )
 
 
@@ -252,7 +260,7 @@ class SiteSeedDefinition:
             region_type=data.get("region_type", "plains"),
             x=int(data.get("x", 0)),
             y=int(data.get("y", 0)),
-            tags=list(data.get("tags", [])),
+            tags=_string_list_payload(data.get("tags", []), field_name="tags"),
         )
 
 
@@ -275,16 +283,17 @@ class NamingRulesDefinition:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "NamingRulesDefinition":
-        male = list(data.get("first_names_male", []))
-        female = list(data.get("first_names_female", []))
-        non_binary = list(data.get("first_names_non_binary", []))
+        male = _string_list_payload(data.get("first_names_male", []), field_name="first_names_male")
+        female = _string_list_payload(data.get("first_names_female", []), field_name="first_names_female")
+        non_binary = _string_list_payload(data.get("first_names_non_binary", []), field_name="first_names_non_binary")
+        last_names = _string_list_payload(data.get("last_names", []), field_name="last_names")
         if not non_binary:
             non_binary = male + female
         return cls(
             first_names_male=male,
             first_names_female=female,
             first_names_non_binary=non_binary,
-            last_names=list(data.get("last_names", [])),
+            last_names=last_names,
         )
 
 
@@ -475,6 +484,8 @@ def validate_setting_bundle(bundle: SettingBundle, *, source: str) -> None:
     site_coords = [(seed.x, seed.y) for seed in world.site_seeds]
     if site_coords and len(site_coords) != len(set(site_coords)):
         raise ValueError(f"Setting bundle {source} contains duplicate site seed coordinates")
+    if any(seed.x < 0 or seed.y < 0 for seed in world.site_seeds):
+        raise ValueError(f"Setting bundle {source} contains negative site seed coordinates")
 
     naming = world.naming_rules
     has_first_name_rules = (

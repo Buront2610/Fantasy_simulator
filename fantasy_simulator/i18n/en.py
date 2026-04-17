@@ -483,6 +483,8 @@ TEXT_EN: Dict[str, str] = {
     'location_memorials_count': '{count} memorial(s)',
     'location_aliases_count': '{count} alias(es)',
     'location_traces_count': '{count} trace(s)',
+    'location_recent_events_count': '{count} recent event(s)',
+    'unknown_location_with_id': 'Unknown location ({location_id})',
     'monthly_report_card_header': 'Monthly highlights ({year}-{month})',
     'monthly_report_card_characters': '  Notable people: {names}',
     'monthly_report_card_locations': '  Notable places: {names}',

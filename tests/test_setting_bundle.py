@@ -8,6 +8,7 @@ from fantasy_simulator.content.setting_bundle import (
     CalendarDefinition,
     SettingBundle,
     WorldDefinition,
+    bundle_from_dict_validated,
     default_aethoria_bundle,
     load_setting_bundle,
 )
@@ -218,6 +219,63 @@ def test_load_setting_bundle_reports_duplicate_site_seed_names(tmp_path):
         assert "Duplicate" in str(exc)
     else:
         raise AssertionError("Expected ValueError for duplicate site seed names")
+
+
+def test_bundle_from_dict_rejects_string_tags_instead_of_coercing_characters() -> None:
+    payload = {
+        "schema_version": 1,
+        "world_definition": {
+            "world_key": "bad_tags",
+            "display_name": "Bad Tags",
+            "lore_text": "Malformed",
+            "site_seeds": [
+                {
+                    "location_id": "loc_bad",
+                    "name": "Bad",
+                    "description": "",
+                    "region_type": "city",
+                    "x": 0,
+                    "y": 0,
+                    "tags": "capital",
+                }
+            ],
+        },
+    }
+
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "tags" in str(exc)
+    else:
+        raise AssertionError("Expected malformed tags payload to fail fast")
+
+
+def test_bundle_validation_rejects_negative_site_coordinates() -> None:
+    payload = {
+        "schema_version": 1,
+        "world_definition": {
+            "world_key": "bad_coords",
+            "display_name": "Bad Coords",
+            "lore_text": "Malformed",
+            "site_seeds": [
+                {
+                    "location_id": "loc_bad",
+                    "name": "Bad",
+                    "description": "",
+                    "region_type": "city",
+                    "x": -1,
+                    "y": 0,
+                }
+            ],
+        },
+    }
+
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "negative site seed coordinates" in str(exc)
+    else:
+        raise AssertionError("Expected negative coordinates to fail fast")
 
 
 def test_load_setting_bundle_reports_duplicate_race_names(tmp_path):

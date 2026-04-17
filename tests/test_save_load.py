@@ -219,6 +219,59 @@ class TestLoadSimulation:
 
         assert restored is None
 
+    def test_load_returns_none_for_duplicate_event_record_ids(self, tmp_path):
+        path = tmp_path / "duplicate_event_ids.json"
+        world_payload = World().to_dict()
+        world_payload["event_records"] = [
+            {
+                "record_id": "dup_event",
+                "kind": "battle",
+                "year": 1000,
+                "month": 1,
+                "day": 1,
+                "absolute_day": 0,
+                "location_id": "loc_thornwood",
+                "primary_actor_id": None,
+                "secondary_actor_ids": [],
+                "description": "First",
+                "severity": 2,
+                "visibility": "public",
+                "calendar_key": "",
+                "tags": [],
+                "impacts": [],
+            },
+            {
+                "record_id": "dup_event",
+                "kind": "journey",
+                "year": 1000,
+                "month": 1,
+                "day": 2,
+                "absolute_day": 0,
+                "location_id": "loc_thornwood",
+                "primary_actor_id": None,
+                "secondary_actor_ids": [],
+                "description": "Second",
+                "severity": 1,
+                "visibility": "public",
+                "calendar_key": "",
+                "tags": [],
+                "impacts": [],
+            },
+        ]
+        duplicate_save = {
+            "schema_version": CURRENT_VERSION,
+            "world": world_payload,
+            "characters": [],
+            "events_per_year": 8,
+            "adventure_steps_per_year": 3,
+            "history": [],
+        }
+        path.write_text(json.dumps(duplicate_save), encoding="utf-8")
+
+        restored = load_simulation(str(path))
+
+        assert restored is None
+
     def test_load_custom_bundle_recovers_legacy_character_location_names_via_embedded_bundle(self, tmp_path):
         path = tmp_path / "custom-bundle-location.json"
         sim = Simulator(World(name="Custom"), seed=0)
@@ -556,6 +609,7 @@ class TestLoadSimulation:
         restored.world.characters[0].favorite = False
         report = generate_monthly_report(restored.world, 1000, 3)
         assert f"{restored.world.WATCHED_ACTOR_TAG_PREFIX}char_hero" in restored.world.event_records[0].tags
+        assert restored.world.WATCHED_ACTOR_INFERRED_TAG in restored.world.event_records[0].tags
         assert [entry.name for entry in report.character_entries] == ["Hero"]
 
     def test_migration_lifts_mixed_legacy_history_and_event_log_into_canonical_event_records(self, tmp_path):

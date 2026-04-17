@@ -77,6 +77,27 @@ class TestWorld:
         assert neighbors
         assert all(hasattr(loc, "canonical_name") for loc in neighbors)
 
+    def test_propagation_topology_can_diverge_from_travel_topology(self):
+        world = World()
+        route = world.routes[0]
+        source = world.get_location_by_id(route.from_site_id)
+        target = world.get_location_by_id(route.to_site_id)
+        assert source is not None
+        assert target is not None
+
+        assert target in world.get_travel_neighboring_locations(source.id)
+        route.blocked = True
+
+        assert target not in world.get_travel_neighboring_locations(source.id)
+        assert target in world.get_propagation_neighboring_locations(source.id, mode="grid")
+
+        source.danger = 90
+        target.danger = 0
+        world.propagation_rules["topology"]["mode"] = "grid"
+        world.propagate_state(months=12)
+
+        assert target.danger > 0
+
     def test_add_character_marks_location_visited(self):
         world = World()
         capital = world.get_location_by_id("loc_aethoria_capital")
@@ -775,6 +796,12 @@ class TestWorld:
         assert restored.days_in_month(2) == 35
         assert restored.season_for_month(2) == "summer"
         assert restored.calendar_baseline.calendar_key == "lunar_cycle"
+
+    def test_location_name_makes_unknown_locations_explicit(self):
+        set_locale("en")
+        world = World()
+
+        assert world.location_name("loc_missing_ruin") == "Unknown location (loc_missing_ruin)"
 
     def test_advance_calendar_position_respects_variable_month_lengths(self):
         world = World()

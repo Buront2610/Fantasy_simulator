@@ -26,6 +26,11 @@ from .world_state_propagation import (
     decay_toward_baseline,
     propagate_state_changes,
 )
+from .world_topology import (
+    PROPAGATION_TOPOLOGY_TRAVEL,
+    resolve_neighbor_ids,
+    route_neighbor_ids,
+)
 from .content.setting_bundle import (
     CalendarDefinition,
     SettingBundle,
@@ -320,6 +325,7 @@ class World:
     """Represents the entire game world."""
 
     WATCHED_ACTOR_TAG_PREFIX = "watched_actor:"
+    WATCHED_ACTOR_INFERRED_TAG = "watched_actor_inferred"
 
     def __init__(
         self,
@@ -353,7 +359,7 @@ class World:
         self.event_log: List[str] = []
         self.event_records: List[WorldEventRecord] = []
         self.event_impact_rules: Dict[str, Dict[str, int]] = clone_default_event_impact_rules()
-        self.propagation_rules: Dict[str, Dict[str, float | int]] = clone_default_propagation_rules()
+        self.propagation_rules: Dict[str, Dict[str, Any]] = clone_default_propagation_rules()
         self.rumors: List[Rumor] = []
         self.rumor_archive: List[Rumor] = []
         self.active_adventures: List[AdventureRun] = []
@@ -742,12 +748,71 @@ class World:
 
     def get_connected_site_ids(self, location_id: str) -> List[str]:
         """Return location_ids of sites reachable via routes from a site."""
-        result: List[str] = []
-        for route in self.routes:
-            other = route.other_end(location_id)
-            if other is not None and not route.blocked:
-                result.append(other)
-        return result
+        return route_neighbor_ids(location_id, routes=self.routes)
+
+    def get_grid_neighboring_locations(self, location_id: str) -> List[LocationState]:
+        """Return adjacency by physical map grid, regardless of route state."""
+        neighbor_ids = resolve_neighbor_ids(
+            location_id,
+            location_index=self._location_id_index,
+            grid=self.grid,
+            routes=self.routes,
+            mode="grid",
+        )
+        return [
+            self._location_id_index[neighbor_id]
+            for neighbor_id in neighbor_ids
+            if neighbor_id in self._location_id_index
+        ]
+
+    def get_travel_neighboring_locations(self, location_id: str) -> List[LocationState]:
+        """Return neighbors reachable for travel using the travel topology contract."""
+        neighbor_ids = resolve_neighbor_ids(
+            location_id,
+            location_index=self._location_id_index,
+            grid=self.grid,
+            routes=self.routes,
+            mode=PROPAGATION_TOPOLOGY_TRAVEL,
+        )
+        return [
+            self._location_id_index[neighbor_id]
+            for neighbor_id in neighbor_ids
+            if neighbor_id in self._location_id_index
+        ]
+
+    def get_propagation_neighboring_locations(
+        self,
+        location_id: str,
+        *,
+        mode: str | None = None,
+        include_blocked_routes: bool | None = None,
+    ) -> List[LocationState]:
+        """Return neighbors used for state propagation.
+
+        The propagation topology is intentionally explicit so future worldgen
+        and blocked-route features can vary travel and propagation semantics
+        independently.
+        """
+        topology_rules = self.propagation_rules.get("topology", {})
+        topology_mode = mode or str(topology_rules.get("mode", PROPAGATION_TOPOLOGY_TRAVEL))
+        effective_include_blocked_routes = (
+            bool(topology_rules.get("include_blocked_routes", False))
+            if include_blocked_routes is None
+            else include_blocked_routes
+        )
+        neighbor_ids = resolve_neighbor_ids(
+            location_id,
+            location_index=self._location_id_index,
+            grid=self.grid,
+            routes=self.routes,
+            mode=topology_mode,
+            include_blocked_routes=effective_include_blocked_routes,
+        )
+        return [
+            self._location_id_index[neighbor_id]
+            for neighbor_id in neighbor_ids
+            if neighbor_id in self._location_id_index
+        ]
 
     def reachable_location_ids(self, location_id: str) -> List[str]:
         """Return all reachable location_ids from ``location_id``."""
@@ -760,22 +825,9 @@ class World:
 
         while queue:
             current = queue.popleft()
-            if self.routes:
-                neighbor_ids = self.get_connected_site_ids(current)
-            else:
-                current_loc = self._location_id_index.get(current)
-                if current_loc is None:
-                    continue
-                neighbor_ids = [
-                    loc.id
-                    for loc in (
-                        self.grid.get((current_loc.x - 1, current_loc.y)),
-                        self.grid.get((current_loc.x + 1, current_loc.y)),
-                        self.grid.get((current_loc.x, current_loc.y - 1)),
-                        self.grid.get((current_loc.x, current_loc.y + 1)),
-                    )
-                    if loc is not None
-                ]
+            neighbor_ids = [
+                loc.id for loc in self.get_travel_neighboring_locations(current)
+            ]
             for neighbor_id in neighbor_ids:
                 if neighbor_id in visited or neighbor_id not in self._location_id_index:
                     continue
@@ -896,10 +948,19 @@ class World:
         for location in self.grid.values():
             location.recent_event_ids = location.recent_event_ids[-12:]
 
+    def _ensure_unique_event_record_ids(self) -> None:
+        """Fail fast when canonical history contains duplicate record IDs."""
+        seen: set[str] = set()
+        for record in self.event_records:
+            if record.record_id in seen:
+                raise ValueError(f"Duplicate event record ID during rebuild: {record.record_id!r}")
+            seen.add(record.record_id)
+
     def normalize_after_load(self) -> None:
         """Rebuild derived indexes and repair invariants after deserialization."""
         self._repair_location_references()
         self.rebuild_char_index()
+        self._ensure_unique_event_record_ids()
         self._backfill_watched_actor_tags_after_load()
         self.ensure_valid_character_locations()
         self.rebuild_adventure_index()
@@ -935,7 +996,13 @@ class World:
                 if actor_id and actor_id in watched_actor_ids
             ]
             if watched_tags:
-                record.tags = list(dict.fromkeys(list(record.tags) + watched_tags))
+                record.tags = list(
+                    dict.fromkeys(
+                        list(record.tags)
+                        + watched_tags
+                        + [self.WATCHED_ACTOR_INFERRED_TAG]
+                    )
+                )
 
     def add_adventure(self, run: AdventureRun) -> None:
         self.active_adventures.append(run)
@@ -1048,30 +1115,14 @@ class World:
         loc = self._location_id_index.get(location_id)
         if loc is not None:
             return loc.canonical_name
-        lid = location_id
-        if lid.startswith("loc_"):
-            lid = lid[4:]
-        return lid.replace("_", " ").title()
+        return tr("unknown_location_with_id", location_id=location_id)
 
     def get_characters_at_location(self, location_id: str) -> List[Character]:
         return [c for c in self.characters if c.location_id == location_id and c.alive]
 
     def get_neighboring_locations(self, location_id: str) -> List[LocationState]:
-        source = self._location_id_index.get(location_id)
-        if source is None:
-            return []
-        if self.routes:
-            return [
-                self._location_id_index[neighbor_id]
-                for neighbor_id in self.get_connected_site_ids(location_id)
-                if neighbor_id in self._location_id_index
-            ]
-        neighbours: List[LocationState] = []
-        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-            coord = (source.x + dx, source.y + dy)
-            if coord in self.grid:
-                neighbours.append(self.grid[coord])
-        return neighbours
+        """Compatibility alias for travel adjacency."""
+        return self.get_travel_neighboring_locations(location_id)
 
     def months_elapsed_between(
         self,
@@ -1414,13 +1465,13 @@ class World:
         )
 
     def propagate_state(self, months: int = 12) -> None:
-        """Propagate location state to neighbors (design §5.6)."""
+        """Propagate location state using the configured propagation topology."""
         period_months = max(1, months)
         self._decay_toward_baseline(months=period_months)
         propagate_state_changes(
             locations=self.grid.values(),
             location_index=self._location_id_index,
-            get_neighbors=self.get_neighboring_locations,
+            get_neighbors=self.get_propagation_neighboring_locations,
             months=period_months,
             months_per_year=self.months_per_year,
             clamp_state=_clamp_state,

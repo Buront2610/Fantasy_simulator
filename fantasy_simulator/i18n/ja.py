@@ -479,6 +479,8 @@ TEXT_JA: Dict[str, str] = {
     'location_memorials_count': '記念碑 {count}件',
     'location_aliases_count': '別称 {count}件',
     'location_traces_count': '痕跡 {count}件',
+    'location_recent_events_count': '最近の出来事 {count}件',
+    'unknown_location_with_id': '不明な地点 ({location_id})',
     'monthly_report_card_header': '月間ハイライト（{year}年{month}月）',
     'monthly_report_card_characters': '  注目人物: {names}',
     'monthly_report_card_locations': '  注目地点: {names}',

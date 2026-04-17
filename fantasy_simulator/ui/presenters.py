@@ -30,6 +30,8 @@ class LocationPresenter:
             tags.append(tr("location_aliases_count", count=len(view.aliases)))
         if view.traces:
             tags.append(tr("location_traces_count", count=len(view.traces)))
+        if view.recent_event_count:
+            tags.append(tr("location_recent_events_count", count=view.recent_event_count))
         tag_str = f"  [{', '.join(tags)}]" if tags else ""
         return f"  {index:>2}. {view.location_name} ({view.region_type}){tag_str}"
 

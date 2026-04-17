@@ -174,6 +174,20 @@ class WorldEventRecord:
         return list(payload)
 
     @staticmethod
+    def _validate_string_payload(payload: Any, field_name: str) -> str:
+        if not isinstance(payload, str):
+            raise ValueError(f"{field_name} must be a string")
+        return payload
+
+    @staticmethod
+    def _validate_optional_string_payload(payload: Any, field_name: str) -> Optional[str]:
+        if payload is None:
+            return None
+        if not isinstance(payload, str):
+            raise ValueError(f"{field_name} must be a string when provided")
+        return payload
+
+    @staticmethod
     def _validate_impacts_payload(payload: Any) -> List[Dict[str, Any]]:
         if payload is None:
             raise ValueError("impacts must be a list of dicts when provided")
@@ -186,22 +200,22 @@ class WorldEventRecord:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "WorldEventRecord":
         return cls(
-            record_id=data.get("record_id", uuid.uuid4().hex),
-            kind=data.get("kind", "generic"),
+            record_id=cls._validate_string_payload(data.get("record_id", uuid.uuid4().hex), "record_id"),
+            kind=cls._validate_string_payload(data.get("kind", "generic"), "kind"),
             year=data.get("year", 0),
             month=data.get("month", 1),
             day=data.get("day", 1),
             absolute_day=data.get("absolute_day", 0),
             location_id=data.get("location_id"),
-            primary_actor_id=data.get("primary_actor_id"),
+            primary_actor_id=cls._validate_optional_string_payload(data.get("primary_actor_id"), "primary_actor_id"),
             secondary_actor_ids=cls._validate_string_list_payload(
                 data.get("secondary_actor_ids", []),
                 "secondary_actor_ids",
             ),
-            description=data.get("description", ""),
+            description=cls._validate_string_payload(data.get("description", ""), "description"),
             severity=data.get("severity", 1),
-            visibility=data.get("visibility", "public"),
-            calendar_key=data.get("calendar_key", ""),
+            visibility=cls._validate_string_payload(data.get("visibility", "public"), "visibility"),
+            calendar_key=cls._validate_string_payload(data.get("calendar_key", ""), "calendar_key"),
             tags=cls._validate_string_list_payload(data.get("tags", []), "tags"),
             impacts=cls._validate_impacts_payload(data.get("impacts", [])),
             legacy_event_result=cls._validate_legacy_event_result_payload(data.get("legacy_event_result")),
