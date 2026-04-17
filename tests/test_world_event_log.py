@@ -34,13 +34,13 @@ def test_format_event_log_entry_day_without_month_uses_year_only_compat() -> Non
     assert entry == "[Y1000] hello"
 
 
-def test_project_compatibility_event_log_prefers_legacy_entry_when_present() -> None:
+def test_project_compatibility_event_log_uses_canonical_description() -> None:
     records = [
-        WorldEventRecord(kind="battle", year=1000, description="new-format", legacy_event_log_entry="legacy-format"),
+        WorldEventRecord(kind="battle", year=1000, description="new-format"),
     ]
 
     projected = project_compatibility_event_log(records, max_event_log=10, translate=_translate)
-    assert projected == ["legacy-format"]
+    assert projected == ["[Y1000 M1 D1] new-format"]
 
 
 def test_project_compatibility_event_log_uses_formatting_when_no_legacy_entry() -> None:
@@ -50,3 +50,19 @@ def test_project_compatibility_event_log_uses_formatting_when_no_legacy_entry() 
 
     projected = project_compatibility_event_log(records, max_event_log=10, translate=_translate)
     assert projected == ["[Y1001 M6 D4] battle"]
+
+
+def test_project_compatibility_event_log_preserves_exact_legacy_event_log_entry() -> None:
+    records = [
+        WorldEventRecord(
+            kind="legacy_event_log",
+            year=1000,
+            month=1,
+            day=1,
+            description="Year 1000: A legacy omen spread through the capital.",
+            legacy_event_log_entry="Year 1000: A legacy omen spread through the capital.",
+        ),
+    ]
+
+    projected = project_compatibility_event_log(records, max_event_log=10, translate=_translate)
+    assert projected == ["Year 1000: A legacy omen spread through the capital."]

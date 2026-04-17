@@ -65,7 +65,10 @@ class AdventureMixin:
     def _start_solo_adventure(self, candidates: List["Character"]) -> None:
         """Pick one candidate and start a solo adventure."""
         char = self.rng.choice(candidates)
-        run = create_adventure_run(char, self.world, rng=self.rng, id_rng=self.id_rng)
+        try:
+            run = create_adventure_run(char, self.world, rng=self.rng, id_rng=self.id_rng)
+        except ValueError:
+            return
         char.active_adventure_id = run.adventure_id
         char.add_history(
             tr(
@@ -99,20 +102,18 @@ class AdventureMixin:
         # instant cross-map assembly.
         leader = self.rng.choice(candidates)
         same_location = [c for c in candidates if c.location_id == leader.location_id and c.char_id != leader.char_id]
-        other_locations = [c for c in candidates if c.location_id != leader.location_id and c.char_id != leader.char_id]
-
         size = self.rng.choice(range(2, _MAX_PARTY_SIZE + 1))
         size = min(size, len(candidates))
         needed_companions = max(0, size - 1)
         selected_companions = self.rng.sample(same_location, min(needed_companions, len(same_location)))
-        if len(selected_companions) < needed_companions:
-            remaining = needed_companions - len(selected_companions)
-            selected_companions.extend(self.rng.sample(other_locations, min(remaining, len(other_locations))))
         members = [leader] + selected_companions
         leader = members[0]
 
         # Build adventure on leader
-        run = create_adventure_run(leader, self.world, rng=self.rng, id_rng=self.id_rng)
+        try:
+            run = create_adventure_run(leader, self.world, rng=self.rng, id_rng=self.id_rng)
+        except ValueError:
+            return
 
         # Apply party data
         run.member_ids = [m.char_id for m in members]

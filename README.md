@@ -234,6 +234,8 @@ supports:
 - Save snapshots persist canonical `world.event_records`; `Simulator.history`
   and `World.event_log` are runtime compatibility projections with backward-load
   support for older snapshots.
+- Event impact / propagation rules can be provided from the active
+  `SettingBundle` (bundled defaults remain the fallback).
 - Changes are being kept incremental and modular.
 
 ## Current Limitations

@@ -32,6 +32,9 @@ form that tests can enforce.
 ## Canonical Event Data
 
 - `World.event_records` is the canonical structured event store.
+- `WorldEventRecord` is canonical-first; optional compatibility payloads
+  (`legacy_event_result` / `legacy_event_log_entry`) may still be persisted
+  in-record only to preserve backward-load adapter behavior.
 - `World.event_log` is a compatibility display buffer derived from canonical
   events.
 - `Simulator.history` is a legacy `EventResult` adapter projected from
@@ -64,6 +67,8 @@ form that tests can enforce.
   `history`/`event_log`.
 - New snapshots must persist canonical `event_records` as the event source of
   truth.
+- Event-impact / propagation rules are loaded from `SettingBundle` when
+  provided, with bundled defaults as fallback.
 
 ## Deterministic Harness Expectations
 

@@ -310,8 +310,8 @@ class Simulator(
         # Party returned (design §4.4: check recently completed adventures)
         if self._recently_completed_adventures:
             for run in self._recently_completed_adventures:
-                char = self.world.get_character_by_id(run.character_id)
-                if char and (char.favorite or char.spotlighted):
+                char = self._watched_party_member(run)
+                if char is not None:
                     reasons.append(("party_returned",
                                     self.AUTO_PAUSE_PRIORITIES["party_returned"]))
                     break
@@ -330,9 +330,22 @@ class Simulator(
                 if run.pending_choice is not None:
                     return {"character": run.character_name, "location": self.world.location_name(run.destination)}
         if reason == "party_returned" and self._recently_completed_adventures:
+            for run in reversed(self._recently_completed_adventures):
+                watched = self._watched_party_member(run)
+                if watched is not None:
+                    return {"character": watched.name, "location": self.world.location_name(run.origin)}
             run = self._recently_completed_adventures[-1]
-            return {"character": run.character_name, "location": self.world.location_name(run.destination)}
+            return {"character": run.character_name, "location": self.world.location_name(run.origin)}
         return {}
+
+    def _watched_party_member(self, run: AdventureRun):
+        """Return a watched member of the run, if one exists."""
+        member_ids = list(run.member_ids) or [run.character_id]
+        for member_id in member_ids:
+            char = self.world.get_character_by_id(member_id)
+            if char is not None and (char.favorite or char.spotlighted or char.playable):
+                return char
+        return None
 
     # ------------------------------------------------------------------
     # Serialization

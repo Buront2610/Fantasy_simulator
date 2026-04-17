@@ -134,7 +134,6 @@ def test_append_canonical_event_record_normalizes_invalid_location_id() -> None:
         secondary_actor_ids=["c1"],
         tags=["t1"],
         impacts=[{"k": "v"}],
-        legacy_event_result={"metadata": {"a": 1}},
     )
 
     stored = append_canonical_event_record(
@@ -153,12 +152,10 @@ def test_append_canonical_event_record_normalizes_invalid_location_id() -> None:
     record.secondary_actor_ids.append("c2")
     record.tags.append("t2")
     record.impacts[0]["k"] = "mutated"
-    record.legacy_event_result["metadata"]["a"] = 2
 
     assert world.event_records[-1].secondary_actor_ids == ["c1"]
     assert world.event_records[-1].tags == ["t1"]
     assert world.event_records[-1].impacts == [{"k": "v"}]
-    assert world.event_records[-1].legacy_event_result == {"metadata": {"a": 1}}
 
 
 def test_append_canonical_event_record_keeps_identity_when_location_is_none() -> None:
@@ -176,11 +173,12 @@ def test_append_canonical_event_record_keeps_identity_when_location_is_none() ->
     assert stored is record
 
 
-def test_apply_event_impact_fails_fast_on_invalid_rule_attribute(monkeypatch) -> None:
+def test_apply_event_impact_fails_fast_on_invalid_rule_attribute() -> None:
     world = World()
     from fantasy_simulator import world_event_state as wes
 
-    monkeypatch.setitem(wes.EVENT_IMPACT_RULES, "broken_kind", {"unknown_attr": 1})
+    custom_rules = wes.clone_default_event_impact_rules()
+    custom_rules["broken_kind"] = {"unknown_attr": 1}
     try:
         with pytest.raises(ValueError, match="Unsupported impact attribute"):
             apply_event_impact_to_location(
@@ -188,16 +186,18 @@ def test_apply_event_impact_fails_fast_on_invalid_rule_attribute(monkeypatch) ->
                 location_id="loc_thornwood",
                 location_index=world._location_id_index,
                 clamp_state=_clamp,
+                impact_rules=custom_rules,
             )
     finally:
-        wes.EVENT_IMPACT_RULES.pop("broken_kind", None)
+        custom_rules.pop("broken_kind", None)
 
 
-def test_apply_event_impact_fails_fast_on_invalid_rule_delta_type(monkeypatch) -> None:
+def test_apply_event_impact_fails_fast_on_invalid_rule_delta_type() -> None:
     world = World()
     from fantasy_simulator import world_event_state as wes
 
-    monkeypatch.setitem(wes.EVENT_IMPACT_RULES, "broken_kind", {"danger": "1"})
+    custom_rules = wes.clone_default_event_impact_rules()
+    custom_rules["broken_kind"] = {"danger": "1"}
     try:
         with pytest.raises(ValueError, match="Unsupported impact delta type"):
             apply_event_impact_to_location(
@@ -205,6 +205,7 @@ def test_apply_event_impact_fails_fast_on_invalid_rule_delta_type(monkeypatch) -
                 location_id="loc_thornwood",
                 location_index=world._location_id_index,
                 clamp_state=_clamp,
+                impact_rules=custom_rules,
             )
     finally:
-        wes.EVENT_IMPACT_RULES.pop("broken_kind", None)
+        custom_rules.pop("broken_kind", None)

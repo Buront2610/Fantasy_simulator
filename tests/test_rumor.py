@@ -647,6 +647,47 @@ def test_generate_rumor_uses_absolute_day_after_calendar_change():
     assert rumor.age_in_months == 1
 
 
+def test_generate_rumor_uses_month_boundaries_for_irregular_month_lengths():
+    world = World()
+    weird_calendar = CalendarDefinition(
+        calendar_key="weird_cycle",
+        display_name="Weird Cycle",
+        months=[
+            CalendarMonthDefinition("long", "Longmoon", 100, season="winter"),
+            CalendarMonthDefinition("blink", "Blink", 1, season="spring"),
+        ],
+    )
+    bundle = world.setting_bundle
+    bundle.world_definition.calendar = weird_calendar
+    world.setting_bundle = bundle
+
+    record = WorldEventRecord(
+        record_id="evt_irregular_months",
+        kind="battle",
+        year=1000,
+        month=1,
+        day=1,
+        absolute_day=1,
+        calendar_key="weird_cycle",
+        location_id="loc_aethoria_capital",
+        description="Battle in a very long month",
+        severity=4,
+    )
+
+    rumor = generate_rumor_from_event(
+        record,
+        listener_location_id="loc_aethoria_capital",
+        current_year=1000,
+        current_month=2,
+        current_absolute_day=101,
+        world=world,
+        rng=random.Random(0),
+    )
+
+    assert rumor is not None
+    assert rumor.age_in_months == 1
+
+
 # ------------------------------------------------------------------
 # Kind-based rumor description builder
 # ------------------------------------------------------------------

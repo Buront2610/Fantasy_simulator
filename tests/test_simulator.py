@@ -6,7 +6,7 @@ from collections import Counter
 
 import pytest
 
-from fantasy_simulator.events import EventResult
+from fantasy_simulator.events import EventResult, WorldEventRecord
 from fantasy_simulator.adventure import (
     AdventureChoice,
     AdventureRun,
@@ -341,6 +341,66 @@ class TestGetCharacterStory:
         sim_small.run(years=3)
         all_stories = sim_small.get_all_stories()
         assert isinstance(all_stories, str)
+
+    def test_story_combines_canonical_event_records_with_supplemental_history(self):
+        world = World()
+        hero = Character("Hero", 25, "Male", "Human", "Warrior", location_id="loc_aethoria_capital")
+        world.add_character(hero)
+        hero.history.append("Born beneath a comet.")
+        world.record_event(
+            WorldEventRecord(
+                record_id="story_canonical_1",
+                kind="meeting",
+                year=world.year,
+                month=1,
+                primary_actor_id=hero.char_id,
+                description="Canonical story event",
+                severity=2,
+            )
+        )
+        sim = Simulator(world, events_per_year=0, seed=1)
+
+        story = sim.get_character_story(hero.char_id)
+
+        assert "Canonical story event" in story
+        assert "Born beneath a comet." in story
+        assert story.index("Canonical story event") < story.index("Born beneath a comet.")
+
+    def test_story_orders_legacy_undated_records_by_nominal_date(self):
+        world = World()
+        hero = Character("Hero", 25, "Male", "Human", "Warrior", location_id="loc_aethoria_capital")
+        world.add_character(hero)
+        world.event_records.extend(
+            [
+                WorldEventRecord(
+                    record_id="story_dated_early",
+                    kind="meeting",
+                    year=1000,
+                    month=1,
+                    day=1,
+                    absolute_day=10,
+                    primary_actor_id=hero.char_id,
+                    description="Earlier dated event",
+                    severity=2,
+                ),
+                WorldEventRecord(
+                    record_id="story_legacy_late",
+                    kind="battle",
+                    year=1001,
+                    month=1,
+                    day=1,
+                    absolute_day=0,
+                    primary_actor_id=hero.char_id,
+                    description="Later legacy undated event",
+                    severity=2,
+                ),
+            ]
+        )
+        sim = Simulator(world, events_per_year=0, seed=1)
+
+        story = sim.get_character_story(hero.char_id)
+
+        assert story.index("Earlier dated event") < story.index("Later legacy undated event")
 
 
 # ---------------------------------------------------------------------------
@@ -738,6 +798,47 @@ class TestAdventureSafety:
         assert far.char_id not in set(run.member_ids)
         assert run.retreat_rule == RETREAT_ON_TROPHY
 
+    def test_party_formation_does_not_snap_remote_companions_into_party(self, monkeypatch):
+        world = World()
+        leader = Character("Leader", 25, "Male", "Human", "Warrior", location_id="loc_aethoria_capital")
+        far = Character("Far", 25, "Female", "Human", "Rogue", location_id="loc_thornwood")
+        world.add_character(leader)
+        world.add_character(far)
+        sim = Simulator(world, events_per_year=0, adventure_steps_per_year=0, seed=11)
+
+        class FixedPartyRng:
+            def random(self):
+                return 0.0
+
+            def choice(self, options):
+                if leader in options:
+                    return leader
+                if 2 in options:
+                    return 2
+                return options[0]
+
+            def sample(self, population, k):
+                return list(population[:k])
+
+            def choices(self, population, weights=None, k=1):
+                return [population[0]] * k
+
+            def randint(self, lo, hi):
+                return lo
+
+        sim.rng = FixedPartyRng()
+        sim.id_rng = FixedPartyRng()
+        monkeypatch.setattr(
+            "fantasy_simulator.simulation.adventure_coordinator.select_party_policy",
+            lambda members, rng: POLICY_TREASURE,
+        )
+
+        sim._start_party_adventure([leader, far])
+        run = world.active_adventures[0]
+
+        assert run.member_ids == [leader.char_id]
+        assert far.char_id not in set(run.member_ids)
+
     def test_companion_death_triggers_death_side_effects_for_companion(self):
         world = World()
         leader = Character("Leader", 25, "Male", "Human", "Warrior", location_id="loc_aethoria_capital")
@@ -765,7 +866,7 @@ class TestAdventureSafety:
 
         class FixedRng:
             def __init__(self):
-                self.values = iter([0.99, 0.12])
+                self.values = iter([0.99, 0.05])
 
             def random(self):
                 return next(self.values, 0.99)

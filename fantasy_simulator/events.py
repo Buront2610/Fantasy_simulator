@@ -472,7 +472,7 @@ class EventSystem:
 
     def event_journey(self, char: Character, world: World, rng: Any = random) -> EventResult:
         neighbours = world.get_neighboring_locations(char.location_id)
-        if not neighbours:
+        if not neighbours and not world.routes:
             neighbours = list(world.grid.values())
         if not neighbours:
             return EventResult(

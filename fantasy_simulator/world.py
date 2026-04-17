@@ -5,14 +5,27 @@ world.py - World map, LocationState dataclass, and the World class.
 from __future__ import annotations
 
 import random
+from collections import deque
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from .event_models import WorldEventRecord
 from .i18n import tr
+from .rule_override_resolution import (
+    clone_default_event_impact_rules,
+    clone_default_propagation_rules,
+    resolve_event_impact_rule_overrides,
+    resolve_propagation_rule_overrides,
+)
 from .world_event_log import format_event_log_entry, project_compatibility_event_log
-from .world_event_state import apply_event_impact_to_location, append_canonical_event_record
-from .world_state_propagation import decay_toward_baseline, propagate_state_changes
+from .world_event_state import (
+    apply_event_impact_to_location,
+    append_canonical_event_record,
+)
+from .world_state_propagation import (
+    decay_toward_baseline,
+    propagate_state_changes,
+)
 from .content.setting_bundle import (
     CalendarDefinition,
     SettingBundle,
@@ -306,6 +319,8 @@ class LocationState:
 class World:
     """Represents the entire game world."""
 
+    WATCHED_ACTOR_TAG_PREFIX = "watched_actor:"
+
     def __init__(
         self,
         name: str = "Aethoria",
@@ -337,6 +352,8 @@ class World:
         # - event_log is an ephemeral CLI-facing compatibility display adapter.
         self.event_log: List[str] = []
         self.event_records: List[WorldEventRecord] = []
+        self.event_impact_rules: Dict[str, Dict[str, int]] = clone_default_event_impact_rules()
+        self.propagation_rules: Dict[str, Dict[str, float | int]] = clone_default_propagation_rules()
         self.rumors: List[Rumor] = []
         self.rumor_archive: List[Rumor] = []
         self.active_adventures: List[AdventureRun] = []
@@ -396,6 +413,12 @@ class World:
                 self.calendar_baseline = _clone_calendar(next_calendar)
                 if hasattr(self, "calendar_history"):
                     self.calendar_history = []
+        self.event_impact_rules = resolve_event_impact_rule_overrides(
+            self._setting_bundle.world_definition.event_impact_rules
+        )
+        self.propagation_rules = resolve_propagation_rule_overrides(
+            self._setting_bundle.world_definition.propagation_rules
+        )
 
     def apply_setting_bundle(self, bundle: SettingBundle) -> None:
         """Apply a bundle while keeping derived world structures consistent."""
@@ -726,6 +749,42 @@ class World:
                 result.append(other)
         return result
 
+    def reachable_location_ids(self, location_id: str) -> List[str]:
+        """Return all reachable location_ids from ``location_id``."""
+        if location_id not in self._location_id_index:
+            return []
+
+        visited = {location_id}
+        queue = deque([location_id])
+        reachable: List[str] = []
+
+        while queue:
+            current = queue.popleft()
+            if self.routes:
+                neighbor_ids = self.get_connected_site_ids(current)
+            else:
+                current_loc = self._location_id_index.get(current)
+                if current_loc is None:
+                    continue
+                neighbor_ids = [
+                    loc.id
+                    for loc in (
+                        self.grid.get((current_loc.x - 1, current_loc.y)),
+                        self.grid.get((current_loc.x + 1, current_loc.y)),
+                        self.grid.get((current_loc.x, current_loc.y - 1)),
+                        self.grid.get((current_loc.x, current_loc.y + 1)),
+                    )
+                    if loc is not None
+                ]
+            for neighbor_id in neighbor_ids:
+                if neighbor_id in visited or neighbor_id not in self._location_id_index:
+                    continue
+                visited.add(neighbor_id)
+                reachable.append(neighbor_id)
+                queue.append(neighbor_id)
+
+        return reachable
+
     def _location_ids_for_site_tag(self, tag: str) -> List[str]:
         """Return in-bounds location_ids for bundle site seeds carrying *tag*."""
         return [
@@ -841,12 +900,42 @@ class World:
         """Rebuild derived indexes and repair invariants after deserialization."""
         self._repair_location_references()
         self.rebuild_char_index()
+        self._backfill_watched_actor_tags_after_load()
         self.ensure_valid_character_locations()
         self.rebuild_adventure_index()
         self.rebuild_recent_event_ids()
         self._rebuild_location_memorial_ids()
         if self.event_records:
             self.rebuild_compatibility_event_log()
+
+    def _backfill_watched_actor_tags_after_load(self) -> None:
+        """Freeze watched-actor report context for older untagged canonical records.
+
+        Older schema-v8 saves may already store canonical event records but
+        predate watched-actor tags. When such a snapshot is loaded, use the
+        current watched roster as the best available approximation and stamp
+        those tags onto untagged records once so future flag changes do not
+        rewrite historical reports again.
+        """
+        watched_actor_ids = {
+            character.char_id
+            for character in self.characters
+            if character.favorite or character.spotlighted or character.playable
+        }
+        if not watched_actor_ids:
+            return
+
+        for record in self.event_records:
+            if any(tag.startswith(self.WATCHED_ACTOR_TAG_PREFIX) for tag in record.tags):
+                continue
+            actor_ids = [record.primary_actor_id] + list(record.secondary_actor_ids)
+            watched_tags = [
+                f"{self.WATCHED_ACTOR_TAG_PREFIX}{actor_id}"
+                for actor_id in actor_ids
+                if actor_id and actor_id in watched_actor_ids
+            ]
+            if watched_tags:
+                record.tags = list(dict.fromkeys(list(record.tags) + watched_tags))
 
     def add_adventure(self, run: AdventureRun) -> None:
         self.active_adventures.append(run)
@@ -971,12 +1060,59 @@ class World:
         source = self._location_id_index.get(location_id)
         if source is None:
             return []
+        if self.routes:
+            return [
+                self._location_id_index[neighbor_id]
+                for neighbor_id in self.get_connected_site_ids(location_id)
+                if neighbor_id in self._location_id_index
+            ]
         neighbours: List[LocationState] = []
         for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
             coord = (source.x + dx, source.y + dy)
             if coord in self.grid:
                 neighbours.append(self.grid[coord])
         return neighbours
+
+    def months_elapsed_between(
+        self,
+        start_year: int,
+        start_month: int,
+        end_year: int,
+        end_month: int,
+        *,
+        start_day: int = 1,
+        end_day: int = 1,
+        start_calendar_key: str = "",
+    ) -> int:
+        """Return completed month boundaries between two in-world dates."""
+        start = (int(start_year), max(1, int(start_month)), max(1, int(start_day)))
+        end = (int(end_year), max(1, int(end_month)), max(1, int(end_day)))
+        if end < start:
+            return 0
+
+        elapsed = 0
+        cursor_year, cursor_month, cursor_day = start
+        cursor_calendar_key = start_calendar_key
+
+        while True:
+            calendar = self.calendar_definition_for_date(
+                cursor_year,
+                cursor_month,
+                cursor_day,
+                calendar_key=cursor_calendar_key,
+            )
+            next_year = cursor_year
+            next_month = cursor_month + 1
+            if next_month > calendar.months_per_year:
+                next_month = 1
+                next_year += 1
+            if (next_year, next_month, 1) > end:
+                break
+            elapsed += 1
+            cursor_year, cursor_month, cursor_day = next_year, next_month, 1
+            cursor_calendar_key = ""
+
+        return elapsed
 
     def random_location(self, exclude_dungeon: bool = False, rng: Any = random) -> LocationState:
         options = list(self.grid.values())
@@ -1221,6 +1357,19 @@ class World:
 
         Returns the canonical stored record (may be a normalized copy).
         """
+        actor_ids = [record.primary_actor_id] + list(record.secondary_actor_ids)
+        watched_tags: List[str] = []
+        for actor_id in actor_ids:
+            if not actor_id:
+                continue
+            actor = self.get_character_by_id(actor_id)
+            if actor is None:
+                continue
+            if actor.favorite or actor.spotlighted or actor.playable:
+                watched_tags.append(f"{self.WATCHED_ACTOR_TAG_PREFIX}{actor_id}")
+        if watched_tags:
+            record.tags = list(dict.fromkeys(list(record.tags) + watched_tags))
+
         stored_record = append_canonical_event_record(
             record=record,
             event_records=self.event_records,
@@ -1243,6 +1392,7 @@ class World:
             location_id=location_id,
             location_index=self._location_id_index,
             clamp_state=_clamp_state,
+            impact_rules=self.event_impact_rules,
         )
 
     # Annual decay rate: each year, event-driven deviations from baseline
@@ -1274,6 +1424,7 @@ class World:
             months=period_months,
             months_per_year=self.months_per_year,
             clamp_state=_clamp_state,
+            propagation_rules=self.propagation_rules,
         )
 
     def get_events_by_location(self, location_id: str) -> List[WorldEventRecord]:

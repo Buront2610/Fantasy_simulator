@@ -97,7 +97,7 @@ class WorldEventRecord:
         self.absolute_day = max(0, int(self.absolute_day))
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        payload = {
             "record_id": self.record_id,
             "kind": self.kind,
             "year": self.year,
@@ -113,9 +113,75 @@ class WorldEventRecord:
             "calendar_key": self.calendar_key,
             "tags": list(self.tags),
             "impacts": deepcopy(self.impacts),
-            "legacy_event_result": deepcopy(self.legacy_event_result) if self.legacy_event_result is not None else None,
-            "legacy_event_log_entry": self.legacy_event_log_entry,
         }
+        if self.legacy_event_result is not None:
+            payload["legacy_event_result"] = deepcopy(self.legacy_event_result)
+        if self.legacy_event_log_entry is not None:
+            payload["legacy_event_log_entry"] = self.legacy_event_log_entry
+        return payload
+
+    @staticmethod
+    def _validate_legacy_event_result_payload(payload: Any) -> Optional[Dict[str, Any]]:
+        if payload is None:
+            return None
+        if not isinstance(payload, dict):
+            raise ValueError("legacy_event_result must be a dict when provided")
+        raw_affected_characters = payload.get("affected_characters", [])
+        if not isinstance(raw_affected_characters, list) or any(
+            not isinstance(character_id, str) for character_id in raw_affected_characters
+        ):
+            raise ValueError("legacy_event_result.affected_characters must be a list of strings")
+        try:
+            projected = EventResult.from_dict(payload)
+        except (AttributeError, KeyError, TypeError, ValueError) as exc:
+            raise ValueError("legacy_event_result must be a valid EventResult payload") from exc
+        if not isinstance(projected.description, str):
+            raise ValueError("legacy_event_result.description must be a string")
+        if not isinstance(projected.stat_changes, dict):
+            raise ValueError("legacy_event_result.stat_changes must be a dict")
+        for character_id, stat_changes in projected.stat_changes.items():
+            if not isinstance(character_id, str):
+                raise ValueError("legacy_event_result.stat_changes keys must be strings")
+            if not isinstance(stat_changes, dict):
+                raise ValueError("legacy_event_result.stat_changes values must be dicts")
+            for stat_name, delta in stat_changes.items():
+                if not isinstance(stat_name, str):
+                    raise ValueError("legacy_event_result.stat names must be strings")
+                if not isinstance(delta, int) or isinstance(delta, bool):
+                    raise ValueError("legacy_event_result stat deltas must be integers")
+        if not isinstance(projected.event_type, str):
+            raise ValueError("legacy_event_result.event_type must be a string")
+        if not isinstance(projected.year, int) or isinstance(projected.year, bool):
+            raise ValueError("legacy_event_result.year must be an integer")
+        if not isinstance(projected.metadata, dict):
+            raise ValueError("legacy_event_result.metadata must be a dict")
+        return projected.to_dict()
+
+    @staticmethod
+    def _validate_legacy_event_log_entry_payload(payload: Any) -> Optional[str]:
+        if payload is None:
+            return None
+        if not isinstance(payload, str):
+            raise ValueError("legacy_event_log_entry must be a string when provided")
+        return payload
+
+    @staticmethod
+    def _validate_string_list_payload(payload: Any, field_name: str) -> List[str]:
+        if payload is None:
+            raise ValueError(f"{field_name} must be a list of strings when provided")
+        if not isinstance(payload, list) or any(not isinstance(item, str) for item in payload):
+            raise ValueError(f"{field_name} must be a list of strings")
+        return list(payload)
+
+    @staticmethod
+    def _validate_impacts_payload(payload: Any) -> List[Dict[str, Any]]:
+        if payload is None:
+            raise ValueError("impacts must be a list of dicts when provided")
+        if not isinstance(payload, list):
+            raise ValueError("impacts must be a list of dicts")
+        if any(not isinstance(item, dict) for item in payload):
+            raise ValueError("impacts entries must be dicts")
+        return deepcopy(payload)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "WorldEventRecord":
@@ -128,19 +194,18 @@ class WorldEventRecord:
             absolute_day=data.get("absolute_day", 0),
             location_id=data.get("location_id"),
             primary_actor_id=data.get("primary_actor_id"),
-            secondary_actor_ids=list(data.get("secondary_actor_ids", [])),
+            secondary_actor_ids=cls._validate_string_list_payload(
+                data.get("secondary_actor_ids", []),
+                "secondary_actor_ids",
+            ),
             description=data.get("description", ""),
             severity=data.get("severity", 1),
             visibility=data.get("visibility", "public"),
             calendar_key=data.get("calendar_key", ""),
-            tags=list(data.get("tags", [])),
-            impacts=deepcopy(data.get("impacts", [])),
-            legacy_event_result=(
-                deepcopy(data["legacy_event_result"])
-                if data.get("legacy_event_result") is not None
-                else None
-            ),
-            legacy_event_log_entry=data.get("legacy_event_log_entry"),
+            tags=cls._validate_string_list_payload(data.get("tags", []), "tags"),
+            impacts=cls._validate_impacts_payload(data.get("impacts", [])),
+            legacy_event_result=cls._validate_legacy_event_result_payload(data.get("legacy_event_result")),
+            legacy_event_log_entry=cls._validate_legacy_event_log_entry_payload(data.get("legacy_event_log_entry")),
         )
 
     @classmethod
@@ -159,6 +224,9 @@ class WorldEventRecord:
         """Create a WorldEventRecord from an EventResult."""
         primary = result.affected_characters[0] if result.affected_characters else None
         secondary = result.affected_characters[1:] if len(result.affected_characters) > 1 else []
+        legacy_event_result = None
+        if result.stat_changes or result.metadata:
+            legacy_event_result = result.to_dict()
         return cls(
             record_id=record_id or generate_record_id(rng),
             kind=result.event_type,
@@ -172,17 +240,22 @@ class WorldEventRecord:
             description=result.description,
             severity=severity,
             calendar_key=calendar_key,
-            legacy_event_result=result.to_dict(),
+            legacy_event_result=legacy_event_result,
         )
 
     def to_event_result(self) -> EventResult:
         """Project a legacy EventResult adapter from the canonical record."""
-        if self.legacy_event_result is not None:
-            return EventResult.from_dict(self.legacy_event_result)
         affected_characters: List[str] = []
         if self.primary_actor_id is not None:
             affected_characters.append(self.primary_actor_id)
         affected_characters.extend(self.secondary_actor_ids)
+        if self.legacy_event_result is not None:
+            projected = EventResult.from_dict(self.legacy_event_result)
+            projected.description = self.description
+            projected.affected_characters = affected_characters
+            projected.event_type = self.kind
+            projected.year = self.year
+            return projected
         return EventResult(
             description=self.description,
             affected_characters=affected_characters,

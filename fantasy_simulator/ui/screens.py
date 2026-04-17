@@ -241,6 +241,115 @@ def _show_results(sim: Simulator, ctx: UIContext | None = None) -> None:
             break
 
 
+def _build_region_memory_payloads(
+    world: World,
+) -> tuple[dict[str, list[str]], dict[str, list[str]], dict[str, list[str]]]:
+    """Return renderer-ready world memory payloads for region-map enrichment."""
+    site_memorials: dict[str, list[str]] = {}
+    site_aliases: dict[str, list[str]] = {}
+    site_traces: dict[str, list[str]] = {}
+    for loc in world.grid.values():
+        if loc.memorial_ids:
+            mems = world.get_memorials_for_location(loc.id)
+            if mems:
+                site_memorials[loc.id] = [
+                    tr("memorial_entry", year=m.year, epitaph=m.epitaph)
+                    for m in mems[:3]
+                ]
+        if loc.aliases:
+            site_aliases[loc.id] = list(loc.aliases)[:3]
+        if loc.live_traces:
+            site_traces[loc.id] = [
+                t.get("text", "") for t in loc.live_traces[-3:]
+            ]
+    return site_memorials, site_aliases, site_traces
+
+
+def _build_detail_memory_payload(
+    world: World,
+    loc: Any,
+) -> tuple[list[str] | None, list[str] | None, list[str] | None]:
+    """Return renderer-ready world memory payloads for a location detail panel."""
+    memorials: list[str] | None = None
+    aliases = list(loc.aliases) or None
+    live_traces: list[str] | None = None
+
+    if loc.memorial_ids:
+        memorials = [
+            tr("memorial_entry", year=m.year, epitaph=m.epitaph)
+            for m in world.get_memorials_for_location(loc.id)
+        ] or None
+
+    recent_traces = list(reversed(loc.live_traces[-5:]))
+    if recent_traces:
+        live_traces = [trace.get("text", "") for trace in recent_traces] or None
+
+    return memorials, aliases, live_traces
+
+
+def _render_region_map_for_location(
+    world: World,
+    info: Any,
+    center_loc: Any,
+) -> str:
+    """Render a region map using the same enrichment path as the interactive UI."""
+    from .map_renderer import render_region_map
+
+    site_memorials, site_aliases, site_traces = _build_region_memory_payloads(world)
+    return render_region_map(
+        info,
+        center_loc.id,
+        site_memorials=site_memorials,
+        site_aliases=site_aliases,
+        site_traces=site_traces,
+    )
+
+
+def _render_location_detail_for_location(
+    world: World,
+    info: Any,
+    loc: Any,
+) -> str:
+    """Render a location detail panel using the same enrichment path as the interactive UI."""
+    from .map_renderer import render_location_detail
+
+    memorials, aliases, live_traces = _build_detail_memory_payload(world, loc)
+    return render_location_detail(
+        info,
+        loc.id,
+        memorials=memorials,
+        aliases=aliases,
+        live_traces=live_traces,
+    )
+
+
+def render_world_map_views_for_location(
+    world: World,
+    location_id: str,
+    *,
+    include_overview: bool = True,
+) -> dict[str, str]:
+    """Return stable world-map overview/region/detail renderings for one location.
+
+    This is a behavior-focused seam for tests and non-interactive callers that need
+    the same world-memory enrichment as the CLI map flow without scripting menu input.
+    """
+    from .map_renderer import build_map_info, render_world_overview
+
+    loc = world.get_location_by_id(location_id)
+    if loc is None:
+        raise ValueError(f"Unknown location id: {location_id}")
+
+    info = build_map_info(world)
+    rendered = {
+        "region": _render_region_map_for_location(world, info, loc),
+        "detail": _render_location_detail_for_location(world, info, loc),
+    }
+    if include_overview:
+        rendered["overview"] = render_world_overview(info)
+    return rendered
+
+
 def _show_detail_for_location(
     world: World,
     info: Any,
@@ -248,28 +357,11 @@ def _show_detail_for_location(
     ctx: UIContext | None = None,
 ) -> None:
     """Render the detail panel for a single location."""
-    from .map_renderer import render_location_detail
-
     ctx = _default_ctx(ctx)
     out = ctx.out
     inp = ctx.inp
-
-    mem_list: list[str] = []
-    if loc.memorial_ids:
-        mems = world.get_memorials_for_location(loc.id)
-        mem_list = [
-            tr("memorial_entry", year=m.year, epitaph=m.epitaph)
-            for m in mems
-        ]
-    recent_traces = list(reversed(loc.live_traces[-5:]))
-    trace_list = [t.get("text", "") for t in recent_traces]
     out.print_line()
-    out.print_line(render_location_detail(
-        info, loc.id,
-        memorials=mem_list or None,
-        aliases=list(loc.aliases) or None,
-        live_traces=trace_list or None,
-    ))
+    out.print_line(_render_location_detail_for_location(world, info, loc))
     inp.pause()
 
 
@@ -287,8 +379,6 @@ def _region_drill_loop(
     * **recenter** — pick any visible site and re-centre the region
     * **back** — return to the atlas overview
     """
-    from .map_renderer import render_region_map
-
     ctx = _default_ctx(ctx)
     out = ctx.out
 
@@ -296,32 +386,8 @@ def _region_drill_loop(
     cell_by_id = {c.location_id: c for c in info.cells.values()}
 
     while True:
-        # Build world memory data for region map enrichment (item 9)
-        site_memorials: dict[str, list[str]] = {}
-        site_aliases: dict[str, list[str]] = {}
-        site_traces: dict[str, list[str]] = {}
-        for loc in world.grid.values():
-            if loc.memorial_ids:
-                mems = world.get_memorials_for_location(loc.id)
-                if mems:
-                    site_memorials[loc.id] = [
-                        tr("memorial_entry", year=m.year, epitaph=m.epitaph)
-                        for m in mems[:3]
-                    ]
-            if loc.aliases:
-                site_aliases[loc.id] = list(loc.aliases)[:3]
-            if loc.live_traces:
-                site_traces[loc.id] = [
-                    t.get("text", "") for t in loc.live_traces[-3:]
-                ]
-
         out.print_line()
-        out.print_line(render_region_map(
-            info, center_loc.id,
-            site_memorials=site_memorials,
-            site_aliases=site_aliases,
-            site_traces=site_traces,
-        ))
+        out.print_line(_render_region_map_for_location(world, info, center_loc))
 
         # Build the visible-site list for the current region centre
         center_cell = None
@@ -476,7 +542,7 @@ def _show_world_map(sim: Simulator, ctx: UIContext | None = None) -> None:
             )
             if idx is not None:
                 loc_id, _ = labeled[idx]
-                loc = world._location_id_index.get(loc_id)
+                loc = world.get_location_by_id(loc_id)
                 if loc is not None:
                     _region_drill_loop(
                         world, info, loc, ctx=ctx,

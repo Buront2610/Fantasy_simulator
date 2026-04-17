@@ -87,12 +87,28 @@ _SEVERITY_THRESHOLD_MONTHLY = 2
 _SEVERITY_THRESHOLD_YEARLY = 3
 
 
-def _watched_char_ids(world: World) -> Set[str]:
-    """Return char_ids for favorite / spotlighted / playable characters."""
-    return {
+def _watched_char_ids(world: World, records: List[WorldEventRecord]) -> Set[str]:
+    """Return watched char_ids using immutable event tags when available."""
+    current_watched = {
         c.char_id for c in world.characters
         if c.favorite or c.spotlighted or c.playable
     }
+    tagged_ids = {
+        tag.split(world.WATCHED_ACTOR_TAG_PREFIX, 1)[1]
+        for record in records
+        for tag in record.tags
+        if tag.startswith(world.WATCHED_ACTOR_TAG_PREFIX)
+    }
+    if tagged_ids:
+        legacy_actor_ids = {
+            actor_id
+            for record in records
+            if not any(tag.startswith(world.WATCHED_ACTOR_TAG_PREFIX) for tag in record.tags)
+            for actor_id in _actors_in_record(record)
+            if actor_id in current_watched
+        }
+        return tagged_ids | legacy_actor_ids
+    return current_watched
 
 
 def _char_name_map(world: World) -> Dict[str, str]:
@@ -137,7 +153,7 @@ def generate_monthly_report(
     )
     season = world.season_for_date(year, month, calendar_key=record_calendar_key)
 
-    watched = _watched_char_ids(world)
+    watched = _watched_char_ids(world, records)
     names = _char_name_map(world)
 
     # Collect events per watched char that appeared in this period
@@ -187,19 +203,29 @@ def generate_monthly_report(
         (record.absolute_day for record in records if record.absolute_day > 0),
         default=world.latest_absolute_day_before_or_on(year, month),
     )
-    avg_days_per_month = max(1, period_calendar.days_per_year // period_calendar.months_per_year)
     all_rumors = list(world.rumors) + list(world.rumor_archive)
     rumor_entries = []
     for r in all_rumors:
         if (r.year_created, r.month_created) > (year, month):
             continue
         if report_absolute_day > 0 and r.created_absolute_day > 0:
-            age_at_report = max(0, (report_absolute_day - r.created_absolute_day) // avg_days_per_month)
-        else:
-            rumor_calendar = world.calendar_definition_for_date(
-                r.year_created, r.month_created, calendar_key=r.created_calendar_key
+            age_at_report = world.months_elapsed_between(
+                r.year_created,
+                r.month_created,
+                year,
+                month,
+                start_day=1,
+                end_day=period_calendar.days_in_month(month),
+                start_calendar_key=r.created_calendar_key,
             )
-            age_at_report = ((year - r.year_created) * rumor_calendar.months_per_year) + (month - r.month_created)
+        else:
+            age_at_report = world.months_elapsed_between(
+                r.year_created,
+                r.month_created,
+                year,
+                month,
+                start_calendar_key=r.created_calendar_key,
+            )
         if age_at_report >= RUMOR_MAX_AGE_MONTHS:
             continue
         if age_at_report > _RUMOR_FRESHNESS_MONTHS:
@@ -238,7 +264,7 @@ def generate_yearly_report(
 
     deaths_this_year = sum(1 for r in records if r.kind in EVENT_KINDS_FATAL)
 
-    watched = _watched_char_ids(world)
+    watched = _watched_char_ids(world, records)
     names = _char_name_map(world)
 
     # Collect events per watched char that appeared this year

@@ -80,7 +80,12 @@ def build_monthly_report_card_view(world: "World", year: int, month: int) -> Mon
             chars[r.primary_actor_id] = chars.get(r.primary_actor_id, 0) + 1
         if r.location_id:
             locs[r.location_id] = locs.get(r.location_id, 0) + 1
-        if r.kind in ("adventure_resolved", "adventure_choice"):
+        if r.kind in (
+            "adventure_returned",
+            "adventure_returned_injured",
+            "adventure_retreated",
+            "adventure_death",
+        ):
             completed_adventures.append(r.description)
         if r.kind in ("death", "adventure_death", "adventure_discovery"):
             new_memory.append(r.description)

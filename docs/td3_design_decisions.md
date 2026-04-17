@@ -1,18 +1,17 @@
 # TD-3 Design Decisions (world/events split)
 
-最終更新: 2026-04-15
+最終更新: 2026-04-16
 
 ## 1) Legacy fields in `WorldEventRecord`
 
-**Decision**: 当面は `legacy_event_result` / `legacy_event_log_entry` を `WorldEventRecord` に残す。
+**Decision**: `legacy_event_result` / `legacy_event_log_entry` は
+`WorldEventRecord` の optional compatibility payload として保持する。
 
 **理由**:
-- save/load 互換維持が最優先。
-- `Simulator.history` / `World.get_compatibility_event_log()` の既存アダプタが即時に利用可能。
-- sunset は TD-1 の保存フォーマット縮退バッチ（PR-J/K 前）で実施する。
-
-**Exit criteria**:
-- 互換アダプタが persistence に依存しなくなった時点で adapter 層へ移管。
+- canonical-first の event record を主に保ちつつ、older saves の backward-load
+  compatibility と legacy adapter の exact projection を維持するため。
+- runtime の互換 adapter (`Simulator.history`, compatibility log formatter) は
+  canonical fields を優先しつつ、必要な場合のみ persisted compatibility payload を使う。
 
 ## 2) Import surface (`events.py` vs `event_models.py`)
 
@@ -41,18 +40,23 @@
 
 ## 5) Legacy concern retreat plan
 
-**Decision**: `WorldEventRecord` に残した legacy fields は移行期間の ACL として扱う。
+**Decision**: legacy payload は canonical-first record に付随する optional
+compatibility field として限定保持する。
 
 **Boundary prep**:
 - canonical path は `kind/year/month/day/...` + `impacts/tags` を正とする。
-- legacy payload は adapter 専用領域として扱い、新規機能は依存しない。
-- sunset 時は adapter module へ移管し、record 本体から段階的に除去する。
+- legacy adapter (`Simulator.history`, compatibility event log) は canonical
+  projection を基本としつつ、migrated save の backward-load compatibility を守る
+  ため persisted compatibility payload も利用してよい。
 
 ## 6) Impact / propagation rule externalization prep
 
-**Decision**: 現在の static table は維持しつつ、bundle-driven 化を前提に境界を固定する。
+**Decision**: helper API を `rules` 引数受け取りへ拡張し、setting bundle から注入可能にした。
 
-**Prep TODO (PR-J/PR-K 前提)**:
-- `EVENT_IMPACT_RULES` / `PROPAGATION_RULES` を setting schema へ持ち上げるための型スロットを追加。
+**Current state**:
+- `WorldDefinition` に `event_impact_rules` / `propagation_rules` を追加し、
+  `World` が active bundle から rules を読み込み helper に渡す。
+- helper 側は bundled default rules を fallback として保持する。
+
+**Remaining TODO (PR-J/PR-K 前提)**:
 - era/faction modifier を rule evaluator の入力として注入可能にする。
-- 現在の helper API を `rules` 引数受け取り対応へ拡張し、static default を fallback とする。

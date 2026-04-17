@@ -16,6 +16,7 @@ from fantasy_simulator.reports import (
     generate_monthly_report,
     generate_yearly_report,
 )
+from fantasy_simulator.rumor import Rumor
 from fantasy_simulator.simulator import Simulator
 from fantasy_simulator.world import World
 
@@ -176,6 +177,54 @@ class TestGenerateMonthlyReport:
         char_names = {e.name for e in report.character_entries}
         assert "NPC" not in char_names
 
+    def test_report_uses_watched_tags_captured_at_record_time(self, world_with_chars):
+        hero = world_with_chars.characters[0]
+        stored = world_with_chars.record_event(WorldEventRecord(
+            record_id="r_tagged_watch",
+            kind="battle",
+            year=1000,
+            month=3,
+            primary_actor_id=hero.char_id,
+            description="Hero was watched when this happened",
+            severity=3,
+        ))
+        hero.favorite = False
+
+        report = generate_monthly_report(world_with_chars, 1000, 3)
+
+        assert f"{world_with_chars.WATCHED_ACTOR_TAG_PREFIX}{hero.char_id}" in stored.tags
+        assert [entry.name for entry in report.character_entries] == ["Hero"]
+
+    def test_report_keeps_legacy_untagged_watched_events_when_period_also_has_tagged_records(self, world_with_chars):
+        hero = world_with_chars.characters[0]
+        sidekick = world_with_chars.characters[1]
+        world_with_chars.event_records.append(
+            WorldEventRecord(
+                record_id="r_legacy_untagged_watch",
+                kind="meeting",
+                year=1000,
+                month=3,
+                primary_actor_id=hero.char_id,
+                description="Hero legacy event before watched tags existed",
+                severity=2,
+            )
+        )
+        world_with_chars.record_event(
+            WorldEventRecord(
+                record_id="r_modern_tagged_watch",
+                kind="battle",
+                year=1000,
+                month=3,
+                primary_actor_id=sidekick.char_id,
+                description="Sidekick modern tagged event",
+                severity=3,
+            )
+        )
+
+        report = generate_monthly_report(world_with_chars, 1000, 3)
+
+        assert {entry.name for entry in report.character_entries} == {"Hero", "Sidekick"}
+
     def test_notable_events_filtered_by_severity(self, world_with_chars):
         world_with_chars.record_event(WorldEventRecord(
             record_id="r3", kind="meeting", year=1000, month=5,
@@ -266,6 +315,35 @@ class TestGenerateMonthlyReport:
 
         assert report.month_label == "Wanetide"
         assert report.season == "summer"
+
+    def test_monthly_report_keeps_rumor_visible_across_irregular_month_lengths(self, world_with_chars):
+        weird_calendar = CalendarDefinition(
+            calendar_key="weird_cycle",
+            display_name="Weird Cycle",
+            months=[
+                CalendarMonthDefinition("long", "Longmoon", 100, season="winter"),
+                CalendarMonthDefinition("blink", "Blink", 1, season="spring"),
+            ],
+        )
+        bundle = world_with_chars.setting_bundle
+        bundle.world_definition.calendar = weird_calendar
+        world_with_chars.setting_bundle = bundle
+        world_with_chars.rumors.append(
+            Rumor(
+                id="rumor_irregular_months",
+                category="battle",
+                reliability="plausible",
+                description="A long-month rumor",
+                year_created=1000,
+                month_created=1,
+                created_absolute_day=1,
+                created_calendar_key="weird_cycle",
+            )
+        )
+
+        report = generate_monthly_report(world_with_chars, 1000, 2)
+
+        assert [entry.rumor_id for entry in report.rumor_entries] == ["rumor_irregular_months"]
 
 
 # ---------------------------------------------------------------------------

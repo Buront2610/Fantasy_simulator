@@ -370,6 +370,10 @@ _ROUTE_TYPE_PRIORITY: Dict[str, int] = {
 }
 
 
+def _band_label(band: str) -> str:
+    return tr(f"map_band_{band}")
+
+
 def _overlay_suffix(cell: MapCellInfo) -> str:
     """Build a compact overlay suffix string for a site cell.
 
@@ -1014,12 +1018,12 @@ def render_location_detail(
     rumor_label = tr('map_detail_rumor_heat')
 
     lines.append(f"  |{_fit(f' {safety_label}: {cell.safety_label}', w)}|")
-    lines.append(f"  |{_fit(f' {danger_label}: {cell.danger:>3} ({cell.danger_band})', w)}|")
-    lines.append(f"  |{_fit(f' {traffic_label}: {cell.traffic_indicator} ({cell.traffic_band})', w)}|")
+    lines.append(f"  |{_fit(f' {danger_label}: {cell.danger:>3} ({_band_label(cell.danger_band)})', w)}|")
+    lines.append(f"  |{_fit(f' {traffic_label}: {cell.traffic_indicator} ({_band_label(cell.traffic_band)})', w)}|")
     lines.append(f"  |{_fit(f' {pop_label}: {cell.population}', w)}|")
     lines.append(f"  |{_fit(f' {prosperity_label}: {cell.prosperity_label} ({cell.prosperity})', w)}|")
     lines.append(f"  |{_fit(f' {mood_label}: {cell.mood_label} ({cell.mood})', w)}|")
-    lines.append(f"  |{_fit(f' {rumor_label}: {cell.rumor_heat} ({cell.rumor_heat_band})', w)}|")
+    lines.append(f"  |{_fit(f' {rumor_label}: {cell.rumor_heat} ({_band_label(cell.rumor_heat_band)})', w)}|")
     lines.append(border)
 
     # Overlays

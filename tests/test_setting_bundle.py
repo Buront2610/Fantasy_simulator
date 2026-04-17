@@ -11,6 +11,7 @@ from fantasy_simulator.content.setting_bundle import (
     default_aethoria_bundle,
     load_setting_bundle,
 )
+from fantasy_simulator.world import World
 
 
 def test_world_definition_round_trip():
@@ -357,3 +358,129 @@ def test_empty_calendar_definition_uses_consistent_30_day_fallback():
     assert calendar.months_per_year == 1
     assert calendar.days_in_month(1) == 30
     assert calendar.days_per_year == 30
+
+
+def test_load_setting_bundle_rejects_invalid_event_impact_rule_delta(tmp_path):
+    bundle_path = tmp_path / "invalid-impact-rules.json"
+    bundle_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "world_definition": {
+                    "world_key": "invalid",
+                    "display_name": "Invalid",
+                    "lore_text": "Invalid lore",
+                    "event_impact_rules": {
+                        "meeting": {
+                            "mood": "loud",
+                        }
+                    },
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    try:
+        load_setting_bundle(bundle_path)
+    except ValueError as exc:
+        assert "event_impact_rules" in str(exc)
+        assert "Unsupported impact delta type" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError for invalid impact rule delta")
+
+
+def test_load_setting_bundle_rejects_unknown_event_impact_attribute(tmp_path):
+    bundle_path = tmp_path / "unknown-impact-attribute.json"
+    bundle_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "world_definition": {
+                    "world_key": "invalid",
+                    "display_name": "Invalid",
+                    "lore_text": "Invalid lore",
+                    "event_impact_rules": {
+                        "meeting": {
+                            "curiosity": 3,
+                        }
+                    },
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    try:
+        load_setting_bundle(bundle_path)
+    except ValueError as exc:
+        assert "event_impact_rules" in str(exc)
+        assert "Unsupported impact attribute" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError for unknown impact attribute")
+
+
+def test_load_setting_bundle_rejects_unknown_propagation_section(tmp_path):
+    bundle_path = tmp_path / "unknown-propagation-section.json"
+    bundle_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "world_definition": {
+                    "world_key": "invalid",
+                    "display_name": "Invalid",
+                    "lore_text": "Invalid lore",
+                    "propagation_rules": {
+                        "omens": {
+                            "decay": 1,
+                        }
+                    },
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    try:
+        load_setting_bundle(bundle_path)
+    except ValueError as exc:
+        assert "propagation_rules" in str(exc)
+        assert "Unsupported propagation section" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError for unknown propagation section")
+
+
+def test_world_apply_setting_bundle_rejects_invalid_propagation_rule_override():
+    world = World()
+    bundle = world.setting_bundle
+    bundle.world_definition.propagation_rules = {
+        "danger": {
+            "decay": "fast",
+        }
+    }
+
+    try:
+        world.apply_setting_bundle(bundle)
+    except ValueError as exc:
+        assert "propagation_rules" in str(exc)
+        assert "must be numeric" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError for invalid propagation rule override")
+
+
+def test_world_apply_setting_bundle_rejects_unknown_propagation_rule_key():
+    world = World()
+    bundle = world.setting_bundle
+    bundle.world_definition.propagation_rules = {
+        "danger": {
+            "mystery": 4,
+        }
+    }
+
+    try:
+        world.apply_setting_bundle(bundle)
+    except ValueError as exc:
+        assert "propagation_rules" in str(exc)
+        assert "Unsupported propagation key" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError for unknown propagation rule key")
