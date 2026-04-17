@@ -266,60 +266,88 @@ def _restore_locale():
 EXPECTED_EN = {
     "year": 1002,
     "month": 1,
-    "event_record_count": 22,
-    "event_log_count": 22,
-    "history_count": 22,
+    "event_record_count": 30,
+    "event_log_count": 30,
+    "history_count": 30,
     "kind_counts": {
         "adventure_arrived": 1,
+        "adventure_discovery": 1,
         "adventure_started": 1,
         "aging": 12,
-        "discovery": 2,
-        "journey": 4,
-        "skill_training": 2,
+        "battle": 2,
+        "condition_worsened": 1,
+        "discovery": 3,
+        "injury_recovery": 2,
+        "journey": 5,
+        "meeting": 2,
     },
     "summary_lines": [
         "  SIMULATION SUMMARY - Aethoria",
         "  Final year: 1002",
-        "  Total events recorded : 22",
+        "  Total events recorded : 30",
         "  Characters alive      : 6",
         "  Characters deceased   : 0",
         "  Event breakdown:",
         "    Aging                  12 times",
-        "    Journey                 4 times",
-        "    Discovery               2 times",
-        "    Skill training          2 times",
+        "    Journey                 5 times",
+        "    Discovery               3 times",
+        "    Battle                  2 times",
+        "    Injury recovery         2 times",
+        "    Meeting                 2 times",
         "    Adventure departure     1 times",
         "    Adventure arrival       1 times",
+        "    Condition worsened      1 times",
+        "    Adventure discovery     1 times",
         "  Notable moments:",
-        "    • Petra Shadowmere discovered a fragment of a prophetic tablet near "
-        "The Verdant Vale. The discovery will prove useful in future battles.",
-        "    • Brynn Zephyrhaven discovered a hidden shrine to a forgotten deity "
-        "near Sunbaked Plains. Word of the discovery spread quickly, raising their reputation.",
+        "    • Talia Coldwater discovered a weapon of legendary make, lost for centuries near "
+        "Sandstone Outpost. Word of the discovery spread quickly, raising their reputation.",
+        "    • Jorin Riverstone discovered a fragment of a prophetic tablet near Frostpeak Summit. "
+        "Word of the discovery spread quickly, raising their reputation.",
+        "    • Jorin Riverstone discovered a cache of pre-Cataclysm gold coins near Frostpeak Summit. "
+        "Word of the discovery spread quickly, raising their reputation.",
     ],
-    "yearly_overview": ["    Total events recorded: 8"],
-    "yearly_notable": [],
-    "yearly_regions": [],
-    "monthly_notable": [],
-    "monthly_world": [],
+    "yearly_overview": ["    Total events recorded: 13"],
+    "yearly_notable": [
+        "    - Jorin Riverstone discovered a fragment of a prophetic tablet near Frostpeak Summit. "
+        "Word of the discovery spread quickly, raising their reputation.",
+        "    - Casia Riverstone defeated Talia Coldwater. Talia Coldwater was injured in the fight.",
+        "    - Jorin Riverstone discovered a cache of pre-Cataclysm gold coins near Frostpeak Summit. "
+        "Word of the discovery spread quickly, raising their reputation.",
+    ],
+    "yearly_regions": [
+        "    Frostpeak Summit: Jorin Riverstone discovered a fragment of a prophetic tablet near "
+        "Frostpeak Summit. Word of the discovery spread quickly, raising their reputation.",
+        "    Frostpeak Summit: Jorin Riverstone discovered a cache of pre-Cataclysm gold coins near "
+        "Frostpeak Summit. Word of the discovery spread quickly, raising their reputation.",
+        "    Sandstone Outpost: Casia Riverstone defeated Talia Coldwater. Talia Coldwater was injured "
+        "in the fight.",
+    ],
+    "monthly_notable": [
+        "    - Jorin Riverstone discovered a fragment of a prophetic tablet near Frostpeak Summit. "
+        "Word of the discovery spread quickly, raising their reputation.",
+    ],
+    "monthly_world": [
+        "    Frostpeak Summit: Jorin Riverstone discovered a fragment of a prophetic tablet near "
+        "Frostpeak Summit. Word of the discovery spread quickly, raising their reputation.",
+    ],
     "monthly_rumors": [
         "    - Something happened... (doubtful)",
-        "    - some time ago, Brynn Zephyrhaven discovered something Sunbaked Plains (plausible)",
-        "    - some time ago, Petra Shadowmere set out traveling toward somewhere (doubtful)",
-        "    - Something happened... (doubtful)",
-        "    - recently, someone embarked on an adventure Sunbaked Plains (doubtful)",
-        "    - recently, Brynn Zephyrhaven was involved in something somewhere (doubtful)",
-        "    Total events: 0",
+        "    - Petra Shadowmere defeated Casia Riverstone. Casia Riverstone was injured in the fight. "
+        "(plausible)",
+        "    - Casia Riverstone journeyed from Sandstone Outpost to The Verdant Vale (village) and was "
+        "briefly chased by a hungry wolf pack. (doubtful)",
+        "    Total events: 2",
     ],
     "detail_lines": [
         "  | V The Verdant Vale (village)                     |",
         "  | Terrain: plains (,)                              |",
         "  | Elev:128 Moist:128 Temp:128                      |",
         "  | Safety: tense                                    |",
-        "  | Danger:  68 (high)                               |",
+        "  | Danger:  71 (high)                               |",
         "  | Traffic: ++ (medium)                             |",
-        "  | Pop: 0                                           |",
+        "  | Pop: 1                                           |",
         "  | Prosperity: stable (50)                          |",
-        "  | Mood: calm (51)                                  |",
+        "  | Mood: calm (49)                                  |",
         "  | Rumor heat: 20 (low)                             |",
     ],
 }
@@ -328,82 +356,109 @@ EXPECTED_EN = {
 EXPECTED_JA = {
     "year": 1002,
     "month": 1,
-    "event_record_count": 22,
-    "event_log_count": 22,
-    "history_count": 22,
+    "event_record_count": 30,
+    "event_log_count": 30,
+    "history_count": 30,
     "kind_counts": {
         "adventure_arrived": 1,
+        "adventure_discovery": 1,
         "adventure_started": 1,
         "aging": 12,
-        "discovery": 2,
-        "journey": 4,
-        "skill_training": 2,
+        "battle": 2,
+        "condition_worsened": 1,
+        "discovery": 3,
+        "injury_recovery": 2,
+        "journey": 5,
+        "meeting": 2,
     },
     "summary_lines": [
         "  シミュレーション要約 - Aethoria",
         "  最終年: 1002",
-        "  記録イベント数               : 22",
+        "  記録イベント数               : 30",
         "  生存キャラクター              : 6",
         "  死亡キャラクター              : 0",
         "  イベント内訳:",
         "    加齢                     12 回",
-        "    旅                       4 回",
-        "    発見                      2 回",
-        "    技能訓練                    2 回",
+        "    旅                       5 回",
+        "    発見                      3 回",
+        "    戦闘                      2 回",
+        "    負傷回復                    2 回",
+        "    出会い                     2 回",
         "    冒険出発                    1 回",
         "    冒険到着                    1 回",
+        "    容態悪化                    1 回",
+        "    冒険中の発見                  1 回",
         "  主な出来事:",
-        "    • Petra Shadowmere は The Verdant Vale 近くで 予言の石板の破片 を発見した。"
-        "その発見は、これからの戦いで大いに役立つだろう。",
-        "    • Brynn Zephyrhaven は Sunbaked Plains 近くで 忘れられた神を祀る隠された祠 "
+        "    • Talia Coldwater は Sandstone Outpost 近くで 何世紀も失われていた伝説級の武具 "
+        "を発見した。発見の噂はすぐに広まり、名声を高めた。",
+        "    • Jorin Riverstone は Frostpeak Summit 近くで 予言の石板の破片 "
+        "を発見した。発見の噂はすぐに広まり、名声を高めた。",
+        "    • Jorin Riverstone は Frostpeak Summit 近くで 大災厄以前の金貨の隠し財産 "
         "を発見した。発見の噂はすぐに広まり、名声を高めた。",
     ],
-    "yearly_overview": ["    記録イベント数: 8"],
-    "yearly_notable": [],
-    "yearly_regions": [],
-    "monthly_notable": [],
-    "monthly_world": [],
+    "yearly_overview": ["    記録イベント数: 13"],
+    "yearly_notable": [
+        "    - Jorin Riverstone は Frostpeak Summit 近くで 予言の石板の破片 "
+        "を発見した。発見の噂はすぐに広まり、名声を高めた。",
+        "    - Casia Riverstone は Talia Coldwater に勝利した。 Talia Coldwater は戦いで負傷した。",
+        "    - Jorin Riverstone は Frostpeak Summit 近くで 大災厄以前の金貨の隠し財産 "
+        "を発見した。発見の噂はすぐに広まり、名声を高めた。",
+    ],
+    "yearly_regions": [
+        "    Frostpeak Summit: Jorin Riverstone は Frostpeak Summit 近くで 予言の石板の破片 "
+        "を発見した。発見の噂はすぐに広まり、名声を高めた。",
+        "    Frostpeak Summit: Jorin Riverstone は Frostpeak Summit 近くで 大災厄以前の金貨の隠し財産 "
+        "を発見した。発見の噂はすぐに広まり、名声を高めた。",
+        "    Sandstone Outpost: Casia Riverstone は Talia Coldwater に勝利した。 "
+        "Talia Coldwater は戦いで負傷した。",
+    ],
+    "monthly_notable": [
+        "    - Jorin Riverstone は Frostpeak Summit 近くで 予言の石板の破片 "
+        "を発見した。発見の噂はすぐに広まり、名声を高めた。",
+    ],
+    "monthly_world": [
+        "    Frostpeak Summit: Jorin Riverstone は Frostpeak Summit 近くで 予言の石板の破片 "
+        "を発見した。発見の噂はすぐに広まり、名声を高めた。",
+    ],
     "monthly_rumors": [
         "    - 何かが起きたらしい… (疑わしい)",
-        "    - いつか、Brynn ZephyrhavenがSunbaked Plainsで何かを発見したらしい (もっともらしい)",
-        "    - いつか、Petra Shadowmereがどこかへ旅立ったと聞いた (疑わしい)",
-        "    - 何かが起きたらしい… (疑わしい)",
-        "    - 最近、誰かがSunbaked Plainsで冒険に出たという噂がある (疑わしい)",
-        "    - 最近、Brynn Zephyrhavenがどこかで何かに関わったらしい (疑わしい)",
-        "    イベント総数: 0",
+        "    - Petra Shadowmere は Casia Riverstone に勝利した。 Casia Riverstone は戦いで負傷した。 (もっともらしい)",
+        "    - Casia Riverstone は Sandstone Outpost から The Verdant Vale（村）へ旅し、"
+        "was briefly chased by a hungry wolf pack。 (疑わしい)",
+        "    イベント総数: 2",
     ],
     "detail_lines": [
         "  | V The Verdant Vale (村)                          |",
         "  | 地形: 平原 (,)                                   |",
         "  | 標高:128 湿度:128 気温:128                       |",
         "  | 安全: 緊張                                       |",
-        "  | 危険:  68 (high)                                 |",
-        "  | 交通: ++ (medium)                                |",
-        "  | 人数: 0                                          |",
+        "  | 危険:  71 (高)                                   |",
+        "  | 交通: ++ (中)                                    |",
+        "  | 人数: 1                                          |",
         "  | 繁栄度: 安定 (50)                                |",
-        "  | 雰囲気: 平静 (51)                                |",
-        "  | 噂の熱量: 20 (low)                               |",
+        "  | 雰囲気: 平静 (49)                                |",
+        "  | 噂の熱量: 20 (低)                                |",
     ],
 }
 
 
 EXPECTED_PROJECTION_CONTRACT = {
     "summary": {
-        "total_events": 60,
+        "total_events": 68,
         "kind_counts": {
-            "adventure_arrived": 2,
-            "adventure_choice": 1,
-            "adventure_discovery": 2,
-            "adventure_returned": 2,
-            "adventure_started": 2,
+            "adventure_arrived": 1,
+            "adventure_discovery": 1,
+            "adventure_returned": 1,
+            "adventure_started": 1,
             "aging": 30,
-            "battle": 1,
-            "condition_worsened": 2,
+            "battle": 2,
+            "condition_worsened": 5,
             "discovery": 4,
-            "injury_recovery": 1,
-            "journey": 7,
-            "meeting": 4,
-            "skill_training": 2,
+            "injury_recovery": 3,
+            "journey": 6,
+            "meeting": 6,
+            "romance": 2,
+            "skill_training": 6,
         },
     },
     "subject_ids": [
@@ -416,7 +471,6 @@ EXPECTED_PROJECTION_CONTRACT = {
     ],
     "event_tags": [
         ("adventure_arrived",),
-        ("adventure_choice",),
         ("adventure_discovery",),
         ("adventure_returned",),
         ("adventure_started",),
@@ -427,62 +481,54 @@ EXPECTED_PROJECTION_CONTRACT = {
         ("injury_recovery",),
         ("journey",),
         ("meeting",),
+        ("romance",),
         ("skill_training",),
     ],
     "relation_tags": [
-        ("8ede0d7a", "a5aa3c81", ("rival",)),
-        ("a5aa3c81", "8ede0d7a", ("rival",)),
+        ("1738f7d9", "8ede0d7a", ("rival",)),
+        ("1738f7d9", "a5aa3c81", ("rival",)),
+        ("8ede0d7a", "1738f7d9", ("rival",)),
+        ("a5aa3c81", "1738f7d9", ("rival",)),
     ],
     "memory_tags": [
         ("loc_dragonbone_ridge", ("trace",)),
-        ("loc_ironvein_mine", ("trace",)),
     ],
     "report_selection": {
         "yearly": {
             "year": 1004,
-            "total_events": 12,
+            "total_events": 10,
             "deaths_this_year": 0,
             "character_ids": [],
             "notable_records": [
-                ("discovery", "loc_sunbaked_plains", "4cdd2055", ()),
+                ("condition_worsened", "loc_frostpeak_summit", "907a70c3", ()),
+                ("condition_worsened", "loc_frostpeak_summit", "907a70c3", ()),
             ],
-            "location_ids": ["loc_sunbaked_plains"],
+            "location_ids": ["loc_frostpeak_summit"],
             "location_event_counts": {
-                "loc_sunbaked_plains": 2,
+                "loc_frostpeak_summit": 3,
             },
             "location_notable_records": {
-                "loc_sunbaked_plains": [
-                    ("discovery", "loc_sunbaked_plains", "4cdd2055", ()),
+                "loc_frostpeak_summit": [
+                    ("condition_worsened", "loc_frostpeak_summit", "907a70c3", ()),
+                    ("condition_worsened", "loc_frostpeak_summit", "907a70c3", ()),
                 ],
             },
         },
         "monthly": {
             "year": 1004,
             "month": 3,
-            "total_events": 0,
+            "total_events": 1,
             "character_ids": [],
-            "notable_records": [],
-            "location_ids": [],
-            "location_event_counts": {},
-            "location_notable_records": {},
-            "rumor_ids": [
-                "rum_51a70112a280",
-                "rum_34ba06d32ef2",
-                "rum_c2c960c34e8d",
-                "rum_4c7e3be8b43f",
-                "rum_dd4c1b0cf936",
-                "rum_c2f63e561d38",
-                "rum_a761dc60504c",
-            ],
-            "rumor_categories": {
-                "rum_51a70112a280": "event",
-                "rum_34ba06d32ef2": "battle",
-                "rum_c2c960c34e8d": "event",
-                "rum_4c7e3be8b43f": "adventure",
-                "rum_dd4c1b0cf936": "event",
-                "rum_c2f63e561d38": "adventure",
-                "rum_a761dc60504c": "adventure",
+            "notable_records": [("journey", "loc_sandstone_outpost", "a5aa3c81", ())],
+            "location_ids": ["loc_sandstone_outpost"],
+            "location_event_counts": {
+                "loc_sandstone_outpost": 1,
             },
+            "location_notable_records": {
+                "loc_sandstone_outpost": [("journey", "loc_sandstone_outpost", "a5aa3c81", ())],
+            },
+            "rumor_ids": [],
+            "rumor_categories": {},
         },
     },
     "detail_projection": {

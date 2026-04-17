@@ -313,6 +313,70 @@ class TestEventJourney:
         assert "（city）" not in result.description
         assert any(region in result.description for region in ("都市", "村", "森", "山岳", "地下迷宮", "平原"))
 
+    def test_blocked_route_network_prevents_global_teleport(self, es):
+        from fantasy_simulator.terrain import RouteEdge
+        from fantasy_simulator.world import LocationState
+
+        world = World(_skip_defaults=True, width=3, height=1)
+        origin = LocationState(
+            id="loc_origin",
+            canonical_name="Origin",
+            description="Origin",
+            region_type="city",
+            x=0,
+            y=0,
+            prosperity=50,
+            safety=50,
+            mood=50,
+            danger=10,
+            traffic=30,
+            rumor_heat=10,
+            road_condition=60,
+        )
+        blocked = LocationState(
+            id="loc_blocked",
+            canonical_name="Blocked",
+            description="Blocked",
+            region_type="village",
+            x=1,
+            y=0,
+            prosperity=50,
+            safety=50,
+            mood=50,
+            danger=10,
+            traffic=30,
+            rumor_heat=10,
+            road_condition=60,
+        )
+        remote = LocationState(
+            id="loc_remote",
+            canonical_name="Remote",
+            description="Remote",
+            region_type="forest",
+            x=2,
+            y=0,
+            prosperity=50,
+            safety=50,
+            mood=50,
+            danger=40,
+            traffic=20,
+            rumor_heat=10,
+            road_condition=60,
+        )
+        for loc in (origin, blocked, remote):
+            world._register_location(loc)
+        world._build_terrain_from_grid()
+        world.routes = [
+            RouteEdge("route_blocked", "loc_origin", "loc_blocked", "road", blocked=True),
+        ]
+        char = _make_char("Traveler", location_id="loc_origin")
+        world.add_character(char)
+
+        result = es.event_journey(char, world, rng=random.Random(0))
+
+        assert char.location_id == "loc_origin"
+        assert "no destination" in result.description.lower()
+
 
 # ---------------------------------------------------------------------------
 # event_aging

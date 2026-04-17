@@ -4,6 +4,7 @@ migrations.py - Schema migration for save data.
 
 from __future__ import annotations
 
+import json
 from typing import Any, Callable, Dict
 
 from ..content.setting_bundle import bundle_from_dict_validated
@@ -464,26 +465,54 @@ def _migrate_v6_to_v7(data: Dict[str, Any]) -> Dict[str, Any]:
 def _migrate_v7_to_v8(data: Dict[str, Any]) -> Dict[str, Any]:
     """Canonicalize legacy event adapters into ``world.event_records``."""
     world_data = data.setdefault("world", {})
-    event_records = world_data.setdefault("event_records", [])
+    event_records = list(world_data.setdefault("event_records", []))
     history = list(data.get("history", []))
     event_log = list(world_data.get("event_log", []))
     calendar_key = _calendar_key_for_data(data)
 
-    if not event_records:
-        canonical_records = []
-        if history:
-            canonical_records.extend([
-                _record_from_legacy_history_item(item, index=index, calendar_key=calendar_key)
-                for index, item in enumerate(history, start=1)
-            ])
-        if event_log:
-            year = int(world_data.get("year", 0))
-            canonical_records.extend([
-                _record_from_legacy_event_log_entry(entry, index=index, year=year, calendar_key=calendar_key)
-                for index, entry in enumerate(event_log, start=1)
-            ])
-        if canonical_records:
-            world_data["event_records"] = canonical_records
+    canonical_records = list(event_records)
+    existing_history_payload_counts: Dict[str, int] = {}
+    existing_legacy_log_counts: Dict[str, int] = {}
+    for record in canonical_records:
+        record_id = str(record.get("record_id", ""))
+        if record_id.startswith("legacy_history_"):
+            payload = record.get("legacy_event_result")
+            if payload is not None:
+                payload_key = json.dumps(payload, sort_keys=True)
+                existing_history_payload_counts[payload_key] = existing_history_payload_counts.get(payload_key, 0) + 1
+        elif record_id.startswith("legacy_event_log_"):
+            entry = record.get("legacy_event_log_entry")
+            if entry is not None:
+                existing_legacy_log_counts[entry] = existing_legacy_log_counts.get(entry, 0) + 1
+    history_index = sum(
+        1 for record in canonical_records if str(record.get("record_id", "")).startswith("legacy_history_")
+    )
+    event_log_index = sum(
+        1 for record in canonical_records if str(record.get("record_id", "")).startswith("legacy_event_log_")
+    )
+
+    for item in history:
+        payload_key = json.dumps(item, sort_keys=True)
+        if existing_history_payload_counts.get(payload_key, 0) > 0:
+            existing_history_payload_counts[payload_key] -= 1
+            continue
+        history_index += 1
+        canonical_records.append(
+            _record_from_legacy_history_item(item, index=history_index, calendar_key=calendar_key)
+        )
+
+    year = int(world_data.get("year", 0))
+    for entry in event_log:
+        if existing_legacy_log_counts.get(entry, 0) > 0:
+            existing_legacy_log_counts[entry] -= 1
+            continue
+        event_log_index += 1
+        canonical_records.append(
+            _record_from_legacy_event_log_entry(entry, index=event_log_index, year=year, calendar_key=calendar_key)
+        )
+
+    if canonical_records:
+        world_data["event_records"] = canonical_records
 
     data["schema_version"] = 8
     return data

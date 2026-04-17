@@ -251,7 +251,7 @@ def test_adventure_death_clears_spouse_on_survivor():
     spouse_id must be cleared and the spouse must receive a history entry.
 
     With death staging (design §8), only already-dying characters die
-    instantly in the 0.18-0.24 range; others worsen injury instead.
+    on the lowest hazard band; higher hazard rolls only worsen injury.
     """
     world = World()
     hero = _make_character("Hero")
@@ -278,8 +278,8 @@ def test_adventure_death_clears_spouse_on_survivor():
     hero.active_adventure_id = run.adventure_id
     world.add_adventure(run)
 
-    # Roll in (injury_chance, critical_chance): causes death for already-dying target
-    run.step(hero, world, rng=FakeRng([0.24]))
+    # Roll in the lowest hazard band: causes death for already-dying target.
+    run.step(hero, world, rng=FakeRng([0.12]))
 
     assert not hero.alive
     assert run.outcome == "death"
@@ -666,10 +666,10 @@ def test_solo_run_ignores_retreat_rule_on_self_injury():
     char.active_adventure_id = run.adventure_id
     world.add_adventure(run)
 
-    # Roll that lands in the critical zone (death for dying char)
+    # Roll that lands in the lowest hazard band (death for dying char)
     # With STR=60, CON=55 (from _make_character) and danger_level=50:
-    # Use a roll in (injury_chance, critical_chance) for assault policy.
-    run.step(char, world, rng=FakeRng([0.24]))
+    # Use a roll below injury_chance for assault policy.
+    run.step(char, world, rng=FakeRng([0.12]))
 
     # Should die (not auto-retreat) since is_party = False
     assert not char.alive
@@ -739,6 +739,87 @@ def test_create_adventure_run_sets_member_ids():
 
     assert run.member_ids == [char.char_id]
     assert run.is_party is False
+
+
+def test_create_adventure_run_prefers_route_reachable_risky_destination():
+    from fantasy_simulator.terrain import RouteEdge
+    from fantasy_simulator.world import LocationState
+
+    world = World(_skip_defaults=True, width=4, height=1)
+    origin = LocationState(
+        id="loc_origin",
+        canonical_name="Origin",
+        description="A safe starting town",
+        region_type="city",
+        x=0,
+        y=0,
+        prosperity=50,
+        safety=70,
+        mood=50,
+        danger=10,
+        traffic=40,
+        rumor_heat=10,
+        road_condition=60,
+    )
+    waypoint = LocationState(
+        id="loc_waypoint",
+        canonical_name="Waypoint",
+        description="A quiet waypoint",
+        region_type="village",
+        x=1,
+        y=0,
+        prosperity=50,
+        safety=60,
+        mood=50,
+        danger=15,
+        traffic=30,
+        rumor_heat=10,
+        road_condition=60,
+    )
+    reachable_dungeon = LocationState(
+        id="loc_reachable_dungeon",
+        canonical_name="Reachable Dungeon",
+        description="A reachable dungeon",
+        region_type="dungeon",
+        x=2,
+        y=0,
+        prosperity=10,
+        safety=20,
+        mood=30,
+        danger=80,
+        traffic=10,
+        rumor_heat=15,
+        road_condition=40,
+    )
+    unreachable_dungeon = LocationState(
+        id="loc_unreachable_dungeon",
+        canonical_name="Unreachable Dungeon",
+        description="A blocked dungeon",
+        region_type="dungeon",
+        x=3,
+        y=0,
+        prosperity=10,
+        safety=20,
+        mood=30,
+        danger=90,
+        traffic=10,
+        rumor_heat=15,
+        road_condition=40,
+    )
+    for loc in (origin, waypoint, reachable_dungeon, unreachable_dungeon):
+        world._register_location(loc)
+    world._build_terrain_from_grid()
+    world.routes = [
+        RouteEdge("route_origin_waypoint", "loc_origin", "loc_waypoint", "road"),
+        RouteEdge("route_waypoint_reachable", "loc_waypoint", "loc_reachable_dungeon", "road"),
+    ]
+    char = _make_character()
+    char.location_id = origin.id
+    world.add_character(char)
+
+    run = create_adventure_run(char, world, rng=FakeRng([0.99]))
+
+    assert run.destination == "loc_reachable_dungeon"
 
 
 def test_select_party_policy_returns_valid_policy():
@@ -822,7 +903,7 @@ def test_adventure_death_clears_spouse_via_simulator_integration():
     cleanup when a dying character's adventure step kills them.
 
     With death staging (design §8), character must be dying to die in
-    the 0.18-0.24 roll range; otherwise injury worsens.
+    the lowest hazard band; otherwise injury worsens.
     """
     world = World()
     hero = _make_character("Hero")
@@ -849,10 +930,37 @@ def test_adventure_death_clears_spouse_via_simulator_integration():
     hero.active_adventure_id = run.adventure_id
     world.add_adventure(run)
 
-    # Use a roll in (injury_chance, critical_chance): death for already-dying character.
-    sim.rng = FakeRng([0.24])
+    # Use a roll below injury_chance: death for already-dying character.
+    sim.rng = FakeRng([0.12])
     sim._advance_adventures()
 
     assert not hero.alive
     assert spouse.spouse_id is None
     assert any("Hero" in h for h in spouse.history)
+
+
+def test_dying_character_upper_hazard_band_worsens_but_does_not_die():
+    world = World()
+    hero = _make_character("Hero")
+    hero.injury_status = "dying"
+    world.add_character(hero)
+
+    run = AdventureRun(
+        character_id=hero.char_id,
+        character_name=hero.name,
+        origin=hero.location_id,
+        destination="loc_thornwood",
+        year_started=world.year,
+        state="exploring",
+        policy=POLICY_ASSAULT,
+    )
+    hero.active_adventure_id = run.adventure_id
+    world.add_adventure(run)
+
+    # This roll lands above injury_chance but below critical_chance.
+    run.step(hero, world, rng=FakeRng([0.24]))
+
+    assert hero.alive
+    assert hero.injury_status == "dying"
+    assert run.state == "returning"
+    assert run.outcome is None

@@ -17,6 +17,7 @@ from fantasy_simulator.persistence.save_load import load_simulation, save_simula
 from fantasy_simulator.simulator import Simulator
 from fantasy_simulator.events import WorldEventRecord
 from fantasy_simulator.world import World
+from fantasy_simulator.reports import generate_monthly_report
 
 
 def _make_world(n_chars: int = 3) -> World:
@@ -510,6 +511,53 @@ class TestLoadSimulation:
         assert restored.history[0].stat_changes == {"char_1": {"strength": -2}}
         assert restored.history[0].metadata == {"source": "legacy"}
 
+    def test_load_current_schema_backfills_watched_tags_for_untagged_canonical_records(self, tmp_path):
+        path = tmp_path / "current-schema-untagged-watch.json"
+        hero = {
+            "char_id": "char_hero",
+            "name": "Hero",
+            "age": 25,
+            "gender": "Male",
+            "race": "Human",
+            "job": "Warrior",
+            "location_id": "loc_aethoria_capital",
+            "favorite": True,
+        }
+        payload = {
+            "schema_version": CURRENT_VERSION,
+            "world": World().to_dict(),
+            "characters": [hero],
+            "history": [],
+        }
+        payload["world"]["event_records"] = [
+            {
+                "record_id": "untagged_watch_001",
+                "kind": "meeting",
+                "year": 1000,
+                "month": 3,
+                "day": 1,
+                "absolute_day": 0,
+                "location_id": "loc_aethoria_capital",
+                "primary_actor_id": "char_hero",
+                "secondary_actor_ids": [],
+                "description": "Old canonical record without watched tags.",
+                "severity": 2,
+                "visibility": "public",
+                "calendar_key": "",
+                "tags": [],
+                "impacts": [],
+            }
+        ]
+        path.write_text(json.dumps(payload), encoding="utf-8")
+
+        restored = load_simulation(str(path))
+
+        assert restored is not None
+        restored.world.characters[0].favorite = False
+        report = generate_monthly_report(restored.world, 1000, 3)
+        assert f"{restored.world.WATCHED_ACTOR_TAG_PREFIX}char_hero" in restored.world.event_records[0].tags
+        assert [entry.name for entry in report.character_entries] == ["Hero"]
+
     def test_migration_lifts_mixed_legacy_history_and_event_log_into_canonical_event_records(self, tmp_path):
         path = tmp_path / "legacy-mixed-event-adapters.json"
         world = World()
@@ -545,6 +593,138 @@ class TestLoadSimulation:
         assert battle_event.metadata == {"source": "legacy"}
         assert legacy_log_event.metadata == {"legacy_event_log_entry": True}
         assert payload["world"]["event_log"][0] in restored.world.get_compatibility_event_log()
+
+    def test_migration_merges_existing_canonical_records_with_legacy_adapters(self, tmp_path):
+        path = tmp_path / "legacy-mixed-with-canonical.json"
+        world = World()
+        payload = {
+            "schema_version": CURRENT_VERSION - 1,
+            "world": world.to_dict(),
+            "characters": [],
+            "history": [
+                {
+                    "description": "A legacy battle occurred.",
+                    "affected_characters": ["char_1"],
+                    "stat_changes": {"char_1": {"strength": -2}},
+                    "event_type": "battle",
+                    "year": 1000,
+                    "metadata": {"source": "legacy"},
+                }
+            ],
+        }
+        payload["world"]["event_records"] = [
+            {
+                "record_id": "existing_001",
+                "kind": "meeting",
+                "year": 1000,
+                "month": 4,
+                "day": 2,
+                "absolute_day": 0,
+                "location_id": "loc_aethoria_capital",
+                "primary_actor_id": "char_existing",
+                "secondary_actor_ids": [],
+                "description": "A canonical meeting already exists.",
+                "severity": 2,
+                "visibility": "public",
+                "calendar_key": "",
+                "tags": [],
+                "impacts": [],
+            }
+        ]
+        payload["world"]["event_log"] = ["Year 1000: A legacy omen spread through the capital."]
+        path.write_text(json.dumps(payload), encoding="utf-8")
+
+        restored = load_simulation(str(path))
+
+        assert restored is not None
+        assert len(restored.world.event_records) == 3
+        assert {record.kind for record in restored.world.event_records} == {
+            "meeting", "battle", "legacy_event_log",
+        }
+        assert any(record.record_id == "existing_001" for record in restored.world.event_records)
+        assert any(
+            record.description == "A canonical meeting already exists."
+            for record in restored.world.event_records
+        )
+
+    def test_migration_preserves_repeated_legacy_adapters_while_skipping_already_migrated_duplicates(self, tmp_path):
+        path = tmp_path / "legacy-repeated-adapters.json"
+        world = World()
+        repeated_history_item = {
+            "description": "A repeated legacy battle occurred.",
+            "affected_characters": ["char_1"],
+            "stat_changes": {"char_1": {"strength": -1}},
+            "event_type": "battle",
+            "year": 1000,
+            "metadata": {"source": "legacy"},
+        }
+        repeated_log_entry = "Year 1000: A repeated legacy omen spread through the capital."
+        payload = {
+            "schema_version": CURRENT_VERSION - 1,
+            "world": world.to_dict(),
+            "characters": [],
+            "history": [dict(repeated_history_item), dict(repeated_history_item)],
+        }
+        payload["world"]["event_records"] = [
+            {
+                "record_id": "legacy_history_000001",
+                "kind": "battle",
+                "year": 1000,
+                "month": 1,
+                "day": 1,
+                "absolute_day": 0,
+                "location_id": None,
+                "primary_actor_id": "char_1",
+                "secondary_actor_ids": [],
+                "description": repeated_history_item["description"],
+                "severity": 1,
+                "visibility": "public",
+                "calendar_key": "",
+                "tags": [],
+                "impacts": [],
+                "legacy_event_result": dict(repeated_history_item),
+                "legacy_event_log_entry": None,
+            },
+            {
+                "record_id": "legacy_event_log_000001",
+                "kind": "legacy_event_log",
+                "year": 1000,
+                "month": 1,
+                "day": 1,
+                "absolute_day": 0,
+                "location_id": None,
+                "primary_actor_id": None,
+                "secondary_actor_ids": [],
+                "description": repeated_log_entry,
+                "severity": 1,
+                "visibility": "public",
+                "calendar_key": "",
+                "tags": ["legacy_event_log"],
+                "impacts": [],
+                "legacy_event_result": {
+                    "description": repeated_log_entry,
+                    "affected_characters": [],
+                    "stat_changes": {},
+                    "event_type": "legacy_event_log",
+                    "year": 1000,
+                    "metadata": {"legacy_event_log_entry": True},
+                },
+                "legacy_event_log_entry": repeated_log_entry,
+            },
+        ]
+        payload["world"]["event_log"] = [repeated_log_entry, repeated_log_entry]
+        path.write_text(json.dumps(payload), encoding="utf-8")
+
+        restored = load_simulation(str(path))
+
+        assert restored is not None
+        battle_records = [record for record in restored.world.event_records if record.kind == "battle"]
+        legacy_log_records = [
+            record for record in restored.world.event_records if record.kind == "legacy_event_log"
+        ]
+        assert len(battle_records) == 2
+        assert len(legacy_log_records) == 2
+        assert len(restored.world.event_records) == 4
 
     def test_save_load_preserves_non_default_bundle_rule_overrides(self, tmp_path):
         path = tmp_path / "custom-rules.json"

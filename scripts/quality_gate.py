@@ -24,7 +24,9 @@ STANDARD_TARGETS = [
     "tests/test_quality_gate.py",
     "tests/test_agent_workflow_docs.py",
     "tests/test_doc_freshness.py",
+    "tests/test_event_record_read_policy.py",
     "tests/test_harness_scenarios.py",
+    "tests/test_map_visible_harness.py",
 ]
 
 LINT_TARGETS = [

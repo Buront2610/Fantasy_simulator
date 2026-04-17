@@ -297,13 +297,28 @@ def generate_rumor_from_event(
     )
     if current_absolute_day > 0 and record.absolute_day > 0 and world is not None:
         period_calendar = world.calendar_definition_for_date(current_year, current_month)
-        avg_days_per_month = max(1, period_calendar.days_per_year // period_calendar.months_per_year)
-        months_elapsed = max(0, (current_absolute_day - record.absolute_day) // avg_days_per_month)
+        months_elapsed = world.months_elapsed_between(
+            record.year,
+            record.month,
+            current_year,
+            current_month,
+            start_day=record.day,
+            end_day=period_calendar.days_in_month(current_month),
+            start_calendar_key=record.calendar_key,
+        )
     else:
         period_calendar = world.calendar_definition_for_date(current_year, current_month) if world is not None else None
-        months_per_year = period_calendar.months_per_year if period_calendar is not None else 12
-        months_elapsed = (current_year - record.year) * months_per_year + (current_month - record.month)
-        months_elapsed = max(0, months_elapsed)
+        months_elapsed = (
+            world.months_elapsed_between(
+                record.year,
+                record.month,
+                current_year,
+                current_month,
+                start_calendar_key=record.calendar_key,
+            )
+            if world is not None
+            else max(0, ((current_year - record.year) * 12) + (current_month - record.month))
+        )
 
     reliability = _determine_reliability(
         record.severity, same_location, months_elapsed, rng=rng,

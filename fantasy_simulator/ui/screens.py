@@ -542,7 +542,7 @@ def _show_world_map(sim: Simulator, ctx: UIContext | None = None) -> None:
             )
             if idx is not None:
                 loc_id, _ = labeled[idx]
-                loc = world._location_id_index.get(loc_id)
+                loc = world.get_location_by_id(loc_id)
                 if loc is not None:
                     _region_drill_loop(
                         world, info, loc, ctx=ctx,

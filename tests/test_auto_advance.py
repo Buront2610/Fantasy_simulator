@@ -217,6 +217,30 @@ class TestPartyReturnedPause:
         reason = sim._check_pause_conditions()
         assert reason is None
 
+    def test_party_returned_pauses_for_watched_companion(self, sim):
+        from fantasy_simulator.adventure import AdventureRun
+        leader = sim.world.characters[0]
+        companion = sim.world.characters[1]
+        companion.playable = True
+        run = AdventureRun(
+            character_id=leader.char_id,
+            character_name=leader.name,
+            origin="loc_aethoria_capital",
+            destination="loc_thornwood",
+            year_started=1000,
+            state="resolved",
+            outcome="safe_return",
+            member_ids=[leader.char_id, companion.char_id],
+        )
+        sim._recently_completed_adventures = [run]
+
+        reason = sim._check_pause_conditions()
+        context = sim._pause_context_for_reason("party_returned")
+
+        assert reason == "party_returned"
+        assert context["character"] == companion.name
+        assert context["location"] == "Aethoria Capital"
+
     def test_recently_completed_cleared_each_year(self, sim):
         from fantasy_simulator.adventure import AdventureRun
         run = AdventureRun(

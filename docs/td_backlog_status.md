@@ -70,13 +70,14 @@
 
 - architecture constraints: legacy adapter read-path と legacy projection import 制約を強化。
 - doc freshness: implementation/architecture/readme の整合監視を追加。
-- quality gate `standard`: architecture/doc/harness 系を routine 実行。
+- quality gate `standard`: architecture/doc/harness 系を routine 実行
+  (`tests/test_event_record_read_policy.py` と `tests/test_map_visible_harness.py` を含む)。
 - invalid location_id の統合経路（record -> report -> save/load）を characterization test で固定。
 - seeded reproducibility の acceptance として、summary / compatibility event log /
   monthly report / yearly report を同一 seed で一致させる E2E characterization を追加。
 - map-visible golden harness として、seeded overview / region / detail の snapshot、
   memorial-heavy world memory snapshot を production の screen helper 経路で固定し、
-  save-load-midyear 後の map-visible 同値性も `tests/test_harness_scenarios.py` で固定。
+  save-load-midyear 後の map-visible 同値性も `tests/test_map_visible_harness.py` で固定。
 
 ### Remaining
 

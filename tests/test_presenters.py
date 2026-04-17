@@ -19,7 +19,7 @@ def test_monthly_report_card_is_built_from_event_records():
         WorldEventRecord(
             year=world.year,
             month=3,
-            kind="adventure_resolved",
+            kind="adventure_returned",
             description="Aldric returned.",
             primary_actor_id=c.char_id,
             location_id="loc_aethoria_capital",
@@ -29,3 +29,27 @@ def test_monthly_report_card_is_built_from_event_records():
     lines = ReportPresenter.render_monthly_card(card)
     assert any("Monthly highlights" in line for line in lines)
     assert any("Recent adventures" in line for line in lines)
+
+
+def test_monthly_report_card_excludes_pending_adventure_choices_from_completed_adventures():
+    set_locale("en")
+    world = World()
+    c = world.characters[0] if world.characters else None
+    if c is None:
+        from fantasy_simulator.character import Character
+        c = Character("Aldric", 20, "Male", "Human", "Warrior", location_id="loc_aethoria_capital")
+        world.add_character(c)
+    world.event_records.append(
+        WorldEventRecord(
+            year=world.year,
+            month=3,
+            kind="adventure_choice",
+            description="Aldric must decide whether to press on.",
+            primary_actor_id=c.char_id,
+            location_id="loc_aethoria_capital",
+        )
+    )
+
+    card = build_monthly_report_card_view(world, world.year, 3)
+
+    assert card.completed_adventures == []

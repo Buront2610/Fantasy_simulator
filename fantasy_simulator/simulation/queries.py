@@ -129,7 +129,27 @@ class QueryMixin:
             f"  {tr_term(char.race)} {tr_term(char.job)}",
             "─" * 50,
         ]
-        if char.history:
+        event_history = sorted(
+            self.world.get_events_by_actor(char_id),
+            key=lambda record: (
+                record.year,
+                record.month,
+                record.day,
+                record.absolute_day == 0,
+                record.absolute_day,
+                record.record_id,
+            ),
+        )
+        seen_entries = set()
+        if event_history:
+            for record in event_history:
+                lines.append(f"  • {record.description}")
+                seen_entries.add(record.description)
+            for entry in char.history:
+                if entry in seen_entries:
+                    continue
+                lines.append(f"  • {entry}")
+        elif char.history:
             for entry in char.history:
                 lines.append(f"  • {entry}")
         else:
