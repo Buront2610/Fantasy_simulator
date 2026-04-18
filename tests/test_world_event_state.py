@@ -173,6 +173,29 @@ def test_append_canonical_event_record_keeps_identity_when_location_is_none() ->
     assert stored is record
 
 
+def test_append_canonical_event_record_rejects_duplicate_record_id() -> None:
+    world = World()
+    first = WorldEventRecord(record_id="r1", kind="battle", year=1000, location_id="loc_thornwood")
+    duplicate = WorldEventRecord(record_id="r1", kind="journey", year=1000, location_id="loc_thornwood")
+
+    append_canonical_event_record(
+        record=first,
+        event_records=world.event_records,
+        location_index=world._location_id_index,
+        grid=world.grid,
+        max_event_records=world.MAX_EVENT_RECORDS,
+    )
+
+    with pytest.raises(ValueError, match="Duplicate event record ID"):
+        append_canonical_event_record(
+            record=duplicate,
+            event_records=world.event_records,
+            location_index=world._location_id_index,
+            grid=world.grid,
+            max_event_records=world.MAX_EVENT_RECORDS,
+        )
+
+
 def test_apply_event_impact_fails_fast_on_invalid_rule_attribute() -> None:
     world = World()
     from fantasy_simulator import world_event_state as wes

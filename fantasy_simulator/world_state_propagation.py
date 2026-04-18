@@ -5,11 +5,12 @@ TD-3 split: isolate state propagation mechanics from world orchestration.
 
 from __future__ import annotations
 
-from typing import Callable, Dict, Iterable, List, Mapping, MutableMapping, Optional, Protocol, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Mapping, MutableMapping, Optional, Protocol, Tuple
 
 from .rule_override_resolution import (
     DEFAULT_PROPAGATION_RULES,
     clone_default_propagation_rules as _clone_default_propagation_rules,
+    is_disabled_threshold,
     validate_propagation_rules,
 )
 
@@ -61,7 +62,7 @@ def propagate_state_changes(
     months: int,
     months_per_year: int,
     clamp_state: Callable[[int], int],
-    propagation_rules: Optional[Mapping[str, Mapping[str, float | int]]] = None,
+    propagation_rules: Optional[Mapping[str, Mapping[str, Any]]] = None,
 ) -> None:
     """Propagate danger/traffic/mood/road-condition across neighboring locations."""
     rules = DEFAULT_PROPAGATION_RULES if propagation_rules is None else propagation_rules
@@ -99,11 +100,11 @@ def propagate_state_changes(
         rule = rules["mood_from_ruin"]
         if loc.prosperity < rule["source_threshold"]:
             penalty = _scaled(-rule["neighbor_penalty"])
-            for neighbor in neighbors[:rule["max_neighbors"]]:
+            for neighbor in sorted(neighbors, key=lambda item: item.id)[:rule["max_neighbors"]]:
                 pending_changes.append((neighbor.id, "mood", penalty))
 
         rule = rules["road_damage_from_danger"]
-        if loc.danger >= rule["danger_threshold"]:
+        if not is_disabled_threshold(rule["danger_threshold"]) and loc.danger >= rule["danger_threshold"]:
             pending_changes.append((loc.id, "road_condition", _scaled(-rule["road_penalty"])))
 
     for loc_id, attr, delta in pending_changes:
@@ -114,6 +115,6 @@ def propagate_state_changes(
         setattr(location, attr, clamp_state(old + delta))
 
 
-def clone_default_propagation_rules() -> Dict[str, Dict[str, float | int]]:
+def clone_default_propagation_rules() -> Dict[str, Dict[str, Any]]:
     """Compatibility wrapper around the shared rule-table owner."""
     return _clone_default_propagation_rules()

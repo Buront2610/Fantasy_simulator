@@ -16,9 +16,8 @@ from ..content.world_data import (
 )
 from ..terrain import (
     assemble_atlas_layout_inputs,
-    REGION_TYPE_TO_BIOME,
-    SITE_IMPORTANCE,
     build_default_atlas_layout,
+    build_terrain_payload_from_locations,
 )
 
 CURRENT_VERSION = 8
@@ -344,95 +343,24 @@ def _migrate_v5_to_v6(data: Dict[str, Any]) -> Dict[str, Any]:
     width = world_data.get("width", 5)
     height = world_data.get("height", 5)
 
-    # Build terrain cells for every grid coordinate
-    terrain_cells = []
-    for y in range(height):
-        for x in range(width):
-            terrain_cells.append({
-                "x": x, "y": y,
-                "biome": "plains",
-                "elevation": 128,
-                "moisture": 128,
-                "temperature": 128,
-            })
-
-    # Map (x, y) -> terrain cell dict for biome overwriting
-    cell_lookup: Dict[tuple, Dict[str, Any]] = {}
-    for tc in terrain_cells:
-        cell_lookup[(tc["x"], tc["y"])] = tc
-
-    # Build sites from existing grid locations and set biomes
-    sites = []
-    site_coords: Dict[tuple, str] = {}
-    for loc_data in grid:
-        loc_id = loc_data.get("id", "")
-        region_type = loc_data.get("region_type", "city")
-        x = loc_data.get("x", 0)
-        y = loc_data.get("y", 0)
-
-        # Skip out-of-bounds locations (same policy as build_default_terrain)
-        if not (0 <= x < width and 0 <= y < height):
-            continue
-
-        biome = REGION_TYPE_TO_BIOME.get(region_type, "plains")
-        importance = SITE_IMPORTANCE.get(region_type, 50)
-
-        tc = cell_lookup.get((x, y))
-        if tc is not None:
-            tc["biome"] = biome
-
-        sites.append({
-            "location_id": loc_id,
-            "x": x,
-            "y": y,
-            "site_type": region_type,
-            "importance": importance,
-        })
-        site_coords[(x, y)] = loc_id
-
-    # Auto-generate routes between adjacent sites
-    routes = []
-    seen_pairs: set = set()
-    route_counter = 0
-    for (x, y), loc_id in site_coords.items():
-        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-            nx, ny = x + dx, y + dy
-            neighbor_id = site_coords.get((nx, ny))
-            if neighbor_id is None:
-                continue
-            pair = tuple(sorted([loc_id, neighbor_id]))
-            if pair in seen_pairs:
-                continue
-            seen_pairs.add(pair)
-            route_counter += 1
-
-            from_biome = cell_lookup.get((x, y), {}).get("biome", "plains")
-            to_biome = cell_lookup.get((nx, ny), {}).get("biome", "plains")
-            if "mountain" in (from_biome, to_biome):
-                route_type = "mountain_pass"
-            elif "ocean" in (from_biome, to_biome):
-                route_type = "sea_lane"
-            elif "swamp" in (from_biome, to_biome):
-                route_type = "trail"
-            else:
-                route_type = "road"
-
-            routes.append({
-                "route_id": f"route_{route_counter:03d}",
-                "from_site_id": loc_id,
-                "to_site_id": neighbor_id,
-                "route_type": route_type,
-                "distance": 1,
-                "blocked": False,
-            })
-
-    world_data["terrain_map"] = {
-        "width": width,
-        "height": height,
-        "cells": terrain_cells,
-    }
-    world_data["sites"] = sites
-    world_data["routes"] = routes
+    payload = build_terrain_payload_from_locations(
+        width=width,
+        height=height,
+        locations=[
+            (
+                loc_data.get("id", ""),
+                loc_data.get("canonical_name") or loc_data.get("name", ""),
+                loc_data.get("description", ""),
+                loc_data.get("region_type", "city"),
+                loc_data.get("x", 0),
+                loc_data.get("y", 0),
+            )
+            for loc_data in grid
+        ],
+    )
+    world_data["terrain_map"] = payload["terrain_map"]
+    world_data["sites"] = payload["sites"]
+    world_data["routes"] = payload["routes"]
     data["schema_version"] = 6
     return data
 

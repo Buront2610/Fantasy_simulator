@@ -116,6 +116,14 @@ def _char_name_map(world: World) -> Dict[str, str]:
     return {c.char_id: c.name for c in world.characters}
 
 
+def _sort_location_entries(entries: List[LocationReportEntry]) -> List[LocationReportEntry]:
+    """Sort location report entries by player-facing importance and name."""
+    return sorted(
+        entries,
+        key=lambda entry: (-entry.event_count, entry.name.casefold(), entry.location_id),
+    )
+
+
 def _actors_in_record(record: WorldEventRecord) -> List[str]:
     """Return all actor ids mentioned in a record."""
     ids: List[str] = []
@@ -244,7 +252,7 @@ def generate_monthly_report(
         season=season,
         character_entries=char_entries,
         notable_events=notable,
-        location_entries=loc_entries,
+        location_entries=_sort_location_entries(loc_entries),
         rumor_entries=rumor_entries,
         total_events=len(records),
     )
@@ -298,19 +306,18 @@ def generate_yearly_report(
     for loc_id, loc_records in sorted(loc_event_map.items()):
         loc_name = world.location_name(loc_id)
         notable_loc = [r.description for r in loc_records if r.severity >= _SEVERITY_THRESHOLD_YEARLY]
-        if notable_loc:
-            loc_entries.append(LocationReportEntry(
-                location_id=loc_id,
-                name=loc_name,
-                event_count=len(loc_records),
-                notable_events=notable_loc,
-            ))
+        loc_entries.append(LocationReportEntry(
+            location_id=loc_id,
+            name=loc_name,
+            event_count=len(loc_records),
+            notable_events=notable_loc,
+        ))
 
     return YearlyReport(
         year=year,
         character_entries=char_entries,
         notable_events=notable,
-        location_entries=loc_entries,
+        location_entries=_sort_location_entries(loc_entries),
         total_events=len(records),
         deaths_this_year=deaths_this_year,
     )
@@ -350,16 +357,20 @@ def format_monthly_report(report: MonthlyReport) -> str:
         for ev in report.notable_events:
             lines.append(f"    - {ev}")
 
-    # Location highlights — only locations with notable events
-    location_entries_with_notables = [
-        loc for loc in report.location_entries if loc.notable_events
-    ]
-    if location_entries_with_notables:
+    # Location highlights. When no event crosses the notable threshold,
+    # still surface the location-level activity count so route/topology
+    # changes remain visible in the rendered report.
+    if report.location_entries:
         lines.append("")
         lines.append(f"  {tr('report_section_world')}")
-        for loc in location_entries_with_notables:
-            for ev in loc.notable_events:
-                lines.append(f"    {loc.name}: {ev}")
+        for loc in report.location_entries:
+            if loc.notable_events:
+                for ev in loc.notable_events:
+                    lines.append(f"    {loc.name}: {ev}")
+            else:
+                lines.append(
+                    f"    {loc.name}: {tr('report_location_activity', count=loc.event_count)}"
+                )
 
     # Rumors
     if report.rumor_entries:
@@ -403,8 +414,13 @@ def format_yearly_report(report: YearlyReport) -> str:
         lines.append("")
         lines.append(f"  {tr('report_section_locations')}")
         for loc in report.location_entries:
-            for ev in loc.notable_events:
-                lines.append(f"    {loc.name}: {ev}")
+            if loc.notable_events:
+                for ev in loc.notable_events:
+                    lines.append(f"    {loc.name}: {ev}")
+            else:
+                lines.append(
+                    f"    {loc.name}: {tr('report_location_activity', count=loc.event_count)}"
+                )
 
     # Watched characters — only those with events this year
     if report.character_entries:

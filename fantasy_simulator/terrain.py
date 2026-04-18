@@ -16,8 +16,42 @@ pure landscape description for that coordinate.
 from __future__ import annotations
 
 import math
+from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from functools import lru_cache
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+
+def _bool_payload(payload: Any, *, field_name: str) -> bool:
+    if not isinstance(payload, bool):
+        raise ValueError(f"{field_name} must be a boolean")
+    return payload
+
+
+def _string_payload(payload: Any, *, field_name: str) -> str:
+    if not isinstance(payload, str) or not payload:
+        raise ValueError(f"{field_name} must be a non-empty string")
+    return payload
+
+
+def _int_payload(payload: Any, *, field_name: str, minimum: Optional[int] = None) -> int:
+    if isinstance(payload, bool) or not isinstance(payload, int):
+        raise ValueError(f"{field_name} must be an integer")
+    if minimum is not None and payload < minimum:
+        raise ValueError(f"{field_name} must be >= {minimum}")
+    return payload
+
+
+def normalize_route_payload(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Validate and normalize serialized route payload fields."""
+    return {
+        "route_id": _string_payload(data["route_id"], field_name="route_id"),
+        "from_site_id": _string_payload(data["from_site_id"], field_name="from_site_id"),
+        "to_site_id": _string_payload(data["to_site_id"], field_name="to_site_id"),
+        "route_type": _string_payload(data.get("route_type", "road"), field_name="route_type"),
+        "distance": _int_payload(data.get("distance", 1), field_name="distance", minimum=1),
+        "blocked": _bool_payload(data.get("blocked", False), field_name="blocked"),
+    }
 
 
 # ------------------------------------------------------------------
@@ -71,7 +105,7 @@ BIOME_MOVE_COST: Dict[str, float] = {
 # TerrainCell
 # ------------------------------------------------------------------
 
-@dataclass
+@dataclass(slots=True)
 class TerrainCell:
     """A single cell in the terrain grid.
 
@@ -136,7 +170,7 @@ class TerrainCell:
 # Site
 # ------------------------------------------------------------------
 
-@dataclass
+@dataclass(slots=True)
 class Site:
     """A named location placed on the terrain grid.
 
@@ -209,7 +243,7 @@ ROUTE_BASE_COST: Dict[str, float] = {
 }
 
 
-@dataclass
+@dataclass(slots=True)
 class RouteEdge:
     """A navigable connection between two sites.
 
@@ -232,6 +266,29 @@ class RouteEdge:
     route_type: str = "road"
     distance: int = 1
     blocked: bool = False
+    _on_change: Optional[Callable[[], None]] = field(default=None, repr=False, compare=False)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        callback = None
+        old_value = None
+        had_old_value = False
+        if name in {"route_id", "from_site_id", "to_site_id", "route_type", "distance", "blocked"}:
+            try:
+                old_value = object.__getattribute__(self, name)
+                had_old_value = True
+            except AttributeError:
+                had_old_value = False
+            try:
+                callback = object.__getattribute__(self, "_on_change")
+            except AttributeError:
+                callback = None
+        object.__setattr__(self, name, value)
+        if (
+            name in {"route_id", "from_site_id", "to_site_id", "route_type", "distance", "blocked"}
+            and callback is not None
+            and (not had_old_value or old_value != value)
+        ):
+            callback()
 
     @property
     def base_cost(self) -> float:
@@ -262,13 +319,14 @@ class RouteEdge:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "RouteEdge":
+        payload = normalize_route_payload(data)
         return cls(
-            route_id=data["route_id"],
-            from_site_id=data["from_site_id"],
-            to_site_id=data["to_site_id"],
-            route_type=data.get("route_type", "road"),
-            distance=data.get("distance", 1),
-            blocked=data.get("blocked", False),
+            route_id=payload["route_id"],
+            from_site_id=payload["from_site_id"],
+            to_site_id=payload["to_site_id"],
+            route_type=payload["route_type"],
+            distance=payload["distance"],
+            blocked=payload["blocked"],
         )
 
 
@@ -276,7 +334,7 @@ class RouteEdge:
 # TerrainMap - container for the terrain grid
 # ------------------------------------------------------------------
 
-@dataclass
+@dataclass(slots=True)
 class TerrainMap:
     """Container for the full terrain grid.
 
@@ -342,7 +400,7 @@ class TerrainMap:
 # AtlasLayout — persistent macro geography layer (PR-G2 item 7)
 # ------------------------------------------------------------------
 
-@dataclass
+@dataclass(slots=True)
 class AtlasLayout:
     """Persistent macro geography for the atlas-scale map.
 
@@ -393,9 +451,9 @@ class AtlasLayout:
         return cls(
             canvas_w=data.get("canvas_w", 72),
             canvas_h=data.get("canvas_h", 30),
-            continents=data.get("continents", []),
-            seas=data.get("seas", []),
-            mountain_ranges=data.get("mountain_ranges", []),
+            continents=deepcopy(data.get("continents", [])),
+            seas=deepcopy(data.get("seas", [])),
+            mountain_ranges=deepcopy(data.get("mountain_ranges", [])),
         )
 
 
@@ -409,7 +467,7 @@ ATLAS_MARGIN_X = 6
 ATLAS_MARGIN_Y = 3
 
 
-@dataclass
+@dataclass(slots=True)
 class AtlasLayoutInputs:
     """Normalized atlas-layout inputs derived from world/site state."""
 
@@ -742,6 +800,55 @@ def build_default_atlas_layout(
     )
 
 
+@lru_cache(maxsize=64)
+def _cached_atlas_layout_template(
+    site_coords: Tuple[Tuple[int, int], ...],
+    route_coords: Tuple[Tuple[Tuple[int, int], Tuple[int, int]], ...],
+    mountain_coords: Tuple[Tuple[int, int], ...],
+) -> AtlasLayout:
+    return build_default_atlas_layout(
+        AtlasLayoutInputs(
+            site_coords=list(site_coords),
+            route_coords=list(route_coords),
+            mountain_coords=list(mountain_coords),
+        )
+    )
+
+
+def build_cached_world_structure(
+    *,
+    width: int,
+    height: int,
+    locations: Optional[List[Tuple[str, str, str, str, int, int]]] = None,
+    route_specs: Optional[List[Dict[str, Any]]] = None,
+) -> Tuple[TerrainMap, List[Site], List[RouteEdge], AtlasLayout]:
+    """Build world structure while caching only the atlas geometry projection."""
+    terrain_map, sites, routes = build_default_terrain(
+        width=width,
+        height=height,
+        locations=locations,
+        route_specs=route_specs,
+    )
+    inputs = assemble_atlas_layout_inputs(
+        width=width,
+        height=height,
+        sites=sites,
+        routes=routes,
+        terrain_cells=list(terrain_map.cells.values()),
+    )
+    atlas_layout = _cached_atlas_layout_template(
+        tuple(inputs.site_coords),
+        tuple(inputs.route_coords),
+        tuple(inputs.mountain_coords),
+    )
+    return (
+        terrain_map,
+        sites,
+        routes,
+        deepcopy(atlas_layout),
+    )
+
+
 # ------------------------------------------------------------------
 # Default terrain generation for the legacy 5x5 world
 # ------------------------------------------------------------------
@@ -775,6 +882,7 @@ def build_default_terrain(
     width: int = 5,
     height: int = 5,
     locations: Optional[List] = None,
+    route_specs: Optional[List[Dict[str, Any]]] = None,
 ) -> Tuple[TerrainMap, List[Site], List[RouteEdge]]:
     """Generate terrain, sites, and routes from a location list.
 
@@ -786,8 +894,13 @@ def build_default_terrain(
     the bounds filter still applies — so a 3×3 world with the default
     25-entry list will only contain the locations that fit.
 
-    Adjacent sites (4-directional) are connected by auto-generated
-    provisional routes (see *PR-G note* below).
+    When ``route_specs`` is provided, those explicit route definitions
+    become the canonical site graph. Otherwise adjacent sites
+    (4-directional) are connected by auto-generated provisional routes
+    (see *PR-G note* below).
+
+    Explicit ``route_specs`` must reference in-bounds sites present in the
+    supplied location set; malformed or dangling route definitions fail fast.
 
     .. note:: PR-G provisional routes
 
@@ -800,9 +913,8 @@ def build_default_terrain(
     Returns:
         (terrain_map, sites, routes)
     """
-    from .content.world_data import DEFAULT_LOCATIONS
-
     if locations is None:
+        from .content.world_data import DEFAULT_LOCATIONS
         locations = DEFAULT_LOCATIONS
 
     tmap = TerrainMap(width=width, height=height)
@@ -835,41 +947,48 @@ def build_default_terrain(
         ))
         site_coords[(x, y)] = loc_id
 
-    # Auto-generate provisional routes between adjacent sites.
-    # These are legacy bridges based on grid adjacency; see docstring.
     routes: List[RouteEdge] = []
-    seen_pairs: set = set()
-    route_counter = 0
-    for (x, y), loc_id in site_coords.items():
-        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-            nx, ny = x + dx, y + dy
-            neighbor_id = site_coords.get((nx, ny))
-            if neighbor_id is None:
-                continue
-            pair = tuple(sorted([loc_id, neighbor_id]))
-            if pair in seen_pairs:
-                continue
-            seen_pairs.add(pair)
-            route_counter += 1
+    if route_specs is not None:
+        valid_site_ids = {site.location_id for site in sites}
+        for spec in route_specs:
+            payload = normalize_route_payload(spec)
+            if payload["from_site_id"] not in valid_site_ids or payload["to_site_id"] not in valid_site_ids:
+                raise ValueError(f"route {payload['route_id']} references an unknown site")
+            routes.append(RouteEdge.from_dict(payload))
+    else:
+        # Auto-generate provisional routes between adjacent sites.
+        # These are legacy bridges based on grid adjacency; see docstring.
+        seen_pairs: set = set()
+        route_counter = 0
+        for (x, y), loc_id in site_coords.items():
+            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                nx, ny = x + dx, y + dy
+                neighbor_id = site_coords.get((nx, ny))
+                if neighbor_id is None:
+                    continue
+                pair = tuple(sorted([loc_id, neighbor_id]))
+                if pair in seen_pairs:
+                    continue
+                seen_pairs.add(pair)
+                route_counter += 1
 
-            # Determine route type from terrain
-            from_biome = (tmap.get(x, y) or TerrainCell(x=x, y=y)).biome
-            to_biome = (tmap.get(nx, ny) or TerrainCell(x=nx, y=ny)).biome
-            if "mountain" in (from_biome, to_biome):
-                route_type = "mountain_pass"
-            elif "ocean" in (from_biome, to_biome):
-                route_type = "sea_lane"
-            elif "swamp" in (from_biome, to_biome):
-                route_type = "trail"
-            else:
-                route_type = "road"
+                from_biome = (tmap.get(x, y) or TerrainCell(x=x, y=y)).biome
+                to_biome = (tmap.get(nx, ny) or TerrainCell(x=nx, y=ny)).biome
+                if "mountain" in (from_biome, to_biome):
+                    route_type = "mountain_pass"
+                elif "ocean" in (from_biome, to_biome):
+                    route_type = "sea_lane"
+                elif "swamp" in (from_biome, to_biome):
+                    route_type = "trail"
+                else:
+                    route_type = "road"
 
-            routes.append(RouteEdge(
-                route_id=f"route_{route_counter:03d}",
-                from_site_id=loc_id,
-                to_site_id=neighbor_id,
-                route_type=route_type,
-            ))
+                routes.append(RouteEdge(
+                    route_id=f"route_{route_counter:03d}",
+                    from_site_id=loc_id,
+                    to_site_id=neighbor_id,
+                    route_type=route_type,
+                ))
 
     # --- Compute atlas coordinates for each site ---
     # These are deterministic projections from grid coords to atlas canvas
@@ -883,3 +1002,23 @@ def build_default_terrain(
         )
 
     return tmap, sites, routes
+
+
+def build_terrain_payload_from_locations(
+    width: int,
+    height: int,
+    locations: List,
+    route_specs: Optional[List[Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
+    """Return serialized terrain/site/route payloads for a location list."""
+    terrain_map, sites, routes = build_default_terrain(
+        width=width,
+        height=height,
+        locations=locations,
+        route_specs=route_specs,
+    )
+    return {
+        "terrain_map": terrain_map.to_dict(),
+        "sites": [site.to_dict() for site in sites],
+        "routes": [route.to_dict() for route in routes],
+    }

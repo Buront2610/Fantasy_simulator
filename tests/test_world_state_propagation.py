@@ -150,6 +150,30 @@ def test_mood_from_ruin_is_capped_by_max_neighbors() -> None:
     assert changed == ["n0", "n1", "n2", "n3"]
 
 
+def test_mood_from_ruin_uses_stable_neighbor_order_before_capping() -> None:
+    src = _FakeLoc(id="src", prosperity=10)
+    neighbors_a = [_FakeLoc(id=f"n{i}", mood=50) for i in range(6)]
+    neighbors_b = [_FakeLoc(id=loc.id, mood=50) for loc in reversed(neighbors_a)]
+
+    def _run(neighbors: list[_FakeLoc]) -> list[str]:
+        index = {"src": src, **{loc.id: loc for loc in neighbors}}
+
+        def _neighbors(_loc_id: str) -> list[_FakeLoc]:
+            return neighbors if _loc_id == "src" else []
+
+        propagate_state_changes(
+            locations=[src, *neighbors],
+            location_index=index,
+            get_neighbors=_neighbors,
+            months=12,
+            months_per_year=12,
+            clamp_state=_clamp,
+        )
+        return sorted(loc.id for loc in neighbors if loc.mood < 50)
+
+    assert _run(neighbors_a) == _run(neighbors_b) == ["n0", "n1", "n2", "n3"]
+
+
 def test_propagation_rules_fail_fast_on_invalid_delta_type() -> None:
     src = _FakeLoc(id="src", danger=40)
     n1 = _FakeLoc(id="n1", danger=10)

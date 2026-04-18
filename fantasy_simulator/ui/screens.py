@@ -886,8 +886,31 @@ def _show_location_history(world: World, ctx: UIContext | None = None) -> None:
     if loc.live_traces:
         for trace in reversed(loc.live_traces[-5:]):
             out.print_line(f"    - {trace['text']}")
+        if len(loc.live_traces) > 5:
+            out.print_dim(f"    {tr('location_live_traces_truncated', count=len(loc.live_traces) - 5)}")
     else:
         out.print_dim(f"    {tr('no_live_traces')}")
+
+    # Recent canonical events (most recent first, up to 5)
+    out.print_line()
+    out.print_line(f"  {tr('location_recent_events_label')}:")
+    event_lookup = {record.record_id: record for record in world.event_records}
+    recent_records = [
+        event_lookup[record_id]
+        for record_id in reversed(loc.recent_event_ids[-5:])
+        if record_id in event_lookup
+    ]
+    if recent_records:
+        for record in recent_records:
+            out.print_line(
+                f"    - {tr('location_recent_event_entry', year=record.year, description=record.description)}"
+            )
+        if len(loc.recent_event_ids) > 5:
+            out.print_dim(
+                f"    {tr('location_recent_events_truncated', count=len(loc.recent_event_ids) - 5)}"
+            )
+    else:
+        out.print_dim(f"    {tr('no_recent_events')}")
 
     ctx.inp.pause()
 

@@ -3,6 +3,7 @@ tests/test_world.py - Unit tests for the World class.
 """
 
 import unicodedata
+import pytest
 
 from fantasy_simulator.adventure import AdventureRun
 from fantasy_simulator.character import Character
@@ -16,6 +17,7 @@ from fantasy_simulator.content.setting_bundle import (
 )
 from fantasy_simulator.i18n import set_locale
 from fantasy_simulator.rumor import Rumor
+from fantasy_simulator.terrain import RouteEdge
 from fantasy_simulator.world import LocationState, MemorialRecord, World
 from fantasy_simulator.content.world_data import get_location_state_defaults
 
@@ -76,6 +78,121 @@ class TestWorld:
         neighbors = world.get_neighboring_locations("loc_aethoria_capital")
         assert neighbors
         assert all(hasattr(loc, "canonical_name") for loc in neighbors)
+
+    def test_propagation_topology_can_diverge_from_travel_topology(self):
+        world = World()
+        route = world.routes[0]
+        source = world.get_location_by_id(route.from_site_id)
+        target = world.get_location_by_id(route.to_site_id)
+        assert source is not None
+        assert target is not None
+
+        assert target in world.get_travel_neighboring_locations(source.id)
+        route.blocked = True
+
+        assert target not in world.get_travel_neighboring_locations(source.id)
+        assert target in world.get_propagation_neighboring_locations(source.id, mode="grid")
+
+        source.danger = 90
+        target.danger = 0
+        world.propagation_rules["topology"]["mode"] = "grid"
+        world.propagate_state(months=12)
+
+        assert target.danger > 0
+
+    def test_route_index_rebuilds_after_in_place_route_replacement(self):
+        world = World()
+        target_index = next(
+            idx for idx, route in enumerate(world.routes)
+            if route.other_end("loc_aethoria_capital") == "loc_silverbrook"
+        )
+        world.routes[target_index] = RouteEdge(
+            route_id="route_capital_coral",
+            from_site_id="loc_aethoria_capital",
+            to_site_id="loc_coral_cove",
+            route_type="road",
+        )
+
+        neighbor_ids = set(world.get_connected_site_ids("loc_aethoria_capital"))
+
+        assert "loc_coral_cove" in neighbor_ids
+        assert "loc_silverbrook" not in neighbor_ids
+
+    def test_route_cache_clean_reads_do_not_recompute_signatures(self, monkeypatch):
+        world = World()
+        rebuild_calls = 0
+        original_rebuild = world._rebuild_route_index
+
+        def _counting_rebuild():
+            nonlocal rebuild_calls
+            rebuild_calls += 1
+            original_rebuild()
+
+        monkeypatch.setattr(world, "_rebuild_route_index", _counting_rebuild)
+
+        routes = world.get_routes_for_site("loc_aethoria_capital")
+
+        assert routes
+        assert rebuild_calls == 0
+
+    def test_route_block_toggle_invalidates_cache_without_signature_scan(self, monkeypatch):
+        world = World()
+        route = next(
+            route for route in world.routes
+            if route.other_end("loc_aethoria_capital") == "loc_silverbrook"
+        )
+        rebuild_calls = 0
+        original_rebuild = world._rebuild_route_index
+
+        def _counting_rebuild():
+            nonlocal rebuild_calls
+            rebuild_calls += 1
+            original_rebuild()
+
+        monkeypatch.setattr(world, "_rebuild_route_index", _counting_rebuild)
+
+        assert "loc_silverbrook" in world.get_connected_site_ids("loc_aethoria_capital")
+        route.blocked = True
+
+        assert "loc_silverbrook" not in world.get_connected_site_ids("loc_aethoria_capital")
+        assert rebuild_calls == 1
+
+    def test_setting_bundle_can_define_explicitly_disconnected_topology(self):
+        world = World(name="Disconnected", width=2, height=1)
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="disconnected",
+                display_name="Disconnected",
+                lore_text="No roads",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="loc_one",
+                        name="One",
+                        description="",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                    ),
+                    SiteSeedDefinition(
+                        location_id="loc_two",
+                        name="Two",
+                        description="",
+                        region_type="village",
+                        x=1,
+                        y=0,
+                    ),
+                ],
+                route_seeds=[],
+            ),
+        )
+
+        assert world.routes == []
+        assert world.get_connected_site_ids("loc_one") == []
+        assert world.get_travel_neighboring_locations("loc_one") == []
+        assert world.get_neighboring_locations("loc_one") == []
+        assert world.reachable_location_ids("loc_one") == []
+        assert world.get_propagation_neighboring_locations("loc_one", mode="travel") == []
 
     def test_add_character_marks_location_visited(self):
         world = World()
@@ -231,6 +348,109 @@ class TestWorld:
             ),
         )
         assert world.normalize_location_id("hub_secondary", location_name="Clockwork Hub") == "hub_secondary"
+
+    def test_from_dict_normalizes_event_record_location_ids_through_bundle_aliases(self):
+        from fantasy_simulator.content.world_data import fallback_location_id
+        from fantasy_simulator.events import WorldEventRecord
+
+        world = World(name="Custom")
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="hub_primary",
+                        name="Clockwork Hub",
+                        description="Primary site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                    ),
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+        payload = world.to_dict()
+        payload["event_records"] = [
+            WorldEventRecord(
+                record_id="r1",
+                kind="battle",
+                year=1001,
+                location_id=fallback_location_id("Clockwork Hub"),
+            ).to_dict()
+        ]
+
+        restored = World.from_dict(payload)
+
+        assert restored.event_records[0].location_id == "hub_primary"
+
+    def test_normalize_after_load_repairs_all_location_backed_references_consistently(self):
+        from fantasy_simulator.events import WorldEventRecord
+        from fantasy_simulator.rumor import Rumor
+        from fantasy_simulator.adventure import AdventureRun
+
+        world = World(name="Custom")
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="hub_primary",
+                        name="Clockwork Hub",
+                        description="Primary site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                        tags=["default_resident"],
+                    ),
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+        world.characters = [Character("Aldric", 25, "Male", "Human", "Warrior", location_id="missing")]
+        world.rumors = [Rumor(source_location_id="missing", description="Old rumor")]
+        world.active_adventures = [
+            AdventureRun(
+                character_id="char_1",
+                character_name="Aldric",
+                origin="missing",
+                destination="missing",
+                year_started=world.year,
+            )
+        ]
+        world.memorials = {
+            "mem_1": MemorialRecord(
+                memorial_id="mem_1",
+                character_id="char_1",
+                character_name="Aldric",
+                location_id="missing",
+                year=world.year,
+                cause="battle_fatal",
+                epitaph="Fell in battle.",
+            )
+        }
+        world.event_records = [WorldEventRecord(record_id="r1", kind="battle", year=1001, location_id="missing")]
+        only_location = world.get_location_by_id("hub_primary")
+        assert only_location is not None
+        only_location.memorial_ids = ["stale"]
+        only_location.recent_event_ids = ["stale"]
+
+        world.normalize_after_load()
+
+        assert world.characters[0].location_id == "hub_primary"
+        assert world.rumors[0].source_location_id is None
+        assert world.active_adventures[0].origin == "hub_primary"
+        assert world.active_adventures[0].destination == "hub_primary"
+        assert world.memorials["mem_1"].location_id == "hub_primary"
+        assert world.event_records[0].location_id is None
+        assert only_location.memorial_ids == ["mem_1"]
+        assert only_location.recent_event_ids == []
 
     def test_setting_bundle_assignment_rebuilds_world_structure(self):
         world = World(name="Custom")
@@ -776,6 +996,56 @@ class TestWorld:
         assert restored.season_for_month(2) == "summer"
         assert restored.calendar_baseline.calendar_key == "lunar_cycle"
 
+    def test_location_name_makes_unknown_locations_explicit(self):
+        set_locale("en")
+        world = World()
+
+        assert world.location_name("loc_missing_ruin") == "Unknown location (loc_missing_ruin)"
+
+    def test_location_state_from_dict_rejects_string_alias_payload(self):
+        payload = World().to_dict()
+        payload["grid"][0]["aliases"] = "The Crown City"
+
+        try:
+            World.from_dict(payload)
+        except ValueError as exc:
+            assert "aliases" in str(exc)
+        else:
+            raise AssertionError("Expected malformed aliases payload to fail fast")
+
+    def test_from_dict_rejects_self_loop_route_in_serialized_topology(self):
+        payload = World(width=1, height=1).to_dict()
+        payload.pop("setting_bundle", None)
+        payload["terrain_map"] = {
+            "width": 1,
+            "height": 1,
+            "cells": [{"x": 0, "y": 0, "biome": "plains", "elevation": 128, "moisture": 128, "temperature": 128}],
+        }
+        payload["sites"] = [
+            {
+                "location_id": payload["grid"][0]["id"],
+                "x": 0,
+                "y": 0,
+                "site_type": "city",
+                "importance": 50,
+            }
+        ]
+        payload["routes"] = [{
+            "route_id": "route_loop",
+            "from_site_id": payload["grid"][0]["id"],
+            "to_site_id": payload["grid"][0]["id"],
+            "route_type": "road",
+            "distance": 1,
+            "blocked": False,
+        }]
+
+        try:
+            World.from_dict(payload)
+        except ValueError as exc:
+            assert "self-loop" in str(exc)
+        else:
+            raise AssertionError("Expected self-loop route to fail fast")
+
     def test_advance_calendar_position_respects_variable_month_lengths(self):
         world = World()
         world.setting_bundle = SettingBundle(
@@ -1033,6 +1303,64 @@ class TestWorld:
         world.event_log = ["stale cache entry"]
 
         assert world.get_compatibility_event_log() == ["[Year 1001, Month 2, Day 3] Canonical clash"]
+
+    def test_event_log_property_projects_canonical_history_over_stale_cache(self):
+        from fantasy_simulator.events import WorldEventRecord
+
+        world = World()
+        world.record_event(
+            WorldEventRecord(
+                record_id="r1",
+                kind="battle",
+                year=1001,
+                month=2,
+                day=3,
+                description="Canonical clash",
+            )
+        )
+        world.event_log = ["stale cache entry"]
+
+        assert world.event_log == ["[Year 1001, Month 2, Day 3] Canonical clash"]
+
+    def test_event_log_view_is_read_only(self):
+        from fantasy_simulator.events import WorldEventRecord
+
+        world = World()
+        world.log_event("display-only line")
+        with pytest.raises(TypeError):
+            world.event_log.append("mutated")
+        assert any("display-only line" in line for line in world.event_log)
+
+        world.record_event(
+            WorldEventRecord(
+                record_id="r1",
+                kind="battle",
+                year=1001,
+                description="Canonical clash",
+            )
+        )
+        with pytest.raises(TypeError):
+            world.event_log.append("mutated again")
+        assert world.event_log == ["[Year 1001, Month 1, Day 1] Canonical clash"]
+
+    def test_record_event_clears_display_adapter_through_world_facade(self):
+        from fantasy_simulator.events import WorldEventRecord
+
+        world = World()
+        world.log_event("display-only line")
+
+        world.record_event(
+            WorldEventRecord(
+                record_id="r1",
+                kind="battle",
+                year=1001,
+                month=1,
+                day=1,
+                description="canonical line",
+            )
+        )
+
+        assert all("display-only line" not in line for line in world.get_compatibility_event_log())
 
     def test_trimming_event_records_removes_dangling_recent_event_ids(self):
         from fantasy_simulator.events import WorldEventRecord

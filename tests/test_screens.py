@@ -229,6 +229,7 @@ class TestAdventureAndLocationViews(unittest.TestCase):
         self.assertIn("Aldric & Lysara", text)
 
     def test_location_history_uses_i18n_count_tags(self) -> None:
+        from fantasy_simulator.event_models import WorldEventRecord
         from fantasy_simulator.ui.screens import _show_location_history
         from fantasy_simulator.ui.ui_context import UIContext
         from fantasy_simulator.ui.render_backend import PrintRenderBackend
@@ -239,7 +240,19 @@ class TestAdventureAndLocationViews(unittest.TestCase):
         assert loc is not None
         loc.aliases.append("The Crown City")
         loc.memorial_ids.append("m1")
-        loc.live_traces.append({"year": 1001, "char_name": "Aldric", "text": "trace"})
+        for idx in range(6):
+            loc.live_traces.append({"year": 1001, "char_name": "Aldric", "text": f"trace {idx}"})
+            world.record_event(
+                WorldEventRecord(
+                    record_id=f"r{idx + 1}",
+                    kind="meeting",
+                    year=1001,
+                    month=1,
+                    day=idx + 1,
+                    location_id=loc.id,
+                    description=f"Capital event {idx}",
+                )
+            )
 
         class PickFirstInputBackend:
             def __init__(self):
@@ -263,7 +276,12 @@ class TestAdventureAndLocationViews(unittest.TestCase):
 
         self.assertIn("1 memorial(s)", text)
         self.assertIn("1 alias(es)", text)
-        self.assertIn("1 trace(s)", text)
+        self.assertIn("6 trace(s)", text)
+        self.assertIn("6 recent event(s)", text)
+        self.assertIn("Recent events", text)
+        self.assertIn("Capital event 5", text)
+        self.assertIn("older visitor record", text)
+        self.assertIn("older event", text)
 
 
 if __name__ == "__main__":

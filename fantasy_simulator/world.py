@@ -17,21 +17,70 @@ from .rule_override_resolution import (
     resolve_event_impact_rule_overrides,
     resolve_propagation_rule_overrides,
 )
-from .world_event_log import format_event_log_entry, project_compatibility_event_log
+from .world_event_log import (
+    append_display_event_log_entry,
+    compatibility_event_log_view,
+    rebuild_display_event_log,
+    trim_event_log_entries,
+)
+from .world_location_references import LocationReferenceResolver
+from .world_memory import (
+    add_alias as add_location_alias,
+    add_live_trace as add_location_live_trace,
+    link_memorial_record,
+    memorials_for_location,
+    rebuild_location_memorial_ids,
+)
+from .world_load_normalizer import (
+    ensure_unique_event_record_ids,
+    normalize_after_load as normalize_loaded_world_state,
+    rebuild_recent_event_ids,
+)
+from .world_route_graph import (
+    ObservableRouteList,
+    rebuild_route_index,
+    replace_routes,
+    routes_for_site,
+)
 from .world_event_state import (
     apply_event_impact_to_location,
     append_canonical_event_record,
 )
+from .world_calendar import (
+    advance_calendar_position as advance_calendar_position_for_calendar,
+    apply_calendar_definition_history,
+    calendar_definition_by_key_ref,
+    calendar_definition_for_date_ref,
+    clamp_calendar_position as clamp_calendar_position_for_calendar,
+    default_season,
+    remaining_days_in_year as remaining_days_in_year_for_calendar,
+    season_for_date as season_for_calendar_date,
+    season_for_month as season_for_calendar,
+    months_elapsed_between as months_elapsed_between_for_calendar,
+)
 from .world_state_propagation import (
     decay_toward_baseline,
     propagate_state_changes,
+)
+from .world_topology_state import (
+    WorldTopologyState,
+    build_atlas_layout_from_topology,
+    build_topology_from_locations,
+    overlay_serialized_route_state,
+    restore_serialized_topology,
+    validate_topology_integrity,
+)
+from .world_topology import (
+    PROPAGATION_TOPOLOGY_TRAVEL,
+    PROPAGATION_TOPOLOGY_GRID,
+    grid_neighbor_ids,
+    route_neighbor_ids,
 )
 from .content.setting_bundle import (
     CalendarDefinition,
     SettingBundle,
     bundle_from_dict_validated,
     default_aethoria_bundle,
-    legacy_location_id_alias,
     validate_setting_bundle,
 )
 from .content.world_data import (
@@ -43,9 +92,6 @@ from .terrain import (
     RouteEdge,
     Site,
     TerrainMap,
-    assemble_atlas_layout_inputs,
-    build_default_atlas_layout,
-    build_default_terrain,
 )
 
 if TYPE_CHECKING:
@@ -66,7 +112,23 @@ def _clone_setting_bundle(bundle: SettingBundle) -> SettingBundle:
     return SettingBundle.from_dict(bundle.to_dict())
 
 
-@dataclass
+def _string_list_payload(payload: Any, *, field_name: str) -> List[str]:
+    if payload is None:
+        return []
+    if not isinstance(payload, list) or any(not isinstance(item, str) for item in payload):
+        raise ValueError(f"{field_name} must be a list of strings")
+    return list(payload)
+
+
+def _trace_list_payload(payload: Any, *, field_name: str) -> List[Dict[str, Any]]:
+    if payload is None:
+        return []
+    if not isinstance(payload, list) or any(not isinstance(item, dict) for item in payload):
+        raise ValueError(f"{field_name} must be a list of dicts")
+    return [dict(item) for item in payload]
+
+
+@dataclass(slots=True)
 class MemorialRecord:
     """A permanent memorial created when a character dies at a location.
 
@@ -107,7 +169,7 @@ class MemorialRecord:
         )
 
 
-@dataclass
+@dataclass(slots=True)
 class CalendarChangeRecord:
     """A dated calendar-definition transition for future world-timeline features."""
 
@@ -173,7 +235,7 @@ def _traffic_indicator(value: int) -> str:
     return "-"
 
 
-@dataclass
+@dataclass(slots=True)
 class LocationState:
     """A single cell on the world grid with persistent state."""
 
@@ -309,10 +371,10 @@ class LocationState:
             road_condition=data.get("road_condition", defaults["road_condition"]),
             visited=data.get("visited", False),
             controlling_faction_id=data.get("controlling_faction_id"),
-            recent_event_ids=list(data.get("recent_event_ids", [])),
-            aliases=list(data.get("aliases", [])),
-            memorial_ids=list(data.get("memorial_ids", [])),
-            live_traces=[dict(trace) for trace in data.get("live_traces", [])],
+            recent_event_ids=_string_list_payload(data.get("recent_event_ids", []), field_name="recent_event_ids"),
+            aliases=_string_list_payload(data.get("aliases", []), field_name="aliases"),
+            memorial_ids=_string_list_payload(data.get("memorial_ids", []), field_name="memorial_ids"),
+            live_traces=_trace_list_payload(data.get("live_traces", []), field_name="live_traces"),
         )
 
 
@@ -320,6 +382,7 @@ class World:
     """Represents the entire game world."""
 
     WATCHED_ACTOR_TAG_PREFIX = "watched_actor:"
+    WATCHED_ACTOR_INFERRED_TAG = "watched_actor_inferred"
 
     def __init__(
         self,
@@ -335,6 +398,9 @@ class World:
             display_name=name,
             lore_text=lore,
         )
+        self._location_reference_resolver = LocationReferenceResolver.from_site_seeds(
+            self._setting_bundle.world_definition.site_seeds
+        )
         self.calendar_baseline: CalendarDefinition = _clone_calendar(
             self._setting_bundle.world_definition.calendar
         )
@@ -349,11 +415,12 @@ class World:
         self._location_id_index: Dict[str, LocationState] = {}
         # Event storage contract:
         # - event_records is the canonical structured history for all new reads.
-        # - event_log is an ephemeral CLI-facing compatibility display adapter.
-        self.event_log: List[str] = []
+        # - _display_event_log holds only display-only legacy lines.
+        # - event_log projects from canonical history when records exist.
+        self._display_event_log: List[str] = []
         self.event_records: List[WorldEventRecord] = []
         self.event_impact_rules: Dict[str, Dict[str, int]] = clone_default_event_impact_rules()
-        self.propagation_rules: Dict[str, Dict[str, float | int]] = clone_default_propagation_rules()
+        self.propagation_rules: Dict[str, Dict[str, Any]] = clone_default_propagation_rules()
         self.rumors: List[Rumor] = []
         self.rumor_archive: List[Rumor] = []
         self.active_adventures: List[AdventureRun] = []
@@ -365,8 +432,11 @@ class World:
         # PR-G: terrain / site / route layers
         self.terrain_map: Optional[TerrainMap] = None
         self.sites: List[Site] = []
-        self.routes: List[RouteEdge] = []
+        self._routes: ObservableRouteList = ObservableRouteList(on_change=self._mark_routes_dirty)
         self._site_index: Dict[str, Site] = {}
+        self._routes_by_site: Dict[str, List[RouteEdge]] = {}
+        self._routes_dirty: bool = True
+        self._route_graph_explicit: bool = False
         # PR-G2: persistent macro geography layer
         self.atlas_layout: Optional[AtlasLayout] = None
         if not _skip_defaults:
@@ -380,6 +450,40 @@ class World:
     @name.setter
     def name(self, value: str) -> None:
         self._setting_bundle.world_definition.display_name = value
+
+    @property
+    def event_log(self) -> List[str]:
+        """Compatibility event log view.
+
+        Once canonical ``event_records`` exist, the compatibility log is
+        projected on demand so we do not retain a second long-lived copy of the
+        same history in memory. The returned value is a read-only view so direct
+        list mutation cannot silently diverge from canonical history.
+        """
+        return compatibility_event_log_view(
+            self._display_event_log,
+            self.event_records,
+            max_event_log=self.MAX_EVENT_LOG,
+            translate=tr,
+        )
+
+    @event_log.setter
+    def event_log(self, value: List[str]) -> None:
+        self._display_event_log = trim_event_log_entries(value, max_event_log=self.MAX_EVENT_LOG)
+
+    @property
+    def routes(self) -> ObservableRouteList:
+        return self._routes
+
+    @routes.setter
+    def routes(self, value: List[RouteEdge]) -> None:
+        current_routes = getattr(self, "_routes", [])
+        self._routes = replace_routes(
+            current_routes,
+            value,
+            on_change=self._mark_routes_dirty,
+        )
+        self._routes_dirty = True
 
     @property
     def lore(self) -> str:
@@ -405,6 +509,9 @@ class World:
         if hasattr(self, "_setting_bundle") and self._setting_bundle is not None:
             previous_calendar = self._setting_bundle.world_definition.calendar.to_dict()
         self._setting_bundle = _clone_setting_bundle(bundle)
+        self._location_reference_resolver = LocationReferenceResolver.from_site_seeds(
+            self._setting_bundle.world_definition.site_seeds
+        )
         if hasattr(self, "lore"):
             self.lore = self._setting_bundle.world_definition.lore_text
         if hasattr(self, "calendar_baseline"):
@@ -423,11 +530,49 @@ class World:
     def apply_setting_bundle(self, bundle: SettingBundle) -> None:
         """Apply a bundle while keeping derived world structures consistent."""
         validate_setting_bundle(bundle, source="World.setting_bundle")
+        previous_bundle = getattr(self, "_setting_bundle", None)
         previous_locations = list(getattr(self, "grid", {}).values())
         self._set_setting_bundle_metadata(bundle)
         if hasattr(self, "grid"):
-            self._build_default_map(previous_locations=previous_locations)
-            self._normalize_references_after_bundle_change()
+            topology_changed = (
+                previous_bundle is None
+                or self._topology_signature(previous_bundle) != self._topology_signature(bundle)
+            )
+            if topology_changed:
+                self._build_default_map(previous_locations=previous_locations)
+                self._normalize_references_after_bundle_change()
+            else:
+                self._refresh_locations_from_site_seeds()
+
+    @staticmethod
+    def _topology_signature(bundle: SettingBundle) -> Tuple[Tuple[Any, ...], Tuple[Any, ...]]:
+        world = bundle.world_definition
+        site_signature = tuple(
+            (seed.location_id, seed.region_type, seed.x, seed.y)
+            for seed in world.site_seeds
+        )
+        route_signature = tuple(
+            (
+                seed.route_id,
+                seed.from_site_id,
+                seed.to_site_id,
+                seed.route_type,
+                int(seed.distance),
+                bool(seed.blocked),
+            )
+            for seed in world.route_seeds
+        )
+        return site_signature, route_signature
+
+    def _refresh_locations_from_site_seeds(self) -> None:
+        """Refresh static location metadata when bundle lore changes but topology does not."""
+        for seed in self._setting_bundle.world_definition.site_seeds:
+            existing = self._location_id_index.get(seed.location_id)
+            if existing is None:
+                continue
+            replacement = self._location_state_from_site_seed(seed)
+            self._copy_location_runtime_state(existing, replacement)
+            self._register_location(replacement)
 
     def _register_location(self, loc: LocationState) -> None:
         existing_at_coord = self.grid.get((loc.x, loc.y))
@@ -452,7 +597,10 @@ class World:
         self.terrain_map = None
         self.sites = []
         self.routes = []
+        self._routes_dirty = True
+        self._route_graph_explicit = False
         self._site_index = {}
+        self._routes_by_site = {}
         self.atlas_layout = None
 
     def _copy_location_runtime_state(self, source: LocationState, target: LocationState) -> None:
@@ -497,7 +645,7 @@ class World:
                 if previous is not None:
                     self._copy_location_runtime_state(previous, location)
                 self._register_location(location)
-        self._build_terrain_from_grid()
+        self._build_terrain_from_grid(explicit_route_graph=True)
 
     def default_location_entries(self) -> List[Tuple[str, str, str, str, int, int]]:
         """Return in-bounds bundle-backed site seeds in the legacy tuple format."""
@@ -514,6 +662,16 @@ class World:
         if current is None:
             return
         self._copy_location_runtime_state(restored, current)
+
+    def _register_serialized_grid_locations(self, serialized_grid: List[Dict[str, Any]]) -> None:
+        """Restore serialized locations as authoritative grid structure."""
+        for loc_data in serialized_grid:
+            self._register_location(self._location_state_from_dict(loc_data))
+
+    def _overlay_serialized_grid_runtime_state(self, serialized_grid: List[Dict[str, Any]]) -> None:
+        """Overlay serialized runtime state onto an already-built bundle-backed grid."""
+        for loc_data in serialized_grid:
+            self._overlay_location_runtime_state_from_dict(loc_data)
 
     def _serialized_grid_is_compatible_with_active_bundle(self, grid_data: List[Dict[str, Any]]) -> bool:
         """Return whether serialized locations can be mapped onto the active bundle."""
@@ -542,23 +700,18 @@ class World:
 
     def _bundle_location_id_for_name(self, name: str) -> str | None:
         """Resolve a location name through the active setting bundle."""
-        for seed in self._setting_bundle.world_definition.site_seeds:
-            if seed.name == name:
-                return seed.location_id
-        return None
+        return self._location_reference_resolver.bundle_location_id_for_name(name)
 
     def resolve_location_id_from_name(self, name: str) -> str:
         """Resolve a location name through the active bundle with slug fallback."""
-        return self._bundle_location_id_for_name(name) or fallback_location_id(name)
+        return self._location_reference_resolver.resolve_location_id_from_name(
+            name,
+            fallback_resolver=fallback_location_id,
+        )
 
     def _legacy_location_id_aliases(self) -> Dict[str, str]:
         """Return legacy fallback-slug IDs that should map to canonical bundle IDs."""
-        aliases: Dict[str, str] = {}
-        for seed in self._setting_bundle.world_definition.site_seeds:
-            legacy_id = legacy_location_id_alias(seed.name)
-            if legacy_id != seed.location_id:
-                aliases[legacy_id] = seed.location_id
-        return aliases
+        return self._location_reference_resolver.legacy_location_id_aliases()
 
     def normalize_location_id(
         self,
@@ -567,24 +720,11 @@ class World:
         location_name: str | None = None,
     ) -> Optional[str]:
         """Normalize persisted location IDs against the active bundle."""
-        if location_id:
-            aliased = self._legacy_location_id_aliases().get(location_id)
-            if aliased is not None:
-                return aliased
-            bundle_location_ids = {
-                seed.location_id
-                for seed in self._setting_bundle.world_definition.site_seeds
-            }
-            if location_id in bundle_location_ids:
-                return location_id
-            if location_name is not None:
-                bundle_location_id = self._bundle_location_id_for_name(location_name)
-                if bundle_location_id is not None:
-                    return bundle_location_id
-            return location_id
-        if location_name is not None:
-            return self.resolve_location_id_from_name(location_name)
-        return location_id
+        return self._location_reference_resolver.normalize_location_id(
+            location_id,
+            location_name=location_name,
+            fallback_resolver=fallback_location_id,
+        )
 
     def _repair_location_reference(
         self,
@@ -595,16 +735,17 @@ class World:
         fallback_location_id: str | None = None,
     ) -> Optional[str]:
         """Resolve a location reference to a valid current-world location."""
-        normalized = self.normalize_location_id(location_id, location_name=location_name)
-        if normalized in self._location_id_index:
-            return normalized
-        if required:
-            if fallback_location_id is not None:
-                return fallback_location_id
-            if self._location_id_index:
-                return self._default_resident_location_id()
-            return ""
-        return None
+        resolved_fallback = fallback_location_id
+        if required and resolved_fallback is None and self._location_id_index:
+            resolved_fallback = self._default_resident_location_id()
+        return self._location_reference_resolver.repair_location_reference(
+            location_id,
+            known_location_ids=self._location_id_index,
+            location_name=location_name,
+            required=required,
+            fallback_location_id=resolved_fallback,
+            fallback_resolver=fallback_location_id,
+        )
 
     def _repair_location_references(self) -> None:
         """Repair persisted location references against the active world structure."""
@@ -655,12 +796,11 @@ class World:
 
     def _rebuild_location_memorial_ids(self) -> None:
         """Rebuild per-location memorial indices from canonical memorial records."""
-        for location in self.grid.values():
-            location.memorial_ids = []
-        for memorial in self.memorials.values():
-            location = self._location_id_index.get(memorial.location_id)
-            if location is not None and memorial.memorial_id not in location.memorial_ids:
-                location.memorial_ids.append(memorial.memorial_id)
+        rebuild_location_memorial_ids(
+            locations=self.grid.values(),
+            location_index=self._location_id_index,
+            memorials=self.memorials.values(),
+        )
 
     def _normalize_references_after_bundle_change(self) -> None:
         """Repair references after replacing the active setting bundle."""
@@ -694,43 +834,85 @@ class World:
             **defaults,
         )
 
-    def _build_terrain_from_grid(self) -> None:
+    def _build_terrain_from_grid(self, *, explicit_route_graph: Optional[bool] = None) -> None:
         """Generate terrain, sites, and routes from the current grid.
 
         Derives terrain biome from each ``LocationState.region_type``
-        and creates provisional routes between adjacent sites.
+        and creates provisional routes between adjacent sites only when no
+        explicit route graph is defined for the current structure.
         """
-        # Collect current grid as pseudo-location tuples for the builder
-        location_tuples = [
-            (loc.id, loc.canonical_name, loc.description,
-             loc.region_type, loc.x, loc.y)
-            for loc in self.grid.values()
-        ]
-        tmap, sites, routes = build_default_terrain(
+        use_explicit_route_graph = (
+            self._grid_matches_bundle_seeds()
+            if explicit_route_graph is None
+            else explicit_route_graph
+        )
+        location_ids = set(self._location_id_index)
+        topology_state = build_topology_from_locations(
             width=self.width,
             height=self.height,
-            locations=location_tuples,
+            locations=self.grid.values(),
+            route_specs=(
+                [
+                    seed.to_dict()
+                    for seed in self._setting_bundle.world_definition.route_seeds
+                    if seed.from_site_id in location_ids and seed.to_site_id in location_ids
+                ]
+                if use_explicit_route_graph
+                else None
+            ),
+            explicit_route_graph=use_explicit_route_graph,
         )
-        self.terrain_map = tmap
-        self.sites = sites
-        self.routes = routes
+        self._apply_topology_state(topology_state)
+
+    def _apply_topology_state(self, topology_state: WorldTopologyState) -> None:
+        """Apply a reconstructed topology snapshot to the live world state."""
+        self.terrain_map = topology_state.terrain_map
+        self.sites = topology_state.sites
+        self.routes = topology_state.routes
         self._rebuild_site_index()
-        self.atlas_layout = self._build_atlas_layout_from_current_state()
+        self._rebuild_route_index()
+        self._route_graph_explicit = topology_state.route_graph_explicit
+        self.atlas_layout = topology_state.atlas_layout
 
     def _build_atlas_layout_from_current_state(self) -> AtlasLayout:
         """Generate the persistent atlas layout from current terrain/site data."""
-        inputs = assemble_atlas_layout_inputs(
+        return build_atlas_layout_from_topology(
             width=self.width,
             height=self.height,
+            terrain_map=self.terrain_map,
             sites=self.sites,
             routes=self.routes,
-            terrain_cells=list(self.terrain_map.cells.values()) if self.terrain_map is not None else [],
         )
-        return build_default_atlas_layout(inputs)
 
     def _rebuild_site_index(self) -> None:
         """Rebuild the site lookup index keyed by location_id."""
         self._site_index = {s.location_id: s for s in self.sites}
+
+    def _mark_routes_dirty(self) -> None:
+        """Mark cached route adjacency as stale after route mutations."""
+        self._routes_dirty = True
+
+    def _rebuild_route_index(self) -> None:
+        """Rebuild route adjacency lists keyed by endpoint location id."""
+        self._routes_by_site = rebuild_route_index(
+            sites=self.sites,
+            routes=self.routes,
+            on_change=self._mark_routes_dirty,
+        )
+        self._routes_dirty = False
+
+    def _ensure_route_index_current(self) -> None:
+        """Keep the cached route adjacency in sync with direct route reassignment."""
+        if self._routes_dirty:
+            self._rebuild_route_index()
+
+    def _validate_topology_integrity(self) -> None:
+        """Validate that restored topology is coherent with the active grid."""
+        validate_topology_integrity(
+            sites=self.sites,
+            routes=self.routes,
+            location_index=self._location_id_index,
+        )
 
     def get_site_by_id(self, location_id: str) -> Optional[Site]:
         """Return the Site record for a location, or None."""
@@ -738,16 +920,84 @@ class World:
 
     def get_routes_for_site(self, location_id: str) -> List[RouteEdge]:
         """Return all routes connected to a site."""
-        return [r for r in self.routes if r.connects(location_id)]
+        self._ensure_route_index_current()
+        return routes_for_site(self._routes_by_site, location_id)
 
     def get_connected_site_ids(self, location_id: str) -> List[str]:
         """Return location_ids of sites reachable via routes from a site."""
-        result: List[str] = []
-        for route in self.routes:
-            other = route.other_end(location_id)
-            if other is not None and not route.blocked:
-                result.append(other)
-        return result
+        return sorted(
+            route_neighbor_ids(location_id, routes=self.get_routes_for_site(location_id)),
+        )
+
+    def get_grid_neighboring_locations(self, location_id: str) -> List[LocationState]:
+        """Return adjacency by physical map grid, regardless of route state."""
+        neighbor_ids = grid_neighbor_ids(
+            location_id,
+            location_index=self._location_id_index,
+            grid=self.grid,
+        )
+        return [
+            self._location_id_index[neighbor_id]
+            for neighbor_id in neighbor_ids
+            if neighbor_id in self._location_id_index
+        ]
+
+    def get_travel_neighboring_locations(self, location_id: str) -> List[LocationState]:
+        """Return neighbors reachable for travel using the travel topology contract."""
+        if self.routes:
+            neighbor_ids = self.get_connected_site_ids(location_id)
+        elif self._route_graph_explicit:
+            neighbor_ids = []
+        else:
+            neighbor_ids = grid_neighbor_ids(location_id, location_index=self._location_id_index, grid=self.grid)
+        return [
+            self._location_id_index[neighbor_id]
+            for neighbor_id in neighbor_ids
+            if neighbor_id in self._location_id_index
+        ]
+
+    def get_propagation_neighboring_locations(
+        self,
+        location_id: str,
+        *,
+        mode: str | None = None,
+        include_blocked_routes: bool | None = None,
+    ) -> List[LocationState]:
+        """Return neighbors used for state propagation.
+
+        The propagation topology is intentionally explicit so future worldgen
+        and blocked-route features can vary travel and propagation semantics
+        independently.
+        """
+        topology_rules = self.propagation_rules.get("topology", {})
+        topology_mode = mode or str(topology_rules.get("mode", PROPAGATION_TOPOLOGY_TRAVEL))
+        effective_include_blocked_routes = (
+            bool(topology_rules.get("include_blocked_routes", False))
+            if include_blocked_routes is None
+            else include_blocked_routes
+        )
+        if topology_mode == PROPAGATION_TOPOLOGY_TRAVEL:
+            if self.routes:
+                neighbor_ids = sorted(
+                    route_neighbor_ids(
+                        location_id,
+                        routes=self.get_routes_for_site(location_id),
+                        include_blocked=effective_include_blocked_routes,
+                    )
+                )
+            elif self._route_graph_explicit:
+                neighbor_ids = []
+            else:
+                neighbor_ids = grid_neighbor_ids(location_id, location_index=self._location_id_index, grid=self.grid)
+        elif topology_mode == PROPAGATION_TOPOLOGY_GRID:
+            neighbor_ids = grid_neighbor_ids(location_id, location_index=self._location_id_index, grid=self.grid)
+        else:
+            raise ValueError(f"Unsupported propagation topology mode: {topology_mode}")
+        return [
+            self._location_id_index[neighbor_id]
+            for neighbor_id in neighbor_ids
+            if neighbor_id in self._location_id_index
+        ]
 
     def reachable_location_ids(self, location_id: str) -> List[str]:
         """Return all reachable location_ids from ``location_id``."""
@@ -760,22 +1010,9 @@ class World:
 
         while queue:
             current = queue.popleft()
-            if self.routes:
-                neighbor_ids = self.get_connected_site_ids(current)
-            else:
-                current_loc = self._location_id_index.get(current)
-                if current_loc is None:
-                    continue
-                neighbor_ids = [
-                    loc.id
-                    for loc in (
-                        self.grid.get((current_loc.x - 1, current_loc.y)),
-                        self.grid.get((current_loc.x + 1, current_loc.y)),
-                        self.grid.get((current_loc.x, current_loc.y - 1)),
-                        self.grid.get((current_loc.x, current_loc.y + 1)),
-                    )
-                    if loc is not None
-                ]
+            neighbor_ids = [
+                loc.id for loc in self.get_travel_neighboring_locations(current)
+            ]
             for neighbor_id in neighbor_ids:
                 if neighbor_id in visited or neighbor_id not in self._location_id_index:
                     continue
@@ -884,29 +1121,29 @@ class World:
 
     def rebuild_recent_event_ids(self) -> None:
         """Rebuild derived per-location recent_event_ids from structured event records."""
-        for location in self.grid.values():
-            location.recent_event_ids = []
+        rebuild_recent_event_ids(
+            locations=self.grid.values(),
+            location_index=self._location_id_index,
+            event_records=self.event_records,
+        )
 
-        for record in self.event_records:
-            if record.location_id not in self._location_id_index:
-                record.location_id = None
-                continue
-            self._location_id_index[record.location_id].recent_event_ids.append(record.record_id)
-
-        for location in self.grid.values():
-            location.recent_event_ids = location.recent_event_ids[-12:]
+    def _ensure_unique_event_record_ids(self) -> None:
+        """Fail fast when canonical history contains duplicate record IDs."""
+        ensure_unique_event_record_ids(self.event_records)
 
     def normalize_after_load(self) -> None:
         """Rebuild derived indexes and repair invariants after deserialization."""
-        self._repair_location_references()
-        self.rebuild_char_index()
-        self._backfill_watched_actor_tags_after_load()
-        self.ensure_valid_character_locations()
-        self.rebuild_adventure_index()
-        self.rebuild_recent_event_ids()
-        self._rebuild_location_memorial_ids()
-        if self.event_records:
-            self.rebuild_compatibility_event_log()
+        normalize_loaded_world_state(
+            event_records=self.event_records,
+            repair_location_references=self._repair_location_references,
+            rebuild_char_index=self.rebuild_char_index,
+            backfill_watched_actor_tags=self._backfill_watched_actor_tags_after_load,
+            ensure_valid_character_locations=self.ensure_valid_character_locations,
+            rebuild_adventure_index=self.rebuild_adventure_index,
+            rebuild_recent_event_ids_fn=self.rebuild_recent_event_ids,
+            rebuild_location_memorial_ids_fn=self._rebuild_location_memorial_ids,
+            rebuild_compatibility_event_log=self.rebuild_compatibility_event_log,
+        )
 
     def _backfill_watched_actor_tags_after_load(self) -> None:
         """Freeze watched-actor report context for older untagged canonical records.
@@ -935,7 +1172,13 @@ class World:
                 if actor_id and actor_id in watched_actor_ids
             ]
             if watched_tags:
-                record.tags = list(dict.fromkeys(list(record.tags) + watched_tags))
+                record.tags = list(
+                    dict.fromkeys(
+                        list(record.tags)
+                        + watched_tags
+                        + [self.WATCHED_ACTOR_INFERRED_TAG]
+                    )
+                )
 
     def add_adventure(self, run: AdventureRun) -> None:
         self.active_adventures.append(run)
@@ -971,12 +1214,14 @@ class World:
         Traces are ephemeral footprints capped at ``MAX_LIVE_TRACES``
         per location.  Oldest entries are dropped when the cap is reached.
         """
-        loc = self._location_id_index.get(location_id)
-        if loc is None:
-            return
-        loc.live_traces.append({"year": year, "char_name": char_name, "text": text})
-        if len(loc.live_traces) > self.MAX_LIVE_TRACES:
-            loc.live_traces = loc.live_traces[-self.MAX_LIVE_TRACES:]
+        add_location_live_trace(
+            location_index=self._location_id_index,
+            location_id=location_id,
+            year=year,
+            char_name=char_name,
+            text=text,
+            max_live_traces=self.MAX_LIVE_TRACES,
+        )
 
     def add_memorial(
         self,
@@ -1002,10 +1247,11 @@ class World:
             cause=cause,
             epitaph=epitaph,
         )
-        self.memorials[memorial_id] = record
-        loc = self._location_id_index.get(location_id)
-        if loc is not None and memorial_id not in loc.memorial_ids:
-            loc.memorial_ids.append(memorial_id)
+        link_memorial_record(
+            memorials=self.memorials,
+            location_index=self._location_id_index,
+            record=record,
+        )
 
     def add_alias(self, location_id: str, alias: str) -> None:
         """Append an alias to a location if not already present (design §E-2).
@@ -1013,22 +1259,22 @@ class World:
         Capped at ``MAX_ALIASES`` per location; duplicate strings are
         silently ignored.
         """
-        loc = self._location_id_index.get(location_id)
-        if loc is None:
-            return
-        if alias not in loc.aliases and len(loc.aliases) < self.MAX_ALIASES:
-            loc.aliases.append(alias)
+        add_location_alias(
+            location_index=self._location_id_index,
+            location_id=location_id,
+            alias=alias,
+            max_aliases=self.MAX_ALIASES,
+        )
 
     def get_memorials_for_location(self, location_id: str) -> List[MemorialRecord]:
         """Return all ``MemorialRecord`` objects associated with a location."""
-        loc = self._location_id_index.get(location_id)
-        if loc is None:
-            return []
-        return [
-            self.memorials[mid]
-            for mid in loc.memorial_ids
-            if mid in self.memorials
-        ]
+        return list(
+            memorials_for_location(
+                location_index=self._location_id_index,
+                memorials=self.memorials,
+                location_id=location_id,
+            )
+        )
 
     @property
     def location_names(self) -> List[str]:
@@ -1048,30 +1294,14 @@ class World:
         loc = self._location_id_index.get(location_id)
         if loc is not None:
             return loc.canonical_name
-        lid = location_id
-        if lid.startswith("loc_"):
-            lid = lid[4:]
-        return lid.replace("_", " ").title()
+        return tr("unknown_location_with_id", location_id=location_id)
 
     def get_characters_at_location(self, location_id: str) -> List[Character]:
         return [c for c in self.characters if c.location_id == location_id and c.alive]
 
     def get_neighboring_locations(self, location_id: str) -> List[LocationState]:
-        source = self._location_id_index.get(location_id)
-        if source is None:
-            return []
-        if self.routes:
-            return [
-                self._location_id_index[neighbor_id]
-                for neighbor_id in self.get_connected_site_ids(location_id)
-                if neighbor_id in self._location_id_index
-            ]
-        neighbours: List[LocationState] = []
-        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-            coord = (source.x + dx, source.y + dy)
-            if coord in self.grid:
-                neighbours.append(self.grid[coord])
-        return neighbours
+        """Compatibility alias for travel adjacency."""
+        return self.get_travel_neighboring_locations(location_id)
 
     def months_elapsed_between(
         self,
@@ -1085,34 +1315,16 @@ class World:
         start_calendar_key: str = "",
     ) -> int:
         """Return completed month boundaries between two in-world dates."""
-        start = (int(start_year), max(1, int(start_month)), max(1, int(start_day)))
-        end = (int(end_year), max(1, int(end_month)), max(1, int(end_day)))
-        if end < start:
-            return 0
-
-        elapsed = 0
-        cursor_year, cursor_month, cursor_day = start
-        cursor_calendar_key = start_calendar_key
-
-        while True:
-            calendar = self.calendar_definition_for_date(
-                cursor_year,
-                cursor_month,
-                cursor_day,
-                calendar_key=cursor_calendar_key,
-            )
-            next_year = cursor_year
-            next_month = cursor_month + 1
-            if next_month > calendar.months_per_year:
-                next_month = 1
-                next_year += 1
-            if (next_year, next_month, 1) > end:
-                break
-            elapsed += 1
-            cursor_year, cursor_month, cursor_day = next_year, next_month, 1
-            cursor_calendar_key = ""
-
-        return elapsed
+        return months_elapsed_between_for_calendar(
+            calendar_definition_for_date_ref_fn=self._calendar_definition_for_date_ref,
+            start_year=start_year,
+            start_month=start_month,
+            end_year=end_year,
+            end_month=end_month,
+            start_day=start_day,
+            end_day=end_day,
+            start_calendar_key=start_calendar_key,
+        )
 
     def random_location(self, exclude_dungeon: bool = False, rng: Any = random) -> LocationState:
         options = list(self.grid.values())
@@ -1122,35 +1334,55 @@ class World:
             raise ValueError("World has no locations.")
         return rng.choice(options)
 
+    def _base_calendar_ref(self) -> CalendarDefinition:
+        return self._setting_bundle.world_definition.calendar
+
     @property
     def calendar_definition(self):
-        return _clone_calendar(self._setting_bundle.world_definition.calendar)
+        return _clone_calendar(self._base_calendar_ref())
 
     @property
     def months_per_year(self) -> int:
-        return self.calendar_definition.months_per_year
+        return self._base_calendar_ref().months_per_year
 
     @property
     def days_per_year(self) -> int:
-        return self.calendar_definition.days_per_year
+        return self._base_calendar_ref().days_per_year
 
     def days_in_month(self, month: int) -> int:
-        return self.calendar_definition.days_in_month(month)
+        return self._base_calendar_ref().days_in_month(month)
 
     def month_display_name(self, month: int) -> str:
-        return self.calendar_definition.month_display_name(month)
+        return self._base_calendar_ref().month_display_name(month)
+
+    def _calendar_definition_by_key_ref(self, calendar_key: str) -> CalendarDefinition:
+        return calendar_definition_by_key_ref(
+            base_calendar=self._base_calendar_ref(),
+            calendar_baseline=self.calendar_baseline,
+            calendar_history=self.calendar_history,
+            calendar_key=calendar_key,
+        )
 
     def calendar_definition_by_key(self, calendar_key: str) -> CalendarDefinition:
-        if not calendar_key:
-            return self.calendar_definition
-        if self._setting_bundle.world_definition.calendar.calendar_key == calendar_key:
-            return _clone_calendar(self._setting_bundle.world_definition.calendar)
-        if self.calendar_baseline.calendar_key == calendar_key:
-            return _clone_calendar(self.calendar_baseline)
-        for entry in reversed(sorted(self.calendar_history, key=lambda item: (item.year, item.month, item.day))):
-            if entry.calendar.calendar_key == calendar_key:
-                return _clone_calendar(entry.calendar)
-        return self.calendar_definition
+        return _clone_calendar(self._calendar_definition_by_key_ref(calendar_key))
+
+    def _calendar_definition_for_date_ref(
+        self,
+        year: int,
+        month: int = 1,
+        day: int = 1,
+        *,
+        calendar_key: str = "",
+    ) -> CalendarDefinition:
+        return calendar_definition_for_date_ref(
+            base_calendar=self._base_calendar_ref(),
+            calendar_baseline=self.calendar_baseline,
+            calendar_history=self.calendar_history,
+            year=year,
+            month=month,
+            day=day,
+            calendar_key=calendar_key,
+        )
 
     def calendar_definition_for_date(
         self,
@@ -1160,40 +1392,32 @@ class World:
         *,
         calendar_key: str = "",
     ) -> CalendarDefinition:
-        if calendar_key:
-            return self.calendar_definition_by_key(calendar_key)
-        target = (int(year), max(1, int(month)), max(1, int(day)))
-        selected = self.calendar_baseline
-        for entry in sorted(self.calendar_history, key=lambda item: (item.year, item.month, item.day)):
-            if (entry.year, entry.month, entry.day) <= target:
-                selected = entry.calendar
-            else:
-                break
-        return _clone_calendar(selected)
+        return _clone_calendar(
+            self._calendar_definition_for_date_ref(
+                year,
+                month,
+                day,
+                calendar_key=calendar_key,
+            )
+        )
 
     def months_per_year_for_date(
         self, year: int, month: int = 1, day: int = 1, *, calendar_key: str = ""
     ) -> int:
-        return self.calendar_definition_for_date(
+        return self._calendar_definition_for_date_ref(
             year, month, day, calendar_key=calendar_key
         ).months_per_year
 
     def month_display_name_for_date(
         self, year: int, month: int, day: int = 1, *, calendar_key: str = ""
     ) -> str:
-        calendar = self.calendar_definition_for_date(year, month, day, calendar_key=calendar_key)
+        calendar = self._calendar_definition_for_date_ref(year, month, day, calendar_key=calendar_key)
         return calendar.month_display_name(month)
 
     @staticmethod
     def get_season(month: int) -> str:
         """Return the default season mapping used by the built-in calendar."""
-        if month in (12, 1, 2):
-            return "winter"
-        if month in (3, 4, 5):
-            return "spring"
-        if month in (6, 7, 8):
-            return "summer"
-        return "autumn"
+        return default_season(month)
 
     def season_for_month(self, month: int) -> str:
         """Return the season for a month in the active world definition.
@@ -1202,10 +1426,7 @@ class World:
         month, the simulator falls back to the built-in ordinal month mapping
         used by the default Aethorian calendar.
         """
-        season = self.calendar_definition.season_for_month(month)
-        if season != "unknown":
-            return season
-        return self.get_season(month)
+        return season_for_calendar(self._base_calendar_ref(), month)
 
     def season_for_date(
         self, year: int, month: int, day: int = 1, *, calendar_key: str = ""
@@ -1216,17 +1437,19 @@ class World:
         irregular calendars without explicit season metadata still resolve to a
         stable season label.
         """
-        calendar = self.calendar_definition_for_date(year, month, day, calendar_key=calendar_key)
-        season = calendar.season_for_month(month)
-        if season != "unknown":
-            return season
-        return self.get_season(month)
+        return season_for_calendar_date(
+            base_calendar=self._base_calendar_ref(),
+            calendar_baseline=self.calendar_baseline,
+            calendar_history=self.calendar_history,
+            year=year,
+            month=month,
+            day=day,
+            calendar_key=calendar_key,
+        )
 
     def clamp_calendar_position(self, month: int, day: int) -> Tuple[int, int]:
         """Clamp month/day into the active calendar's valid ranges."""
-        clamped_month = max(1, min(self.months_per_year, int(month)))
-        clamped_day = max(1, min(self.days_in_month(clamped_month), int(day)))
-        return clamped_month, clamped_day
+        return clamp_calendar_position_for_calendar(self._base_calendar_ref(), month, day)
 
     def apply_calendar_definition(
         self,
@@ -1244,37 +1467,33 @@ class World:
         historical date of the transition in ``calendar_history``.
         """
         self._setting_bundle.world_definition.calendar = _clone_calendar(calendar)
-        month = max(1, min(calendar.months_per_year, int(changed_month)))
-        day = max(1, min(calendar.days_in_month(month), int(changed_day)))
-        self.calendar_history.append(CalendarChangeRecord(
-            year=self.year if changed_year is None else changed_year,
-            month=month,
-            day=day,
-            calendar=_clone_calendar(calendar),
-        ))
-        self.calendar_history.sort(key=lambda item: (item.year, item.month, item.day))
+        self.calendar_history = apply_calendar_definition_history(
+            calendar=calendar,
+            current_year=self.year,
+            calendar_history=self.calendar_history,
+            build_change_record=lambda year, month, day, changed_calendar: CalendarChangeRecord(
+                year=year,
+                month=month,
+                day=day,
+                calendar=changed_calendar,
+            ),
+            changed_year=changed_year,
+            changed_month=changed_month,
+            changed_day=changed_day,
+        )
 
     def remaining_days_in_year(self, month: int, day: int) -> int:
         """Return how many in-world days remain including the current date."""
-        clamped_month, clamped_day = self.clamp_calendar_position(month, day)
-        remaining = self.days_in_month(clamped_month) - clamped_day + 1
-        for month_index in range(clamped_month + 1, self.months_per_year + 1):
-            remaining += self.days_in_month(month_index)
-        return remaining
+        return remaining_days_in_year_for_calendar(self._base_calendar_ref(), month, day)
 
     def advance_calendar_position(self, month: int, day: int, days: int = 1) -> Tuple[int, int, int]:
         """Advance a month/day position and return ``(month, day, year_delta)``."""
-        current_month, current_day = self.clamp_calendar_position(month, day)
-        year_delta = 0
-        for _ in range(max(0, int(days))):
-            current_day += 1
-            if current_day > self.days_in_month(current_month):
-                current_day = 1
-                current_month += 1
-                if current_month > self.months_per_year:
-                    current_month = 1
-                    year_delta += 1
-        return current_month, current_day, year_delta
+        return advance_calendar_position_for_calendar(
+            self._base_calendar_ref(),
+            month,
+            day,
+            days=days,
+        )
 
     def advance_time(self, years: int = 1) -> None:
         self.year += years
@@ -1289,24 +1508,6 @@ class World:
         return max(matching_days, default=0)
 
     MAX_EVENT_LOG = 2000
-
-    def _format_event_log_entry(
-        self,
-        event_text: str,
-        *,
-        year: Optional[int] = None,
-        month: Optional[int] = None,
-        day: Optional[int] = None,
-    ) -> str:
-        """Format a compatibility event-log line from canonical event data."""
-        effective_year = self.year if year is None else year
-        return format_event_log_entry(
-            event_text,
-            translate=tr,
-            year=effective_year,
-            month=month,
-            day=day,
-        )
 
     def log_event(
         self,
@@ -1326,28 +1527,29 @@ class World:
         When *month*/*day* are provided, the prefix includes intra-year date
         information so that the player-visible log reflects finer causality.
         """
-        self.event_log.append(self._format_event_log_entry(event_text, month=month, day=day))
-        if len(self.event_log) > self.MAX_EVENT_LOG:
-            self.event_log = self.event_log[-self.MAX_EVENT_LOG:]
+        self._display_event_log = append_display_event_log_entry(
+            self._display_event_log,
+            event_text,
+            translate=tr,
+            year=self.year,
+            max_event_log=self.MAX_EVENT_LOG,
+            month=month,
+            day=day,
+        )
 
     MAX_EVENT_RECORDS = 5000
 
     def rebuild_compatibility_event_log(self) -> None:
-        """Rebuild the legacy display buffer from canonical event records."""
-        if self.event_records:
-            self.event_log = self._project_compatibility_event_log()
-
-    def _project_compatibility_event_log(self) -> List[str]:
-        """Project the compatibility display buffer from canonical event records."""
-        return project_compatibility_event_log(
+        """Drop stale display-only lines when canonical history exists."""
+        self._display_event_log = rebuild_display_event_log(
+            self._display_event_log,
             self.event_records,
             max_event_log=self.MAX_EVENT_LOG,
-            translate=tr,
         )
 
     def get_compatibility_event_log(self, last_n: Optional[int] = None) -> List[str]:
         """Return the legacy event-log adapter, projecting from records if needed."""
-        log = self._project_compatibility_event_log() if self.event_records else list(self.event_log)
+        log = list(self.event_log)
         if last_n is not None:
             return log[-last_n:]
         return list(log)
@@ -1377,7 +1579,7 @@ class World:
             grid=self.grid,
             max_event_records=self.MAX_EVENT_RECORDS,
         )
-        self.rebuild_compatibility_event_log()
+        self._display_event_log = []
         return stored_record
 
     def apply_event_impact(self, kind: str, location_id: Optional[str]) -> List[Dict[str, Any]]:
@@ -1414,13 +1616,13 @@ class World:
         )
 
     def propagate_state(self, months: int = 12) -> None:
-        """Propagate location state to neighbors (design §5.6)."""
+        """Propagate location state using the configured propagation topology."""
         period_months = max(1, months)
         self._decay_toward_baseline(months=period_months)
         propagate_state_changes(
             locations=self.grid.values(),
             location_index=self._location_id_index,
-            get_neighbors=self.get_neighboring_locations,
+            get_neighbors=self.get_propagation_neighboring_locations,
             months=period_months,
             months_per_year=self.months_per_year,
             clamp_state=_clamp_state,
@@ -1454,6 +1656,36 @@ class World:
         info = build_map_info(self, highlight_location)
         return render_map_ascii(info)
 
+    def _grid_matches_bundle_seeds(self) -> bool:
+        bundle_locations = sorted(
+            (
+                seed.location_id,
+                seed.name,
+                seed.description,
+                seed.region_type,
+                int(seed.x),
+                int(seed.y),
+            )
+            for seed in self._setting_bundle.world_definition.site_seeds
+            if 0 <= seed.x < self.width and 0 <= seed.y < self.height
+        )
+        current_locations = sorted(
+            (
+                loc.id,
+                loc.canonical_name,
+                loc.description,
+                loc.region_type,
+                int(loc.x),
+                int(loc.y),
+            )
+            for loc in self.grid.values()
+        )
+        return bundle_locations == current_locations
+
+    def _overlay_serialized_route_state(self, serialized_routes: List[Dict[str, Any]]) -> None:
+        """Overlay mutable route state onto the canonical route graph."""
+        overlay_serialized_route_state(self.routes, serialized_routes)
+
     def to_dict(self) -> Dict[str, Any]:
         lore_text = self._setting_bundle.world_definition.lore_text
         result: Dict[str, Any] = {
@@ -1472,10 +1704,13 @@ class World:
             "calendar_baseline": self.calendar_baseline.to_dict(),
             "calendar_history": [entry.to_dict() for entry in self.calendar_history],
         }
-        # PR-G: persist terrain/site/route layers
-        if self.terrain_map is not None:
+        bundle_backed_topology = self._setting_bundle is not None and self._grid_matches_bundle_seeds()
+        # PR-G: persist terrain/site/route layers for non-bundle-backed worlds.
+        # Bundle-backed worlds persist route state separately from the
+        # canonical bundle topology to avoid conflicting sources of truth.
+        if self.terrain_map is not None and not bundle_backed_topology:
             result["terrain_map"] = self.terrain_map.to_dict()
-        if self.sites:
+        if self.sites and not bundle_backed_topology:
             result["sites"] = [s.to_dict() for s in self.sites]
         if self.routes:
             result["routes"] = [r.to_dict() for r in self.routes]
@@ -1509,10 +1744,10 @@ class World:
             road_condition=data.get("road_condition", defaults["road_condition"]),
             visited=data.get("visited", False),
             controlling_faction_id=data.get("controlling_faction_id"),
-            recent_event_ids=list(data.get("recent_event_ids", [])),
-            aliases=list(data.get("aliases", [])),
-            memorial_ids=list(data.get("memorial_ids", [])),
-            live_traces=[dict(trace) for trace in data.get("live_traces", [])],
+            recent_event_ids=_string_list_payload(data.get("recent_event_ids", []), field_name="recent_event_ids"),
+            aliases=_string_list_payload(data.get("aliases", []), field_name="aliases"),
+            memorial_ids=_string_list_payload(data.get("memorial_ids", []), field_name="memorial_ids"),
+            live_traces=_trace_list_payload(data.get("live_traces", []), field_name="live_traces"),
         )
 
     @classmethod
@@ -1541,6 +1776,7 @@ class World:
             _skip_defaults=True,
         )
         serialized_grid = list(data.get("grid", []))
+        bundle_backed_structure = False
         if "setting_bundle" in data:
             world._set_setting_bundle_metadata(
                 bundle_from_dict_validated(
@@ -1549,15 +1785,13 @@ class World:
                 )
             )
             if world._serialized_grid_is_compatible_with_active_bundle(serialized_grid):
+                bundle_backed_structure = True
                 world._build_default_map()
-                for loc_data in serialized_grid:
-                    world._overlay_location_runtime_state_from_dict(loc_data)
+                world._overlay_serialized_grid_runtime_state(serialized_grid)
             else:
-                for loc_data in serialized_grid:
-                    world._register_location(world._location_state_from_dict(loc_data))
+                world._register_serialized_grid_locations(serialized_grid)
         else:
-            for loc_data in serialized_grid:
-                world._register_location(world._location_state_from_dict(loc_data))
+            world._register_serialized_grid_locations(serialized_grid)
         world.event_log = list(data.get("event_log", []))
         world.event_records = [
             WorldEventRecord.from_dict(r) for r in data.get("event_records", [])
@@ -1597,18 +1831,23 @@ class World:
             for item in data.get("calendar_history", [])
         ]
 
-        # PR-G: restore terrain/site/route layers if present;
-        # otherwise derive from loaded grid.
-        if "terrain_map" in data:
-            world.terrain_map = TerrainMap.from_dict(data["terrain_map"])
-            world.sites = [Site.from_dict(s) for s in data.get("sites", [])]
-            world.routes = [RouteEdge.from_dict(r) for r in data.get("routes", [])]
-            for site in world.sites:
-                site.location_id = world.normalize_location_id(site.location_id) or site.location_id
-            for route in world.routes:
-                route.from_site_id = world.normalize_location_id(route.from_site_id) or route.from_site_id
-                route.to_site_id = world.normalize_location_id(route.to_site_id) or route.to_site_id
-            world._rebuild_site_index()
+        # PR-G: when the active bundle already defines the authoritative site set,
+        # rebuild topology from that grid so stale serialized routes cannot
+        # override the active bundle graph. Otherwise restore serialized topology.
+        if bundle_backed_structure:
+            world._build_terrain_from_grid()
+            world._overlay_serialized_route_state(data.get("routes", []))
+            world._rebuild_route_index()
+        elif "terrain_map" in data:
+            world._apply_topology_state(
+                restore_serialized_topology(
+                    terrain_map_data=data["terrain_map"],
+                    site_data=list(data.get("sites", [])),
+                    route_data=list(data.get("routes", [])),
+                    normalize_location_id=world.normalize_location_id,
+                    location_index=world._location_id_index,
+                )
+            )
         else:
             world._build_terrain_from_grid()
 
