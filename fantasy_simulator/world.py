@@ -24,11 +24,23 @@ from .world_event_log import (
     trim_event_log_entries,
 )
 from .world_location_references import LocationReferenceResolver
+from .world_memory import (
+    add_alias as add_location_alias,
+    add_live_trace as add_location_live_trace,
+    link_memorial_record,
+    memorials_for_location,
+    rebuild_location_memorial_ids,
+)
 from .world_load_normalizer import (
     ensure_unique_event_record_ids,
     normalize_after_load as normalize_loaded_world_state,
-    rebuild_location_memorial_ids,
     rebuild_recent_event_ids,
+)
+from .world_route_graph import (
+    ObservableRouteList,
+    rebuild_route_index,
+    replace_routes,
+    routes_for_site,
 )
 from .world_event_state import (
     apply_event_impact_to_location,
@@ -114,51 +126,6 @@ def _trace_list_payload(payload: Any, *, field_name: str) -> List[Dict[str, Any]
     if not isinstance(payload, list) or any(not isinstance(item, dict) for item in payload):
         raise ValueError(f"{field_name} must be a list of dicts")
     return [dict(item) for item in payload]
-
-
-class ObservableRouteList(list[RouteEdge]):
-    """List wrapper that marks cached route projections dirty on mutation."""
-
-    def __init__(self, iterable: Optional[List[RouteEdge]] = None, *, on_change: Any = None) -> None:
-        super().__init__(iterable or [])
-        self._on_change = on_change
-
-    def _notify(self) -> None:
-        if self._on_change is not None:
-            self._on_change()
-
-    def __setitem__(self, index: Any, value: Any) -> None:
-        super().__setitem__(index, value)
-        self._notify()
-
-    def __delitem__(self, index: Any) -> None:
-        super().__delitem__(index)
-        self._notify()
-
-    def append(self, value: RouteEdge) -> None:
-        super().append(value)
-        self._notify()
-
-    def extend(self, values: List[RouteEdge]) -> None:
-        super().extend(values)
-        self._notify()
-
-    def insert(self, index: int, value: RouteEdge) -> None:
-        super().insert(index, value)
-        self._notify()
-
-    def pop(self, index: int = -1) -> RouteEdge:
-        value = super().pop(index)
-        self._notify()
-        return value
-
-    def remove(self, value: RouteEdge) -> None:
-        super().remove(value)
-        self._notify()
-
-    def clear(self) -> None:
-        super().clear()
-        self._notify()
 
 
 @dataclass(slots=True)
@@ -510,12 +477,12 @@ class World:
 
     @routes.setter
     def routes(self, value: List[RouteEdge]) -> None:
-        if hasattr(self, "_routes"):
-            for route in self._routes:
-                route._on_change = None
-        wrapped = ObservableRouteList(list(value), on_change=self._mark_routes_dirty)
-        self._routes = wrapped
-        self._attach_route_observers()
+        current_routes = getattr(self, "_routes", [])
+        self._routes = replace_routes(
+            current_routes,
+            value,
+            on_change=self._mark_routes_dirty,
+        )
         self._routes_dirty = True
 
     @property
@@ -925,21 +892,13 @@ class World:
         """Mark cached route adjacency as stale after route mutations."""
         self._routes_dirty = True
 
-    def _attach_route_observers(self) -> None:
-        """Attach mutation hooks to each route in the active route collection."""
-        for route in self.routes:
-            route._on_change = self._mark_routes_dirty
-
     def _rebuild_route_index(self) -> None:
         """Rebuild route adjacency lists keyed by endpoint location id."""
-        self._attach_route_observers()
-        route_index: Dict[str, List[RouteEdge]] = {
-            site.location_id: [] for site in self.sites
-        }
-        for route in self.routes:
-            route_index.setdefault(route.from_site_id, []).append(route)
-            route_index.setdefault(route.to_site_id, []).append(route)
-        self._routes_by_site = route_index
+        self._routes_by_site = rebuild_route_index(
+            sites=self.sites,
+            routes=self.routes,
+            on_change=self._mark_routes_dirty,
+        )
         self._routes_dirty = False
 
     def _ensure_route_index_current(self) -> None:
@@ -962,7 +921,7 @@ class World:
     def get_routes_for_site(self, location_id: str) -> List[RouteEdge]:
         """Return all routes connected to a site."""
         self._ensure_route_index_current()
-        return list(self._routes_by_site.get(location_id, []))
+        return routes_for_site(self._routes_by_site, location_id)
 
     def get_connected_site_ids(self, location_id: str) -> List[str]:
         """Return location_ids of sites reachable via routes from a site."""
@@ -1255,12 +1214,14 @@ class World:
         Traces are ephemeral footprints capped at ``MAX_LIVE_TRACES``
         per location.  Oldest entries are dropped when the cap is reached.
         """
-        loc = self._location_id_index.get(location_id)
-        if loc is None:
-            return
-        loc.live_traces.append({"year": year, "char_name": char_name, "text": text})
-        if len(loc.live_traces) > self.MAX_LIVE_TRACES:
-            loc.live_traces = loc.live_traces[-self.MAX_LIVE_TRACES:]
+        add_location_live_trace(
+            location_index=self._location_id_index,
+            location_id=location_id,
+            year=year,
+            char_name=char_name,
+            text=text,
+            max_live_traces=self.MAX_LIVE_TRACES,
+        )
 
     def add_memorial(
         self,
@@ -1286,10 +1247,11 @@ class World:
             cause=cause,
             epitaph=epitaph,
         )
-        self.memorials[memorial_id] = record
-        loc = self._location_id_index.get(location_id)
-        if loc is not None and memorial_id not in loc.memorial_ids:
-            loc.memorial_ids.append(memorial_id)
+        link_memorial_record(
+            memorials=self.memorials,
+            location_index=self._location_id_index,
+            record=record,
+        )
 
     def add_alias(self, location_id: str, alias: str) -> None:
         """Append an alias to a location if not already present (design §E-2).
@@ -1297,22 +1259,22 @@ class World:
         Capped at ``MAX_ALIASES`` per location; duplicate strings are
         silently ignored.
         """
-        loc = self._location_id_index.get(location_id)
-        if loc is None:
-            return
-        if alias not in loc.aliases and len(loc.aliases) < self.MAX_ALIASES:
-            loc.aliases.append(alias)
+        add_location_alias(
+            location_index=self._location_id_index,
+            location_id=location_id,
+            alias=alias,
+            max_aliases=self.MAX_ALIASES,
+        )
 
     def get_memorials_for_location(self, location_id: str) -> List[MemorialRecord]:
         """Return all ``MemorialRecord`` objects associated with a location."""
-        loc = self._location_id_index.get(location_id)
-        if loc is None:
-            return []
-        return [
-            self.memorials[mid]
-            for mid in loc.memorial_ids
-            if mid in self.memorials
-        ]
+        return list(
+            memorials_for_location(
+                location_index=self._location_id_index,
+                memorials=self.memorials,
+                location_id=location_id,
+            )
+        )
 
     @property
     def location_names(self) -> List[str]:

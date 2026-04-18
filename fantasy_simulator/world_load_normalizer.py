@@ -15,15 +15,6 @@ class SupportsRecentEvents(Protocol):
     recent_event_ids: List[str]
 
 
-class SupportsMemorialIds(Protocol):
-    memorial_ids: List[str]
-
-
-class SupportsMemorialRecord(Protocol):
-    memorial_id: str
-    location_id: str
-
-
 def ensure_unique_event_record_ids(event_records: Sequence[WorldEventRecord]) -> None:
     """Fail fast when canonical history contains duplicate record IDs."""
     seen: set[str] = set()
@@ -52,21 +43,6 @@ def rebuild_recent_event_ids(
 
     for location in locations:
         location.recent_event_ids = location.recent_event_ids[-max_recent_event_ids:]
-
-
-def rebuild_location_memorial_ids(
-    *,
-    locations: Iterable[SupportsMemorialIds],
-    location_index: Mapping[str, SupportsMemorialIds],
-    memorials: Iterable[SupportsMemorialRecord],
-) -> None:
-    """Rebuild per-location memorial indices from canonical memorial records."""
-    for location in locations:
-        location.memorial_ids = []
-    for memorial in memorials:
-        location = location_index.get(memorial.location_id)
-        if location is not None and memorial.memorial_id not in location.memorial_ids:
-            location.memorial_ids.append(memorial.memorial_id)
 
 
 def normalize_after_load(
