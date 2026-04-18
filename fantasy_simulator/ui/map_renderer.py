@@ -195,12 +195,19 @@ def build_map_info(
             blocked=route.blocked,
         ))
 
+    alive_counts_by_location: Dict[str, int] = {}
+    for character in world.characters:
+        if character.alive:
+            alive_counts_by_location[character.location_id] = (
+                alive_counts_by_location.get(character.location_id, 0) + 1
+            )
+
     for (x, y), loc in world.grid.items():
         is_highlight = (
             highlight_location is not None
             and (loc.id == highlight_location or loc.canonical_name == highlight_location)
         )
-        population = len(world.get_characters_at_location(loc.id))
+        population = alive_counts_by_location.get(loc.id, 0)
         danger_band = "low" if loc.danger < 34 else "high" if loc.danger >= 67 else "medium"
         traffic_band = "low" if loc.traffic < 34 else "high" if loc.traffic >= 67 else "medium"
         rumor_heat_band = "low" if loc.rumor_heat < 34 else "high" if loc.rumor_heat >= 67 else "medium"

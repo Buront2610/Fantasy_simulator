@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from functools import lru_cache
 from typing import Any
 
 import pytest
@@ -34,7 +35,8 @@ def _extract_section(text: str, header: str) -> list[str]:
     return captured
 
 
-def _capture_bundle(locale: str) -> dict[str, object]:
+@lru_cache(maxsize=None)
+def _capture_bundle_cached(locale: str) -> dict[str, object]:
     set_locale(locale)
     world = build_seeded_world(7)
     sim = Simulator(world, events_per_year=4, adventure_steps_per_year=2, seed=99)
@@ -76,6 +78,11 @@ def _capture_bundle(locale: str) -> dict[str, object]:
         "monthly_rumors": _extract_section(monthly_report, monthly_rumors_header),
         "detail_lines": content_lines(detail),
     }
+
+
+def _capture_bundle(locale: str) -> dict[str, object]:
+    set_locale(locale)
+    return _capture_bundle_cached(locale)
 
 
 def _normalize_event_tags(kind: str, tags: list[str]) -> tuple[str, ...]:
@@ -259,13 +266,19 @@ def _projection_contract_for_sim(sim: Simulator) -> dict[str, Any]:
     }
 
 
-def _capture_projection_contract(locale: str) -> dict[str, Any]:
+@lru_cache(maxsize=None)
+def _capture_projection_contract_cached(locale: str) -> dict[str, Any]:
     """Capture the seeded, locale-stable projection contract for report/detail selection."""
     set_locale(locale)
     world = build_seeded_world(7)
     sim = Simulator(world, events_per_year=4, adventure_steps_per_year=2, seed=99)
     sim.advance_months(60)
     return _projection_contract_for_sim(sim)
+
+
+def _capture_projection_contract(locale: str) -> dict[str, Any]:
+    set_locale(locale)
+    return _capture_projection_contract_cached(locale)
 
 
 @pytest.fixture(autouse=True)

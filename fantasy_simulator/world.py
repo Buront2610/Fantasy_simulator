@@ -1299,35 +1299,60 @@ class World:
             raise ValueError("World has no locations.")
         return rng.choice(options)
 
+    def _base_calendar_ref(self) -> CalendarDefinition:
+        return self._setting_bundle.world_definition.calendar
+
     @property
     def calendar_definition(self):
-        return _clone_calendar(self._setting_bundle.world_definition.calendar)
+        return _clone_calendar(self._base_calendar_ref())
 
     @property
     def months_per_year(self) -> int:
-        return self.calendar_definition.months_per_year
+        return self._base_calendar_ref().months_per_year
 
     @property
     def days_per_year(self) -> int:
-        return self.calendar_definition.days_per_year
+        return self._base_calendar_ref().days_per_year
 
     def days_in_month(self, month: int) -> int:
-        return self.calendar_definition.days_in_month(month)
+        return self._base_calendar_ref().days_in_month(month)
 
     def month_display_name(self, month: int) -> str:
-        return self.calendar_definition.month_display_name(month)
+        return self._base_calendar_ref().month_display_name(month)
 
-    def calendar_definition_by_key(self, calendar_key: str) -> CalendarDefinition:
+    def _calendar_definition_by_key_ref(self, calendar_key: str) -> CalendarDefinition:
         if not calendar_key:
-            return self.calendar_definition
-        if self._setting_bundle.world_definition.calendar.calendar_key == calendar_key:
-            return _clone_calendar(self._setting_bundle.world_definition.calendar)
+            return self._base_calendar_ref()
+        if self._base_calendar_ref().calendar_key == calendar_key:
+            return self._base_calendar_ref()
         if self.calendar_baseline.calendar_key == calendar_key:
-            return _clone_calendar(self.calendar_baseline)
+            return self.calendar_baseline
         for entry in reversed(sorted(self.calendar_history, key=lambda item: (item.year, item.month, item.day))):
             if entry.calendar.calendar_key == calendar_key:
-                return _clone_calendar(entry.calendar)
-        return self.calendar_definition
+                return entry.calendar
+        return self._base_calendar_ref()
+
+    def calendar_definition_by_key(self, calendar_key: str) -> CalendarDefinition:
+        return _clone_calendar(self._calendar_definition_by_key_ref(calendar_key))
+
+    def _calendar_definition_for_date_ref(
+        self,
+        year: int,
+        month: int = 1,
+        day: int = 1,
+        *,
+        calendar_key: str = "",
+    ) -> CalendarDefinition:
+        if calendar_key:
+            return self._calendar_definition_by_key_ref(calendar_key)
+        target = (int(year), max(1, int(month)), max(1, int(day)))
+        selected = self.calendar_baseline
+        for entry in sorted(self.calendar_history, key=lambda item: (item.year, item.month, item.day)):
+            if (entry.year, entry.month, entry.day) <= target:
+                selected = entry.calendar
+            else:
+                break
+        return selected
 
     def calendar_definition_for_date(
         self,
@@ -1337,28 +1362,26 @@ class World:
         *,
         calendar_key: str = "",
     ) -> CalendarDefinition:
-        if calendar_key:
-            return self.calendar_definition_by_key(calendar_key)
-        target = (int(year), max(1, int(month)), max(1, int(day)))
-        selected = self.calendar_baseline
-        for entry in sorted(self.calendar_history, key=lambda item: (item.year, item.month, item.day)):
-            if (entry.year, entry.month, entry.day) <= target:
-                selected = entry.calendar
-            else:
-                break
-        return _clone_calendar(selected)
+        return _clone_calendar(
+            self._calendar_definition_for_date_ref(
+                year,
+                month,
+                day,
+                calendar_key=calendar_key,
+            )
+        )
 
     def months_per_year_for_date(
         self, year: int, month: int = 1, day: int = 1, *, calendar_key: str = ""
     ) -> int:
-        return self.calendar_definition_for_date(
+        return self._calendar_definition_for_date_ref(
             year, month, day, calendar_key=calendar_key
         ).months_per_year
 
     def month_display_name_for_date(
         self, year: int, month: int, day: int = 1, *, calendar_key: str = ""
     ) -> str:
-        calendar = self.calendar_definition_for_date(year, month, day, calendar_key=calendar_key)
+        calendar = self._calendar_definition_for_date_ref(year, month, day, calendar_key=calendar_key)
         return calendar.month_display_name(month)
 
     @staticmethod
@@ -1379,7 +1402,7 @@ class World:
         month, the simulator falls back to the built-in ordinal month mapping
         used by the default Aethorian calendar.
         """
-        season = self.calendar_definition.season_for_month(month)
+        season = self._base_calendar_ref().season_for_month(month)
         if season != "unknown":
             return season
         return self.get_season(month)
@@ -1393,7 +1416,7 @@ class World:
         irregular calendars without explicit season metadata still resolve to a
         stable season label.
         """
-        calendar = self.calendar_definition_for_date(year, month, day, calendar_key=calendar_key)
+        calendar = self._calendar_definition_for_date_ref(year, month, day, calendar_key=calendar_key)
         season = calendar.season_for_month(month)
         if season != "unknown":
             return season
@@ -1522,6 +1545,17 @@ class World:
             translate=tr,
         )
 
+    def _compatibility_event_log_line(self, record: WorldEventRecord) -> str:
+        if record.legacy_event_log_entry is not None:
+            return record.legacy_event_log_entry
+        return format_event_log_entry(
+            record.description,
+            translate=tr,
+            year=record.year,
+            month=record.month,
+            day=record.day,
+        )
+
     def get_compatibility_event_log(self, last_n: Optional[int] = None) -> List[str]:
         """Return the legacy event-log adapter, projecting from records if needed."""
         log = self._project_compatibility_event_log() if self.event_records else list(self.event_log)
@@ -1547,6 +1581,7 @@ class World:
         if watched_tags:
             record.tags = list(dict.fromkeys(list(record.tags) + watched_tags))
 
+        previous_count = len(self.event_records)
         stored_record = append_canonical_event_record(
             record=record,
             event_records=self.event_records,
@@ -1554,7 +1589,12 @@ class World:
             grid=self.grid,
             max_event_records=self.MAX_EVENT_RECORDS,
         )
-        self.rebuild_compatibility_event_log()
+        if len(self.event_records) == previous_count + 1:
+            self.event_log.append(self._compatibility_event_log_line(stored_record))
+            if len(self.event_log) > self.MAX_EVENT_LOG:
+                self.event_log = self.event_log[-self.MAX_EVENT_LOG:]
+        else:
+            self.rebuild_compatibility_event_log()
         return stored_record
 
     def apply_event_impact(self, kind: str, location_id: Optional[str]) -> List[Dict[str, Any]]:

@@ -882,46 +882,58 @@ class TestApplyWorldMemory:
             world.add_character(char)
         return Simulator(world, seed=seed)
 
+    def _make_run(
+        self,
+        *,
+        sim: Simulator,
+        outcome: str,
+        destination: str = "loc_thornwood",
+        character_id: str = "c0",
+        character_name: str = "Hero0",
+        death_member_id: str | None = None,
+    ) -> AdventureRun:
+        return AdventureRun(
+            character_id=character_id,
+            character_name=character_name,
+            origin="loc_aethoria_capital",
+            destination=destination,
+            year_started=sim.world.year,
+            outcome=outcome,
+            resolution_year=sim.world.year,
+            death_member_id=death_member_id,
+            member_ids=[character_id],
+        )
+
     def test_live_trace_created_after_adventure_completes(self):
         sim = self._make_sim(seed=10)
-        # Run enough years that at least one adventure resolves
-        for _ in range(25):
-            sim.advance_years(1)
-            total_traces = sum(
-                len(loc.live_traces) for loc in sim.world.grid.values()
-            )
-            if total_traces > 0:
-                break
+        sim._apply_world_memory(self._make_run(sim=sim, outcome="safe"))
         total_traces = sum(
             len(loc.live_traces) for loc in sim.world.grid.values()
         )
-        assert total_traces > 0, "Expected at least one live trace after 25 years"
+        assert total_traces > 0, "Expected at least one live trace after resolved adventure"
 
     def test_memorial_created_after_adventure_death(self):
         sim = self._make_sim(seed=77)
-        for _ in range(60):
-            sim.advance_years(1)
-            if sim.world.memorials:
-                break
-        # If any character died on an adventure, there should be a memorial
-        dead_adventure_chars = [
-            run for run in sim.world.completed_adventures
-            if run.outcome == "death"
-        ]
-        if dead_adventure_chars:
-            assert sim.world.memorials, "Expected memorials for adventure deaths"
+        sim._apply_world_memory(
+            self._make_run(
+                sim=sim,
+                outcome="death",
+                death_member_id="c0",
+            )
+        )
+        assert sim.world.memorials, "Expected memorials for adventure deaths"
 
     def test_alias_created_for_location_after_death(self):
         sim = self._make_sim(seed=88)
-        for _ in range(60):
-            sim.advance_years(1)
-            if any(loc.aliases for loc in sim.world.grid.values()):
-                break
-        # If any character died, there may be aliases
-        dead_runs = [r for r in sim.world.completed_adventures if r.outcome == "death"]
-        if dead_runs:
-            any_alias = any(loc.aliases for loc in sim.world.grid.values())
-            assert any_alias, "Expected at least one location alias after adventure deaths"
+        sim._apply_world_memory(
+            self._make_run(
+                sim=sim,
+                outcome="death",
+                death_member_id="c0",
+            )
+        )
+        any_alias = any(loc.aliases for loc in sim.world.grid.values())
+        assert any_alias, "Expected at least one location alias after adventure deaths"
 
     def test_apply_world_memory_on_death_directly(self):
         """Test _apply_world_memory directly via a mock AdventureRun."""
