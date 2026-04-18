@@ -387,6 +387,71 @@ class TestWorld:
 
         assert restored.event_records[0].location_id == "hub_primary"
 
+    def test_normalize_after_load_repairs_all_location_backed_references_consistently(self):
+        from fantasy_simulator.events import WorldEventRecord
+        from fantasy_simulator.rumor import Rumor
+        from fantasy_simulator.adventure import AdventureRun
+
+        world = World(name="Custom")
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="hub_primary",
+                        name="Clockwork Hub",
+                        description="Primary site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                        tags=["default_resident"],
+                    ),
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+        world.characters = [Character("Aldric", 25, "Male", "Human", "Warrior", location_id="missing")]
+        world.rumors = [Rumor(source_location_id="missing", description="Old rumor")]
+        world.active_adventures = [
+            AdventureRun(
+                character_id="char_1",
+                character_name="Aldric",
+                origin="missing",
+                destination="missing",
+                year_started=world.year,
+            )
+        ]
+        world.memorials = {
+            "mem_1": MemorialRecord(
+                memorial_id="mem_1",
+                character_id="char_1",
+                character_name="Aldric",
+                location_id="missing",
+                year=world.year,
+                cause="battle_fatal",
+                epitaph="Fell in battle.",
+            )
+        }
+        world.event_records = [WorldEventRecord(record_id="r1", kind="battle", year=1001, location_id="missing")]
+        only_location = world.get_location_by_id("hub_primary")
+        assert only_location is not None
+        only_location.memorial_ids = ["stale"]
+        only_location.recent_event_ids = ["stale"]
+
+        world.normalize_after_load()
+
+        assert world.characters[0].location_id == "hub_primary"
+        assert world.rumors[0].source_location_id is None
+        assert world.active_adventures[0].origin == "hub_primary"
+        assert world.active_adventures[0].destination == "hub_primary"
+        assert world.memorials["mem_1"].location_id == "hub_primary"
+        assert world.event_records[0].location_id is None
+        assert only_location.memorial_ids == ["mem_1"]
+        assert only_location.recent_event_ids == []
+
     def test_setting_bundle_assignment_rebuilds_world_structure(self):
         world = World(name="Custom")
         old_location_ids = set(world.location_ids)

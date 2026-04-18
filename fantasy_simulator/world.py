@@ -24,13 +24,39 @@ from .world_event_log import (
     trim_event_log_entries,
 )
 from .world_location_references import LocationReferenceResolver
+from .world_load_normalizer import (
+    ensure_unique_event_record_ids,
+    normalize_after_load as normalize_loaded_world_state,
+    rebuild_location_memorial_ids,
+    rebuild_recent_event_ids,
+)
 from .world_event_state import (
     apply_event_impact_to_location,
     append_canonical_event_record,
 )
+from .world_calendar import (
+    advance_calendar_position as advance_calendar_position_for_calendar,
+    apply_calendar_definition_history,
+    calendar_definition_by_key_ref,
+    calendar_definition_for_date_ref,
+    clamp_calendar_position as clamp_calendar_position_for_calendar,
+    default_season,
+    remaining_days_in_year as remaining_days_in_year_for_calendar,
+    season_for_date as season_for_calendar_date,
+    season_for_month as season_for_calendar,
+    months_elapsed_between as months_elapsed_between_for_calendar,
+)
 from .world_state_propagation import (
     decay_toward_baseline,
     propagate_state_changes,
+)
+from .world_topology_state import (
+    WorldTopologyState,
+    build_atlas_layout_from_topology,
+    build_topology_from_locations,
+    overlay_serialized_route_state,
+    restore_serialized_topology,
+    validate_topology_integrity,
 )
 from .world_topology import (
     PROPAGATION_TOPOLOGY_TRAVEL,
@@ -54,10 +80,6 @@ from .terrain import (
     RouteEdge,
     Site,
     TerrainMap,
-    assemble_atlas_layout_inputs,
-    build_cached_world_structure,
-    build_default_atlas_layout,
-    normalize_route_payload,
 )
 
 if TYPE_CHECKING:
@@ -807,12 +829,11 @@ class World:
 
     def _rebuild_location_memorial_ids(self) -> None:
         """Rebuild per-location memorial indices from canonical memorial records."""
-        for location in self.grid.values():
-            location.memorial_ids = []
-        for memorial in self.memorials.values():
-            location = self._location_id_index.get(memorial.location_id)
-            if location is not None and memorial.memorial_id not in location.memorial_ids:
-                location.memorial_ids.append(memorial.memorial_id)
+        rebuild_location_memorial_ids(
+            locations=self.grid.values(),
+            location_index=self._location_id_index,
+            memorials=self.memorials.values(),
+        )
 
     def _normalize_references_after_bundle_change(self) -> None:
         """Repair references after replacing the active setting bundle."""
@@ -853,22 +874,16 @@ class World:
         and creates provisional routes between adjacent sites only when no
         explicit route graph is defined for the current structure.
         """
-        # Collect current grid as pseudo-location tuples for the builder
-        location_tuples = [
-            (loc.id, loc.canonical_name, loc.description,
-             loc.region_type, loc.x, loc.y)
-            for loc in self.grid.values()
-        ]
-        location_ids = {loc_id for loc_id, *_rest in location_tuples}
         use_explicit_route_graph = (
             self._grid_matches_bundle_seeds()
             if explicit_route_graph is None
             else explicit_route_graph
         )
-        tmap, sites, routes, atlas_layout = build_cached_world_structure(
+        location_ids = set(self._location_id_index)
+        topology_state = build_topology_from_locations(
             width=self.width,
             height=self.height,
-            locations=location_tuples,
+            locations=self.grid.values(),
             route_specs=(
                 [
                     seed.to_dict()
@@ -878,25 +893,29 @@ class World:
                 if use_explicit_route_graph
                 else None
             ),
+            explicit_route_graph=use_explicit_route_graph,
         )
-        self.terrain_map = tmap
-        self.sites = sites
-        self.routes = routes
+        self._apply_topology_state(topology_state)
+
+    def _apply_topology_state(self, topology_state: WorldTopologyState) -> None:
+        """Apply a reconstructed topology snapshot to the live world state."""
+        self.terrain_map = topology_state.terrain_map
+        self.sites = topology_state.sites
+        self.routes = topology_state.routes
         self._rebuild_site_index()
         self._rebuild_route_index()
-        self._route_graph_explicit = use_explicit_route_graph
-        self.atlas_layout = atlas_layout
+        self._route_graph_explicit = topology_state.route_graph_explicit
+        self.atlas_layout = topology_state.atlas_layout
 
     def _build_atlas_layout_from_current_state(self) -> AtlasLayout:
         """Generate the persistent atlas layout from current terrain/site data."""
-        inputs = assemble_atlas_layout_inputs(
+        return build_atlas_layout_from_topology(
             width=self.width,
             height=self.height,
+            terrain_map=self.terrain_map,
             sites=self.sites,
             routes=self.routes,
-            terrain_cells=list(self.terrain_map.cells.values()) if self.terrain_map is not None else [],
         )
-        return build_default_atlas_layout(inputs)
 
     def _rebuild_site_index(self) -> None:
         """Rebuild the site lookup index keyed by location_id."""
@@ -930,29 +949,11 @@ class World:
 
     def _validate_topology_integrity(self) -> None:
         """Validate that restored topology is coherent with the active grid."""
-        for site in self.sites:
-            location = self._location_id_index.get(site.location_id)
-            if location is None:
-                raise ValueError(f"Serialized site references unknown location: {site.location_id!r}")
-            if (site.x, site.y) != (location.x, location.y):
-                raise ValueError(
-                    f"Serialized site coordinates disagree with location state for {site.location_id!r}"
-                )
-
-        seen_route_ids: set[str] = set()
-        seen_route_pairs: set[Tuple[str, str]] = set()
-        for route in self.routes:
-            if route.route_id in seen_route_ids:
-                raise ValueError(f"Serialized topology contains duplicate route id: {route.route_id!r}")
-            seen_route_ids.add(route.route_id)
-            if route.from_site_id == route.to_site_id:
-                raise ValueError(f"Serialized route forms a self-loop: {route.route_id!r}")
-            if route.from_site_id not in self._site_index or route.to_site_id not in self._site_index:
-                raise ValueError(f"Serialized route references unknown site: {route.route_id!r}")
-            pair = tuple(sorted((route.from_site_id, route.to_site_id)))
-            if pair in seen_route_pairs:
-                raise ValueError(f"Serialized topology contains duplicate route pair: {pair[0]}->{pair[1]}")
-            seen_route_pairs.add(pair)
+        validate_topology_integrity(
+            sites=self.sites,
+            routes=self.routes,
+            location_index=self._location_id_index,
+        )
 
     def get_site_by_id(self, location_id: str) -> Optional[Site]:
         """Return the Site record for a location, or None."""
@@ -1161,38 +1162,29 @@ class World:
 
     def rebuild_recent_event_ids(self) -> None:
         """Rebuild derived per-location recent_event_ids from structured event records."""
-        for location in self.grid.values():
-            location.recent_event_ids = []
-
-        for record in self.event_records:
-            if record.location_id not in self._location_id_index:
-                record.location_id = None
-                continue
-            self._location_id_index[record.location_id].recent_event_ids.append(record.record_id)
-
-        for location in self.grid.values():
-            location.recent_event_ids = location.recent_event_ids[-12:]
+        rebuild_recent_event_ids(
+            locations=self.grid.values(),
+            location_index=self._location_id_index,
+            event_records=self.event_records,
+        )
 
     def _ensure_unique_event_record_ids(self) -> None:
         """Fail fast when canonical history contains duplicate record IDs."""
-        seen: set[str] = set()
-        for record in self.event_records:
-            if record.record_id in seen:
-                raise ValueError(f"Duplicate event record ID during rebuild: {record.record_id!r}")
-            seen.add(record.record_id)
+        ensure_unique_event_record_ids(self.event_records)
 
     def normalize_after_load(self) -> None:
         """Rebuild derived indexes and repair invariants after deserialization."""
-        self._repair_location_references()
-        self.rebuild_char_index()
-        self._ensure_unique_event_record_ids()
-        self._backfill_watched_actor_tags_after_load()
-        self.ensure_valid_character_locations()
-        self.rebuild_adventure_index()
-        self.rebuild_recent_event_ids()
-        self._rebuild_location_memorial_ids()
-        if self.event_records:
-            self.rebuild_compatibility_event_log()
+        normalize_loaded_world_state(
+            event_records=self.event_records,
+            repair_location_references=self._repair_location_references,
+            rebuild_char_index=self.rebuild_char_index,
+            backfill_watched_actor_tags=self._backfill_watched_actor_tags_after_load,
+            ensure_valid_character_locations=self.ensure_valid_character_locations,
+            rebuild_adventure_index=self.rebuild_adventure_index,
+            rebuild_recent_event_ids_fn=self.rebuild_recent_event_ids,
+            rebuild_location_memorial_ids_fn=self._rebuild_location_memorial_ids,
+            rebuild_compatibility_event_log=self.rebuild_compatibility_event_log,
+        )
 
     def _backfill_watched_actor_tags_after_load(self) -> None:
         """Freeze watched-actor report context for older untagged canonical records.
@@ -1361,34 +1353,16 @@ class World:
         start_calendar_key: str = "",
     ) -> int:
         """Return completed month boundaries between two in-world dates."""
-        start = (int(start_year), max(1, int(start_month)), max(1, int(start_day)))
-        end = (int(end_year), max(1, int(end_month)), max(1, int(end_day)))
-        if end < start:
-            return 0
-
-        elapsed = 0
-        cursor_year, cursor_month, cursor_day = start
-        cursor_calendar_key = start_calendar_key
-
-        while True:
-            calendar = self.calendar_definition_for_date(
-                cursor_year,
-                cursor_month,
-                cursor_day,
-                calendar_key=cursor_calendar_key,
-            )
-            next_year = cursor_year
-            next_month = cursor_month + 1
-            if next_month > calendar.months_per_year:
-                next_month = 1
-                next_year += 1
-            if (next_year, next_month, 1) > end:
-                break
-            elapsed += 1
-            cursor_year, cursor_month, cursor_day = next_year, next_month, 1
-            cursor_calendar_key = ""
-
-        return elapsed
+        return months_elapsed_between_for_calendar(
+            calendar_definition_for_date_ref_fn=self._calendar_definition_for_date_ref,
+            start_year=start_year,
+            start_month=start_month,
+            end_year=end_year,
+            end_month=end_month,
+            start_day=start_day,
+            end_day=end_day,
+            start_calendar_key=start_calendar_key,
+        )
 
     def random_location(self, exclude_dungeon: bool = False, rng: Any = random) -> LocationState:
         options = list(self.grid.values())
@@ -1420,16 +1394,12 @@ class World:
         return self._base_calendar_ref().month_display_name(month)
 
     def _calendar_definition_by_key_ref(self, calendar_key: str) -> CalendarDefinition:
-        if not calendar_key:
-            return self._base_calendar_ref()
-        if self._base_calendar_ref().calendar_key == calendar_key:
-            return self._base_calendar_ref()
-        if self.calendar_baseline.calendar_key == calendar_key:
-            return self.calendar_baseline
-        for entry in reversed(sorted(self.calendar_history, key=lambda item: (item.year, item.month, item.day))):
-            if entry.calendar.calendar_key == calendar_key:
-                return entry.calendar
-        return self._base_calendar_ref()
+        return calendar_definition_by_key_ref(
+            base_calendar=self._base_calendar_ref(),
+            calendar_baseline=self.calendar_baseline,
+            calendar_history=self.calendar_history,
+            calendar_key=calendar_key,
+        )
 
     def calendar_definition_by_key(self, calendar_key: str) -> CalendarDefinition:
         return _clone_calendar(self._calendar_definition_by_key_ref(calendar_key))
@@ -1442,16 +1412,15 @@ class World:
         *,
         calendar_key: str = "",
     ) -> CalendarDefinition:
-        if calendar_key:
-            return self._calendar_definition_by_key_ref(calendar_key)
-        target = (int(year), max(1, int(month)), max(1, int(day)))
-        selected = self.calendar_baseline
-        for entry in sorted(self.calendar_history, key=lambda item: (item.year, item.month, item.day)):
-            if (entry.year, entry.month, entry.day) <= target:
-                selected = entry.calendar
-            else:
-                break
-        return selected
+        return calendar_definition_for_date_ref(
+            base_calendar=self._base_calendar_ref(),
+            calendar_baseline=self.calendar_baseline,
+            calendar_history=self.calendar_history,
+            year=year,
+            month=month,
+            day=day,
+            calendar_key=calendar_key,
+        )
 
     def calendar_definition_for_date(
         self,
@@ -1486,13 +1455,7 @@ class World:
     @staticmethod
     def get_season(month: int) -> str:
         """Return the default season mapping used by the built-in calendar."""
-        if month in (12, 1, 2):
-            return "winter"
-        if month in (3, 4, 5):
-            return "spring"
-        if month in (6, 7, 8):
-            return "summer"
-        return "autumn"
+        return default_season(month)
 
     def season_for_month(self, month: int) -> str:
         """Return the season for a month in the active world definition.
@@ -1501,10 +1464,7 @@ class World:
         month, the simulator falls back to the built-in ordinal month mapping
         used by the default Aethorian calendar.
         """
-        season = self._base_calendar_ref().season_for_month(month)
-        if season != "unknown":
-            return season
-        return self.get_season(month)
+        return season_for_calendar(self._base_calendar_ref(), month)
 
     def season_for_date(
         self, year: int, month: int, day: int = 1, *, calendar_key: str = ""
@@ -1515,17 +1475,19 @@ class World:
         irregular calendars without explicit season metadata still resolve to a
         stable season label.
         """
-        calendar = self._calendar_definition_for_date_ref(year, month, day, calendar_key=calendar_key)
-        season = calendar.season_for_month(month)
-        if season != "unknown":
-            return season
-        return self.get_season(month)
+        return season_for_calendar_date(
+            base_calendar=self._base_calendar_ref(),
+            calendar_baseline=self.calendar_baseline,
+            calendar_history=self.calendar_history,
+            year=year,
+            month=month,
+            day=day,
+            calendar_key=calendar_key,
+        )
 
     def clamp_calendar_position(self, month: int, day: int) -> Tuple[int, int]:
         """Clamp month/day into the active calendar's valid ranges."""
-        clamped_month = max(1, min(self.months_per_year, int(month)))
-        clamped_day = max(1, min(self.days_in_month(clamped_month), int(day)))
-        return clamped_month, clamped_day
+        return clamp_calendar_position_for_calendar(self._base_calendar_ref(), month, day)
 
     def apply_calendar_definition(
         self,
@@ -1543,37 +1505,33 @@ class World:
         historical date of the transition in ``calendar_history``.
         """
         self._setting_bundle.world_definition.calendar = _clone_calendar(calendar)
-        month = max(1, min(calendar.months_per_year, int(changed_month)))
-        day = max(1, min(calendar.days_in_month(month), int(changed_day)))
-        self.calendar_history.append(CalendarChangeRecord(
-            year=self.year if changed_year is None else changed_year,
-            month=month,
-            day=day,
-            calendar=_clone_calendar(calendar),
-        ))
-        self.calendar_history.sort(key=lambda item: (item.year, item.month, item.day))
+        self.calendar_history = apply_calendar_definition_history(
+            calendar=calendar,
+            current_year=self.year,
+            calendar_history=self.calendar_history,
+            build_change_record=lambda year, month, day, changed_calendar: CalendarChangeRecord(
+                year=year,
+                month=month,
+                day=day,
+                calendar=changed_calendar,
+            ),
+            changed_year=changed_year,
+            changed_month=changed_month,
+            changed_day=changed_day,
+        )
 
     def remaining_days_in_year(self, month: int, day: int) -> int:
         """Return how many in-world days remain including the current date."""
-        clamped_month, clamped_day = self.clamp_calendar_position(month, day)
-        remaining = self.days_in_month(clamped_month) - clamped_day + 1
-        for month_index in range(clamped_month + 1, self.months_per_year + 1):
-            remaining += self.days_in_month(month_index)
-        return remaining
+        return remaining_days_in_year_for_calendar(self._base_calendar_ref(), month, day)
 
     def advance_calendar_position(self, month: int, day: int, days: int = 1) -> Tuple[int, int, int]:
         """Advance a month/day position and return ``(month, day, year_delta)``."""
-        current_month, current_day = self.clamp_calendar_position(month, day)
-        year_delta = 0
-        for _ in range(max(0, int(days))):
-            current_day += 1
-            if current_day > self.days_in_month(current_month):
-                current_day = 1
-                current_month += 1
-                if current_month > self.months_per_year:
-                    current_month = 1
-                    year_delta += 1
-        return current_month, current_day, year_delta
+        return advance_calendar_position_for_calendar(
+            self._base_calendar_ref(),
+            month,
+            day,
+            days=days,
+        )
 
     def advance_time(self, years: int = 1) -> None:
         self.year += years
@@ -1764,28 +1722,7 @@ class World:
 
     def _overlay_serialized_route_state(self, serialized_routes: List[Dict[str, Any]]) -> None:
         """Overlay mutable route state onto the canonical route graph."""
-        if not serialized_routes:
-            return
-        serialized_by_id: Dict[str, Dict[str, Any]] = {}
-        for item in serialized_routes:
-            if not isinstance(item, dict):
-                raise ValueError("Serialized route overlay entries must be dicts")
-            payload = normalize_route_payload(item)
-            route_id = payload["route_id"]
-            if route_id in serialized_by_id:
-                raise ValueError(f"Serialized route overlay contains duplicate route id: {route_id!r}")
-            serialized_by_id[route_id] = payload
-        if not serialized_by_id:
-            return
-        for route in self.routes:
-            payload = serialized_by_id.get(route.route_id)
-            if payload is None:
-                continue
-            if payload["from_site_id"] != route.from_site_id or payload["to_site_id"] != route.to_site_id:
-                raise ValueError(f"Serialized route overlay disagrees with canonical endpoints: {route.route_id!r}")
-            route.route_type = payload["route_type"]
-            route.distance = payload["distance"]
-            route.blocked = payload["blocked"]
+        overlay_serialized_route_state(self.routes, serialized_routes)
 
     def to_dict(self) -> Dict[str, Any]:
         lore_text = self._setting_bundle.world_definition.lore_text
@@ -1940,18 +1877,15 @@ class World:
             world._overlay_serialized_route_state(data.get("routes", []))
             world._rebuild_route_index()
         elif "terrain_map" in data:
-            world.terrain_map = TerrainMap.from_dict(data["terrain_map"])
-            world.sites = [Site.from_dict(s) for s in data.get("sites", [])]
-            world.routes = [RouteEdge.from_dict(r) for r in data.get("routes", [])]
-            world._route_graph_explicit = True
-            for site in world.sites:
-                site.location_id = world.normalize_location_id(site.location_id) or site.location_id
-            for route in world.routes:
-                route.from_site_id = world.normalize_location_id(route.from_site_id) or route.from_site_id
-                route.to_site_id = world.normalize_location_id(route.to_site_id) or route.to_site_id
-            world._rebuild_site_index()
-            world._rebuild_route_index()
-            world._validate_topology_integrity()
+            world._apply_topology_state(
+                restore_serialized_topology(
+                    terrain_map_data=data["terrain_map"],
+                    site_data=list(data.get("sites", [])),
+                    route_data=list(data.get("routes", [])),
+                    normalize_location_id=world.normalize_location_id,
+                    location_index=world._location_id_index,
+                )
+            )
         else:
             world._build_terrain_from_grid()
 
