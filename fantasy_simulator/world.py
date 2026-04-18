@@ -28,7 +28,8 @@ from .world_state_propagation import (
 )
 from .world_topology import (
     PROPAGATION_TOPOLOGY_TRAVEL,
-    resolve_neighbor_ids,
+    PROPAGATION_TOPOLOGY_GRID,
+    grid_neighbor_ids,
     route_neighbor_ids,
 )
 from .content.setting_bundle import (
@@ -69,6 +70,22 @@ def _clone_calendar(calendar: CalendarDefinition) -> CalendarDefinition:
 
 def _clone_setting_bundle(bundle: SettingBundle) -> SettingBundle:
     return SettingBundle.from_dict(bundle.to_dict())
+
+
+def _string_list_payload(payload: Any, *, field_name: str) -> List[str]:
+    if payload is None:
+        return []
+    if not isinstance(payload, list) or any(not isinstance(item, str) for item in payload):
+        raise ValueError(f"{field_name} must be a list of strings")
+    return list(payload)
+
+
+def _trace_list_payload(payload: Any, *, field_name: str) -> List[Dict[str, Any]]:
+    if payload is None:
+        return []
+    if not isinstance(payload, list) or any(not isinstance(item, dict) for item in payload):
+        raise ValueError(f"{field_name} must be a list of dicts")
+    return [dict(item) for item in payload]
 
 
 @dataclass
@@ -314,10 +331,10 @@ class LocationState:
             road_condition=data.get("road_condition", defaults["road_condition"]),
             visited=data.get("visited", False),
             controlling_faction_id=data.get("controlling_faction_id"),
-            recent_event_ids=list(data.get("recent_event_ids", [])),
-            aliases=list(data.get("aliases", [])),
-            memorial_ids=list(data.get("memorial_ids", [])),
-            live_traces=[dict(trace) for trace in data.get("live_traces", [])],
+            recent_event_ids=_string_list_payload(data.get("recent_event_ids", []), field_name="recent_event_ids"),
+            aliases=_string_list_payload(data.get("aliases", []), field_name="aliases"),
+            memorial_ids=_string_list_payload(data.get("memorial_ids", []), field_name="memorial_ids"),
+            live_traces=_trace_list_payload(data.get("live_traces", []), field_name="live_traces"),
         )
 
 
@@ -373,6 +390,10 @@ class World:
         self.sites: List[Site] = []
         self.routes: List[RouteEdge] = []
         self._site_index: Dict[str, Site] = {}
+        self._routes_by_site: Dict[str, List[RouteEdge]] = {}
+        self._routes_index_source_id: int = id(self.routes)
+        self._routes_index_source_size: int = len(self.routes)
+        self._routes_index_signature: Tuple[Tuple[str, str, str, str, int, bool], ...] = ()
         # PR-G2: persistent macro geography layer
         self.atlas_layout: Optional[AtlasLayout] = None
         if not _skip_defaults:
@@ -429,11 +450,49 @@ class World:
     def apply_setting_bundle(self, bundle: SettingBundle) -> None:
         """Apply a bundle while keeping derived world structures consistent."""
         validate_setting_bundle(bundle, source="World.setting_bundle")
+        previous_bundle = getattr(self, "_setting_bundle", None)
         previous_locations = list(getattr(self, "grid", {}).values())
         self._set_setting_bundle_metadata(bundle)
         if hasattr(self, "grid"):
-            self._build_default_map(previous_locations=previous_locations)
-            self._normalize_references_after_bundle_change()
+            topology_changed = (
+                previous_bundle is None
+                or self._topology_signature(previous_bundle) != self._topology_signature(bundle)
+            )
+            if topology_changed:
+                self._build_default_map(previous_locations=previous_locations)
+                self._normalize_references_after_bundle_change()
+            else:
+                self._refresh_locations_from_site_seeds()
+
+    @staticmethod
+    def _topology_signature(bundle: SettingBundle) -> Tuple[Tuple[Any, ...], Tuple[Any, ...]]:
+        world = bundle.world_definition
+        site_signature = tuple(
+            (seed.location_id, seed.region_type, seed.x, seed.y)
+            for seed in world.site_seeds
+        )
+        route_signature = tuple(
+            (
+                seed.route_id,
+                seed.from_site_id,
+                seed.to_site_id,
+                seed.route_type,
+                int(seed.distance),
+                bool(seed.blocked),
+            )
+            for seed in world.route_seeds
+        )
+        return site_signature, route_signature
+
+    def _refresh_locations_from_site_seeds(self) -> None:
+        """Refresh static location metadata when bundle lore changes but topology does not."""
+        for seed in self._setting_bundle.world_definition.site_seeds:
+            existing = self._location_id_index.get(seed.location_id)
+            if existing is None:
+                continue
+            replacement = self._location_state_from_site_seed(seed)
+            self._copy_location_runtime_state(existing, replacement)
+            self._register_location(replacement)
 
     def _register_location(self, loc: LocationState) -> None:
         existing_at_coord = self.grid.get((loc.x, loc.y))
@@ -459,6 +518,10 @@ class World:
         self.sites = []
         self.routes = []
         self._site_index = {}
+        self._routes_by_site = {}
+        self._routes_index_source_id = id(self.routes)
+        self._routes_index_source_size = len(self.routes)
+        self._routes_index_signature = ()
         self.atlas_layout = None
 
     def _copy_location_runtime_state(self, source: LocationState, target: LocationState) -> None:
@@ -716,11 +779,16 @@ class World:
             width=self.width,
             height=self.height,
             locations=location_tuples,
+            route_specs=[
+                seed.to_dict()
+                for seed in self._setting_bundle.world_definition.route_seeds
+            ],
         )
         self.terrain_map = tmap
         self.sites = sites
         self.routes = routes
         self._rebuild_site_index()
+        self._rebuild_route_index()
         self.atlas_layout = self._build_atlas_layout_from_current_state()
 
     def _build_atlas_layout_from_current_state(self) -> AtlasLayout:
@@ -738,26 +806,79 @@ class World:
         """Rebuild the site lookup index keyed by location_id."""
         self._site_index = {s.location_id: s for s in self.sites}
 
+    def _rebuild_route_index(self) -> None:
+        """Rebuild route adjacency lists keyed by endpoint location id."""
+        route_index: Dict[str, List[RouteEdge]] = {
+            site.location_id: [] for site in self.sites
+        }
+        for route in self.routes:
+            route_index.setdefault(route.from_site_id, []).append(route)
+            route_index.setdefault(route.to_site_id, []).append(route)
+        self._routes_by_site = route_index
+        self._routes_index_source_id = id(self.routes)
+        self._routes_index_source_size = len(self.routes)
+        self._routes_index_signature = self._route_index_signature()
+
+    def _route_index_signature(self) -> Tuple[Tuple[str, str, str, str, int, bool], ...]:
+        return tuple(
+            (
+                route.route_id,
+                route.from_site_id,
+                route.to_site_id,
+                route.route_type,
+                int(route.distance),
+                bool(route.blocked),
+            )
+            for route in self.routes
+        )
+
+    def _ensure_route_index_current(self) -> None:
+        """Keep the cached route adjacency in sync with direct route reassignment."""
+        if (
+            id(self.routes) != self._routes_index_source_id
+            or len(self.routes) != self._routes_index_source_size
+            or self._route_index_signature() != self._routes_index_signature
+        ):
+            self._rebuild_route_index()
+
+    def _validate_topology_integrity(self) -> None:
+        """Validate that restored topology is coherent with the active grid."""
+        for site in self.sites:
+            location = self._location_id_index.get(site.location_id)
+            if location is None:
+                raise ValueError(f"Serialized site references unknown location: {site.location_id!r}")
+            if (site.x, site.y) != (location.x, location.y):
+                raise ValueError(
+                    f"Serialized site coordinates disagree with location state for {site.location_id!r}"
+                )
+
+        for route in self.routes:
+            if route.from_site_id == route.to_site_id:
+                raise ValueError(f"Serialized route forms a self-loop: {route.route_id!r}")
+            if route.from_site_id not in self._site_index or route.to_site_id not in self._site_index:
+                raise ValueError(f"Serialized route references unknown site: {route.route_id!r}")
+
     def get_site_by_id(self, location_id: str) -> Optional[Site]:
         """Return the Site record for a location, or None."""
         return self._site_index.get(location_id)
 
     def get_routes_for_site(self, location_id: str) -> List[RouteEdge]:
         """Return all routes connected to a site."""
-        return [r for r in self.routes if r.connects(location_id)]
+        self._ensure_route_index_current()
+        return list(self._routes_by_site.get(location_id, []))
 
     def get_connected_site_ids(self, location_id: str) -> List[str]:
         """Return location_ids of sites reachable via routes from a site."""
-        return route_neighbor_ids(location_id, routes=self.routes)
+        return sorted(
+            route_neighbor_ids(location_id, routes=self.get_routes_for_site(location_id)),
+        )
 
     def get_grid_neighboring_locations(self, location_id: str) -> List[LocationState]:
         """Return adjacency by physical map grid, regardless of route state."""
-        neighbor_ids = resolve_neighbor_ids(
+        neighbor_ids = grid_neighbor_ids(
             location_id,
             location_index=self._location_id_index,
             grid=self.grid,
-            routes=self.routes,
-            mode="grid",
         )
         return [
             self._location_id_index[neighbor_id]
@@ -767,12 +888,10 @@ class World:
 
     def get_travel_neighboring_locations(self, location_id: str) -> List[LocationState]:
         """Return neighbors reachable for travel using the travel topology contract."""
-        neighbor_ids = resolve_neighbor_ids(
-            location_id,
-            location_index=self._location_id_index,
-            grid=self.grid,
-            routes=self.routes,
-            mode=PROPAGATION_TOPOLOGY_TRAVEL,
+        neighbor_ids = (
+            self.get_connected_site_ids(location_id)
+            if self.routes
+            else grid_neighbor_ids(location_id, location_index=self._location_id_index, grid=self.grid)
         )
         return [
             self._location_id_index[neighbor_id]
@@ -800,14 +919,21 @@ class World:
             if include_blocked_routes is None
             else include_blocked_routes
         )
-        neighbor_ids = resolve_neighbor_ids(
-            location_id,
-            location_index=self._location_id_index,
-            grid=self.grid,
-            routes=self.routes,
-            mode=topology_mode,
-            include_blocked_routes=effective_include_blocked_routes,
-        )
+        if topology_mode == PROPAGATION_TOPOLOGY_TRAVEL:
+            if self.routes:
+                neighbor_ids = sorted(
+                    route_neighbor_ids(
+                        location_id,
+                        routes=self.get_routes_for_site(location_id),
+                        include_blocked=effective_include_blocked_routes,
+                    )
+                )
+            else:
+                neighbor_ids = grid_neighbor_ids(location_id, location_index=self._location_id_index, grid=self.grid)
+        elif topology_mode == PROPAGATION_TOPOLOGY_GRID:
+            neighbor_ids = grid_neighbor_ids(location_id, location_index=self._location_id_index, grid=self.grid)
+        else:
+            raise ValueError(f"Unsupported propagation topology mode: {topology_mode}")
         return [
             self._location_id_index[neighbor_id]
             for neighbor_id in neighbor_ids
@@ -1505,6 +1631,56 @@ class World:
         info = build_map_info(self, highlight_location)
         return render_map_ascii(info)
 
+    def _grid_matches_bundle_seeds(self) -> bool:
+        bundle_locations = sorted(
+            (
+                seed.location_id,
+                seed.name,
+                seed.description,
+                seed.region_type,
+                int(seed.x),
+                int(seed.y),
+            )
+            for seed in self._setting_bundle.world_definition.site_seeds
+            if 0 <= seed.x < self.width and 0 <= seed.y < self.height
+        )
+        current_locations = sorted(
+            (
+                loc.id,
+                loc.canonical_name,
+                loc.description,
+                loc.region_type,
+                int(loc.x),
+                int(loc.y),
+            )
+            for loc in self.grid.values()
+        )
+        return bundle_locations == current_locations
+
+    def _overlay_serialized_route_state(self, serialized_routes: List[Dict[str, Any]]) -> None:
+        """Overlay mutable route state onto the canonical route graph."""
+        if not serialized_routes:
+            return
+        serialized_by_id = {
+            str(item.get("route_id")): item
+            for item in serialized_routes
+            if isinstance(item, dict) and item.get("route_id")
+        }
+        if not serialized_by_id:
+            return
+        for route in self.routes:
+            payload = serialized_by_id.get(route.route_id)
+            if payload is None:
+                continue
+            if (
+                str(payload.get("from_site_id", route.from_site_id)) != route.from_site_id
+                or str(payload.get("to_site_id", route.to_site_id)) != route.to_site_id
+            ):
+                continue
+            route.route_type = str(payload.get("route_type", route.route_type))
+            route.distance = int(payload.get("distance", route.distance))
+            route.blocked = bool(payload.get("blocked", route.blocked))
+
     def to_dict(self) -> Dict[str, Any]:
         lore_text = self._setting_bundle.world_definition.lore_text
         result: Dict[str, Any] = {
@@ -1523,10 +1699,13 @@ class World:
             "calendar_baseline": self.calendar_baseline.to_dict(),
             "calendar_history": [entry.to_dict() for entry in self.calendar_history],
         }
-        # PR-G: persist terrain/site/route layers
-        if self.terrain_map is not None:
+        bundle_backed_topology = self._setting_bundle is not None and self._grid_matches_bundle_seeds()
+        # PR-G: persist terrain/site/route layers for non-bundle-backed worlds.
+        # Bundle-backed worlds persist route state separately from the
+        # canonical bundle topology to avoid conflicting sources of truth.
+        if self.terrain_map is not None and not bundle_backed_topology:
             result["terrain_map"] = self.terrain_map.to_dict()
-        if self.sites:
+        if self.sites and not bundle_backed_topology:
             result["sites"] = [s.to_dict() for s in self.sites]
         if self.routes:
             result["routes"] = [r.to_dict() for r in self.routes]
@@ -1560,10 +1739,10 @@ class World:
             road_condition=data.get("road_condition", defaults["road_condition"]),
             visited=data.get("visited", False),
             controlling_faction_id=data.get("controlling_faction_id"),
-            recent_event_ids=list(data.get("recent_event_ids", [])),
-            aliases=list(data.get("aliases", [])),
-            memorial_ids=list(data.get("memorial_ids", [])),
-            live_traces=[dict(trace) for trace in data.get("live_traces", [])],
+            recent_event_ids=_string_list_payload(data.get("recent_event_ids", []), field_name="recent_event_ids"),
+            aliases=_string_list_payload(data.get("aliases", []), field_name="aliases"),
+            memorial_ids=_string_list_payload(data.get("memorial_ids", []), field_name="memorial_ids"),
+            live_traces=_trace_list_payload(data.get("live_traces", []), field_name="live_traces"),
         )
 
     @classmethod
@@ -1592,6 +1771,7 @@ class World:
             _skip_defaults=True,
         )
         serialized_grid = list(data.get("grid", []))
+        bundle_backed_structure = False
         if "setting_bundle" in data:
             world._set_setting_bundle_metadata(
                 bundle_from_dict_validated(
@@ -1600,6 +1780,7 @@ class World:
                 )
             )
             if world._serialized_grid_is_compatible_with_active_bundle(serialized_grid):
+                bundle_backed_structure = True
                 world._build_default_map()
                 for loc_data in serialized_grid:
                     world._overlay_location_runtime_state_from_dict(loc_data)
@@ -1648,9 +1829,14 @@ class World:
             for item in data.get("calendar_history", [])
         ]
 
-        # PR-G: restore terrain/site/route layers if present;
-        # otherwise derive from loaded grid.
-        if "terrain_map" in data:
+        # PR-G: when the active bundle already defines the authoritative site set,
+        # rebuild topology from that grid so stale serialized routes cannot
+        # override the active bundle graph. Otherwise restore serialized topology.
+        if bundle_backed_structure:
+            world._build_terrain_from_grid()
+            world._overlay_serialized_route_state(data.get("routes", []))
+            world._rebuild_route_index()
+        elif "terrain_map" in data:
             world.terrain_map = TerrainMap.from_dict(data["terrain_map"])
             world.sites = [Site.from_dict(s) for s in data.get("sites", [])]
             world.routes = [RouteEdge.from_dict(r) for r in data.get("routes", [])]
@@ -1660,6 +1846,8 @@ class World:
                 route.from_site_id = world.normalize_location_id(route.from_site_id) or route.from_site_id
                 route.to_site_id = world.normalize_location_id(route.to_site_id) or route.to_site_id
             world._rebuild_site_index()
+            world._rebuild_route_index()
+            world._validate_topology_integrity()
         else:
             world._build_terrain_from_grid()
 

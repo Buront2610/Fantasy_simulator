@@ -103,8 +103,12 @@ class TestWorldTerrainLayer:
         world = World()
         connected = world.get_connected_site_ids("loc_aethoria_capital")
         assert len(connected) > 0
-        # Capital at (2,2) should connect to 4 neighbors
-        assert len(connected) == 4
+        expected = sorted(
+            route.other_end("loc_aethoria_capital")
+            for route in world.get_routes_for_site("loc_aethoria_capital")
+            if route.other_end("loc_aethoria_capital") is not None and not route.blocked
+        )
+        assert connected == expected
 
     def test_sites_on_valid_terrain(self):
         """Every site should sit on a valid terrain cell."""
@@ -128,11 +132,11 @@ class TestWorldTerrainLayer:
 # ------------------------------------------------------------------
 
 class TestWorldTerrainRoundTrip:
-    def test_to_dict_includes_terrain(self):
+    def test_to_dict_omits_derived_terrain_for_bundle_backed_worlds(self):
         world = World()
         d = world.to_dict()
-        assert "terrain_map" in d
-        assert "sites" in d
+        assert "terrain_map" not in d
+        assert "sites" not in d
         assert "routes" in d
 
     def test_round_trip_preserves_terrain(self):
@@ -166,9 +170,9 @@ class TestWorldTerrainRoundTrip:
         """Loading save data without terrain should derive it from the grid."""
         world = World()
         d = world.to_dict()
-        del d["terrain_map"]
-        del d["sites"]
-        del d["routes"]
+        d.pop("terrain_map", None)
+        d.pop("sites", None)
+        d.pop("routes", None)
 
         restored = World.from_dict(d)
         assert restored.terrain_map is not None

@@ -10,6 +10,8 @@ from .world_topology import (
     VALID_PROPAGATION_TOPOLOGIES,
 )
 
+DISABLED_ROAD_DAMAGE_THRESHOLD = 101
+
 
 _VALID_IMPACT_ATTRIBUTES = {
     "prosperity",
@@ -93,7 +95,7 @@ def _validate_percentage_threshold(*, section: str, key: str, value: Any) -> Non
 
 def is_disabled_threshold(value: int) -> bool:
     """Return True when a threshold intentionally disables a propagation effect."""
-    return value > 100
+    return value == DISABLED_ROAD_DAMAGE_THRESHOLD
 
 
 def validate_propagation_rules(rules: Mapping[str, Mapping[str, Any]]) -> None:
@@ -170,6 +172,11 @@ def validate_propagation_rules(rules: Mapping[str, Mapping[str, Any]]) -> None:
     danger_threshold = rules["road_damage_from_danger"]["danger_threshold"]
     if danger_threshold < 0:
         raise ValueError("PROPAGATION_RULES['road_damage_from_danger']['danger_threshold'] must be >= 0")
+    if danger_threshold > 100 and not is_disabled_threshold(danger_threshold):
+        raise ValueError(
+            "PROPAGATION_RULES['road_damage_from_danger']['danger_threshold'] "
+            "must be between 0 and 100, or 101 to disable"
+        )
     _validate_non_negative_int(
         section="road_damage_from_danger",
         key="road_penalty",

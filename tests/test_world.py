@@ -16,6 +16,7 @@ from fantasy_simulator.content.setting_bundle import (
 )
 from fantasy_simulator.i18n import set_locale
 from fantasy_simulator.rumor import Rumor
+from fantasy_simulator.terrain import RouteEdge
 from fantasy_simulator.world import LocationState, MemorialRecord, World
 from fantasy_simulator.content.world_data import get_location_state_defaults
 
@@ -97,6 +98,57 @@ class TestWorld:
         world.propagate_state(months=12)
 
         assert target.danger > 0
+
+    def test_route_index_rebuilds_after_in_place_route_replacement(self):
+        world = World()
+        target_index = next(
+            idx for idx, route in enumerate(world.routes)
+            if route.other_end("loc_aethoria_capital") == "loc_silverbrook"
+        )
+        world.routes[target_index] = RouteEdge(
+            route_id="route_capital_coral",
+            from_site_id="loc_aethoria_capital",
+            to_site_id="loc_coral_cove",
+            route_type="road",
+        )
+
+        neighbor_ids = set(world.get_connected_site_ids("loc_aethoria_capital"))
+
+        assert "loc_coral_cove" in neighbor_ids
+        assert "loc_silverbrook" not in neighbor_ids
+
+    def test_setting_bundle_can_define_explicitly_disconnected_topology(self):
+        world = World(name="Disconnected", width=2, height=1)
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="disconnected",
+                display_name="Disconnected",
+                lore_text="No roads",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="loc_one",
+                        name="One",
+                        description="",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                    ),
+                    SiteSeedDefinition(
+                        location_id="loc_two",
+                        name="Two",
+                        description="",
+                        region_type="village",
+                        x=1,
+                        y=0,
+                    ),
+                ],
+                route_seeds=[],
+            ),
+        )
+
+        assert world.routes == []
+        assert world.get_connected_site_ids("loc_one") == []
 
     def test_add_character_marks_location_visited(self):
         world = World()
@@ -802,6 +854,50 @@ class TestWorld:
         world = World()
 
         assert world.location_name("loc_missing_ruin") == "Unknown location (loc_missing_ruin)"
+
+    def test_location_state_from_dict_rejects_string_alias_payload(self):
+        payload = World().to_dict()
+        payload["grid"][0]["aliases"] = "The Crown City"
+
+        try:
+            World.from_dict(payload)
+        except ValueError as exc:
+            assert "aliases" in str(exc)
+        else:
+            raise AssertionError("Expected malformed aliases payload to fail fast")
+
+    def test_from_dict_rejects_self_loop_route_in_serialized_topology(self):
+        payload = World(width=1, height=1).to_dict()
+        payload.pop("setting_bundle", None)
+        payload["terrain_map"] = {
+            "width": 1,
+            "height": 1,
+            "cells": [{"x": 0, "y": 0, "biome": "plains", "elevation": 128, "moisture": 128, "temperature": 128}],
+        }
+        payload["sites"] = [
+            {
+                "location_id": payload["grid"][0]["id"],
+                "x": 0,
+                "y": 0,
+                "site_type": "city",
+                "importance": 50,
+            }
+        ]
+        payload["routes"] = [{
+            "route_id": "route_loop",
+            "from_site_id": payload["grid"][0]["id"],
+            "to_site_id": payload["grid"][0]["id"],
+            "route_type": "road",
+            "distance": 1,
+            "blocked": False,
+        }]
+
+        try:
+            World.from_dict(payload)
+        except ValueError as exc:
+            assert "self-loop" in str(exc)
+        else:
+            raise AssertionError("Expected self-loop route to fail fast")
 
     def test_advance_calendar_position_respects_variable_month_lengths(self):
         world = World()

@@ -81,6 +81,14 @@ def test_validate_propagation_rules_rejects_negative_road_penalty() -> None:
         validate_propagation_rules(rules)
 
 
+def test_validate_propagation_rules_rejects_unknown_disable_sentinel() -> None:
+    rules = clone_default_propagation_rules()
+    rules["road_damage_from_danger"]["danger_threshold"] = 999
+
+    with pytest.raises(ValueError, match="101 to disable"):
+        validate_propagation_rules(rules)
+
+
 def test_validate_propagation_rules_rejects_unknown_topology_mode() -> None:
     rules = clone_default_propagation_rules()
     rules["topology"]["mode"] = "telepathy"

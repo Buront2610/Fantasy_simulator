@@ -56,6 +56,7 @@ def test_default_aethoria_bundle_has_minimal_phase_i_slots():
     assert bundle.world_definition.races
     assert bundle.world_definition.jobs
     assert bundle.world_definition.site_seeds
+    assert bundle.world_definition.route_seeds
     assert bundle.world_definition.naming_rules.last_names
     capital_seed = next(
         seed for seed in bundle.world_definition.site_seeds
@@ -63,6 +64,120 @@ def test_default_aethoria_bundle_has_minimal_phase_i_slots():
     )
     assert "capital" in capital_seed.tags
     assert "default_resident" in capital_seed.tags
+
+
+def test_bundle_validation_rejects_route_seed_with_unknown_site() -> None:
+    payload = {
+        "schema_version": 1,
+        "world_definition": {
+            "world_key": "bad_route",
+            "display_name": "Bad Route",
+            "lore_text": "Malformed",
+            "site_seeds": [
+                {
+                    "location_id": "loc_one",
+                    "name": "One",
+                    "description": "",
+                    "region_type": "city",
+                    "x": 0,
+                    "y": 0,
+                }
+            ],
+            "route_seeds": [
+                {
+                    "route_id": "route_missing",
+                    "from_site_id": "loc_one",
+                    "to_site_id": "loc_two",
+                    "route_type": "road",
+                }
+            ],
+        },
+    }
+
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "unknown site seed" in str(exc)
+    else:
+        raise AssertionError("Expected malformed route seed payload to fail fast")
+
+
+def test_bundle_validation_preserves_explicitly_empty_route_seeds() -> None:
+    payload = {
+        "schema_version": 1,
+        "world_definition": {
+            "world_key": "isolated",
+            "display_name": "Isolated",
+            "lore_text": "Disconnected",
+            "site_seeds": [
+                {
+                    "location_id": "loc_one",
+                    "name": "One",
+                    "description": "",
+                    "region_type": "city",
+                    "x": 0,
+                    "y": 0,
+                },
+                {
+                    "location_id": "loc_two",
+                    "name": "Two",
+                    "description": "",
+                    "region_type": "village",
+                    "x": 1,
+                    "y": 0,
+                },
+            ],
+            "route_seeds": [],
+        },
+    }
+
+    bundle = bundle_from_dict_validated(payload, source="test bundle")
+
+    assert bundle.world_definition.route_seeds == []
+
+
+def test_bundle_validation_rejects_non_boolean_route_seed_blocked() -> None:
+    payload = {
+        "schema_version": 1,
+        "world_definition": {
+            "world_key": "bad_blocked",
+            "display_name": "Bad Blocked",
+            "lore_text": "Malformed",
+            "site_seeds": [
+                {
+                    "location_id": "loc_one",
+                    "name": "One",
+                    "description": "",
+                    "region_type": "city",
+                    "x": 0,
+                    "y": 0,
+                },
+                {
+                    "location_id": "loc_two",
+                    "name": "Two",
+                    "description": "",
+                    "region_type": "village",
+                    "x": 1,
+                    "y": 0,
+                },
+            ],
+            "route_seeds": [
+                {
+                    "route_id": "route_bad",
+                    "from_site_id": "loc_one",
+                    "to_site_id": "loc_two",
+                    "blocked": "false",
+                }
+            ],
+        },
+    }
+
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "blocked" in str(exc)
+    else:
+        raise AssertionError("Expected malformed blocked payload to fail fast")
 
 
 def test_load_setting_bundle_from_json(tmp_path):
@@ -276,6 +391,27 @@ def test_bundle_validation_rejects_negative_site_coordinates() -> None:
         assert "negative site seed coordinates" in str(exc)
     else:
         raise AssertionError("Expected negative coordinates to fail fast")
+
+
+def test_bundle_from_dict_rejects_string_cultures_and_factions() -> None:
+    payload = {
+        "schema_version": 1,
+        "world_definition": {
+            "world_key": "bad_lists",
+            "display_name": "Bad Lists",
+            "lore_text": "Malformed",
+            "cultures": "empire",
+            "factions": "wardens",
+            "site_seeds": [],
+        },
+    }
+
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "cultures" in str(exc) or "factions" in str(exc)
+    else:
+        raise AssertionError("Expected malformed cultures/factions payload to fail fast")
 
 
 def test_load_setting_bundle_reports_duplicate_race_names(tmp_path):

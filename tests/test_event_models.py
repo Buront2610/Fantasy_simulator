@@ -154,6 +154,39 @@ def test_world_event_record_rejects_non_string_optional_primary_actor_at_load_bo
         raise AssertionError("Expected non-string primary_actor_id to fail fast")
 
 
+def test_world_event_record_rejects_non_int_year_at_load_boundary() -> None:
+    malformed = {
+        "record_id": "r6",
+        "kind": "battle",
+        "year": "1001",
+        "description": "Malformed year",
+    }
+
+    try:
+        WorldEventRecord.from_dict(malformed)
+    except ValueError as exc:
+        assert "year" in str(exc)
+    else:
+        raise AssertionError("Expected non-int year to fail fast")
+
+
+def test_world_event_record_rejects_non_string_location_id_at_load_boundary() -> None:
+    malformed = {
+        "record_id": "r7",
+        "kind": "battle",
+        "year": 1001,
+        "description": "Malformed location",
+        "location_id": ["loc_thornwood"],
+    }
+
+    try:
+        WorldEventRecord.from_dict(malformed)
+    except ValueError as exc:
+        assert "location_id" in str(exc)
+    else:
+        raise AssertionError("Expected non-string location_id to fail fast")
+
+
 def test_world_event_record_from_event_result_to_event_result_round_trip() -> None:
     source = EventResult(
         description="A battle happened",

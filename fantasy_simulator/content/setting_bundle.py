@@ -59,6 +59,12 @@ def _string_list_payload(payload: Any, *, field_name: str) -> List[str]:
     return list(payload)
 
 
+def _bool_payload(payload: Any, *, field_name: str) -> bool:
+    if not isinstance(payload, bool):
+        raise ValueError(f"{field_name} must be a boolean")
+    return payload
+
+
 def merge_event_impact_rule_overrides(
     overrides: Mapping[str, Mapping[str, Any]] | None,
 ) -> Dict[str, Dict[str, int]]:
@@ -265,6 +271,48 @@ class SiteSeedDefinition:
 
 
 @dataclass
+class RouteSeedDefinition:
+    """Static canonical route definition for bundle-backed topology."""
+
+    route_id: str
+    from_site_id: str
+    to_site_id: str
+    route_type: str = "road"
+    distance: int = 1
+    blocked: bool = False
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "route_id": self.route_id,
+            "from_site_id": self.from_site_id,
+            "to_site_id": self.to_site_id,
+            "route_type": self.route_type,
+            "distance": int(self.distance),
+            "blocked": bool(self.blocked),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "RouteSeedDefinition":
+        route_id = data["route_id"]
+        from_site_id = data["from_site_id"]
+        to_site_id = data["to_site_id"]
+        if not isinstance(route_id, str) or not route_id:
+            raise ValueError("route_id must be a non-empty string")
+        if not isinstance(from_site_id, str) or not from_site_id:
+            raise ValueError("from_site_id must be a non-empty string")
+        if not isinstance(to_site_id, str) or not to_site_id:
+            raise ValueError("to_site_id must be a non-empty string")
+        return cls(
+            route_id=route_id,
+            from_site_id=from_site_id,
+            to_site_id=to_site_id,
+            route_type=str(data.get("route_type", "road")),
+            distance=int(data.get("distance", 1)),
+            blocked=_bool_payload(data.get("blocked", False), field_name="blocked"),
+        )
+
+
+@dataclass
 class NamingRulesDefinition:
     """Simple name pools for default character generation."""
 
@@ -311,9 +359,10 @@ class WorldDefinition:
     races: List[RaceDefinition] = field(default_factory=list)
     jobs: List[JobDefinition] = field(default_factory=list)
     site_seeds: List[SiteSeedDefinition] = field(default_factory=list)
+    route_seeds: List[RouteSeedDefinition] = field(default_factory=list)
     naming_rules: NamingRulesDefinition = field(default_factory=NamingRulesDefinition)
     event_impact_rules: Dict[str, Dict[str, int]] = field(default_factory=dict)
-    propagation_rules: Dict[str, Dict[str, float | int]] = field(default_factory=dict)
+    propagation_rules: Dict[str, Dict[str, Any]] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -327,6 +376,7 @@ class WorldDefinition:
             "races": [race.to_dict() for race in self.races],
             "jobs": [job.to_dict() for job in self.jobs],
             "site_seeds": [seed.to_dict() for seed in self.site_seeds],
+            "route_seeds": [seed.to_dict() for seed in self.route_seeds],
             "naming_rules": self.naming_rules.to_dict(),
             "event_impact_rules": {
                 kind: {attr: int(delta) for attr, delta in deltas.items()}
@@ -348,8 +398,8 @@ class WorldDefinition:
             display_name=data["display_name"],
             lore_text=data["lore_text"],
             era=data.get("era", ""),
-            cultures=list(data.get("cultures", [])),
-            factions=list(data.get("factions", [])),
+            cultures=_string_list_payload(data.get("cultures", []), field_name="cultures"),
+            factions=_string_list_payload(data.get("factions", []), field_name="factions"),
             calendar=calendar,
             races=[
                 RaceDefinition.from_dict(item)
@@ -362,6 +412,10 @@ class WorldDefinition:
             site_seeds=[
                 SiteSeedDefinition.from_dict(item)
                 for item in data.get("site_seeds", [])
+            ],
+            route_seeds=[
+                RouteSeedDefinition.from_dict(item)
+                for item in data.get("route_seeds", [])
             ],
             naming_rules=NamingRulesDefinition.from_dict(data.get("naming_rules", {})),
             event_impact_rules=_copy_rule_overrides(
@@ -431,6 +485,38 @@ def _default_aethoria_bundle_data() -> Dict[str, Any]:
         ) from exc
 
 
+def _backfill_route_seeds_if_missing(
+    bundle: SettingBundle,
+    *,
+    route_seeds_were_present: bool,
+) -> None:
+    """Populate canonical route seeds for legacy bundles that only ship site seeds."""
+    world = bundle.world_definition
+    if route_seeds_were_present or not world.site_seeds:
+        return
+
+    from ..terrain import build_default_terrain
+
+    width = max(seed.x for seed in world.site_seeds) + 1
+    height = max(seed.y for seed in world.site_seeds) + 1
+    _terrain_map, _sites, routes = build_default_terrain(
+        width=width,
+        height=height,
+        locations=[seed.as_world_data_entry() for seed in world.site_seeds],
+    )
+    world.route_seeds = [
+        RouteSeedDefinition(
+            route_id=route.route_id,
+            from_site_id=route.from_site_id,
+            to_site_id=route.to_site_id,
+            route_type=route.route_type,
+            distance=route.distance,
+            blocked=route.blocked,
+        )
+        for route in routes
+    ]
+
+
 def validate_setting_bundle(bundle: SettingBundle, *, source: str) -> None:
     world = bundle.world_definition
     if bundle.schema_version < 1:
@@ -487,6 +573,31 @@ def validate_setting_bundle(bundle: SettingBundle, *, source: str) -> None:
     if any(seed.x < 0 or seed.y < 0 for seed in world.site_seeds):
         raise ValueError(f"Setting bundle {source} contains negative site seed coordinates")
 
+    route_ids = [seed.route_id for seed in world.route_seeds]
+    duplicate_route_ids = _duplicate_values(route_ids)
+    if duplicate_route_ids:
+        raise ValueError(
+            f"Setting bundle {source} contains duplicate route ids: {', '.join(duplicate_route_ids)}"
+        )
+
+    route_pairs = [
+        tuple(sorted((seed.from_site_id, seed.to_site_id)))
+        for seed in world.route_seeds
+    ]
+    duplicate_route_pairs = _duplicate_values([f"{a}->{b}" for a, b in route_pairs])
+    if duplicate_route_pairs:
+        raise ValueError(
+            f"Setting bundle {source} contains duplicate route pairs: {', '.join(duplicate_route_pairs)}"
+        )
+
+    for route in world.route_seeds:
+        if route.from_site_id == route.to_site_id:
+            raise ValueError(f"Setting bundle {source} contains a self-loop route: {route.route_id}")
+        if route.from_site_id not in canonical_ids or route.to_site_id not in canonical_ids:
+            raise ValueError(
+                f"Setting bundle {source} route {route.route_id} references an unknown site seed"
+            )
+
     naming = world.naming_rules
     has_first_name_rules = (
         naming.first_names_male
@@ -526,6 +637,15 @@ def bundle_from_dict_validated(data: Dict[str, Any], *, source: str) -> SettingB
     except KeyError as exc:
         missing = exc.args[0]
         raise ValueError(f"Setting bundle {source} is missing required field: {missing}") from exc
+    world_definition_data = data.get("world_definition", {})
+    route_seeds_were_present = (
+        isinstance(world_definition_data, Mapping)
+        and "route_seeds" in world_definition_data
+    )
+    _backfill_route_seeds_if_missing(
+        bundle,
+        route_seeds_were_present=route_seeds_were_present,
+    )
     validate_setting_bundle(bundle, source=source)
     return bundle
 

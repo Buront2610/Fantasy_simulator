@@ -100,7 +100,7 @@ def propagate_state_changes(
         rule = rules["mood_from_ruin"]
         if loc.prosperity < rule["source_threshold"]:
             penalty = _scaled(-rule["neighbor_penalty"])
-            for neighbor in neighbors[:rule["max_neighbors"]]:
+            for neighbor in sorted(neighbors, key=lambda item: item.id)[:rule["max_neighbors"]]:
                 pending_changes.append((neighbor.id, "mood", penalty))
 
         rule = rules["road_damage_from_danger"]

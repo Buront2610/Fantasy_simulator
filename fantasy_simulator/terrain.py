@@ -20,6 +20,12 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
 
+def _bool_payload(payload: Any, *, field_name: str) -> bool:
+    if not isinstance(payload, bool):
+        raise ValueError(f"{field_name} must be a boolean")
+    return payload
+
+
 # ------------------------------------------------------------------
 # Terrain types and biome definitions
 # ------------------------------------------------------------------
@@ -268,7 +274,7 @@ class RouteEdge:
             to_site_id=data["to_site_id"],
             route_type=data.get("route_type", "road"),
             distance=data.get("distance", 1),
-            blocked=data.get("blocked", False),
+            blocked=_bool_payload(data.get("blocked", False), field_name="blocked"),
         )
 
 
@@ -775,6 +781,7 @@ def build_default_terrain(
     width: int = 5,
     height: int = 5,
     locations: Optional[List] = None,
+    route_specs: Optional[List[Dict[str, Any]]] = None,
 ) -> Tuple[TerrainMap, List[Site], List[RouteEdge]]:
     """Generate terrain, sites, and routes from a location list.
 
@@ -786,8 +793,10 @@ def build_default_terrain(
     the bounds filter still applies — so a 3×3 world with the default
     25-entry list will only contain the locations that fit.
 
-    Adjacent sites (4-directional) are connected by auto-generated
-    provisional routes (see *PR-G note* below).
+    When ``route_specs`` is provided, those explicit route definitions
+    become the canonical site graph. Otherwise adjacent sites
+    (4-directional) are connected by auto-generated provisional routes
+    (see *PR-G note* below).
 
     .. note:: PR-G provisional routes
 
@@ -800,9 +809,8 @@ def build_default_terrain(
     Returns:
         (terrain_map, sites, routes)
     """
-    from .content.world_data import DEFAULT_LOCATIONS
-
     if locations is None:
+        from .content.world_data import DEFAULT_LOCATIONS
         locations = DEFAULT_LOCATIONS
 
     tmap = TerrainMap(width=width, height=height)
@@ -835,41 +843,56 @@ def build_default_terrain(
         ))
         site_coords[(x, y)] = loc_id
 
-    # Auto-generate provisional routes between adjacent sites.
-    # These are legacy bridges based on grid adjacency; see docstring.
     routes: List[RouteEdge] = []
-    seen_pairs: set = set()
-    route_counter = 0
-    for (x, y), loc_id in site_coords.items():
-        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-            nx, ny = x + dx, y + dy
-            neighbor_id = site_coords.get((nx, ny))
-            if neighbor_id is None:
+    if route_specs is not None:
+        valid_site_ids = {site.location_id for site in sites}
+        for spec in route_specs:
+            from_site_id = str(spec["from_site_id"])
+            to_site_id = str(spec["to_site_id"])
+            if from_site_id not in valid_site_ids or to_site_id not in valid_site_ids:
                 continue
-            pair = tuple(sorted([loc_id, neighbor_id]))
-            if pair in seen_pairs:
-                continue
-            seen_pairs.add(pair)
-            route_counter += 1
-
-            # Determine route type from terrain
-            from_biome = (tmap.get(x, y) or TerrainCell(x=x, y=y)).biome
-            to_biome = (tmap.get(nx, ny) or TerrainCell(x=nx, y=ny)).biome
-            if "mountain" in (from_biome, to_biome):
-                route_type = "mountain_pass"
-            elif "ocean" in (from_biome, to_biome):
-                route_type = "sea_lane"
-            elif "swamp" in (from_biome, to_biome):
-                route_type = "trail"
-            else:
-                route_type = "road"
-
             routes.append(RouteEdge(
-                route_id=f"route_{route_counter:03d}",
-                from_site_id=loc_id,
-                to_site_id=neighbor_id,
-                route_type=route_type,
+                route_id=str(spec["route_id"]),
+                from_site_id=from_site_id,
+                to_site_id=to_site_id,
+                route_type=str(spec.get("route_type", "road")),
+                distance=int(spec.get("distance", 1)),
+                blocked=_bool_payload(spec.get("blocked", False), field_name="blocked"),
             ))
+    else:
+        # Auto-generate provisional routes between adjacent sites.
+        # These are legacy bridges based on grid adjacency; see docstring.
+        seen_pairs: set = set()
+        route_counter = 0
+        for (x, y), loc_id in site_coords.items():
+            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                nx, ny = x + dx, y + dy
+                neighbor_id = site_coords.get((nx, ny))
+                if neighbor_id is None:
+                    continue
+                pair = tuple(sorted([loc_id, neighbor_id]))
+                if pair in seen_pairs:
+                    continue
+                seen_pairs.add(pair)
+                route_counter += 1
+
+                from_biome = (tmap.get(x, y) or TerrainCell(x=x, y=y)).biome
+                to_biome = (tmap.get(nx, ny) or TerrainCell(x=nx, y=ny)).biome
+                if "mountain" in (from_biome, to_biome):
+                    route_type = "mountain_pass"
+                elif "ocean" in (from_biome, to_biome):
+                    route_type = "sea_lane"
+                elif "swamp" in (from_biome, to_biome):
+                    route_type = "trail"
+                else:
+                    route_type = "road"
+
+                routes.append(RouteEdge(
+                    route_id=f"route_{route_counter:03d}",
+                    from_site_id=loc_id,
+                    to_site_id=neighbor_id,
+                    route_type=route_type,
+                ))
 
     # --- Compute atlas coordinates for each site ---
     # These are deterministic projections from grid coords to atlas canvas
@@ -883,3 +906,23 @@ def build_default_terrain(
         )
 
     return tmap, sites, routes
+
+
+def build_terrain_payload_from_locations(
+    width: int,
+    height: int,
+    locations: List,
+    route_specs: Optional[List[Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
+    """Return serialized terrain/site/route payloads for a location list."""
+    terrain_map, sites, routes = build_default_terrain(
+        width=width,
+        height=height,
+        locations=locations,
+        route_specs=route_specs,
+    )
+    return {
+        "terrain_map": terrain_map.to_dict(),
+        "sites": [site.to_dict() for site in sites],
+        "routes": [route.to_dict() for route in routes],
+    }

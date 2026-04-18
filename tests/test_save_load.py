@@ -118,6 +118,18 @@ class TestLoadSimulation:
         assert restored is not None
         assert restored.world.event_log == sim.world.event_log
 
+    def test_round_trip_preserves_bundle_backed_blocked_route_state(self, tmp_path):
+        path = tmp_path / "blocked-route.json"
+        sim = Simulator(World(), seed=0)
+        sim.world.routes[0].blocked = True
+
+        save_simulation(sim, str(path))
+        restored = load_simulation(str(path))
+
+        assert restored is not None
+        assert restored.world.routes[0].route_id == sim.world.routes[0].route_id
+        assert restored.world.routes[0].blocked is True
+
     def test_load_old_save_without_schema_version_migrates_to_v3(self, tmp_path):
         path = tmp_path / "old_save.json"
         old_save = {
@@ -497,7 +509,8 @@ class TestLoadSimulation:
         assert restored.world.event_records[0].location_id == "hub_primary"
         assert restored.world.active_adventures[0].origin == "hub_primary"
         assert restored.world.sites[0].location_id == "hub_primary"
-        assert restored.world.routes[0].from_site_id == "hub_primary"
+        assert restored.world.routes == []
+        assert restored.world.get_neighboring_locations("hub_primary") == []
 
     def test_migration_lifts_text_only_legacy_event_log_into_canonical_event_records(self, tmp_path):
         path = tmp_path / "legacy-event-log-only.json"

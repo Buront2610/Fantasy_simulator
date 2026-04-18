@@ -71,6 +71,10 @@ def build_notification_views(records: List["WorldEventRecord"]) -> List[Notifica
 def build_monthly_report_card_view(world: "World", year: int, month: int) -> MonthlyReportCardView:
     event_records = getattr(world, "event_records", [])
     records = [r for r in event_records if r.year == year and r.month == month]
+    record_calendar_key = next(
+        (record.calendar_key for record in records if getattr(record, "calendar_key", "")),
+        "",
+    )
     chars: Dict[str, int] = {}
     locs: Dict[str, int] = {}
     completed_adventures: List[str] = []
@@ -96,14 +100,22 @@ def build_monthly_report_card_view(world: "World", year: int, month: int) -> Mon
         location_highlights = [world.location_name(lid) for lid, _ in sorted(locs.items(), key=lambda x: -x[1])[:3]]
     else:
         location_highlights = [lid for lid, _ in sorted(locs.items(), key=lambda x: -x[1])[:3]]
+    if hasattr(world, "month_display_name_for_date"):
+        try:
+            month_label = world.month_display_name_for_date(
+                year,
+                month,
+                calendar_key=record_calendar_key,
+            )
+        except TypeError:
+            month_label = world.month_display_name_for_date(year, month)
+    else:
+        month_label = str(month)
+
     return MonthlyReportCardView(
         year=year,
         month=month,
-        month_label=(
-            world.month_display_name_for_date(year, month)
-            if hasattr(world, "month_display_name_for_date")
-            else str(month)
-        ),
+        month_label=month_label,
         highlighted_characters=highlights,
         highlighted_locations=location_highlights,
         completed_adventures=completed_adventures[:3],

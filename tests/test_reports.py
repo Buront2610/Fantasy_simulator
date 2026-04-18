@@ -444,15 +444,16 @@ class TestGenerateYearlyReport:
         report = generate_yearly_report(world_with_chars, 1001)
         assert report.total_events == 1
 
-    def test_location_entries_only_notable(self, world_with_chars):
+    def test_location_entries_include_low_severity_activity(self, world_with_chars):
         world_with_chars.record_event(WorldEventRecord(
             record_id="y5", kind="meeting", year=1001, month=6,
             location_id="loc_aethoria_capital",
             description="Quiet meeting", severity=1,
         ))
         report = generate_yearly_report(world_with_chars, 1001)
-        # Location has only minor events, should not appear
-        assert len(report.location_entries) == 0
+        assert len(report.location_entries) == 1
+        assert report.location_entries[0].event_count == 1
+        assert report.location_entries[0].notable_events == []
 
     def test_report_does_not_use_current_world_state(self, world_with_chars):
         """Year 1000 report read from year 1003 must not reflect year-1003 state."""
@@ -517,8 +518,8 @@ class TestFormatMonthlyReport:
         text = format_monthly_report(report)
         assert "Summer" in text
 
-    def test_empty_world_section_not_shown(self):
-        """If all location entries have no notable events, no World section header."""
+    def test_location_activity_without_notables_is_still_shown(self):
+        """Low-severity location activity should still appear in the rendered report."""
         from fantasy_simulator.reports import LocationReportEntry
         loc = LocationReportEntry(
             location_id="loc_test", name="Test", event_count=1,
@@ -528,7 +529,8 @@ class TestFormatMonthlyReport:
             year=1003, month=3, location_entries=[loc], total_events=1,
         )
         text = format_monthly_report(report)
-        assert "World News" not in text
+        assert "World News" in text
+        assert "Test: 1 event(s)" in text
 
 
 class TestFormatYearlyReport:
@@ -553,6 +555,25 @@ class TestFormatYearlyReport:
         )
         text = format_yearly_report(report)
         assert "2" in text
+
+    def test_yearly_format_shows_location_activity_without_notables(self):
+        from fantasy_simulator.reports import LocationReportEntry
+
+        report = YearlyReport(
+            year=1003,
+            location_entries=[
+                LocationReportEntry(
+                    location_id="loc_test",
+                    name="Test",
+                    event_count=2,
+                    notable_events=[],
+                )
+            ],
+            total_events=2,
+            deaths_this_year=0,
+        )
+        text = format_yearly_report(report)
+        assert "Test: 2 event(s)" in text
 
 
 # ---------------------------------------------------------------------------
