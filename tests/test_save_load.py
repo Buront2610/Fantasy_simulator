@@ -343,6 +343,77 @@ class TestLoadSimulation:
 
         assert restored is None
 
+    def test_load_returns_none_for_malformed_serialized_route_scalars(self, tmp_path):
+        from fantasy_simulator.world import LocationState
+        from fantasy_simulator.terrain import RouteEdge
+
+        path = tmp_path / "malformed_routes.json"
+        world = World(_skip_defaults=True, width=2, height=1)
+        for x, (loc_id, name) in enumerate([("loc_alpha", "Alpha"), ("loc_bravo", "Bravo")]):
+            defaults = world.location_state_defaults(loc_id, "village")
+            world._register_location(
+                LocationState(
+                    id=loc_id,
+                    canonical_name=name,
+                    description=f"{name} description",
+                    region_type="village",
+                    x=x,
+                    y=0,
+                    **defaults,
+                )
+            )
+        world.routes = [RouteEdge("route_alpha_bravo", "loc_alpha", "loc_bravo", "road")]
+        world._build_terrain_from_grid()
+        world.routes = [RouteEdge("route_alpha_bravo", "loc_alpha", "loc_bravo", "road")]
+        world._rebuild_route_index()
+        world.atlas_layout = world._build_atlas_layout_from_current_state()
+        payload = {
+            "schema_version": CURRENT_VERSION,
+            "world": world.to_dict(),
+            "characters": [],
+            "events_per_year": 0,
+            "adventure_steps_per_year": 0,
+            "history": [],
+        }
+        payload["world"]["routes"][0]["route_id"] = 123
+        payload["world"]["routes"][0]["from_site_id"] = ["loc_alpha"]
+        payload["world"]["routes"][0]["route_type"] = 9
+        payload["world"]["routes"][0]["distance"] = "7"
+        path.write_text(json.dumps(payload), encoding="utf-8")
+
+        restored = load_simulation(str(path))
+
+        assert restored is None
+
+    def test_load_returns_none_for_duplicate_bundle_backed_route_state_entries(self, tmp_path):
+        path = tmp_path / "duplicate-bundle-route-state.json"
+        sim = Simulator(World(), seed=0)
+        save_simulation(sim, str(path))
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        duplicate = dict(data["world"]["routes"][0])
+        data["world"]["routes"].append(duplicate)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+
+        restored = load_simulation(str(path))
+
+        assert restored is None
+
+    def test_load_returns_none_for_bundle_backed_route_overlay_with_mismatched_endpoints(self, tmp_path):
+        path = tmp_path / "bundle-route-endpoints.json"
+        sim = Simulator(World(), seed=0)
+        save_simulation(sim, str(path))
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        data["world"]["routes"][0]["from_site_id"] = "loc_thornwood"
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+
+        restored = load_simulation(str(path))
+
+        assert restored is None
+
     def test_load_custom_bundle_recovers_legacy_character_location_names_via_embedded_bundle(self, tmp_path):
         path = tmp_path / "custom-bundle-location.json"
         sim = Simulator(World(name="Custom"), seed=0)

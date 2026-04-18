@@ -19,13 +19,39 @@ import math
 from copy import deepcopy
 from dataclasses import dataclass, field
 from functools import lru_cache
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 
 def _bool_payload(payload: Any, *, field_name: str) -> bool:
     if not isinstance(payload, bool):
         raise ValueError(f"{field_name} must be a boolean")
     return payload
+
+
+def _string_payload(payload: Any, *, field_name: str) -> str:
+    if not isinstance(payload, str) or not payload:
+        raise ValueError(f"{field_name} must be a non-empty string")
+    return payload
+
+
+def _int_payload(payload: Any, *, field_name: str, minimum: Optional[int] = None) -> int:
+    if isinstance(payload, bool) or not isinstance(payload, int):
+        raise ValueError(f"{field_name} must be an integer")
+    if minimum is not None and payload < minimum:
+        raise ValueError(f"{field_name} must be >= {minimum}")
+    return payload
+
+
+def normalize_route_payload(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Validate and normalize serialized route payload fields."""
+    return {
+        "route_id": _string_payload(data["route_id"], field_name="route_id"),
+        "from_site_id": _string_payload(data["from_site_id"], field_name="from_site_id"),
+        "to_site_id": _string_payload(data["to_site_id"], field_name="to_site_id"),
+        "route_type": _string_payload(data.get("route_type", "road"), field_name="route_type"),
+        "distance": _int_payload(data.get("distance", 1), field_name="distance", minimum=1),
+        "blocked": _bool_payload(data.get("blocked", False), field_name="blocked"),
+    }
 
 
 # ------------------------------------------------------------------
@@ -240,6 +266,29 @@ class RouteEdge:
     route_type: str = "road"
     distance: int = 1
     blocked: bool = False
+    _on_change: Optional[Callable[[], None]] = field(default=None, repr=False, compare=False)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        callback = None
+        old_value = None
+        had_old_value = False
+        if name in {"route_id", "from_site_id", "to_site_id", "route_type", "distance", "blocked"}:
+            try:
+                old_value = object.__getattribute__(self, name)
+                had_old_value = True
+            except AttributeError:
+                had_old_value = False
+            try:
+                callback = object.__getattribute__(self, "_on_change")
+            except AttributeError:
+                callback = None
+        object.__setattr__(self, name, value)
+        if (
+            name in {"route_id", "from_site_id", "to_site_id", "route_type", "distance", "blocked"}
+            and callback is not None
+            and (not had_old_value or old_value != value)
+        ):
+            callback()
 
     @property
     def base_cost(self) -> float:
@@ -270,13 +319,14 @@ class RouteEdge:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "RouteEdge":
+        payload = normalize_route_payload(data)
         return cls(
-            route_id=data["route_id"],
-            from_site_id=data["from_site_id"],
-            to_site_id=data["to_site_id"],
-            route_type=data.get("route_type", "road"),
-            distance=data.get("distance", 1),
-            blocked=_bool_payload(data.get("blocked", False), field_name="blocked"),
+            route_id=payload["route_id"],
+            from_site_id=payload["from_site_id"],
+            to_site_id=payload["to_site_id"],
+            route_type=payload["route_type"],
+            distance=payload["distance"],
+            blocked=payload["blocked"],
         )
 
 

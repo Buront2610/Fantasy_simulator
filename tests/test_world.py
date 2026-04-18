@@ -117,6 +117,35 @@ class TestWorld:
         assert "loc_coral_cove" in neighbor_ids
         assert "loc_silverbrook" not in neighbor_ids
 
+    def test_route_cache_clean_reads_do_not_recompute_signatures(self, monkeypatch):
+        world = World()
+
+        def _fail_signature():
+            raise AssertionError("route signature should not be recomputed for clean cache reads")
+
+        monkeypatch.setattr(world, "_route_index_signature", _fail_signature)
+
+        routes = world.get_routes_for_site("loc_aethoria_capital")
+
+        assert routes
+
+    def test_route_block_toggle_invalidates_cache_without_signature_scan(self, monkeypatch):
+        world = World()
+        route = next(
+            route for route in world.routes
+            if route.other_end("loc_aethoria_capital") == "loc_silverbrook"
+        )
+
+        def _fail_signature():
+            raise AssertionError("route signature should not be used for cache invalidation")
+
+        monkeypatch.setattr(world, "_route_index_signature", _fail_signature)
+
+        assert "loc_silverbrook" in world.get_connected_site_ids("loc_aethoria_capital")
+        route.blocked = True
+
+        assert "loc_silverbrook" not in world.get_connected_site_ids("loc_aethoria_capital")
+
     def test_setting_bundle_can_define_explicitly_disconnected_topology(self):
         world = World(name="Disconnected", width=2, height=1)
         world.setting_bundle = SettingBundle(

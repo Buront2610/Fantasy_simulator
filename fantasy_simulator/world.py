@@ -52,6 +52,7 @@ from .terrain import (
     assemble_atlas_layout_inputs,
     build_cached_world_structure,
     build_default_atlas_layout,
+    normalize_route_payload,
 )
 
 if TYPE_CHECKING:
@@ -88,10 +89,49 @@ def _trace_list_payload(payload: Any, *, field_name: str) -> List[Dict[str, Any]
     return [dict(item) for item in payload]
 
 
-def _strict_bool_payload(payload: Any, *, field_name: str) -> bool:
-    if not isinstance(payload, bool):
-        raise ValueError(f"{field_name} must be a boolean")
-    return payload
+class ObservableRouteList(list[RouteEdge]):
+    """List wrapper that marks cached route projections dirty on mutation."""
+
+    def __init__(self, iterable: Optional[List[RouteEdge]] = None, *, on_change: Any = None) -> None:
+        super().__init__(iterable or [])
+        self._on_change = on_change
+
+    def _notify(self) -> None:
+        if self._on_change is not None:
+            self._on_change()
+
+    def __setitem__(self, index: Any, value: Any) -> None:
+        super().__setitem__(index, value)
+        self._notify()
+
+    def __delitem__(self, index: Any) -> None:
+        super().__delitem__(index)
+        self._notify()
+
+    def append(self, value: RouteEdge) -> None:
+        super().append(value)
+        self._notify()
+
+    def extend(self, values: List[RouteEdge]) -> None:
+        super().extend(values)
+        self._notify()
+
+    def insert(self, index: int, value: RouteEdge) -> None:
+        super().insert(index, value)
+        self._notify()
+
+    def pop(self, index: int = -1) -> RouteEdge:
+        value = super().pop(index)
+        self._notify()
+        return value
+
+    def remove(self, value: RouteEdge) -> None:
+        super().remove(value)
+        self._notify()
+
+    def clear(self) -> None:
+        super().clear()
+        self._notify()
 
 
 @dataclass(slots=True)
@@ -395,12 +435,10 @@ class World:
         # PR-G: terrain / site / route layers
         self.terrain_map: Optional[TerrainMap] = None
         self.sites: List[Site] = []
-        self.routes: List[RouteEdge] = []
+        self._routes: ObservableRouteList = ObservableRouteList(on_change=self._mark_routes_dirty)
         self._site_index: Dict[str, Site] = {}
         self._routes_by_site: Dict[str, List[RouteEdge]] = {}
-        self._routes_index_source_id: int = id(self.routes)
-        self._routes_index_source_size: int = len(self.routes)
-        self._routes_index_signature: Tuple[Tuple[str, str, str, str, int, bool], ...] = ()
+        self._routes_dirty: bool = True
         # PR-G2: persistent macro geography layer
         self.atlas_layout: Optional[AtlasLayout] = None
         if not _skip_defaults:
@@ -431,6 +469,20 @@ class World:
     def event_log(self, value: List[str]) -> None:
         trimmed = list(value)[-self.MAX_EVENT_LOG:]
         self._display_event_log = trimmed
+
+    @property
+    def routes(self) -> ObservableRouteList:
+        return self._routes
+
+    @routes.setter
+    def routes(self, value: List[RouteEdge]) -> None:
+        if hasattr(self, "_routes"):
+            for route in self._routes:
+                route._on_change = None
+        wrapped = ObservableRouteList(list(value), on_change=self._mark_routes_dirty)
+        self._routes = wrapped
+        self._attach_route_observers()
+        self._routes_dirty = True
 
     @property
     def lore(self) -> str:
@@ -541,11 +593,9 @@ class World:
         self.terrain_map = None
         self.sites = []
         self.routes = []
+        self._routes_dirty = True
         self._site_index = {}
         self._routes_by_site = {}
-        self._routes_index_source_id = id(self.routes)
-        self._routes_index_source_size = len(self.routes)
-        self._routes_index_signature = ()
         self.atlas_layout = None
 
     def _copy_location_runtime_state(self, source: LocationState, target: LocationState) -> None:
@@ -607,6 +657,16 @@ class World:
         if current is None:
             return
         self._copy_location_runtime_state(restored, current)
+
+    def _register_serialized_grid_locations(self, serialized_grid: List[Dict[str, Any]]) -> None:
+        """Restore serialized locations as authoritative grid structure."""
+        for loc_data in serialized_grid:
+            self._register_location(self._location_state_from_dict(loc_data))
+
+    def _overlay_serialized_grid_runtime_state(self, serialized_grid: List[Dict[str, Any]]) -> None:
+        """Overlay serialized runtime state onto an already-built bundle-backed grid."""
+        for loc_data in serialized_grid:
+            self._overlay_location_runtime_state_from_dict(loc_data)
 
     def _serialized_grid_is_compatible_with_active_bundle(self, grid_data: List[Dict[str, Any]]) -> bool:
         """Return whether serialized locations can be mapped onto the active bundle."""
@@ -830,8 +890,18 @@ class World:
         """Rebuild the site lookup index keyed by location_id."""
         self._site_index = {s.location_id: s for s in self.sites}
 
+    def _mark_routes_dirty(self) -> None:
+        """Mark cached route adjacency as stale after route mutations."""
+        self._routes_dirty = True
+
+    def _attach_route_observers(self) -> None:
+        """Attach mutation hooks to each route in the active route collection."""
+        for route in self.routes:
+            route._on_change = self._mark_routes_dirty
+
     def _rebuild_route_index(self) -> None:
         """Rebuild route adjacency lists keyed by endpoint location id."""
+        self._attach_route_observers()
         route_index: Dict[str, List[RouteEdge]] = {
             site.location_id: [] for site in self.sites
         }
@@ -839,9 +909,7 @@ class World:
             route_index.setdefault(route.from_site_id, []).append(route)
             route_index.setdefault(route.to_site_id, []).append(route)
         self._routes_by_site = route_index
-        self._routes_index_source_id = id(self.routes)
-        self._routes_index_source_size = len(self.routes)
-        self._routes_index_signature = self._route_index_signature()
+        self._routes_dirty = False
 
     def _route_index_signature(self) -> Tuple[Tuple[str, str, str, str, int, bool], ...]:
         return tuple(
@@ -858,11 +926,7 @@ class World:
 
     def _ensure_route_index_current(self) -> None:
         """Keep the cached route adjacency in sync with direct route reassignment."""
-        if (
-            id(self.routes) != self._routes_index_source_id
-            or len(self.routes) != self._routes_index_source_size
-            or self._route_index_signature() != self._routes_index_signature
-        ):
+        if self._routes_dirty:
             self._rebuild_route_index()
 
     def _validate_topology_integrity(self) -> None:
@@ -1728,25 +1792,26 @@ class World:
         """Overlay mutable route state onto the canonical route graph."""
         if not serialized_routes:
             return
-        serialized_by_id = {
-            str(item.get("route_id")): item
-            for item in serialized_routes
-            if isinstance(item, dict) and item.get("route_id")
-        }
+        serialized_by_id: Dict[str, Dict[str, Any]] = {}
+        for item in serialized_routes:
+            if not isinstance(item, dict):
+                raise ValueError("Serialized route overlay entries must be dicts")
+            payload = normalize_route_payload(item)
+            route_id = payload["route_id"]
+            if route_id in serialized_by_id:
+                raise ValueError(f"Serialized route overlay contains duplicate route id: {route_id!r}")
+            serialized_by_id[route_id] = payload
         if not serialized_by_id:
             return
         for route in self.routes:
             payload = serialized_by_id.get(route.route_id)
             if payload is None:
                 continue
-            if (
-                str(payload.get("from_site_id", route.from_site_id)) != route.from_site_id
-                or str(payload.get("to_site_id", route.to_site_id)) != route.to_site_id
-            ):
-                continue
-            route.route_type = str(payload.get("route_type", route.route_type))
-            route.distance = int(payload.get("distance", route.distance))
-            route.blocked = _strict_bool_payload(payload.get("blocked", route.blocked), field_name="blocked")
+            if payload["from_site_id"] != route.from_site_id or payload["to_site_id"] != route.to_site_id:
+                raise ValueError(f"Serialized route overlay disagrees with canonical endpoints: {route.route_id!r}")
+            route.route_type = payload["route_type"]
+            route.distance = payload["distance"]
+            route.blocked = payload["blocked"]
 
     def to_dict(self) -> Dict[str, Any]:
         lore_text = self._setting_bundle.world_definition.lore_text
@@ -1849,14 +1914,11 @@ class World:
             if world._serialized_grid_is_compatible_with_active_bundle(serialized_grid):
                 bundle_backed_structure = True
                 world._build_default_map()
-                for loc_data in serialized_grid:
-                    world._overlay_location_runtime_state_from_dict(loc_data)
+                world._overlay_serialized_grid_runtime_state(serialized_grid)
             else:
-                for loc_data in serialized_grid:
-                    world._register_location(world._location_state_from_dict(loc_data))
+                world._register_serialized_grid_locations(serialized_grid)
         else:
-            for loc_data in serialized_grid:
-                world._register_location(world._location_state_from_dict(loc_data))
+            world._register_serialized_grid_locations(serialized_grid)
         world.event_log = list(data.get("event_log", []))
         world.event_records = [
             WorldEventRecord.from_dict(r) for r in data.get("event_records", [])
