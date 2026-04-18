@@ -17,7 +17,13 @@ from .rule_override_resolution import (
     resolve_event_impact_rule_overrides,
     resolve_propagation_rule_overrides,
 )
-from .world_event_log import format_event_log_entry, project_compatibility_event_log
+from .world_event_log import (
+    append_display_event_log_entry,
+    compatibility_event_log_view,
+    rebuild_display_event_log,
+    trim_event_log_entries,
+)
+from .world_location_references import LocationReferenceResolver
 from .world_event_state import (
     apply_event_impact_to_location,
     append_canonical_event_record,
@@ -37,7 +43,6 @@ from .content.setting_bundle import (
     SettingBundle,
     bundle_from_dict_validated,
     default_aethoria_bundle,
-    legacy_location_id_alias,
     validate_setting_bundle,
 )
 from .content.world_data import (
@@ -132,36 +137,6 @@ class ObservableRouteList(list[RouteEdge]):
     def clear(self) -> None:
         super().clear()
         self._notify()
-
-
-class ReadOnlyEventLog(list[str]):
-    """List-like read-only view for compatibility event-log access."""
-
-    def _readonly(self, *_args: Any, **_kwargs: Any) -> None:
-        raise TypeError("event_log is a read-only view; use log_event() or record_event()")
-
-    append = _readonly
-    clear = _readonly
-    extend = _readonly
-    insert = _readonly
-    pop = _readonly
-    remove = _readonly
-    reverse = _readonly
-    sort = _readonly
-
-    def __delitem__(self, _index: Any) -> None:
-        self._readonly()
-
-    def __iadd__(self, _other: Any) -> "ReadOnlyEventLog":
-        self._readonly()
-        return self
-
-    def __imul__(self, _other: Any) -> "ReadOnlyEventLog":
-        self._readonly()
-        return self
-
-    def __setitem__(self, _index: Any, _value: Any) -> None:
-        self._readonly()
 
 
 @dataclass(slots=True)
@@ -434,6 +409,9 @@ class World:
             display_name=name,
             lore_text=lore,
         )
+        self._location_reference_resolver = LocationReferenceResolver.from_site_seeds(
+            self._setting_bundle.world_definition.site_seeds
+        )
         self.calendar_baseline: CalendarDefinition = _clone_calendar(
             self._setting_bundle.world_definition.calendar
         )
@@ -493,14 +471,16 @@ class World:
         same history in memory. The returned value is a read-only view so direct
         list mutation cannot silently diverge from canonical history.
         """
-        if self.event_records:
-            return ReadOnlyEventLog(self._project_compatibility_event_log())
-        return ReadOnlyEventLog(self._display_event_log)
+        return compatibility_event_log_view(
+            self._display_event_log,
+            self.event_records,
+            max_event_log=self.MAX_EVENT_LOG,
+            translate=tr,
+        )
 
     @event_log.setter
     def event_log(self, value: List[str]) -> None:
-        trimmed = list(value)[-self.MAX_EVENT_LOG:]
-        self._display_event_log = trimmed
+        self._display_event_log = trim_event_log_entries(value, max_event_log=self.MAX_EVENT_LOG)
 
     @property
     def routes(self) -> ObservableRouteList:
@@ -540,6 +520,9 @@ class World:
         if hasattr(self, "_setting_bundle") and self._setting_bundle is not None:
             previous_calendar = self._setting_bundle.world_definition.calendar.to_dict()
         self._setting_bundle = _clone_setting_bundle(bundle)
+        self._location_reference_resolver = LocationReferenceResolver.from_site_seeds(
+            self._setting_bundle.world_definition.site_seeds
+        )
         if hasattr(self, "lore"):
             self.lore = self._setting_bundle.world_definition.lore_text
         if hasattr(self, "calendar_baseline"):
@@ -728,23 +711,18 @@ class World:
 
     def _bundle_location_id_for_name(self, name: str) -> str | None:
         """Resolve a location name through the active setting bundle."""
-        for seed in self._setting_bundle.world_definition.site_seeds:
-            if seed.name == name:
-                return seed.location_id
-        return None
+        return self._location_reference_resolver.bundle_location_id_for_name(name)
 
     def resolve_location_id_from_name(self, name: str) -> str:
         """Resolve a location name through the active bundle with slug fallback."""
-        return self._bundle_location_id_for_name(name) or fallback_location_id(name)
+        return self._location_reference_resolver.resolve_location_id_from_name(
+            name,
+            fallback_resolver=fallback_location_id,
+        )
 
     def _legacy_location_id_aliases(self) -> Dict[str, str]:
         """Return legacy fallback-slug IDs that should map to canonical bundle IDs."""
-        aliases: Dict[str, str] = {}
-        for seed in self._setting_bundle.world_definition.site_seeds:
-            legacy_id = legacy_location_id_alias(seed.name)
-            if legacy_id != seed.location_id:
-                aliases[legacy_id] = seed.location_id
-        return aliases
+        return self._location_reference_resolver.legacy_location_id_aliases()
 
     def normalize_location_id(
         self,
@@ -753,24 +731,11 @@ class World:
         location_name: str | None = None,
     ) -> Optional[str]:
         """Normalize persisted location IDs against the active bundle."""
-        if location_id:
-            aliased = self._legacy_location_id_aliases().get(location_id)
-            if aliased is not None:
-                return aliased
-            bundle_location_ids = {
-                seed.location_id
-                for seed in self._setting_bundle.world_definition.site_seeds
-            }
-            if location_id in bundle_location_ids:
-                return location_id
-            if location_name is not None:
-                bundle_location_id = self._bundle_location_id_for_name(location_name)
-                if bundle_location_id is not None:
-                    return bundle_location_id
-            return location_id
-        if location_name is not None:
-            return self.resolve_location_id_from_name(location_name)
-        return location_id
+        return self._location_reference_resolver.normalize_location_id(
+            location_id,
+            location_name=location_name,
+            fallback_resolver=fallback_location_id,
+        )
 
     def _repair_location_reference(
         self,
@@ -781,16 +746,17 @@ class World:
         fallback_location_id: str | None = None,
     ) -> Optional[str]:
         """Resolve a location reference to a valid current-world location."""
-        normalized = self.normalize_location_id(location_id, location_name=location_name)
-        if normalized in self._location_id_index:
-            return normalized
-        if required:
-            if fallback_location_id is not None:
-                return fallback_location_id
-            if self._location_id_index:
-                return self._default_resident_location_id()
-            return ""
-        return None
+        resolved_fallback = fallback_location_id
+        if required and resolved_fallback is None and self._location_id_index:
+            resolved_fallback = self._default_resident_location_id()
+        return self._location_reference_resolver.repair_location_reference(
+            location_id,
+            known_location_ids=self._location_id_index,
+            location_name=location_name,
+            required=required,
+            fallback_location_id=resolved_fallback,
+            fallback_resolver=fallback_location_id,
+        )
 
     def _repair_location_references(self) -> None:
         """Repair persisted location references against the active world structure."""
@@ -1623,24 +1589,6 @@ class World:
 
     MAX_EVENT_LOG = 2000
 
-    def _format_event_log_entry(
-        self,
-        event_text: str,
-        *,
-        year: Optional[int] = None,
-        month: Optional[int] = None,
-        day: Optional[int] = None,
-    ) -> str:
-        """Format a compatibility event-log line from canonical event data."""
-        effective_year = self.year if year is None else year
-        return format_event_log_entry(
-            event_text,
-            translate=tr,
-            year=effective_year,
-            month=month,
-            day=day,
-        )
-
     def log_event(
         self,
         event_text: str,
@@ -1659,34 +1607,24 @@ class World:
         When *month*/*day* are provided, the prefix includes intra-year date
         information so that the player-visible log reflects finer causality.
         """
-        self._display_event_log.append(self._format_event_log_entry(event_text, month=month, day=day))
-        if len(self._display_event_log) > self.MAX_EVENT_LOG:
-            self._display_event_log = self._display_event_log[-self.MAX_EVENT_LOG:]
+        self._display_event_log = append_display_event_log_entry(
+            self._display_event_log,
+            event_text,
+            translate=tr,
+            year=self.year,
+            max_event_log=self.MAX_EVENT_LOG,
+            month=month,
+            day=day,
+        )
 
     MAX_EVENT_RECORDS = 5000
 
     def rebuild_compatibility_event_log(self) -> None:
         """Drop stale display-only lines when canonical history exists."""
-        if self.event_records:
-            self._display_event_log = []
-
-    def _project_compatibility_event_log(self) -> List[str]:
-        """Project the compatibility display buffer from canonical event records."""
-        return project_compatibility_event_log(
+        self._display_event_log = rebuild_display_event_log(
+            self._display_event_log,
             self.event_records,
             max_event_log=self.MAX_EVENT_LOG,
-            translate=tr,
-        )
-
-    def _compatibility_event_log_line(self, record: WorldEventRecord) -> str:
-        if record.legacy_event_log_entry is not None:
-            return record.legacy_event_log_entry
-        return format_event_log_entry(
-            record.description,
-            translate=tr,
-            year=record.year,
-            month=record.month,
-            day=record.day,
         )
 
     def get_compatibility_event_log(self, last_n: Optional[int] = None) -> List[str]:

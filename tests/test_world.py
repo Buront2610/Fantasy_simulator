@@ -349,6 +349,44 @@ class TestWorld:
         )
         assert world.normalize_location_id("hub_secondary", location_name="Clockwork Hub") == "hub_secondary"
 
+    def test_from_dict_normalizes_event_record_location_ids_through_bundle_aliases(self):
+        from fantasy_simulator.content.world_data import fallback_location_id
+        from fantasy_simulator.events import WorldEventRecord
+
+        world = World(name="Custom")
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="hub_primary",
+                        name="Clockwork Hub",
+                        description="Primary site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                    ),
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+        payload = world.to_dict()
+        payload["event_records"] = [
+            WorldEventRecord(
+                record_id="r1",
+                kind="battle",
+                year=1001,
+                location_id=fallback_location_id("Clockwork Hub"),
+            ).to_dict()
+        ]
+
+        restored = World.from_dict(payload)
+
+        assert restored.event_records[0].location_id == "hub_primary"
+
     def test_setting_bundle_assignment_rebuilds_world_structure(self):
         world = World(name="Custom")
         old_location_ids = set(world.location_ids)
@@ -1239,6 +1277,25 @@ class TestWorld:
         with pytest.raises(TypeError):
             world.event_log.append("mutated again")
         assert world.event_log == ["[Year 1001, Month 1, Day 1] Canonical clash"]
+
+    def test_record_event_clears_display_adapter_through_world_facade(self):
+        from fantasy_simulator.events import WorldEventRecord
+
+        world = World()
+        world.log_event("display-only line")
+
+        world.record_event(
+            WorldEventRecord(
+                record_id="r1",
+                kind="battle",
+                year=1001,
+                month=1,
+                day=1,
+                description="canonical line",
+            )
+        )
+
+        assert all("display-only line" not in line for line in world.get_compatibility_event_log())
 
     def test_trimming_event_records_removes_dangling_recent_event_ids(self):
         from fantasy_simulator.events import WorldEventRecord
