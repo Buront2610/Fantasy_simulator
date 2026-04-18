@@ -116,6 +116,14 @@ def _char_name_map(world: World) -> Dict[str, str]:
     return {c.char_id: c.name for c in world.characters}
 
 
+def _sort_location_entries(entries: List[LocationReportEntry]) -> List[LocationReportEntry]:
+    """Sort location report entries by player-facing importance and name."""
+    return sorted(
+        entries,
+        key=lambda entry: (-entry.event_count, entry.name.casefold(), entry.location_id),
+    )
+
+
 def _actors_in_record(record: WorldEventRecord) -> List[str]:
     """Return all actor ids mentioned in a record."""
     ids: List[str] = []
@@ -244,7 +252,7 @@ def generate_monthly_report(
         season=season,
         character_entries=char_entries,
         notable_events=notable,
-        location_entries=loc_entries,
+        location_entries=_sort_location_entries(loc_entries),
         rumor_entries=rumor_entries,
         total_events=len(records),
     )
@@ -309,7 +317,7 @@ def generate_yearly_report(
         year=year,
         character_entries=char_entries,
         notable_events=notable,
-        location_entries=loc_entries,
+        location_entries=_sort_location_entries(loc_entries),
         total_events=len(records),
         deaths_this_year=deaths_this_year,
     )

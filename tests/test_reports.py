@@ -248,6 +248,27 @@ class TestGenerateMonthlyReport:
         assert len(report.location_entries) == 1
         assert report.location_entries[0].location_id == "loc_aethoria_capital"
 
+    def test_location_entries_sorted_by_activity_then_name(self, world_with_chars):
+        world_with_chars.record_event(WorldEventRecord(
+            record_id="r5a", kind="discovery", year=1000, month=6,
+            location_id="loc_thornwood", description="Forest rumor", severity=1,
+        ))
+        world_with_chars.record_event(WorldEventRecord(
+            record_id="r5b", kind="discovery", year=1000, month=6,
+            location_id="loc_aethoria_capital", description="Capital rumor", severity=1,
+        ))
+        world_with_chars.record_event(WorldEventRecord(
+            record_id="r5c", kind="discovery", year=1000, month=6,
+            location_id="loc_aethoria_capital", description="Capital follow-up", severity=1,
+        ))
+
+        report = generate_monthly_report(world_with_chars, 1000, 6)
+
+        assert [entry.location_id for entry in report.location_entries] == [
+            "loc_aethoria_capital",
+            "loc_thornwood",
+        ]
+
     def test_filters_by_year_and_month(self, world_with_chars):
         world_with_chars.record_event(WorldEventRecord(
             record_id="r6", kind="battle", year=1000, month=3,
@@ -454,6 +475,27 @@ class TestGenerateYearlyReport:
         assert len(report.location_entries) == 1
         assert report.location_entries[0].event_count == 1
         assert report.location_entries[0].notable_events == []
+
+    def test_yearly_location_entries_sorted_by_activity_then_name(self, world_with_chars):
+        world_with_chars.record_event(WorldEventRecord(
+            record_id="y5a", kind="meeting", year=1001, month=6,
+            location_id="loc_thornwood", description="Forest meeting", severity=1,
+        ))
+        world_with_chars.record_event(WorldEventRecord(
+            record_id="y5b", kind="meeting", year=1001, month=7,
+            location_id="loc_aethoria_capital", description="Capital meeting", severity=1,
+        ))
+        world_with_chars.record_event(WorldEventRecord(
+            record_id="y5c", kind="meeting", year=1001, month=8,
+            location_id="loc_aethoria_capital", description="Capital follow-up", severity=1,
+        ))
+
+        report = generate_yearly_report(world_with_chars, 1001)
+
+        assert [entry.location_id for entry in report.location_entries] == [
+            "loc_aethoria_capital",
+            "loc_thornwood",
+        ]
 
     def test_report_does_not_use_current_world_state(self, world_with_chars):
         """Year 1000 report read from year 1003 must not reflect year-1003 state."""

@@ -16,7 +16,9 @@ pure landscape description for that coordinate.
 from __future__ import annotations
 
 import math
+from copy import deepcopy
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import Any, Dict, List, Optional, Tuple
 
 
@@ -282,7 +284,7 @@ class RouteEdge:
 # TerrainMap - container for the terrain grid
 # ------------------------------------------------------------------
 
-@dataclass
+@dataclass(slots=True)
 class TerrainMap:
     """Container for the full terrain grid.
 
@@ -399,9 +401,9 @@ class AtlasLayout:
         return cls(
             canvas_w=data.get("canvas_w", 72),
             canvas_h=data.get("canvas_h", 30),
-            continents=data.get("continents", []),
-            seas=data.get("seas", []),
-            mountain_ranges=data.get("mountain_ranges", []),
+            continents=deepcopy(data.get("continents", [])),
+            seas=deepcopy(data.get("seas", [])),
+            mountain_ranges=deepcopy(data.get("mountain_ranges", [])),
         )
 
 
@@ -745,6 +747,55 @@ def build_default_atlas_layout(
                 sorted(mountain_components, key=lambda component: (-len(component), sorted(component)[0]))
             )
         ],
+    )
+
+
+@lru_cache(maxsize=64)
+def _cached_atlas_layout_template(
+    site_coords: Tuple[Tuple[int, int], ...],
+    route_coords: Tuple[Tuple[Tuple[int, int], Tuple[int, int]], ...],
+    mountain_coords: Tuple[Tuple[int, int], ...],
+) -> AtlasLayout:
+    return build_default_atlas_layout(
+        AtlasLayoutInputs(
+            site_coords=list(site_coords),
+            route_coords=list(route_coords),
+            mountain_coords=list(mountain_coords),
+        )
+    )
+
+
+def build_cached_world_structure(
+    *,
+    width: int,
+    height: int,
+    locations: Optional[List[Tuple[str, str, str, str, int, int]]] = None,
+    route_specs: Optional[List[Dict[str, Any]]] = None,
+) -> Tuple[TerrainMap, List[Site], List[RouteEdge], AtlasLayout]:
+    """Build world structure while caching only the atlas geometry projection."""
+    terrain_map, sites, routes = build_default_terrain(
+        width=width,
+        height=height,
+        locations=locations,
+        route_specs=route_specs,
+    )
+    inputs = assemble_atlas_layout_inputs(
+        width=width,
+        height=height,
+        sites=sites,
+        routes=routes,
+        terrain_cells=list(terrain_map.cells.values()),
+    )
+    atlas_layout = _cached_atlas_layout_template(
+        tuple(inputs.site_coords),
+        tuple(inputs.route_coords),
+        tuple(inputs.mountain_coords),
+    )
+    return (
+        terrain_map,
+        sites,
+        routes,
+        deepcopy(atlas_layout),
     )
 
 

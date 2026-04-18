@@ -324,9 +324,9 @@ EXPECTED_EN = {
     "yearly_overview": ["    Total events recorded: 6"],
     "yearly_notable": [],
     "yearly_regions": [
+        "    Sandstone Outpost: 2 event(s)",
         "    Dusty Crossroads: 1 event(s)",
         "    Obsidian Crater: 1 event(s)",
-        "    Sandstone Outpost: 2 event(s)",
         "    Sunbaked Plains: 1 event(s)",
         "    The Grey Pass: 1 event(s)",
     ],
@@ -388,9 +388,9 @@ EXPECTED_JA = {
     "yearly_overview": ["    記録イベント数: 6"],
     "yearly_notable": [],
     "yearly_regions": [
+        "    Sandstone Outpost: 2件の出来事",
         "    Dusty Crossroads: 1件の出来事",
         "    Obsidian Crater: 1件の出来事",
-        "    Sandstone Outpost: 2件の出来事",
         "    Sunbaked Plains: 1件の出来事",
         "    The Grey Pass: 1件の出来事",
     ],
@@ -542,8 +542,8 @@ EXPECTED_PROJECTION_CONTRACT = {
                 ("death", "loc_ashenvale", "907a70c3", ()),
             ],
             "location_ids": [
-                "loc_ashenvale",
                 "loc_dusty_crossroads",
+                "loc_ashenvale",
                 "loc_sunbaked_plains",
                 "loc_the_verdant_vale",
             ],

@@ -130,6 +130,20 @@ class TestLoadSimulation:
         assert restored.world.routes[0].route_id == sim.world.routes[0].route_id
         assert restored.world.routes[0].blocked is True
 
+    def test_load_returns_none_for_invalid_bundle_backed_blocked_route_state(self, tmp_path):
+        path = tmp_path / "invalid-blocked-route.json"
+        sim = Simulator(World(), seed=0)
+        save_simulation(sim, str(path))
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        data["world"]["routes"][0]["blocked"] = "false"
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+
+        restored = load_simulation(str(path))
+
+        assert restored is None
+
     def test_load_old_save_without_schema_version_migrates_to_v3(self, tmp_path):
         path = tmp_path / "old_save.json"
         old_save = {
@@ -278,6 +292,51 @@ class TestLoadSimulation:
             "adventure_steps_per_year": 3,
             "history": [],
         }
+        path.write_text(json.dumps(duplicate_save), encoding="utf-8")
+
+        restored = load_simulation(str(path))
+
+        assert restored is None
+
+    def test_load_returns_none_for_duplicate_serialized_route_pairs(self, tmp_path):
+        from fantasy_simulator.world import LocationState
+        from fantasy_simulator.terrain import RouteEdge
+
+        path = tmp_path / "duplicate_routes.json"
+        world = World(_skip_defaults=True, width=3, height=1)
+        for x, (loc_id, name) in enumerate(
+            [("loc_alpha", "Alpha"), ("loc_bravo", "Bravo"), ("loc_charlie", "Charlie")]
+        ):
+            defaults = world.location_state_defaults(loc_id, "village")
+            world._register_location(
+                LocationState(
+                    id=loc_id,
+                    canonical_name=name,
+                    description=f"{name} description",
+                    region_type="village",
+                    x=x,
+                    y=0,
+                    **defaults,
+                )
+            )
+        world._build_terrain_from_grid()
+        world.routes = [
+            RouteEdge("route_alpha_bravo", "loc_alpha", "loc_bravo", "road"),
+            RouteEdge("route_bravo_charlie", "loc_bravo", "loc_charlie", "road"),
+        ]
+        world._rebuild_route_index()
+        world.atlas_layout = world._build_atlas_layout_from_current_state()
+        duplicate_save = {
+            "schema_version": CURRENT_VERSION,
+            "world": world.to_dict(),
+            "characters": [],
+            "events_per_year": 0,
+            "adventure_steps_per_year": 0,
+            "history": [],
+        }
+        duplicate = dict(duplicate_save["world"]["routes"][0])
+        duplicate["route_id"] = "route_duplicate"
+        duplicate_save["world"]["routes"].append(duplicate)
         path.write_text(json.dumps(duplicate_save), encoding="utf-8")
 
         restored = load_simulation(str(path))

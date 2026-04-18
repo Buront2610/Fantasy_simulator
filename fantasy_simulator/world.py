@@ -50,8 +50,8 @@ from .terrain import (
     Site,
     TerrainMap,
     assemble_atlas_layout_inputs,
+    build_cached_world_structure,
     build_default_atlas_layout,
-    build_default_terrain,
 )
 
 if TYPE_CHECKING:
@@ -86,6 +86,12 @@ def _trace_list_payload(payload: Any, *, field_name: str) -> List[Dict[str, Any]
     if not isinstance(payload, list) or any(not isinstance(item, dict) for item in payload):
         raise ValueError(f"{field_name} must be a list of dicts")
     return [dict(item) for item in payload]
+
+
+def _strict_bool_payload(payload: Any, *, field_name: str) -> bool:
+    if not isinstance(payload, bool):
+        raise ValueError(f"{field_name} must be a boolean")
+    return payload
 
 
 @dataclass(slots=True)
@@ -793,7 +799,7 @@ class World:
              loc.region_type, loc.x, loc.y)
             for loc in self.grid.values()
         ]
-        tmap, sites, routes = build_default_terrain(
+        tmap, sites, routes, atlas_layout = build_cached_world_structure(
             width=self.width,
             height=self.height,
             locations=location_tuples,
@@ -807,7 +813,7 @@ class World:
         self.routes = routes
         self._rebuild_site_index()
         self._rebuild_route_index()
-        self.atlas_layout = self._build_atlas_layout_from_current_state()
+        self.atlas_layout = atlas_layout
 
     def _build_atlas_layout_from_current_state(self) -> AtlasLayout:
         """Generate the persistent atlas layout from current terrain/site data."""
@@ -870,11 +876,20 @@ class World:
                     f"Serialized site coordinates disagree with location state for {site.location_id!r}"
                 )
 
+        seen_route_ids: set[str] = set()
+        seen_route_pairs: set[Tuple[str, str]] = set()
         for route in self.routes:
+            if route.route_id in seen_route_ids:
+                raise ValueError(f"Serialized topology contains duplicate route id: {route.route_id!r}")
+            seen_route_ids.add(route.route_id)
             if route.from_site_id == route.to_site_id:
                 raise ValueError(f"Serialized route forms a self-loop: {route.route_id!r}")
             if route.from_site_id not in self._site_index or route.to_site_id not in self._site_index:
                 raise ValueError(f"Serialized route references unknown site: {route.route_id!r}")
+            pair = tuple(sorted((route.from_site_id, route.to_site_id)))
+            if pair in seen_route_pairs:
+                raise ValueError(f"Serialized topology contains duplicate route pair: {pair[0]}->{pair[1]}")
+            seen_route_pairs.add(pair)
 
     def get_site_by_id(self, location_id: str) -> Optional[Site]:
         """Return the Site record for a location, or None."""
@@ -1731,7 +1746,7 @@ class World:
                 continue
             route.route_type = str(payload.get("route_type", route.route_type))
             route.distance = int(payload.get("distance", route.distance))
-            route.blocked = bool(payload.get("blocked", route.blocked))
+            route.blocked = _strict_bool_payload(payload.get("blocked", route.blocked), field_name="blocked")
 
     def to_dict(self) -> Dict[str, Any]:
         lore_text = self._setting_bundle.world_definition.lore_text

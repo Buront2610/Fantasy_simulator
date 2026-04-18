@@ -126,6 +126,23 @@ class TestWorldTerrainLayer:
         connected = world.get_connected_site_ids(route.from_site_id)
         assert route.to_site_id not in connected
 
+    def test_new_worlds_do_not_share_cached_structure_instances(self):
+        world_a = World()
+        world_b = World()
+
+        assert world_a.terrain_map is not None
+        assert world_b.terrain_map is not None
+        assert world_a.atlas_layout is not None
+        assert world_b.atlas_layout is not None
+
+        world_a.routes[0].blocked = True
+        world_a.terrain_map.get(0, 0).biome = "swamp"
+        world_a.atlas_layout.continents[0]["name"] = "Mutated"
+
+        assert world_b.routes[0].blocked is False
+        assert world_b.terrain_map.get(0, 0).biome != "swamp"
+        assert world_b.atlas_layout.continents[0]["name"] != "Mutated"
+
 
 # ------------------------------------------------------------------
 # World round-trip with terrain
