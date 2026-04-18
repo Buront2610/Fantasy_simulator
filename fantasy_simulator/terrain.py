@@ -77,7 +77,7 @@ BIOME_MOVE_COST: Dict[str, float] = {
 # TerrainCell
 # ------------------------------------------------------------------
 
-@dataclass
+@dataclass(slots=True)
 class TerrainCell:
     """A single cell in the terrain grid.
 
@@ -142,7 +142,7 @@ class TerrainCell:
 # Site
 # ------------------------------------------------------------------
 
-@dataclass
+@dataclass(slots=True)
 class Site:
     """A named location placed on the terrain grid.
 
@@ -215,7 +215,7 @@ ROUTE_BASE_COST: Dict[str, float] = {
 }
 
 
-@dataclass
+@dataclass(slots=True)
 class RouteEdge:
     """A navigable connection between two sites.
 
@@ -348,7 +348,7 @@ class TerrainMap:
 # AtlasLayout — persistent macro geography layer (PR-G2 item 7)
 # ------------------------------------------------------------------
 
-@dataclass
+@dataclass(slots=True)
 class AtlasLayout:
     """Persistent macro geography for the atlas-scale map.
 
@@ -415,7 +415,7 @@ ATLAS_MARGIN_X = 6
 ATLAS_MARGIN_Y = 3
 
 
-@dataclass
+@dataclass(slots=True)
 class AtlasLayoutInputs:
     """Normalized atlas-layout inputs derived from world/site state."""
 

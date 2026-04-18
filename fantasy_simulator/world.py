@@ -88,7 +88,7 @@ def _trace_list_payload(payload: Any, *, field_name: str) -> List[Dict[str, Any]
     return [dict(item) for item in payload]
 
 
-@dataclass
+@dataclass(slots=True)
 class MemorialRecord:
     """A permanent memorial created when a character dies at a location.
 
@@ -129,7 +129,7 @@ class MemorialRecord:
         )
 
 
-@dataclass
+@dataclass(slots=True)
 class CalendarChangeRecord:
     """A dated calendar-definition transition for future world-timeline features."""
 
@@ -195,7 +195,7 @@ def _traffic_indicator(value: int) -> str:
     return "-"
 
 
-@dataclass
+@dataclass(slots=True)
 class LocationState:
     """A single cell on the world grid with persistent state."""
 
@@ -372,8 +372,9 @@ class World:
         self._location_id_index: Dict[str, LocationState] = {}
         # Event storage contract:
         # - event_records is the canonical structured history for all new reads.
-        # - event_log is an ephemeral CLI-facing compatibility display adapter.
-        self.event_log: List[str] = []
+        # - _display_event_log holds only display-only legacy lines.
+        # - event_log projects from canonical history when records exist.
+        self._display_event_log: List[str] = []
         self.event_records: List[WorldEventRecord] = []
         self.event_impact_rules: Dict[str, Dict[str, int]] = clone_default_event_impact_rules()
         self.propagation_rules: Dict[str, Dict[str, Any]] = clone_default_propagation_rules()
@@ -407,6 +408,23 @@ class World:
     @name.setter
     def name(self, value: str) -> None:
         self._setting_bundle.world_definition.display_name = value
+
+    @property
+    def event_log(self) -> List[str]:
+        """Compatibility event log view.
+
+        Once canonical ``event_records`` exist, the compatibility log is
+        projected on demand so we do not retain a second long-lived copy of the
+        same history in memory.
+        """
+        if self.event_records:
+            return self._project_compatibility_event_log()
+        return self._display_event_log
+
+    @event_log.setter
+    def event_log(self, value: List[str]) -> None:
+        trimmed = list(value)[-self.MAX_EVENT_LOG:]
+        self._display_event_log = trimmed
 
     @property
     def lore(self) -> str:
@@ -1526,16 +1544,16 @@ class World:
         When *month*/*day* are provided, the prefix includes intra-year date
         information so that the player-visible log reflects finer causality.
         """
-        self.event_log.append(self._format_event_log_entry(event_text, month=month, day=day))
-        if len(self.event_log) > self.MAX_EVENT_LOG:
-            self.event_log = self.event_log[-self.MAX_EVENT_LOG:]
+        self._display_event_log.append(self._format_event_log_entry(event_text, month=month, day=day))
+        if len(self._display_event_log) > self.MAX_EVENT_LOG:
+            self._display_event_log = self._display_event_log[-self.MAX_EVENT_LOG:]
 
     MAX_EVENT_RECORDS = 5000
 
     def rebuild_compatibility_event_log(self) -> None:
-        """Rebuild the legacy display buffer from canonical event records."""
+        """Drop stale display-only lines when canonical history exists."""
         if self.event_records:
-            self.event_log = self._project_compatibility_event_log()
+            self._display_event_log = []
 
     def _project_compatibility_event_log(self) -> List[str]:
         """Project the compatibility display buffer from canonical event records."""
@@ -1558,7 +1576,7 @@ class World:
 
     def get_compatibility_event_log(self, last_n: Optional[int] = None) -> List[str]:
         """Return the legacy event-log adapter, projecting from records if needed."""
-        log = self._project_compatibility_event_log() if self.event_records else list(self.event_log)
+        log = list(self.event_log)
         if last_n is not None:
             return log[-last_n:]
         return list(log)
@@ -1581,7 +1599,6 @@ class World:
         if watched_tags:
             record.tags = list(dict.fromkeys(list(record.tags) + watched_tags))
 
-        previous_count = len(self.event_records)
         stored_record = append_canonical_event_record(
             record=record,
             event_records=self.event_records,
@@ -1589,12 +1606,7 @@ class World:
             grid=self.grid,
             max_event_records=self.MAX_EVENT_RECORDS,
         )
-        if len(self.event_records) == previous_count + 1:
-            self.event_log.append(self._compatibility_event_log_line(stored_record))
-            if len(self.event_log) > self.MAX_EVENT_LOG:
-                self.event_log = self.event_log[-self.MAX_EVENT_LOG:]
-        else:
-            self.rebuild_compatibility_event_log()
+        self._display_event_log = []
         return stored_record
 
     def apply_event_impact(self, kind: str, location_id: Optional[str]) -> List[Dict[str, Any]]:

@@ -34,7 +34,7 @@ def generate_record_id(rng: Optional[SupportsGetRandBits] = None) -> str:
     return uuid.uuid4().hex
 
 
-@dataclass
+@dataclass(slots=True)
 class EventResult:
     """The outcome of a single in-world event."""
 
@@ -67,7 +67,7 @@ class EventResult:
         )
 
 
-@dataclass
+@dataclass(slots=True)
 class WorldEventRecord:
     """A structured record of a world event for history and analysis."""
 

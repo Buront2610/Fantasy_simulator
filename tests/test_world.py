@@ -1157,6 +1157,24 @@ class TestWorld:
 
         assert world.get_compatibility_event_log() == ["[Year 1001, Month 2, Day 3] Canonical clash"]
 
+    def test_event_log_property_projects_canonical_history_over_stale_cache(self):
+        from fantasy_simulator.events import WorldEventRecord
+
+        world = World()
+        world.record_event(
+            WorldEventRecord(
+                record_id="r1",
+                kind="battle",
+                year=1001,
+                month=2,
+                day=3,
+                description="Canonical clash",
+            )
+        )
+        world.event_log = ["stale cache entry"]
+
+        assert world.event_log == ["[Year 1001, Month 2, Day 3] Canonical clash"]
+
     def test_trimming_event_records_removes_dangling_recent_event_ids(self):
         from fantasy_simulator.events import WorldEventRecord
 
