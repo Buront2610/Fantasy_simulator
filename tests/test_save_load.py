@@ -456,6 +456,47 @@ class TestLoadSimulation:
         assert restored is not None
         assert restored.world.characters[0].location_id == "hub_primary"
 
+    def test_load_preserves_explicitly_disconnected_bundle_travel_contract(self, tmp_path):
+        path = tmp_path / "disconnected-bundle.json"
+        sim = Simulator(World(name="Disconnected", width=2, height=1), seed=0)
+        sim.world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="disconnected",
+                display_name="Disconnected",
+                lore_text="No roads",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="loc_one",
+                        name="One",
+                        description="",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                    ),
+                    SiteSeedDefinition(
+                        location_id="loc_two",
+                        name="Two",
+                        description="",
+                        region_type="village",
+                        x=1,
+                        y=0,
+                    ),
+                ],
+                route_seeds=[],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+        save_simulation(sim, str(path))
+
+        restored = load_simulation(str(path))
+
+        assert restored is not None
+        assert restored.world.routes == []
+        assert restored.world.get_neighboring_locations("loc_one") == []
+        assert restored.world.get_travel_neighboring_locations("loc_one") == []
+        assert restored.world.reachable_location_ids("loc_one") == []
+
     def test_migration_uses_embedded_custom_bundle_for_legacy_location_recovery(self, tmp_path):
         path = tmp_path / "legacy-custom-bundle.json"
         legacy_payload = {

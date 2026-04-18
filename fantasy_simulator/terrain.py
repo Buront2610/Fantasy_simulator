@@ -899,6 +899,9 @@ def build_default_terrain(
     (4-directional) are connected by auto-generated provisional routes
     (see *PR-G note* below).
 
+    Explicit ``route_specs`` must reference in-bounds sites present in the
+    supplied location set; malformed or dangling route definitions fail fast.
+
     .. note:: PR-G provisional routes
 
        Routes generated here are **provisional legacy bridges** derived
@@ -948,18 +951,10 @@ def build_default_terrain(
     if route_specs is not None:
         valid_site_ids = {site.location_id for site in sites}
         for spec in route_specs:
-            from_site_id = str(spec["from_site_id"])
-            to_site_id = str(spec["to_site_id"])
-            if from_site_id not in valid_site_ids or to_site_id not in valid_site_ids:
-                continue
-            routes.append(RouteEdge(
-                route_id=str(spec["route_id"]),
-                from_site_id=from_site_id,
-                to_site_id=to_site_id,
-                route_type=str(spec.get("route_type", "road")),
-                distance=int(spec.get("distance", 1)),
-                blocked=_bool_payload(spec.get("blocked", False), field_name="blocked"),
-            ))
+            payload = normalize_route_payload(spec)
+            if payload["from_site_id"] not in valid_site_ids or payload["to_site_id"] not in valid_site_ids:
+                raise ValueError(f"route {payload['route_id']} references an unknown site")
+            routes.append(RouteEdge.from_dict(payload))
     else:
         # Auto-generate provisional routes between adjacent sites.
         # These are legacy bridges based on grid adjacency; see docstring.

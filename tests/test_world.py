@@ -3,6 +3,7 @@ tests/test_world.py - Unit tests for the World class.
 """
 
 import unicodedata
+import pytest
 
 from fantasy_simulator.adventure import AdventureRun
 from fantasy_simulator.character import Character
@@ -119,15 +120,20 @@ class TestWorld:
 
     def test_route_cache_clean_reads_do_not_recompute_signatures(self, monkeypatch):
         world = World()
+        rebuild_calls = 0
+        original_rebuild = world._rebuild_route_index
 
-        def _fail_signature():
-            raise AssertionError("route signature should not be recomputed for clean cache reads")
+        def _counting_rebuild():
+            nonlocal rebuild_calls
+            rebuild_calls += 1
+            original_rebuild()
 
-        monkeypatch.setattr(world, "_route_index_signature", _fail_signature)
+        monkeypatch.setattr(world, "_rebuild_route_index", _counting_rebuild)
 
         routes = world.get_routes_for_site("loc_aethoria_capital")
 
         assert routes
+        assert rebuild_calls == 0
 
     def test_route_block_toggle_invalidates_cache_without_signature_scan(self, monkeypatch):
         world = World()
@@ -135,16 +141,21 @@ class TestWorld:
             route for route in world.routes
             if route.other_end("loc_aethoria_capital") == "loc_silverbrook"
         )
+        rebuild_calls = 0
+        original_rebuild = world._rebuild_route_index
 
-        def _fail_signature():
-            raise AssertionError("route signature should not be used for cache invalidation")
+        def _counting_rebuild():
+            nonlocal rebuild_calls
+            rebuild_calls += 1
+            original_rebuild()
 
-        monkeypatch.setattr(world, "_route_index_signature", _fail_signature)
+        monkeypatch.setattr(world, "_rebuild_route_index", _counting_rebuild)
 
         assert "loc_silverbrook" in world.get_connected_site_ids("loc_aethoria_capital")
         route.blocked = True
 
         assert "loc_silverbrook" not in world.get_connected_site_ids("loc_aethoria_capital")
+        assert rebuild_calls == 1
 
     def test_setting_bundle_can_define_explicitly_disconnected_topology(self):
         world = World(name="Disconnected", width=2, height=1)
@@ -178,6 +189,10 @@ class TestWorld:
 
         assert world.routes == []
         assert world.get_connected_site_ids("loc_one") == []
+        assert world.get_travel_neighboring_locations("loc_one") == []
+        assert world.get_neighboring_locations("loc_one") == []
+        assert world.reachable_location_ids("loc_one") == []
+        assert world.get_propagation_neighboring_locations("loc_one", mode="travel") == []
 
     def test_add_character_marks_location_visited(self):
         world = World()
@@ -1203,6 +1218,27 @@ class TestWorld:
         world.event_log = ["stale cache entry"]
 
         assert world.event_log == ["[Year 1001, Month 2, Day 3] Canonical clash"]
+
+    def test_event_log_view_is_read_only(self):
+        from fantasy_simulator.events import WorldEventRecord
+
+        world = World()
+        world.log_event("display-only line")
+        with pytest.raises(TypeError):
+            world.event_log.append("mutated")
+        assert any("display-only line" in line for line in world.event_log)
+
+        world.record_event(
+            WorldEventRecord(
+                record_id="r1",
+                kind="battle",
+                year=1001,
+                description="Canonical clash",
+            )
+        )
+        with pytest.raises(TypeError):
+            world.event_log.append("mutated again")
+        assert world.event_log == ["[Year 1001, Month 1, Day 1] Canonical clash"]
 
     def test_trimming_event_records_removes_dangling_recent_event_ids(self):
         from fantasy_simulator.events import WorldEventRecord

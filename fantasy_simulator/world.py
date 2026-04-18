@@ -134,6 +134,36 @@ class ObservableRouteList(list[RouteEdge]):
         self._notify()
 
 
+class ReadOnlyEventLog(list[str]):
+    """List-like read-only view for compatibility event-log access."""
+
+    def _readonly(self, *_args: Any, **_kwargs: Any) -> None:
+        raise TypeError("event_log is a read-only view; use log_event() or record_event()")
+
+    append = _readonly
+    clear = _readonly
+    extend = _readonly
+    insert = _readonly
+    pop = _readonly
+    remove = _readonly
+    reverse = _readonly
+    sort = _readonly
+
+    def __delitem__(self, _index: Any) -> None:
+        self._readonly()
+
+    def __iadd__(self, _other: Any) -> "ReadOnlyEventLog":
+        self._readonly()
+        return self
+
+    def __imul__(self, _other: Any) -> "ReadOnlyEventLog":
+        self._readonly()
+        return self
+
+    def __setitem__(self, _index: Any, _value: Any) -> None:
+        self._readonly()
+
+
 @dataclass(slots=True)
 class MemorialRecord:
     """A permanent memorial created when a character dies at a location.
@@ -439,6 +469,7 @@ class World:
         self._site_index: Dict[str, Site] = {}
         self._routes_by_site: Dict[str, List[RouteEdge]] = {}
         self._routes_dirty: bool = True
+        self._route_graph_explicit: bool = False
         # PR-G2: persistent macro geography layer
         self.atlas_layout: Optional[AtlasLayout] = None
         if not _skip_defaults:
@@ -459,11 +490,12 @@ class World:
 
         Once canonical ``event_records`` exist, the compatibility log is
         projected on demand so we do not retain a second long-lived copy of the
-        same history in memory.
+        same history in memory. The returned value is a read-only view so direct
+        list mutation cannot silently diverge from canonical history.
         """
         if self.event_records:
-            return self._project_compatibility_event_log()
-        return self._display_event_log
+            return ReadOnlyEventLog(self._project_compatibility_event_log())
+        return ReadOnlyEventLog(self._display_event_log)
 
     @event_log.setter
     def event_log(self, value: List[str]) -> None:
@@ -594,6 +626,7 @@ class World:
         self.sites = []
         self.routes = []
         self._routes_dirty = True
+        self._route_graph_explicit = False
         self._site_index = {}
         self._routes_by_site = {}
         self.atlas_layout = None
@@ -640,7 +673,7 @@ class World:
                 if previous is not None:
                     self._copy_location_runtime_state(previous, location)
                 self._register_location(location)
-        self._build_terrain_from_grid()
+        self._build_terrain_from_grid(explicit_route_graph=True)
 
     def default_location_entries(self) -> List[Tuple[str, str, str, str, int, int]]:
         """Return in-bounds bundle-backed site seeds in the legacy tuple format."""
@@ -847,11 +880,12 @@ class World:
             **defaults,
         )
 
-    def _build_terrain_from_grid(self) -> None:
+    def _build_terrain_from_grid(self, *, explicit_route_graph: Optional[bool] = None) -> None:
         """Generate terrain, sites, and routes from the current grid.
 
         Derives terrain biome from each ``LocationState.region_type``
-        and creates provisional routes between adjacent sites.
+        and creates provisional routes between adjacent sites only when no
+        explicit route graph is defined for the current structure.
         """
         # Collect current grid as pseudo-location tuples for the builder
         location_tuples = [
@@ -859,20 +893,32 @@ class World:
              loc.region_type, loc.x, loc.y)
             for loc in self.grid.values()
         ]
+        location_ids = {loc_id for loc_id, *_rest in location_tuples}
+        use_explicit_route_graph = (
+            self._grid_matches_bundle_seeds()
+            if explicit_route_graph is None
+            else explicit_route_graph
+        )
         tmap, sites, routes, atlas_layout = build_cached_world_structure(
             width=self.width,
             height=self.height,
             locations=location_tuples,
-            route_specs=[
-                seed.to_dict()
-                for seed in self._setting_bundle.world_definition.route_seeds
-            ],
+            route_specs=(
+                [
+                    seed.to_dict()
+                    for seed in self._setting_bundle.world_definition.route_seeds
+                    if seed.from_site_id in location_ids and seed.to_site_id in location_ids
+                ]
+                if use_explicit_route_graph
+                else None
+            ),
         )
         self.terrain_map = tmap
         self.sites = sites
         self.routes = routes
         self._rebuild_site_index()
         self._rebuild_route_index()
+        self._route_graph_explicit = use_explicit_route_graph
         self.atlas_layout = atlas_layout
 
     def _build_atlas_layout_from_current_state(self) -> AtlasLayout:
@@ -910,19 +956,6 @@ class World:
             route_index.setdefault(route.to_site_id, []).append(route)
         self._routes_by_site = route_index
         self._routes_dirty = False
-
-    def _route_index_signature(self) -> Tuple[Tuple[str, str, str, str, int, bool], ...]:
-        return tuple(
-            (
-                route.route_id,
-                route.from_site_id,
-                route.to_site_id,
-                route.route_type,
-                int(route.distance),
-                bool(route.blocked),
-            )
-            for route in self.routes
-        )
 
     def _ensure_route_index_current(self) -> None:
         """Keep the cached route adjacency in sync with direct route reassignment."""
@@ -985,11 +1018,12 @@ class World:
 
     def get_travel_neighboring_locations(self, location_id: str) -> List[LocationState]:
         """Return neighbors reachable for travel using the travel topology contract."""
-        neighbor_ids = (
-            self.get_connected_site_ids(location_id)
-            if self.routes
-            else grid_neighbor_ids(location_id, location_index=self._location_id_index, grid=self.grid)
-        )
+        if self.routes:
+            neighbor_ids = self.get_connected_site_ids(location_id)
+        elif self._route_graph_explicit:
+            neighbor_ids = []
+        else:
+            neighbor_ids = grid_neighbor_ids(location_id, location_index=self._location_id_index, grid=self.grid)
         return [
             self._location_id_index[neighbor_id]
             for neighbor_id in neighbor_ids
@@ -1025,6 +1059,8 @@ class World:
                         include_blocked=effective_include_blocked_routes,
                     )
                 )
+            elif self._route_graph_explicit:
+                neighbor_ids = []
             else:
                 neighbor_ids = grid_neighbor_ids(location_id, location_index=self._location_id_index, grid=self.grid)
         elif topology_mode == PROPAGATION_TOPOLOGY_GRID:
@@ -1969,6 +2005,7 @@ class World:
             world.terrain_map = TerrainMap.from_dict(data["terrain_map"])
             world.sites = [Site.from_dict(s) for s in data.get("sites", [])]
             world.routes = [RouteEdge.from_dict(r) for r in data.get("routes", [])]
+            world._route_graph_explicit = True
             for site in world.sites:
                 site.location_id = world.normalize_location_id(site.location_id) or site.location_id
             for route in world.routes:

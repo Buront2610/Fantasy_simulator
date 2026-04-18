@@ -4,6 +4,7 @@ TerrainMap, and the default terrain builder.
 """
 
 import json
+import pytest
 
 from fantasy_simulator.terrain import (
     BIOME_GLYPHS,
@@ -235,6 +236,25 @@ class TestBuildDefaultTerrain:
         assert "loc_a" in site_ids
         assert "loc_c" in site_ids
         assert "loc_b" not in site_ids
+
+    def test_invalid_route_specs_fail_fast_for_unknown_sites(self):
+        locations = [
+            ("loc_a", "A", "A", "city", 0, 0),
+            ("loc_b", "B", "B", "village", 1, 0),
+        ]
+        route_specs = [
+            {
+                "route_id": "route_invalid",
+                "from_site_id": "loc_a",
+                "to_site_id": "loc_missing",
+                "route_type": "road",
+                "distance": 1,
+                "blocked": False,
+            }
+        ]
+
+        with pytest.raises(ValueError):
+            build_default_terrain(width=2, height=1, locations=locations, route_specs=route_specs)
 
     def test_default_locations_filtered_by_size(self):
         """Using DEFAULT_LOCATIONS with a small grid drops out-of-bounds entries."""
