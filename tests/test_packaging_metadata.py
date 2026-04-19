@@ -13,6 +13,12 @@ def test_pyproject_includes_setting_bundle_package_data() -> None:
     assert '"fantasy_simulator.content" = ["bundles/*.json"]' in PYPROJECT_TEXT
 
 
+def test_pyproject_declares_pytest_defaults() -> None:
+    assert "[tool.pytest.ini_options]" in PYPROJECT_TEXT
+    assert 'testpaths = ["tests"]' in PYPROJECT_TEXT
+    assert 'addopts = "-ra"' in PYPROJECT_TEXT
+
+
 def test_gitignore_covers_packaging_artifacts() -> None:
     assert "*.egg-info/" in GITIGNORE_TEXT
     assert "build/" in GITIGNORE_TEXT

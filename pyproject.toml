@@ -26,3 +26,7 @@ include = ["fantasy_simulator*"]
 
 [tool.setuptools.package-data]
 "fantasy_simulator.content" = ["bundles/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
