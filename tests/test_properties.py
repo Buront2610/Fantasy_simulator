@@ -27,7 +27,6 @@ def test_location_state_values_can_be_clamped_to_bounds(prosperity, safety, mood
     loc = LocationState(
         id="loc_x",
         canonical_name="X",
-        name="X",
         description="",
         region_type="city",
         x=0,
