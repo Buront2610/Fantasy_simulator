@@ -59,6 +59,9 @@ def test_link_memorial_record_and_lookup_helper_skip_stale_ids() -> None:
 
 def test_add_alias_helper_respects_uniqueness_and_cap() -> None:
     world = World()
+    location = world.get_location_by_id("loc_aethoria_capital")
+    assert location is not None
+    location.aliases = []
     for alias in ["A", "A", "B", "C", "D"]:
         add_alias(
             location_index=world._location_id_index,
@@ -67,6 +70,4 @@ def test_add_alias_helper_respects_uniqueness_and_cap() -> None:
             max_aliases=3,
         )
 
-    location = world.get_location_by_id("loc_aethoria_capital")
-    assert location is not None
     assert location.aliases == ["A", "B", "C"]

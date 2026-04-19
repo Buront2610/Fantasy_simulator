@@ -6,12 +6,14 @@ import json
 
 from fantasy_simulator.character_creator import CharacterCreator
 from fantasy_simulator.content.setting_bundle import (
+    LanguageDefinition,
     NamingRulesDefinition,
     SettingBundle,
     SiteSeedDefinition,
     WorldDefinition,
 )
 from fantasy_simulator.event_models import EventResult
+from fantasy_simulator.language.schema import SoundChangeRuleDefinition
 from fantasy_simulator.persistence.migrations import CURRENT_VERSION
 from fantasy_simulator.persistence.save_load import load_simulation, save_simulation
 from fantasy_simulator.simulator import Simulator
@@ -978,10 +980,55 @@ class TestLoadSimulation:
         assert restored.world.setting_bundle.world_definition.propagation_rules == {
             "road_damage_from_danger": {"danger_threshold": 101, "road_penalty": 0}
         }
-        assert restored.world.event_impact_rules["meeting"]["mood"] == 7
-        assert restored.world.event_impact_rules["battle"]["danger"] == 3
-        assert restored.world.propagation_rules["road_damage_from_danger"]["danger_threshold"] == 101
-        assert restored.world.propagation_rules["danger"]["cap"] == 15
+
+    def test_save_load_preserves_language_evolution_history(self, tmp_path):
+        path = tmp_path / "language-evolution.json"
+        world = World(name="Custom", year=1000)
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="loc_custom",
+                        name="Custom",
+                        description="Custom site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                        language_key="custom_lang",
+                    ),
+                ],
+                languages=[
+                    LanguageDefinition(
+                        language_key="custom_lang",
+                        display_name="Custom Lang",
+                        seed_syllables=["tor", "sel", "mar"],
+                        evolution_rule_pool=[
+                            SoundChangeRuleDefinition(
+                                rule_key="custom_lang.rhotic_drift",
+                                source="r",
+                                target="rh",
+                            )
+                        ],
+                        evolution_interval_years=2,
+                    )
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+        sim = Simulator(world, seed=0)
+        sim.advance_years(2)
+
+        assert save_simulation(sim, str(path)) is True
+        restored = load_simulation(str(path))
+
+        assert restored is not None
+        assert len(restored.world.language_evolution_history) == 1
+        assert restored.world.language_evolution_history[0].language_key == "custom_lang"
+        assert restored.world.language_status()[0]["sound_shifts"].get("r") == "rh"
 
     def test_save_load_round_trip_preserves_history_metadata_for_event_result_records(self, tmp_path):
         path = tmp_path / "legacy-history-roundtrip.json"

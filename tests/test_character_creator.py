@@ -7,7 +7,15 @@ from types import SimpleNamespace
 
 import fantasy_simulator.character_creator as character_creator_module
 from fantasy_simulator.character_creator import CharacterCreator
-from fantasy_simulator.content.setting_bundle import JobDefinition, RaceDefinition, default_aethoria_bundle
+from fantasy_simulator.content.setting_bundle import (
+    JobDefinition,
+    LanguageCommunityDefinition,
+    LanguageDefinition,
+    RaceDefinition,
+    SettingBundle,
+    WorldDefinition,
+    default_aethoria_bundle,
+)
 from fantasy_simulator.i18n import get_locale, set_locale, tr, tr_term
 
 
@@ -115,13 +123,105 @@ class TestCreateRandomReproducibility:
         assert character.job == "Scribe"
 
     def test_empty_bundle_naming_rules_fall_back_to_default_names(self):
+        baseline_bundle = default_aethoria_bundle()
+        baseline_bundle.world_definition.languages = []
+        baseline_bundle.world_definition.language_communities = []
         bundle = default_aethoria_bundle()
         bundle.world_definition.naming_rules = bundle.world_definition.naming_rules.__class__()
+        bundle.world_definition.languages = []
+        bundle.world_definition.language_communities = []
 
-        default_name = CharacterCreator().create_random(rng=random.Random(7)).name
+        default_name = CharacterCreator(setting_bundle=baseline_bundle).create_random(rng=random.Random(7)).name
         fallback_name = CharacterCreator(setting_bundle=bundle).create_random(rng=random.Random(7)).name
 
         assert fallback_name == default_name
+
+    def test_race_specific_language_rules_drive_generated_template_names(self):
+        creator = CharacterCreator()
+        human = creator.create_from_template("warrior", rng=random.Random(4))
+        elf = creator.create_from_template("mage", rng=random.Random(4))
+
+        human_rules = creator.naming_rules_for_identity(race="Human")
+        elf_rules = creator.naming_rules_for_identity(race="Elf")
+        human_given_names = (
+            human_rules.first_names_male
+            + human_rules.first_names_female
+            + human_rules.first_names_non_binary
+        )
+        elf_given_names = (
+            elf_rules.first_names_male
+            + elf_rules.first_names_female
+            + elf_rules.first_names_non_binary
+        )
+
+        assert human.name != elf.name
+        assert human.name.split()[0] in human_given_names
+        assert human.name.split()[1] in human_rules.last_names
+        assert elf.name.split()[0] in elf_given_names
+        assert elf.name.split()[1] in elf_rules.last_names
+
+    def test_region_specific_language_rules_are_reachable_from_character_generation(self):
+        creator = CharacterCreator()
+
+        thornwood_elf = creator.create_from_template("mage", rng=random.Random(8), region="loc_thornwood")
+        thornwood_rules = creator.naming_rules_for_identity(race=thornwood_elf.race, region="loc_thornwood")
+
+        assert thornwood_elf.name.split()[0] in (
+            thornwood_rules.first_names_male
+            + thornwood_rules.first_names_female
+            + thornwood_rules.first_names_non_binary
+        )
+
+    def test_generated_language_names_stay_within_reasonable_length(self):
+        creator = CharacterCreator()
+        character = creator.create_from_template("mage", rng=random.Random(12), region="loc_thornwood")
+        first_name, last_name = character.name.split()
+
+        assert len(first_name) <= 12
+        assert len(last_name) <= 14
+
+    def test_small_language_name_space_does_not_hang_and_still_generates_names(self):
+        bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="small",
+                display_name="Small",
+                lore_text="Small lore",
+                races=[
+                    RaceDefinition(name="Human", description="Test", stat_bonuses={}),
+                ],
+                jobs=[
+                    JobDefinition(name="Warrior", description="Test", primary_skills=[]),
+                ],
+                languages=[
+                    LanguageDefinition(
+                        language_key="tiny",
+                        display_name="Tiny",
+                        name_stems=["al"],
+                        male_suffixes=["an"],
+                        female_suffixes=["a"],
+                        neutral_suffixes=["en"],
+                        surname_suffixes=["or"],
+                        given_name_patterns=["RX"],
+                        surname_patterns=["RY"],
+                        lexicon_size=8,
+                    )
+                ],
+                language_communities=[
+                    LanguageCommunityDefinition(
+                        community_key="tiny",
+                        display_name="Tiny",
+                        language_key="tiny",
+                        races=["Human"],
+                    )
+                ],
+            ),
+        )
+
+        creator = CharacterCreator(setting_bundle=bundle)
+        character = creator.create_random(rng=random.Random(1))
+
+        assert character.name
 
     def test_random_character_defaults_to_empty_location_until_added_to_world(self):
         creator = CharacterCreator()

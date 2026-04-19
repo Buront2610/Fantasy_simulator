@@ -125,6 +125,7 @@ def test_core_ui_modules_do_not_import_simulation_or_persistence() -> None:
 def test_direct_event_log_access_stays_in_compatibility_layers() -> None:
     allowed = {
         PACKAGE_ROOT / "world.py",
+        PACKAGE_ROOT / "world_persistence.py",
         PACKAGE_ROOT / "simulation" / "queries.py",
     }
     for path in _production_files():

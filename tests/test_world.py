@@ -10,12 +10,14 @@ from fantasy_simulator.character import Character
 from fantasy_simulator.content.setting_bundle import (
     CalendarDefinition,
     CalendarMonthDefinition,
+    LanguageDefinition,
     NamingRulesDefinition,
     SettingBundle,
     SiteSeedDefinition,
     WorldDefinition,
 )
 from fantasy_simulator.i18n import set_locale
+from fantasy_simulator.language.schema import SoundChangeRuleDefinition
 from fantasy_simulator.rumor import Rumor
 from fantasy_simulator.terrain import RouteEdge
 from fantasy_simulator.world import LocationState, MemorialRecord, World
@@ -493,6 +495,336 @@ class TestWorld:
         assert rebuilt is not None
         assert rebuilt.danger == 42
         assert rebuilt.visited is True
+
+    def test_world_resolves_language_by_identity(self):
+        world = World()
+
+        assert world.resolve_language_for_identity(race="Human") == "Aethic Common"
+        assert world.resolve_language_for_identity(race="Elf", region="loc_thornwood") == "Sindral"
+
+    def test_world_describes_language_lineage(self):
+        world = World()
+
+        assert world.describe_language_lineage("quenic") == ["Elder Speech", "Proto Quenic", "Quenic"]
+
+    def test_location_endonym_uses_site_language(self):
+        world = World()
+
+        thornwood = world.get_location_by_id("loc_thornwood")
+
+        assert thornwood is not None
+        assert world.location_endonym("loc_thornwood") in thornwood.aliases
+        assert world.location_endonym("loc_thornwood") != thornwood.canonical_name
+
+    def test_location_endonym_uses_toponym_specific_stems(self):
+        world = World(name="Custom")
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="loc_custom",
+                        name="Custom",
+                        description="Custom site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                        language_key="custom_lang",
+                    ),
+                ],
+                languages=[
+                    LanguageDefinition(
+                        language_key="custom_lang",
+                        display_name="Custom Lang",
+                        name_stems=["per"],
+                        toponym_stems=["tor"],
+                        toponym_suffixes=["um"],
+                        toponym_patterns=["RY"],
+                    )
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+
+        assert world.location_endonym("loc_custom") == "Torum"
+
+    def test_bundle_update_preserves_runtime_aliases_and_adds_new_endonym_alias(self):
+        world = World(name="Custom")
+        first_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="loc_custom",
+                        name="Custom",
+                        description="Custom site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                        language_key="lang_one",
+                    ),
+                ],
+                languages=[
+                    LanguageDefinition(
+                        language_key="lang_one",
+                        display_name="Lang One",
+                        toponym_stems=["tor"],
+                        toponym_suffixes=["um"],
+                        toponym_patterns=["RY"],
+                    ),
+                    LanguageDefinition(
+                        language_key="lang_two",
+                        display_name="Lang Two",
+                        toponym_stems=["sel"],
+                        toponym_suffixes=["eth"],
+                        toponym_patterns=["RY"],
+                    ),
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+        world.setting_bundle = first_bundle
+        location = world.get_location_by_id("loc_custom")
+        assert location is not None
+        world.add_alias("loc_custom", "Traveler's Rest")
+
+        updated_bundle = SettingBundle.from_dict(first_bundle.to_dict())
+        updated_bundle.world_definition.site_seeds[0].language_key = "lang_two"
+        world.setting_bundle = updated_bundle
+
+        updated_location = world.get_location_by_id("loc_custom")
+        assert updated_location is not None
+        assert "Traveler's Rest" in updated_location.aliases
+        assert "Seleth" in updated_location.aliases
+
+    def test_language_evolution_applies_at_interval_and_records_history(self):
+        world = World(name="Custom", year=1000)
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="loc_custom",
+                        name="Custom",
+                        description="Custom site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                        language_key="custom_lang",
+                    ),
+                ],
+                languages=[
+                    LanguageDefinition(
+                        language_key="custom_lang",
+                        display_name="Custom Lang",
+                        seed_syllables=["tor", "sel", "mar"],
+                        name_stems=["tor"],
+                        toponym_suffixes=["um"],
+                        evolution_interval_years=2,
+                    )
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+        before_endonym = world.location_endonym("loc_custom")
+
+        world.advance_time(2)
+
+        assert world.year == 1002
+        assert len(world.language_evolution_history) == 1
+        assert world.language_evolution_history[0].language_key == "custom_lang"
+        assert world.language_status()[0]["evolution_count"] == 1
+        assert world.location_endonym("loc_custom") is not None
+        assert (
+            world.location_endonym("loc_custom") != before_endonym
+            or world.language_evolution_history[0].source_token
+        )
+
+    def test_language_evolution_history_round_trips_with_world(self):
+        world = World(name="Custom", year=1000)
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="loc_custom",
+                        name="Custom",
+                        description="Custom site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                        language_key="custom_lang",
+                    ),
+                ],
+                languages=[
+                    LanguageDefinition(
+                        language_key="custom_lang",
+                        display_name="Custom Lang",
+                        seed_syllables=["tor", "sel", "mar"],
+                        evolution_interval_years=2,
+                    )
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+        world.advance_time(2)
+
+        restored = World.from_dict(world.to_dict())
+
+        assert restored.language_origin_year == 1000
+        assert len(restored.language_evolution_history) == 1
+        assert restored.language_evolution_history[0].year == 1002
+
+    def test_setting_bundle_rebases_language_origin_year_for_new_language_state(self):
+        world = World(name="Custom", year=1010)
+        bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="loc_custom",
+                        name="Custom",
+                        description="Custom site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                        language_key="custom_lang",
+                    ),
+                ],
+                languages=[
+                    LanguageDefinition(
+                        language_key="custom_lang",
+                        display_name="Custom Lang",
+                        seed_syllables=["tor", "sel", "mar"],
+                        evolution_interval_years=3,
+                    )
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+
+        world.setting_bundle = bundle
+        world.advance_time(2)
+        assert world.language_evolution_history == []
+
+        world.advance_time(1)
+        assert len(world.language_evolution_history) == 1
+        assert world.language_evolution_history[0].year == 1013
+
+    def test_language_evolution_keeps_staged_sound_shift_chain(self):
+        world = World(name="Custom", year=1000)
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="loc_custom",
+                        name="Custom",
+                        description="Custom site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                        language_key="custom_lang",
+                    ),
+                ],
+                languages=[
+                    LanguageDefinition(
+                        language_key="custom_lang",
+                        display_name="Custom Lang",
+                        consonants=["g"],
+                        vowels=["a"],
+                        seed_syllables=["ga"],
+                        evolution_rule_pool=[
+                            SoundChangeRuleDefinition(
+                                rule_key="custom_lang.g_to_gh",
+                                source="g",
+                                target="gh",
+                            ),
+                            SoundChangeRuleDefinition(
+                                rule_key="custom_lang.gh_to_w",
+                                source="gh",
+                                target="w",
+                            ),
+                        ],
+                        evolution_interval_years=1,
+                    )
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+
+        world.advance_time(2)
+
+        assert len(world.language_evolution_history) == 2
+        assert world.language_evolution_history[0].rule_key != world.language_evolution_history[1].rule_key
+        assert world.setting_bundle.world_definition.languages[0].sound_shifts == {}
+        assert world.language_status()[0]["sound_shifts"].get("g") == "gh"
+
+    def test_structured_sound_change_rules_apply_conditionally_in_runtime_profiles(self):
+        world = World(name="Custom", year=1000)
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="loc_custom",
+                        name="Custom",
+                        description="Custom site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                        language_key="custom_lang",
+                    ),
+                ],
+                languages=[
+                    LanguageDefinition(
+                        language_key="custom_lang",
+                        display_name="Custom Lang",
+                        seed_syllables=["ata", "tan"],
+                        vowels=["a"],
+                        consonants=["t", "n"],
+                        sound_change_rules=[
+                            SoundChangeRuleDefinition(
+                                rule_key="custom_lang.intervocalic_t_voicing",
+                                source="t",
+                                target="d",
+                                before="vowel",
+                                after="vowel",
+                                position="medial",
+                            )
+                        ],
+                    )
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+
+        evolved = world.language_engine.evolve_surface_form("custom_lang", "ata")
+        untouched = world.language_engine.evolve_surface_form("custom_lang", "tan")
+
+        assert evolved == "ada"
+        assert untouched == "tan"
 
     def test_setting_bundle_assignment_deep_copies_live_traces(self):
         world = World()

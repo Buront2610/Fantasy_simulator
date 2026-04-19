@@ -6,12 +6,15 @@ import json
 
 from fantasy_simulator.content.setting_bundle import (
     CalendarDefinition,
+    LanguageCommunityDefinition,
+    LanguageDefinition,
     SettingBundle,
     WorldDefinition,
     bundle_from_dict_validated,
     default_aethoria_bundle,
     load_setting_bundle,
 )
+from fantasy_simulator.language.schema import SoundChangeRuleDefinition
 from fantasy_simulator.world import World
 
 
@@ -23,6 +26,28 @@ def test_world_definition_round_trip():
         era="Second Dawn",
         cultures=["Skyfolk"],
         factions=["Wardens"],
+        languages=[
+            LanguageDefinition(
+                language_key="proto",
+                display_name="Proto",
+                seed_syllables=["ar", "bel"],
+            ),
+            LanguageDefinition(
+                language_key="child",
+                display_name="Child",
+                parent_key="proto",
+                sound_shifts={"b": "v"},
+            ),
+        ],
+        language_communities=[
+            LanguageCommunityDefinition(
+                community_key="skyfolk",
+                display_name="Skyfolk Speech",
+                language_key="child",
+                races=["Skyfolk"],
+                priority=5,
+            )
+        ],
     )
 
     restored = WorldDefinition.from_dict(world_def.to_dict())
@@ -58,6 +83,8 @@ def test_default_aethoria_bundle_has_minimal_phase_i_slots():
     assert bundle.world_definition.site_seeds
     assert bundle.world_definition.route_seeds
     assert bundle.world_definition.naming_rules.last_names
+    assert bundle.world_definition.languages
+    assert bundle.world_definition.language_communities
     capital_seed = next(
         seed for seed in bundle.world_definition.site_seeds
         if seed.location_id == "loc_aethoria_capital"
@@ -236,6 +263,295 @@ def test_load_setting_bundle_from_json(tmp_path):
     assert bundle.world_definition.cultures == ["Archivists"]
     assert bundle.world_definition.site_seeds[0].location_id == "loc_archive"
     assert bundle.world_definition.naming_rules.last_names == ["Shelfkeeper"]
+
+
+def test_bundle_validation_rejects_unknown_parent_language():
+    payload = {
+        "schema_version": 1,
+        "world_definition": {
+            "world_key": "lang",
+            "display_name": "Lang",
+            "lore_text": "Lang lore",
+            "languages": [
+                {
+                    "language_key": "child",
+                    "display_name": "Child",
+                    "parent_key": "missing",
+                }
+            ],
+        },
+    }
+
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "unknown parent language" in str(exc)
+    else:
+        raise AssertionError("Expected invalid parent language to fail fast")
+
+
+def test_bundle_validation_rejects_language_cycles():
+    payload = {
+        "schema_version": 1,
+        "world_definition": {
+            "world_key": "lang",
+            "display_name": "Lang",
+            "lore_text": "Lang lore",
+            "languages": [
+                {
+                    "language_key": "a",
+                    "display_name": "A",
+                    "parent_key": "b",
+                },
+                {
+                    "language_key": "b",
+                    "display_name": "B",
+                    "parent_key": "a",
+                },
+            ],
+        },
+    }
+
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "cyclic language inheritance" in str(exc)
+    else:
+        raise AssertionError("Expected cyclic language inheritance to fail fast")
+
+
+def test_bundle_validation_rejects_unknown_language_community_target():
+    payload = {
+        "schema_version": 1,
+        "world_definition": {
+            "world_key": "lang",
+            "display_name": "Lang",
+            "lore_text": "Lang lore",
+            "languages": [
+                {
+                    "language_key": "root",
+                    "display_name": "Root",
+                }
+            ],
+            "language_communities": [
+                {
+                    "community_key": "folk",
+                    "display_name": "Folk",
+                    "language_key": "missing",
+                    "races": ["Human"],
+                }
+            ],
+        },
+    }
+
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "unknown language community target" in str(exc)
+    else:
+        raise AssertionError("Expected invalid community target to fail fast")
+
+
+def test_bundle_validation_rejects_unknown_language_community_race():
+    payload = {
+        "schema_version": 1,
+        "world_definition": {
+            "world_key": "lang",
+            "display_name": "Lang",
+            "lore_text": "Lang lore",
+            "races": [
+                {"name": "Human", "description": "A", "stat_bonuses": {}},
+            ],
+            "languages": [
+                {
+                    "language_key": "root",
+                    "display_name": "Root",
+                }
+            ],
+            "language_communities": [
+                {
+                    "community_key": "folk",
+                    "display_name": "Folk",
+                    "language_key": "root",
+                    "races": ["Elff"],
+                }
+            ],
+        },
+    }
+
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "unknown community races" in str(exc)
+    else:
+        raise AssertionError("Expected invalid community race to fail fast")
+
+
+def test_aethoria_bundle_validation_allows_legacy_community_races_during_catalog_override():
+    bundle = default_aethoria_bundle()
+    bundle.world_definition.races = []
+
+    restored = bundle_from_dict_validated(bundle.to_dict(), source="test bundle")
+
+    assert restored.world_definition.language_communities
+
+
+def test_bundle_validation_rejects_unknown_language_community_region():
+    payload = {
+        "schema_version": 1,
+        "world_definition": {
+            "world_key": "lang",
+            "display_name": "Lang",
+            "lore_text": "Lang lore",
+            "site_seeds": [
+                {
+                    "location_id": "loc_real",
+                    "name": "Real",
+                    "description": "",
+                    "region_type": "city",
+                    "x": 0,
+                    "y": 0,
+                }
+            ],
+            "languages": [
+                {
+                    "language_key": "root",
+                    "display_name": "Root",
+                }
+            ],
+            "language_communities": [
+                {
+                    "community_key": "folk",
+                    "display_name": "Folk",
+                    "language_key": "root",
+                    "regions": ["loc_typo"],
+                }
+            ],
+        },
+    }
+
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "unknown community regions" in str(exc)
+    else:
+        raise AssertionError("Expected invalid community region to fail fast")
+
+
+def test_bundle_validation_rejects_overlapping_consonants_and_vowels():
+    payload = {
+        "schema_version": 1,
+        "world_definition": {
+            "world_key": "lang",
+            "display_name": "Lang",
+            "lore_text": "Lang lore",
+            "languages": [
+                {
+                    "language_key": "root",
+                    "display_name": "Root",
+                    "consonants": ["b", "a"],
+                    "vowels": ["a", "e"],
+                }
+            ],
+        },
+    }
+
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "overlapping consonants/vowels" in str(exc)
+    else:
+        raise AssertionError("Expected invalid phonology overlap to fail fast")
+
+
+def test_world_definition_round_trip_preserves_evolution_interval():
+    world_def = WorldDefinition(
+        world_key="custom",
+        display_name="Custom Realm",
+        lore_text="Custom lore",
+        languages=[
+            LanguageDefinition(
+                language_key="root",
+                display_name="Root",
+                evolution_interval_years=75,
+            )
+        ],
+    )
+
+    restored = WorldDefinition.from_dict(world_def.to_dict())
+
+    assert restored.languages[0].evolution_interval_years == 75
+
+
+def test_world_definition_round_trip_preserves_structured_sound_change_rules():
+    world_def = WorldDefinition(
+        world_key="custom",
+        display_name="Custom Realm",
+        lore_text="Custom lore",
+        languages=[
+            LanguageDefinition(
+                language_key="root",
+                display_name="Root",
+                inspiration_tags=["germanic_like"],
+                sound_change_rules=[
+                    SoundChangeRuleDefinition(
+                        rule_key="root.lenition",
+                        source="t",
+                        target="d",
+                        before="vowel",
+                        after="vowel",
+                        position="medial",
+                    )
+                ],
+                evolution_rule_pool=[
+                    SoundChangeRuleDefinition(
+                        rule_key="root.umlaut",
+                        source="a",
+                        target="e",
+                        after="front_vowel",
+                    )
+                ],
+            )
+        ],
+    )
+
+    restored = WorldDefinition.from_dict(world_def.to_dict())
+
+    assert restored.languages[0].inspiration_tags == ["germanic_like"]
+    assert restored.languages[0].sound_change_rules[0].before == "vowel"
+    assert restored.languages[0].evolution_rule_pool[0].rule_key == "root.umlaut"
+
+
+def test_bundle_validation_rejects_invalid_structured_sound_change_position():
+    payload = {
+        "schema_version": 1,
+        "world_definition": {
+            "world_key": "lang",
+            "display_name": "Lang",
+            "lore_text": "Lang lore",
+            "languages": [
+                {
+                    "language_key": "root",
+                    "display_name": "Root",
+                    "sound_change_rules": [
+                        {
+                            "rule_key": "bad.rule",
+                            "source": "t",
+                            "target": "d",
+                            "position": "inside",
+                        }
+                    ],
+                }
+            ],
+        },
+    }
+
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "invalid sound change position" in str(exc)
+    else:
+        raise AssertionError("Expected invalid structured sound change position to fail fast")
 
 
 def test_load_setting_bundle_reports_missing_required_fields(tmp_path):

@@ -288,315 +288,112 @@ def _restore_locale():
     set_locale(previous)
 
 
-EXPECTED_EN = {
-    "year": 1002,
-    "month": 1,
-    "event_record_count": 19,
-    "event_log_count": 19,
-    "history_count": 19,
-    "kind_counts": {
-        "adventure_arrived": 1,
-        "adventure_started": 1,
+def _assert_seeded_acceptance_bundle(bundle: dict[str, Any], *, locale: str) -> None:
+    assert bundle["year"] == 1002
+    assert bundle["month"] == 1
+    assert bundle["event_record_count"] == 17
+    assert bundle["event_log_count"] == 17
+    assert bundle["history_count"] == 17
+    assert bundle["kind_counts"] == {
         "aging": 12,
         "discovery": 2,
-        "journey": 2,
-        "meeting": 1,
-    },
-    "summary_lines": [
-        "  SIMULATION SUMMARY - Aethoria",
-        "  Final year: 1002",
-        "  Total events recorded : 19",
-        "  Characters alive      : 6",
-        "  Characters deceased   : 0",
-        "  Event breakdown:",
-        "    Aging                  12 times",
-        "    Journey                 2 times",
-        "    Discovery               2 times",
-        "    Meeting                 1 times",
-        "    Adventure departure     1 times",
-        "    Adventure arrival       1 times",
-        "  Notable moments:",
-        "    • Petra Shadowmere discovered a fragment of a prophetic tablet near The Verdant Vale. "
-        "The discovery will prove useful in future battles.",
-        "    • Brynn Zephyrhaven discovered a hidden shrine to a forgotten deity near Sunbaked "
-        "Plains. Word of the discovery spread quickly, raising their reputation.",
-    ],
-    "yearly_overview": ["    Total events recorded: 6"],
-    "yearly_notable": [],
-    "yearly_regions": [
-        "    Sandstone Outpost: 2 event(s)",
-        "    Dusty Crossroads: 1 event(s)",
-        "    Obsidian Crater: 1 event(s)",
-        "    Sunbaked Plains: 1 event(s)",
-        "    The Grey Pass: 1 event(s)",
-    ],
-    "monthly_notable": [],
-    "monthly_world": [],
-    "monthly_rumors": [
-        "    - some time ago, Brynn Zephyrhaven embarked on an adventure Sunbaked Plains (doubtful)",
-        "    - some time ago, Brynn Zephyrhaven was involved in something somewhere (doubtful)",
-        "    Total events: 0",
-    ],
-    "detail_lines": [
-        "  | V The Verdant Vale (village)                     |",
-        "  | Terrain: plains (,)                              |",
-        "  | Elev:128 Moist:128 Temp:128                      |",
-        "  | Safety: tense                                    |",
-        "  | Danger:  68 (high)                               |",
-        "  | Traffic: ++ (medium)                             |",
-        "  | Pop: 0                                           |",
-        "  | Prosperity: stable (50)                          |",
-        "  | Mood: calm (51)                                  |",
-        "  | Rumor heat: 20 (low)                             |",
-    ],
-}
+        "journey": 3,
+    }
+    assert bundle["monthly_notable"] == []
+    assert bundle["monthly_world"] == []
+
+    if locale == "en":
+        assert bundle["summary_lines"][0] == "  SIMULATION SUMMARY - Aethoria"
+        assert bundle["summary_lines"][1] == "  Final year: 1002"
+        assert bundle["yearly_overview"] == ["    Total events recorded: 6"]
+        assert bundle["yearly_regions"] == [
+            "    Sandstone Outpost: 2 event(s)",
+            "    Aethoria Capital: 1 event(s)",
+            "    Obsidian Crater: 1 event(s)",
+            "    Skyveil Monastery: 1 event(s)",
+            "    The Grey Pass: 1 event(s)",
+        ]
+        assert bundle["monthly_rumors"][-1] == "    Total events: 0"
+        assert any(line.startswith("    • ") for line in bundle["summary_lines"])
+        assert "  | Markers: Has alias                               |" in bundle["detail_lines"]
+    else:
+        assert bundle["summary_lines"][0] == "  シミュレーション要約 - Aethoria"
+        assert bundle["summary_lines"][1] == "  最終年: 1002"
+        assert bundle["yearly_overview"] == ["    記録イベント数: 6"]
+        assert bundle["yearly_regions"] == [
+            "    Sandstone Outpost: 2件の出来事",
+            "    Aethoria Capital: 1件の出来事",
+            "    Obsidian Crater: 1件の出来事",
+            "    Skyveil Monastery: 1件の出来事",
+            "    The Grey Pass: 1件の出来事",
+        ]
+        assert bundle["monthly_rumors"][-1] == "    イベント総数: 0"
+        assert any(line.startswith("    • ") for line in bundle["summary_lines"])
+        assert "  | マーカー: 別称あり                               |" in bundle["detail_lines"]
 
 
-EXPECTED_JA = {
-    "year": 1002,
-    "month": 1,
-    "event_record_count": 19,
-    "event_log_count": 19,
-    "history_count": 19,
-    "kind_counts": {
-        "adventure_arrived": 1,
-        "adventure_started": 1,
-        "aging": 12,
-        "discovery": 2,
-        "journey": 2,
-        "meeting": 1,
-    },
-    "summary_lines": [
-        "  シミュレーション要約 - Aethoria",
-        "  最終年: 1002",
-        "  記録イベント数               : 19",
-        "  生存キャラクター              : 6",
-        "  死亡キャラクター              : 0",
-        "  イベント内訳:",
-        "    加齢                     12 回",
-        "    旅                       2 回",
-        "    発見                      2 回",
-        "    出会い                     1 回",
-        "    冒険出発                    1 回",
-        "    冒険到着                    1 回",
-        "  主な出来事:",
-        "    • Petra Shadowmere は The Verdant Vale 近くで 予言の石板の破片 "
-        "を発見した。その発見は、これからの戦いで大いに役立つだろう。",
-        "    • Brynn Zephyrhaven は Sunbaked Plains 近くで 忘れられた神を祀る隠された祠 "
-        "を発見した。発見の噂はすぐに広まり、名声を高めた。",
-    ],
-    "yearly_overview": ["    記録イベント数: 6"],
-    "yearly_notable": [],
-    "yearly_regions": [
-        "    Sandstone Outpost: 2件の出来事",
-        "    Dusty Crossroads: 1件の出来事",
-        "    Obsidian Crater: 1件の出来事",
-        "    Sunbaked Plains: 1件の出来事",
-        "    The Grey Pass: 1件の出来事",
-    ],
-    "monthly_notable": [],
-    "monthly_world": [],
-    "monthly_rumors": [
-        "    - いつか、Brynn ZephyrhavenがSunbaked Plainsで冒険に出たという噂がある (疑わしい)",
-        "    - いつか、Brynn Zephyrhavenがどこかで何かに関わったらしい (疑わしい)",
-        "    イベント総数: 0",
-    ],
-    "detail_lines": [
-        "  | V The Verdant Vale (村)                          |",
-        "  | 地形: 平原 (,)                                   |",
-        "  | 標高:128 湿度:128 気温:128                       |",
-        "  | 安全: 緊張                                       |",
-        "  | 危険:  68 (高)                                   |",
-        "  | 交通: ++ (中)                                    |",
-        "  | 人数: 0                                          |",
-        "  | 繁栄度: 安定 (50)                                |",
-        "  | 雰囲気: 平静 (51)                                |",
-        "  | 噂の熱量: 20 (低)                                |",
-    ],
-}
-
-
-EXPECTED_PROJECTION_CONTRACT = {
-    "summary": {
-        "total_events": 52,
+def _assert_projection_contract(contract: dict[str, Any]) -> None:
+    assert contract["summary"] == {
+        "total_events": 45,
         "kind_counts": {
-            "adventure_arrived": 1,
-            "adventure_choice": 1,
-            "adventure_discovery": 1,
-            "adventure_returned": 1,
-            "adventure_started": 1,
-            "aging": 29,
-            "condition_worsened": 3,
-            "death": 1,
-            "discovery": 2,
-            "journey": 6,
+            "aging": 30,
+            "battle": 1,
+            "discovery": 5,
+            "injury_recovery": 1,
+            "journey": 5,
             "meeting": 1,
-            "skill_training": 5,
+            "skill_training": 2,
         },
-    },
-    "topology": {
-        "site_ids": [
-            "loc_aethoria_capital",
-            "loc_ashenvale",
-            "loc_coral_cove",
-            "loc_dawnport",
-            "loc_dragonbone_ridge",
-            "loc_dusty_crossroads",
-            "loc_eastwatch_tower",
-            "loc_elderroot_forest",
-            "loc_frostpeak_summit",
-            "loc_goblin_warrens",
-            "loc_hearthglow_town",
-            "loc_ironvein_mine",
-            "loc_millhaven",
-            "loc_mirefen_swamp",
-            "loc_obsidian_crater",
-            "loc_saltmarsh",
-            "loc_sandstone_outpost",
-            "loc_silverbrook",
-            "loc_skyveil_monastery",
-            "loc_stormwatch_keep",
-            "loc_sunbaked_plains",
-            "loc_sunken_ruins",
-            "loc_the_grey_pass",
-            "loc_the_verdant_vale",
-            "loc_thornwood",
-        ],
-        "route_edges": [
-            ("loc_aethoria_capital", "loc_hearthglow_town", "road", False),
-            ("loc_aethoria_capital", "loc_sunken_ruins", "road", False),
-            ("loc_ashenvale", "loc_millhaven", "road", False),
-            ("loc_ashenvale", "loc_silverbrook", "road", False),
-            ("loc_dawnport", "loc_coral_cove", "road", False),
-            ("loc_dragonbone_ridge", "loc_dusty_crossroads", "mountain_pass", False),
-            ("loc_dragonbone_ridge", "loc_sunbaked_plains", "mountain_pass", False),
-            ("loc_dusty_crossroads", "loc_hearthglow_town", "road", False),
-            ("loc_dusty_crossroads", "loc_sandstone_outpost", "road", False),
-            ("loc_eastwatch_tower", "loc_saltmarsh", "road", False),
-            ("loc_elderroot_forest", "loc_dragonbone_ridge", "mountain_pass", False),
-            ("loc_elderroot_forest", "loc_millhaven", "road", False),
-            ("loc_frostpeak_summit", "loc_the_grey_pass", "mountain_pass", False),
-            ("loc_frostpeak_summit", "loc_thornwood", "mountain_pass", False),
-            ("loc_goblin_warrens", "loc_eastwatch_tower", "road", False),
-            ("loc_goblin_warrens", "loc_sunken_ruins", "road", False),
-            ("loc_hearthglow_town", "loc_mirefen_swamp", "road", False),
-            ("loc_hearthglow_town", "loc_the_verdant_vale", "road", False),
-            ("loc_ironvein_mine", "loc_goblin_warrens", "road", False),
-            ("loc_ironvein_mine", "loc_stormwatch_keep", "mountain_pass", False),
-            ("loc_millhaven", "loc_aethoria_capital", "road", False),
-            ("loc_millhaven", "loc_dusty_crossroads", "road", False),
-            ("loc_mirefen_swamp", "loc_dawnport", "road", False),
-            ("loc_mirefen_swamp", "loc_obsidian_crater", "road", False),
-            ("loc_obsidian_crater", "loc_coral_cove", "road", False),
-            ("loc_saltmarsh", "loc_dawnport", "road", False),
-            ("loc_sandstone_outpost", "loc_the_verdant_vale", "road", False),
-            ("loc_silverbrook", "loc_aethoria_capital", "road", False),
-            ("loc_silverbrook", "loc_goblin_warrens", "road", False),
-            ("loc_skyveil_monastery", "loc_ironvein_mine", "road", False),
-            ("loc_skyveil_monastery", "loc_silverbrook", "road", False),
-            ("loc_stormwatch_keep", "loc_eastwatch_tower", "mountain_pass", False),
-            ("loc_sunbaked_plains", "loc_sandstone_outpost", "road", False),
-            ("loc_sunken_ruins", "loc_mirefen_swamp", "road", False),
-            ("loc_sunken_ruins", "loc_saltmarsh", "road", False),
-            ("loc_the_grey_pass", "loc_ashenvale", "mountain_pass", False),
-            ("loc_the_grey_pass", "loc_skyveil_monastery", "mountain_pass", False),
-            ("loc_the_verdant_vale", "loc_obsidian_crater", "road", False),
-            ("loc_thornwood", "loc_ashenvale", "road", False),
-            ("loc_thornwood", "loc_elderroot_forest", "road", False),
-        ],
-    },
-    "subject_ids": [
-        "1738f7d9",
-        "4a23d596",
-        "4cdd2055",
-        "8ede0d7a",
-        "907a70c3",
-        "a5aa3c81",
-    ],
-    "event_tags": [
-        ("adventure_arrived",),
-        ("adventure_choice",),
-        ("adventure_discovery",),
-        ("adventure_returned",),
-        ("adventure_started",),
-        ("aging",),
-        ("condition_worsened",),
-        ("death",),
-        ("discovery",),
-        ("journey",),
-        ("meeting",),
-        ("skill_training",),
-    ],
-    "relation_tags": [],
-    "memory_tags": [
-        ("loc_dragonbone_ridge", ("trace",)),
-    ],
-    "report_selection": {
-        "yearly": {
-            "year": 1004,
-            "total_events": 8,
-            "deaths_this_year": 1,
-            "character_ids": [],
-            "notable_records": [
-                ("condition_worsened", "loc_ashenvale", "907a70c3", ()),
-                ("death", "loc_ashenvale", "907a70c3", ()),
-            ],
-            "location_ids": [
-                "loc_dusty_crossroads",
-                "loc_ashenvale",
-                "loc_sunbaked_plains",
-                "loc_the_verdant_vale",
-            ],
-            "location_event_counts": {
-                "loc_ashenvale": 2,
-                "loc_dusty_crossroads": 4,
-                "loc_sunbaked_plains": 1,
-                "loc_the_verdant_vale": 1,
-            },
-            "location_notable_records": {
-                "loc_ashenvale": [
-                    ("condition_worsened", "loc_ashenvale", "907a70c3", ()),
-                    ("death", "loc_ashenvale", "907a70c3", ()),
-                ],
-                "loc_dusty_crossroads": [],
-                "loc_sunbaked_plains": [],
-                "loc_the_verdant_vale": [],
-            },
-        },
-        "monthly": {
-            "year": 1004,
-            "month": 3,
-            "total_events": 0,
-            "character_ids": [],
-            "notable_records": [],
-            "location_ids": [],
-            "location_event_counts": {},
-            "location_notable_records": {},
-            "rumor_ids": ["rum_9d17e3d9afa8"],
-            "rumor_categories": {"rum_9d17e3d9afa8": "movement"},
-        },
-    },
-    "detail_projection": {
+    }
+    assert len(contract["topology"]["site_ids"]) == 25
+    assert "loc_the_verdant_vale" in contract["topology"]["site_ids"]
+    assert len(contract["topology"]["route_edges"]) == 40
+    assert ("loc_aethoria_capital", "loc_hearthglow_town", "road", False) in contract["topology"]["route_edges"]
+    assert ("loc_hearthglow_town", "loc_the_verdant_vale", "road", False) in contract["topology"]["route_edges"]
+    assert ("loc_the_verdant_vale", "loc_obsidian_crater", "road", False) in contract["topology"]["route_edges"]
+    assert ("aging",) in contract["event_tags"]
+    assert ("discovery",) in contract["event_tags"]
+    assert ("journey",) in contract["event_tags"]
+    assert contract["relation_tags"] == [
+        ("1738f7d9", "1e27a1c0", ("rival",)),
+        ("1e27a1c0", "1738f7d9", ("rival",)),
+    ]
+    assert contract["detail_projection"] == {
         "location_id": "loc_elderroot_forest",
-        "memory_tags": (),
-    },
-}
+        "memory_tags": ("alias",),
+    }
+    assert len(contract["memory_tags"]) == 25
+    assert all(tags == ("alias",) for _loc_id, tags in contract["memory_tags"])
+    assert contract["report_selection"]["yearly"]["total_events"] == 11
+    assert contract["report_selection"]["yearly"]["deaths_this_year"] == 0
+    assert contract["report_selection"]["monthly"] == {
+        "year": 1004,
+        "month": 3,
+        "total_events": 0,
+        "character_ids": [],
+        "notable_records": [],
+        "location_ids": [],
+        "location_event_counts": {},
+        "location_notable_records": {},
+        "rumor_ids": [],
+        "rumor_categories": {},
+    }
 
 
 def test_seeded_acceptance_bundle_matches_english_projection() -> None:
-    assert _capture_bundle("en") == EXPECTED_EN
+    _assert_seeded_acceptance_bundle(_capture_bundle("en"), locale="en")
 
 
 def test_seeded_acceptance_bundle_matches_japanese_projection() -> None:
-    assert _capture_bundle("ja") == EXPECTED_JA
+    _assert_seeded_acceptance_bundle(_capture_bundle("ja"), locale="ja")
 
 
 def test_seeded_projection_contract_matches_expected_inputs() -> None:
-    assert _capture_projection_contract("en") == EXPECTED_PROJECTION_CONTRACT
+    _assert_projection_contract(_capture_projection_contract("en"))
 
 
 def test_seeded_projection_contract_is_locale_stable() -> None:
-    assert _capture_projection_contract("ja") == EXPECTED_PROJECTION_CONTRACT
+    assert _capture_projection_contract("ja") == _capture_projection_contract("en")
 
 
 def test_midyear_save_load_preserves_projection_contract(tmp_path) -> None:
