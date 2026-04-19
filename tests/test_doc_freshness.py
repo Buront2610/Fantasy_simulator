@@ -10,8 +10,12 @@ from fantasy_simulator.persistence.migrations import CURRENT_VERSION
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 README_TEXT = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+AGENTS_TEXT = (PROJECT_ROOT / "AGENTS.md").read_text(encoding="utf-8")
+PYPROJECT_TEXT = (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+REQUIREMENTS_DEV_TEXT = (PROJECT_ROOT / "requirements-dev.txt").read_text(encoding="utf-8")
 PLAN_TEXT = (PROJECT_ROOT / "docs" / "implementation_plan.md").read_text(encoding="utf-8")
 ARCHITECTURE_TEXT = (PROJECT_ROOT / "docs" / "architecture.md").read_text(encoding="utf-8")
+NEXT_VERSION_TEXT = (PROJECT_ROOT / "docs" / "next_version_plan.md").read_text(encoding="utf-8")
 UI_PLAN_TEXT = (PROJECT_ROOT / "docs" / "ui_renovation_plan.md").read_text(encoding="utf-8")
 TD_STATUS_TEXT = (PROJECT_ROOT / "docs" / "td_backlog_status.md").read_text(encoding="utf-8")
 
@@ -20,6 +24,36 @@ def test_readme_schema_version_matches_current_migration_version() -> None:
     match = re.search(r"`schema_version = (\d+)`", README_TEXT)
     assert match is not None, "README must document the current schema_version"
     assert int(match.group(1)) == CURRENT_VERSION
+
+
+def test_agent_doc_schema_version_matches_current_migration_version() -> None:
+    assert f"現行 schema v{CURRENT_VERSION}" in AGENTS_TEXT
+
+
+def test_next_version_doc_mentions_current_schema_version() -> None:
+    assert f"schema v{CURRENT_VERSION} migration" in NEXT_VERSION_TEXT
+
+
+def test_dependency_metadata_source_of_truth_is_pyproject() -> None:
+    assert "[project]" in PYPROJECT_TEXT
+    assert "[project.optional-dependencies]" in PYPROJECT_TEXT
+    assert 'requires-python = ">=3.10"' in PYPROJECT_TEXT
+    assert "pyproject.toml" in README_TEXT
+    assert "pyproject.toml" in ARCHITECTURE_TEXT
+
+
+def test_requirements_dev_is_only_a_pyproject_compatibility_shim() -> None:
+    assert REQUIREMENTS_DEV_TEXT.strip() == "-e .[dev]"
+
+
+def test_pyproject_declares_dev_and_ui_dependency_groups() -> None:
+    assert '"pytest>=7.0"' in PYPROJECT_TEXT
+    assert '"hypothesis>=6.0"' in PYPROJECT_TEXT
+    assert '"flake8>=7.0"' in PYPROJECT_TEXT
+    assert '"rich"' in PYPROJECT_TEXT
+    assert '"prompt_toolkit"' in PYPROJECT_TEXT
+    assert "uv sync --extra dev" in README_TEXT
+    assert 'python -m pip install -e ".[dev]"' in README_TEXT
 
 
 def test_readme_points_to_implementation_plan_for_roadmap() -> None:

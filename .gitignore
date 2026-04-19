@@ -8,3 +8,6 @@ __pycache__/
 .history/
 .runs/*
 !.runs/README.md
+*.egg-info/
+build/
+dist/

@@ -44,9 +44,29 @@ influence.
 Requirements:
 
 - Python 3.10+
+- Dependencies are declared in `pyproject.toml`
 - Optional UI extras:
   - `rich` (thin Rich render shell)
   - `prompt_toolkit` (input assistance backend)
+
+Install development dependencies:
+
+```bash
+uv sync --extra dev
+```
+
+Install development dependencies plus the optional UI extras:
+
+```bash
+uv sync --extra dev --extra ui
+```
+
+If you prefer `pip`, the same metadata can be installed from `pyproject.toml`:
+
+```bash
+python -m pip install -e ".[dev]"
+python -m pip install -e ".[dev,ui]"
+```
 
 Start the CLI:
 
