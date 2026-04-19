@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fantasy-simulator"
+version = "0.1.0"
+description = "A Python CLI world and life simulation set in the fantasy world of Aethoria."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "hypothesis>=6.0",
+    "flake8>=7.0",
+]
+ui = [
+    "rich",
+    "prompt_toolkit",
+]
+
+[tool.setuptools.packages.find]
+include = ["fantasy_simulator*"]
+
+[tool.setuptools.package-data]
+"fantasy_simulator.content" = ["bundles/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

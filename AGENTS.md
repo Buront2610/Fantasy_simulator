@@ -14,7 +14,7 @@ Fantasy Simulator: Python CLI世界シミュレーション（Aethoria）。Pyth
   `terrain.py` が terrain/site/route/atlas layout を担当
 - **UI**: `ui/screens.py` が画面制御、`ui/map_renderer.py` / `ui/atlas_renderer.py` が地図描画、
   `ui/presenters.py` / `ui/view_models.py` が表示整形を担当
-- **永続化**: `persistence/save_load.py`（JSON）、`persistence/migrations.py`（現行 schema v7）
+- **永続化**: `persistence/save_load.py`（JSON）、`persistence/migrations.py`（現行 schema v8）
 - **叙述補助**: `narrative/context.py` と `narrative/template_history.py` が最小 NarrativeContext を提供
 
 ## Directory Structure
@@ -84,6 +84,12 @@ Fantasy_simulator/
 ## Setup & Validation
 
 ```bash
+# 開発依存のインストール
+python -m pip install -e ".[dev]"
+
+# UI extras も含めてインストールする場合
+python -m pip install -e ".[dev,ui]"
+
 # 実行（推奨）
 python -m fantasy_simulator
 

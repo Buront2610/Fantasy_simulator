@@ -84,6 +84,8 @@ form that tests can enforce.
   task-mode context files, not new sources of truth.
 - `docs/subagent_contract.md` defines the preferred delegation shape for
   focused subagent work.
+- `pyproject.toml` is the dependency metadata source of truth; `requirements-dev.txt`
+  is a compatibility shim for tools or workflows that still expect a requirements file.
 - `docs/session_handoffs/` is for concise repo-local handoffs; keep entries
   short and factual, anchored to the template, and avoid carrying more than
   the latest relevant dated note.
