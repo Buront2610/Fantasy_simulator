@@ -146,10 +146,38 @@ def _collect_relation_tags(
         return ()
     relation_tags: List[str] = []
     for item in _normalize_observers(observer):
-        for tag in item.get_relation_tags(subject_id):
+        for tag in _relation_tags_for_subject(item, subject_id):
             if tag not in relation_tags:
                 relation_tags.append(tag)
     return tuple(relation_tags)
+
+
+def _relation_tags_for_subject(observer: "Character", subject_id: str) -> Sequence[str]:
+    if hasattr(observer, "get_relationship_state"):
+        relationship = observer.get_relationship_state(subject_id)
+        return tuple(relationship.tags)
+    if hasattr(observer, "get_relation_tags"):
+        return tuple(observer.get_relation_tags(subject_id))
+    return ()
+
+
+def _all_relation_tags(observer: "Character") -> Sequence[str]:
+    if hasattr(observer, "relationship_details"):
+        all_tags: List[str] = []
+        for relationship in observer.relationship_details.values():
+            for tag in relationship.tags:
+                if tag not in all_tags:
+                    all_tags.append(tag)
+        return tuple(all_tags)
+    relation_tags = getattr(observer, "relation_tags", None)
+    if relation_tags is None:
+        return ()
+    all_tags: List[str] = []
+    for tags in relation_tags.values():
+        for tag in tags:
+            if tag not in all_tags:
+                all_tags.append(tag)
+    return tuple(all_tags)
 
 
 def derive_relation_hint(
@@ -166,15 +194,7 @@ def derive_relation_hint(
     if observers is None:
         return None
     if subject_id is None:
-        relation_tags = getattr(observers, "relation_tags", None)
-        if relation_tags is None:
-            return None
-        all_tags: List[str] = []
-        for tags in relation_tags.values():
-            for tag in tags:
-                if tag not in all_tags:
-                    all_tags.append(tag)
-        return _primary_relation_tag(tuple(all_tags))
+        return _primary_relation_tag(_all_relation_tags(observers))
     return _primary_relation_tag(_collect_relation_tags(observers, subject_id))
 
 

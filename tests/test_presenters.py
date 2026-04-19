@@ -3,6 +3,7 @@
 from fantasy_simulator.i18n import set_locale
 from fantasy_simulator.ui.presenters import ReportPresenter
 from fantasy_simulator.ui.view_models import build_monthly_report_card_view
+from fantasy_simulator.rumor import Rumor
 from fantasy_simulator.world import CalendarChangeRecord, World
 from fantasy_simulator.events import WorldEventRecord
 from fantasy_simulator.content.setting_bundle import CalendarDefinition, CalendarMonthDefinition
@@ -99,3 +100,24 @@ def test_monthly_report_card_uses_historical_calendar_label_after_calendar_chang
     card = build_monthly_report_card_view(world, world.year, 3)
 
     assert card.month_label == "Wanetide"
+
+
+def test_monthly_report_card_surfaces_hot_rumors():
+    set_locale("en")
+    world = World()
+    world.rumors.append(
+        Rumor(
+            id="rumor_1",
+            description="Something happened at the capital.",
+            reliability="plausible",
+            source_location_id="loc_aethoria_capital",
+            year_created=world.year,
+            month_created=3,
+        )
+    )
+
+    card = build_monthly_report_card_view(world, world.year, 3)
+    lines = ReportPresenter.render_monthly_card(card)
+
+    assert any("Rumors" in line for line in lines)
+    assert any("Something happened at the capital." in line for line in lines)

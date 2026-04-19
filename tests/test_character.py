@@ -3,7 +3,13 @@ tests/test_character.py - Unit tests for the Character class.
 """
 
 import pytest
-from fantasy_simulator.character import Character, random_stats
+from fantasy_simulator.character import (
+    Character,
+    CharacterAbilities,
+    CharacterNarrativeState,
+    Relationship,
+    random_stats,
+)
 from fantasy_simulator.i18n import get_locale, set_locale
 
 
@@ -134,6 +140,34 @@ class TestCharacterProperties:
     def test_max_age_unknown_race(self):
         c = Character("Test", 20, "Male", "Gnome", "Warrior")
         assert c.max_age == 80  # fallback
+
+    def test_abilities_property_exposes_value_object(self, hero):
+        abilities = hero.abilities
+
+        assert isinstance(abilities, CharacterAbilities)
+        assert abilities.strength == hero.strength
+        assert abilities.combat_power == hero.combat_power
+
+    def test_narrative_state_property_exposes_value_object(self, hero):
+        hero.favorite = True
+        hero.history.append("Year 1: Test")
+
+        state = hero.narrative_state
+
+        assert isinstance(state, CharacterNarrativeState)
+        assert state.favorite is True
+        assert state.history == ["Year 1: Test"]
+
+    def test_relationship_state_exposes_richer_domain_view(self, hero, mage):
+        hero.update_relationship(mage.char_id, 25)
+        hero.add_relation_tag(mage.char_id, "friend", source_event_id="evt_001")
+
+        relationship = hero.get_relationship_state(mage.char_id)
+
+        assert isinstance(relationship, Relationship)
+        assert relationship.score == 25
+        assert relationship.tags == ["friend"]
+        assert relationship.tag_sources == {"friend": ["evt_001"]}
 
 
 # ---------------------------------------------------------------------------
@@ -320,6 +354,61 @@ class TestSerialization:
         assert restored.favorite is False
         assert restored.spotlighted is False
         assert restored.playable is False
+
+    def test_to_dict_includes_richer_domain_payloads(self, hero, mage):
+        hero.update_relationship(mage.char_id, 12)
+        hero.add_relation_tag(mage.char_id, "friend", source_event_id="evt_friend")
+
+        payload = hero.to_dict()
+
+        assert payload["abilities"]["strength"] == hero.strength
+        assert payload["narrative_state"]["injury_status"] == hero.injury_status
+        assert payload["relationship_details"][mage.char_id]["score"] == 12
+        assert payload["relationship_details"][mage.char_id]["tags"] == ["friend"]
+
+    def test_from_dict_accepts_richer_domain_payloads(self):
+        data = {
+            "name": "Nested",
+            "age": 30,
+            "gender": "Male",
+            "race": "Human",
+            "job": "Warrior",
+            "alive": True,
+            "location_id": "loc_aethoria_capital",
+            "abilities": {
+                "strength": 70,
+                "intelligence": 20,
+                "dexterity": 40,
+                "wisdom": 30,
+                "charisma": 25,
+                "constitution": 65,
+            },
+            "narrative_state": {
+                "favorite": True,
+                "spotlighted": True,
+                "playable": False,
+                "history": ["Nested history"],
+                "spouse_id": "ally_001",
+                "injury_status": "injured",
+                "active_adventure_id": "adv_001",
+            },
+            "relationship_details": {
+                "ally_001": {
+                    "score": 33,
+                    "tags": ["friend", "savior"],
+                    "tag_sources": {"friend": ["evt_001"], "savior": ["evt_002"]},
+                }
+            },
+        }
+
+        restored = Character.from_dict(data)
+
+        assert restored.strength == 70
+        assert restored.favorite is True
+        assert restored.history == ["Nested history"]
+        assert restored.relationships == {"ally_001": 33}
+        assert restored.relation_tags == {"ally_001": ["friend", "savior"]}
+        assert restored.relation_tag_sources["ally_001:friend"] == ["evt_001"]
 
 
 # ---------------------------------------------------------------------------

@@ -993,6 +993,9 @@ def render_location_detail(
     aliases: Optional[List[str]] = None,
     live_traces: Optional[List[str]] = None,
     generated_endonym: Optional[str] = None,
+    recent_events: Optional[List[str]] = None,
+    rumor_lines: Optional[List[str]] = None,
+    connected_routes: Optional[List[str]] = None,
 ) -> str:
     """Render a detailed single-site view with AA panel.
 
@@ -1087,7 +1090,33 @@ def render_location_detail(
         for trace in live_traces[:5]:
             lines.append(f"  |{_fit(f'   - {trace}', w)}|")
 
-    if generated_endonym or aliases or memorials or live_traces:
+    if connected_routes:
+        routes_label = tr('map_region_routes')
+        lines.append(f"  |{_fit(f' {routes_label}:', w)}|")
+        for route in connected_routes[:5]:
+            lines.append(f"  |{_fit(f'   - {route}', w)}|")
+
+    if recent_events:
+        events_label = tr('location_recent_events_label')
+        lines.append(f"  |{_fit(f' {events_label}:', w)}|")
+        for event in recent_events[:5]:
+            lines.append(f"  |{_fit(f'   - {event}', w)}|")
+
+    if rumor_lines:
+        rumors_label = tr('rumor_section_title')
+        lines.append(f"  |{_fit(f' {rumors_label}:', w)}|")
+        for rumor in rumor_lines[:5]:
+            lines.append(f"  |{_fit(f'   - {rumor}', w)}|")
+
+    if (
+        generated_endonym
+        or aliases
+        or memorials
+        or live_traces
+        or connected_routes
+        or recent_events
+        or rumor_lines
+    ):
         lines.append(border)
 
     return "\n".join(lines)

@@ -8,7 +8,13 @@ from __future__ import annotations
 from typing import List
 
 from ..i18n import tr
-from .view_models import AdventureSummaryView, LocationHistoryView, MonthlyReportCardView
+from .view_models import (
+    AdventureSummaryView,
+    LocationHistoryView,
+    LocationObservationView,
+    MonthlyReportCardView,
+    RumorSummaryView,
+)
 
 
 class AdventurePresenter:
@@ -35,6 +41,63 @@ class LocationPresenter:
         tag_str = f"  [{', '.join(tags)}]" if tags else ""
         return f"  {index:>2}. {view.location_name} ({view.region_type}){tag_str}"
 
+    @staticmethod
+    def render_observation_sections(view: LocationObservationView) -> List[str]:
+        lines: List[str] = []
+        if view.generated_endonym:
+            lines.append(f"  {tr('location_endonym_label')}: {view.generated_endonym}")
+            lines.append("")
+
+        lines.append(f"  {tr('location_aliases_label')}:")
+        if view.aliases:
+            lines.append(f"    {', '.join(view.aliases)}")
+        else:
+            lines.append("    -")
+
+        lines.append("")
+        lines.append(f"  {tr('location_memorials_label')}:")
+        if view.memorials:
+            for memorial in view.memorials:
+                lines.append(f"    {memorial}")
+        else:
+            lines.append(f"    {tr('no_memorials')}")
+
+        lines.append("")
+        lines.append(f"  {tr('location_live_traces_label')}:")
+        if view.traces:
+            for trace in view.traces:
+                lines.append(f"    - {trace}")
+        else:
+            lines.append(f"    {tr('no_live_traces')}")
+
+        lines.append("")
+        lines.append(f"  {tr('location_recent_events_label')}:")
+        if view.recent_events:
+            for event in view.recent_events:
+                lines.append(f"    - {event}")
+        else:
+            lines.append(f"    {tr('no_recent_events')}")
+
+        if view.connected_routes:
+            lines.append("")
+            lines.append(f"  {tr('map_region_routes')}:")
+            for route in view.connected_routes:
+                lines.append(f"    - {route}")
+
+        if view.rumors:
+            lines.append("")
+            lines.append(f"  {tr('rumor_section_title')}:")
+            for rumor in view.rumors:
+                lines.append(f"    - {RumorPresenter.render_brief(rumor)}")
+        return lines
+
+
+class RumorPresenter:
+    @staticmethod
+    def render_brief(view: RumorSummaryView) -> str:
+        reliability = tr(f"rumor_reliability_{view.reliability}")
+        return f"{view.description} ({reliability})"
+
 
 class ReportPresenter:
     @staticmethod
@@ -48,4 +111,6 @@ class ReportPresenter:
             lines.append(tr("monthly_report_card_adventures", items=" | ".join(card.completed_adventures)))
         if card.new_memory_items:
             lines.append(tr("monthly_report_card_memory", items=" | ".join(card.new_memory_items)))
+        if card.hot_rumors:
+            lines.append(f"  {tr('report_section_rumors')}: {' | '.join(card.hot_rumors)}")
         return lines

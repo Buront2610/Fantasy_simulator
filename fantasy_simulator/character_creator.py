@@ -214,6 +214,15 @@ class CharacterCreator:
             for job in jobs
         ]
 
+    @property
+    def location_entries(self) -> List[tuple[str, str, str, List[str]]]:
+        """Return site seeds as authoring-friendly region/origin options."""
+        bundle = self._effective_bundle()
+        return [
+            (seed.location_id, seed.name, seed.region_type, list(seed.tags))
+            for seed in bundle.world_definition.site_seeds
+        ]
+
     def _require_race_and_job_entries(
         self,
     ) -> tuple[List[tuple[str, str, Dict[str, int]]], List[tuple[str, str, List[str]]]]:
@@ -241,6 +250,40 @@ class CharacterCreator:
         if self._supports_aethoria_templates():
             return list(_TEMPLATES.keys())
         return []
+
+    def _race_entries_for_context(
+        self,
+        *,
+        tribe: str | None = None,
+        region: str | None = None,
+    ) -> List[tuple[str, str, Dict[str, int]]]:
+        """Prefer region/tribe-authored race pools when bundle communities specify them."""
+        race_entries = self.race_entries
+        if not race_entries or (tribe is None and region is None):
+            return race_entries
+
+        bundle = self._effective_bundle()
+        communities = bundle.world_definition.language_communities
+        matching_communities = [
+            community
+            for community in communities
+            if (
+                (region is not None and region in community.regions)
+                or (tribe is not None and tribe in community.tribes)
+            )
+            and community.races
+        ]
+        if not matching_communities:
+            return race_entries
+
+        matching_communities.sort(key=lambda community: (-community.priority, community.community_key))
+        allowed_races = {
+            race_name
+            for community in matching_communities
+            for race_name in community.races
+        }
+        filtered = [entry for entry in race_entries if entry[0] in allowed_races]
+        return filtered or race_entries
 
     def create_interactive(self, ctx: "UIContext | None" = None) -> Character:
         from .ui.ui_context import _default_ctx
@@ -305,6 +348,7 @@ class CharacterCreator:
         region: str | None = None,
     ) -> Character:
         race_entries, job_entries = self._require_race_and_job_entries()
+        race_entries = self._race_entries_for_context(tribe=tribe, region=region)
         gender = rng.choice(_GENDERS)
         race_entry = rng.choice(race_entries)
         race = race_entry[0]

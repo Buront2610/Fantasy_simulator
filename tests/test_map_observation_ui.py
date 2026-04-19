@@ -557,6 +557,19 @@ class TestRenderLocationDetail(unittest.TestCase):
         )
         self.assertIn("Alice visited", output)
 
+    def test_detail_with_routes_recent_events_and_rumors(self) -> None:
+        output = render_location_detail(
+            self.info,
+            "loc_test_town",
+            connected_routes=["ForestCamp (Road)"],
+            recent_events=["[Year 10] Scouts returned with news."],
+            rumor_lines=["People say ForestCamp is stirring. (plausible)"],
+        )
+        self.assertIn("Routes from here", output)
+        self.assertIn("Scouts returned with news", output)
+        self.assertIn("Rumors & Intelligence", output)
+        self.assertIn("ForestCamp is stirring", output)
+
     def test_overlay_markers_shown(self) -> None:
         """ForestCamp has memorial and recent death → markers shown."""
         output = render_location_detail(self.info, "loc_forest_camp")

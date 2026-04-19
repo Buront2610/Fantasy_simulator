@@ -23,9 +23,14 @@ from ..i18n import set_locale, tr, tr_term
 from ..persistence.save_load import load_simulation, save_simulation
 from ..simulator import Simulator
 from ..world import World
-from .presenters import AdventurePresenter, LocationPresenter, ReportPresenter
+from .presenters import AdventurePresenter, LocationPresenter, ReportPresenter, RumorPresenter
 from .ui_helpers import fit_display_width
-from .view_models import AdventureSummaryView, LocationHistoryView, build_monthly_report_card_view
+from .view_models import (
+    AdventureSummaryView,
+    LocationHistoryView,
+    build_location_observation_view,
+    build_monthly_report_card_view,
+)
 
 from .ui_context import UIContext, _default_ctx
 
@@ -291,6 +296,18 @@ def _build_detail_memory_payload(
     return memorials, aliases, live_traces, generated_endonym
 
 
+def _build_detail_observation_payload(
+    world: World,
+    loc: Any,
+) -> tuple[list[str] | None, list[str] | None, list[str] | None]:
+    """Return inspectable route/event/rumor notes for the rich detail panel."""
+    observation = build_location_observation_view(world, loc.id)
+    connected_routes = observation.connected_routes or None
+    recent_events = observation.recent_events or None
+    rumor_lines = [RumorPresenter.render_brief(rumor) for rumor in observation.rumors] or None
+    return connected_routes, recent_events, rumor_lines
+
+
 def _render_region_map_for_location(
     world: World,
     info: Any,
@@ -314,11 +331,18 @@ def _render_location_detail_for_location(
     world: World,
     info: Any,
     loc: Any,
+    *,
+    include_observation_notes: bool = False,
 ) -> str:
     """Render a location detail panel using the same enrichment path as the interactive UI."""
     from .map_renderer import render_location_detail
 
     memorials, aliases, live_traces, generated_endonym = _build_detail_memory_payload(world, loc)
+    connected_routes = None
+    recent_events = None
+    rumor_lines = None
+    if include_observation_notes:
+        connected_routes, recent_events, rumor_lines = _build_detail_observation_payload(world, loc)
     return render_location_detail(
         info,
         loc.id,
@@ -326,6 +350,9 @@ def _render_location_detail_for_location(
         aliases=aliases,
         live_traces=live_traces,
         generated_endonym=generated_endonym,
+        connected_routes=connected_routes,
+        recent_events=recent_events,
+        rumor_lines=rumor_lines,
     )
 
 
@@ -334,6 +361,7 @@ def render_world_map_views_for_location(
     location_id: str,
     *,
     include_overview: bool = True,
+    include_observation_notes: bool = False,
 ) -> dict[str, str]:
     """Return stable world-map overview/region/detail renderings for one location.
 
@@ -349,7 +377,12 @@ def render_world_map_views_for_location(
     info = build_map_info(world)
     rendered = {
         "region": _render_region_map_for_location(world, info, loc),
-        "detail": _render_location_detail_for_location(world, info, loc),
+        "detail": _render_location_detail_for_location(
+            world,
+            info,
+            loc,
+            include_observation_notes=include_observation_notes,
+        ),
     }
     if include_overview:
         rendered["overview"] = render_world_overview(info)
@@ -367,7 +400,14 @@ def _show_detail_for_location(
     out = ctx.out
     inp = ctx.inp
     out.print_line()
-    out.print_line(_render_location_detail_for_location(world, info, loc))
+    out.print_line(
+        _render_location_detail_for_location(
+            world,
+            info,
+            loc,
+            include_observation_notes=True,
+        )
+    )
     inp.pause()
 
 
@@ -867,60 +907,17 @@ def _show_location_history(world: World, ctx: UIContext | None = None) -> None:
         return
 
     loc = locations[idx]
+    observation = build_location_observation_view(world, loc.id)
     out.print_line()
     out.print_separator()
     out.print_heading(f"  {tr('location_detail_header', name=loc.canonical_name)}")
     out.print_separator()
-
-    if loc.generated_endonym:
-        out.print_line(f"  {tr('location_endonym_label')}: {loc.generated_endonym}")
-        out.print_line()
-
-    # Aliases
-    if loc.aliases:
-        out.print_line(f"  {tr('location_aliases_label')}: {', '.join(loc.aliases)}")
-        out.print_line()
-
-    # Memorials
-    out.print_line(f"  {tr('location_memorials_label')}:")
-    memorials = world.get_memorials_for_location(loc.id)
-    if memorials:
-        for mem in memorials:
-            out.print_line(f"    {tr('memorial_entry', year=mem.year, epitaph=mem.epitaph)}")
-    else:
-        out.print_dim(f"    {tr('no_memorials')}")
-
-    # Live traces (most recent first, up to 5)
-    out.print_line()
-    out.print_line(f"  {tr('location_live_traces_label')}:")
-    if loc.live_traces:
-        for trace in reversed(loc.live_traces[-5:]):
-            out.print_line(f"    - {trace['text']}")
-        if len(loc.live_traces) > 5:
-            out.print_dim(f"    {tr('location_live_traces_truncated', count=len(loc.live_traces) - 5)}")
-    else:
-        out.print_dim(f"    {tr('no_live_traces')}")
-
-    # Recent canonical events (most recent first, up to 5)
-    out.print_line()
-    out.print_line(f"  {tr('location_recent_events_label')}:")
-    event_lookup = {record.record_id: record for record in world.event_records}
-    recent_records = [
-        event_lookup[record_id]
-        for record_id in reversed(loc.recent_event_ids[-5:])
-        if record_id in event_lookup
-    ]
-    if recent_records:
-        for record in recent_records:
-            out.print_line(
-                f"    - {tr('location_recent_event_entry', year=record.year, description=record.description)}"
-            )
-        if len(loc.recent_event_ids) > 5:
-            out.print_dim(
-                f"    {tr('location_recent_events_truncated', count=len(loc.recent_event_ids) - 5)}"
-            )
-    else:
-        out.print_dim(f"    {tr('no_recent_events')}")
+    for line in LocationPresenter.render_observation_sections(observation):
+        out.print_line(line)
+    if len(loc.live_traces) > 5:
+        out.print_dim(f"    {tr('location_live_traces_truncated', count=len(loc.live_traces) - 5)}")
+    if len(loc.recent_event_ids) > 5:
+        out.print_dim(f"    {tr('location_recent_events_truncated', count=len(loc.recent_event_ids) - 5)}")
 
     ctx.inp.pause()
 

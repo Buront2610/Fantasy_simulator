@@ -10,6 +10,7 @@ from fantasy_simulator.content.setting_bundle import (
     LanguageDefinition,
     SettingBundle,
     WorldDefinition,
+    build_setting_bundle_authoring_summary,
     bundle_from_dict_validated,
     default_aethoria_bundle,
     load_setting_bundle,
@@ -868,6 +869,96 @@ def test_empty_calendar_definition_uses_consistent_30_day_fallback():
     assert calendar.months_per_year == 1
     assert calendar.days_in_month(1) == 30
     assert calendar.days_per_year == 30
+
+
+def test_bundle_authoring_summary_exposes_region_route_and_language_breakdowns():
+    bundle = default_aethoria_bundle()
+
+    summary = build_setting_bundle_authoring_summary(bundle)
+
+    assert summary.world_key == "aethoria"
+    assert summary.site_count == len(bundle.world_definition.site_seeds)
+    assert summary.route_count == len(bundle.world_definition.route_seeds)
+    assert "loc_aethoria_capital" in summary.capital_site_ids
+    assert "loc_aethoria_capital" in summary.resident_site_ids
+    assert summary.site_counts_by_region_type["city"] >= 1
+    assert summary.route_counts_by_type["road"] >= 1
+    assert "aethic_common" in summary.language_keys
+    assert "loc_thornwood" in summary.community_keys_by_region
+
+
+def test_bundle_validation_rejects_native_name_without_language_key() -> None:
+    payload = {
+        "schema_version": 1,
+        "world_definition": {
+            "world_key": "bad_native_name",
+            "display_name": "Bad Native Name",
+            "lore_text": "Malformed",
+            "site_seeds": [
+                {
+                    "location_id": "loc_bad",
+                    "name": "Bad",
+                    "native_name": "Baad",
+                    "description": "",
+                    "region_type": "city",
+                    "x": 0,
+                    "y": 0,
+                }
+            ],
+        },
+    }
+
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "native_name" in str(exc)
+        assert "language_key" in str(exc)
+    else:
+        raise AssertionError("Expected native_name without language_key to fail fast")
+
+
+def test_bundle_validation_rejects_non_positive_route_distance() -> None:
+    payload = {
+        "schema_version": 1,
+        "world_definition": {
+            "world_key": "bad_distance",
+            "display_name": "Bad Distance",
+            "lore_text": "Malformed",
+            "site_seeds": [
+                {
+                    "location_id": "loc_one",
+                    "name": "One",
+                    "description": "",
+                    "region_type": "city",
+                    "x": 0,
+                    "y": 0,
+                },
+                {
+                    "location_id": "loc_two",
+                    "name": "Two",
+                    "description": "",
+                    "region_type": "village",
+                    "x": 1,
+                    "y": 0,
+                },
+            ],
+            "route_seeds": [
+                {
+                    "route_id": "route_bad",
+                    "from_site_id": "loc_one",
+                    "to_site_id": "loc_two",
+                    "distance": 0,
+                }
+            ],
+        },
+    }
+
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "distance >= 1" in str(exc)
+    else:
+        raise AssertionError("Expected non-positive route distance to fail fast")
 
 
 def test_load_setting_bundle_rejects_invalid_event_impact_rule_delta(tmp_path):

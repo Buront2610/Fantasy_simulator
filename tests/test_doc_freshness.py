@@ -111,3 +111,9 @@ def test_td_backlog_status_tracks_invariants_and_remaining_major_split() -> None
     assert "TD-3 Responsibility Split" in TD_STATUS_TEXT
     assert "未完" in TD_STATUS_TEXT
     assert "world_key == \"aethoria\"" in TD_STATUS_TEXT
+
+
+def test_implementation_plan_mentions_current_observation_and_type_gate_debt_payoff() -> None:
+    assert "inspectable" in PLAN_TEXT
+    assert "bundle authoring / swap review" in PLAN_TEXT
+    assert "type-gate scaffolding" in PLAN_TEXT
