@@ -243,11 +243,12 @@ def _show_results(sim: Simulator, ctx: UIContext | None = None) -> None:
 
 def _build_region_memory_payloads(
     world: World,
-) -> tuple[dict[str, list[str]], dict[str, list[str]], dict[str, list[str]]]:
+) -> tuple[dict[str, list[str]], dict[str, list[str]], dict[str, list[str]], dict[str, str]]:
     """Return renderer-ready world memory payloads for region-map enrichment."""
     site_memorials: dict[str, list[str]] = {}
     site_aliases: dict[str, list[str]] = {}
     site_traces: dict[str, list[str]] = {}
+    site_endonyms: dict[str, str] = {}
     for loc in world.grid.values():
         if loc.memorial_ids:
             mems = world.get_memorials_for_location(loc.id)
@@ -262,17 +263,20 @@ def _build_region_memory_payloads(
             site_traces[loc.id] = [
                 t.get("text", "") for t in loc.live_traces[-3:]
             ]
-    return site_memorials, site_aliases, site_traces
+        if loc.generated_endonym:
+            site_endonyms[loc.id] = loc.generated_endonym
+    return site_memorials, site_aliases, site_traces, site_endonyms
 
 
 def _build_detail_memory_payload(
     world: World,
     loc: Any,
-) -> tuple[list[str] | None, list[str] | None, list[str] | None]:
+) -> tuple[list[str] | None, list[str] | None, list[str] | None, str | None]:
     """Return renderer-ready world memory payloads for a location detail panel."""
     memorials: list[str] | None = None
     aliases = list(loc.aliases) or None
     live_traces: list[str] | None = None
+    generated_endonym = loc.generated_endonym or None
 
     if loc.memorial_ids:
         memorials = [
@@ -284,7 +288,7 @@ def _build_detail_memory_payload(
     if recent_traces:
         live_traces = [trace.get("text", "") for trace in recent_traces] or None
 
-    return memorials, aliases, live_traces
+    return memorials, aliases, live_traces, generated_endonym
 
 
 def _render_region_map_for_location(
@@ -295,13 +299,14 @@ def _render_region_map_for_location(
     """Render a region map using the same enrichment path as the interactive UI."""
     from .map_renderer import render_region_map
 
-    site_memorials, site_aliases, site_traces = _build_region_memory_payloads(world)
+    site_memorials, site_aliases, site_traces, site_endonyms = _build_region_memory_payloads(world)
     return render_region_map(
         info,
         center_loc.id,
         site_memorials=site_memorials,
         site_aliases=site_aliases,
         site_traces=site_traces,
+        site_endonyms=site_endonyms,
     )
 
 
@@ -313,13 +318,14 @@ def _render_location_detail_for_location(
     """Render a location detail panel using the same enrichment path as the interactive UI."""
     from .map_renderer import render_location_detail
 
-    memorials, aliases, live_traces = _build_detail_memory_payload(world, loc)
+    memorials, aliases, live_traces, generated_endonym = _build_detail_memory_payload(world, loc)
     return render_location_detail(
         info,
         loc.id,
         memorials=memorials,
         aliases=aliases,
         live_traces=live_traces,
+        generated_endonym=generated_endonym,
     )
 
 
@@ -865,6 +871,10 @@ def _show_location_history(world: World, ctx: UIContext | None = None) -> None:
     out.print_separator()
     out.print_heading(f"  {tr('location_detail_header', name=loc.canonical_name)}")
     out.print_separator()
+
+    if loc.generated_endonym:
+        out.print_line(f"  {tr('location_endonym_label')}: {loc.generated_endonym}")
+        out.print_line()
 
     # Aliases
     if loc.aliases:

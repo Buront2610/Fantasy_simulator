@@ -11,17 +11,32 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from .event_models import WorldEventRecord
 from .i18n import tr
+from .language.engine import LanguageEngine, fallback_evolution_targets
+from .language.state import LanguageEvolutionRecord, LanguageRuntimeState
 from .rule_override_resolution import (
     clone_default_event_impact_rules,
     clone_default_propagation_rules,
-    resolve_event_impact_rule_overrides,
-    resolve_propagation_rule_overrides,
+)
+from .world_language import (
+    advance_world_languages_for_year,
+    apply_evolution_record as apply_language_evolution_record,
+    build_language_engine,
+    evolution_records_for_language,
+    language_status as build_language_status,
+    location_endonym as resolve_location_endonym,
+    refresh_world_generated_endonyms,
+    resolve_language_display_name,
 )
 from .world_event_log import (
     append_display_event_log_entry,
     compatibility_event_log_view,
     rebuild_display_event_log,
     trim_event_log_entries,
+)
+from .world_bundle_transition import (
+    apply_setting_bundle as apply_world_setting_bundle,
+    set_setting_bundle_metadata,
+    topology_signature,
 )
 from .world_location_references import LocationReferenceResolver
 from .world_memory import (
@@ -35,6 +50,10 @@ from .world_load_normalizer import (
     ensure_unique_event_record_ids,
     normalize_after_load as normalize_loaded_world_state,
     rebuild_recent_event_ids,
+)
+from .world_persistence import (
+    hydrate_world_state,
+    serialize_world_state,
 )
 from .world_route_graph import (
     ObservableRouteList,
@@ -67,7 +86,6 @@ from .world_topology_state import (
     build_atlas_layout_from_topology,
     build_topology_from_locations,
     overlay_serialized_route_state,
-    restore_serialized_topology,
     validate_topology_integrity,
 )
 from .world_topology import (
@@ -79,9 +97,7 @@ from .world_topology import (
 from .content.setting_bundle import (
     CalendarDefinition,
     SettingBundle,
-    bundle_from_dict_validated,
     default_aethoria_bundle,
-    validate_setting_bundle,
 )
 from .content.world_data import (
     fallback_location_id,
@@ -256,6 +272,7 @@ class LocationState:
     controlling_faction_id: Optional[str] = None
     recent_event_ids: List[str] = field(default_factory=list)
     aliases: List[str] = field(default_factory=list)
+    generated_endonym: str = ""
     memorial_ids: List[str] = field(default_factory=list)
     live_traces: List[Dict[str, Any]] = field(default_factory=list)
 
@@ -328,6 +345,7 @@ class LocationState:
             "controlling_faction_id": self.controlling_faction_id,
             "recent_event_ids": list(self.recent_event_ids),
             "aliases": list(self.aliases),
+            "generated_endonym": self.generated_endonym,
             "memorial_ids": list(self.memorial_ids),
             "live_traces": [dict(trace) for trace in self.live_traces],
         }
@@ -373,6 +391,7 @@ class LocationState:
             controlling_faction_id=data.get("controlling_faction_id"),
             recent_event_ids=_string_list_payload(data.get("recent_event_ids", []), field_name="recent_event_ids"),
             aliases=_string_list_payload(data.get("aliases", []), field_name="aliases"),
+            generated_endonym=str(data.get("generated_endonym", "")),
             memorial_ids=_string_list_payload(data.get("memorial_ids", []), field_name="memorial_ids"),
             live_traces=_trace_list_payload(data.get("live_traces", []), field_name="live_traces"),
         )
@@ -383,6 +402,7 @@ class World:
 
     WATCHED_ACTOR_TAG_PREFIX = "watched_actor:"
     WATCHED_ACTOR_INFERRED_TAG = "watched_actor_inferred"
+    LANGUAGE_SHIFT_CANDIDATES: Dict[str, List[str]] = fallback_evolution_targets()
 
     def __init__(
         self,
@@ -401,6 +421,7 @@ class World:
         self._location_reference_resolver = LocationReferenceResolver.from_site_seeds(
             self._setting_bundle.world_definition.site_seeds
         )
+        self._language_engine: LanguageEngine | None = None
         self.calendar_baseline: CalendarDefinition = _clone_calendar(
             self._setting_bundle.world_definition.calendar
         )
@@ -429,6 +450,9 @@ class World:
         self.memorials: Dict[str, MemorialRecord] = {}
         # Future-facing trace of in-world calendar transitions.
         self.calendar_history: List[CalendarChangeRecord] = []
+        self.language_origin_year: int = year
+        self.language_evolution_history: List[LanguageEvolutionRecord] = []
+        self._language_runtime_states: Dict[str, LanguageRuntimeState] = {}
         # PR-G: terrain / site / route layers
         self.terrain_map: Optional[TerrainMap] = None
         self.sites: List[Site] = []
@@ -504,65 +528,24 @@ class World:
         self.apply_setting_bundle(value)
 
     def _set_setting_bundle_metadata(self, bundle: SettingBundle) -> None:
-        """Replace bundle-backed metadata without rebuilding world structure."""
-        previous_calendar = None
-        if hasattr(self, "_setting_bundle") and self._setting_bundle is not None:
-            previous_calendar = self._setting_bundle.world_definition.calendar.to_dict()
-        self._setting_bundle = _clone_setting_bundle(bundle)
-        self._location_reference_resolver = LocationReferenceResolver.from_site_seeds(
-            self._setting_bundle.world_definition.site_seeds
-        )
-        if hasattr(self, "lore"):
-            self.lore = self._setting_bundle.world_definition.lore_text
-        if hasattr(self, "calendar_baseline"):
-            next_calendar = self._setting_bundle.world_definition.calendar
-            if previous_calendar is None or previous_calendar != next_calendar.to_dict():
-                self.calendar_baseline = _clone_calendar(next_calendar)
-                if hasattr(self, "calendar_history"):
-                    self.calendar_history = []
-        self.event_impact_rules = resolve_event_impact_rule_overrides(
-            self._setting_bundle.world_definition.event_impact_rules
-        )
-        self.propagation_rules = resolve_propagation_rule_overrides(
-            self._setting_bundle.world_definition.propagation_rules
+        set_setting_bundle_metadata(
+            self,
+            bundle,
+            clone_bundle=_clone_setting_bundle,
+            clone_calendar=_clone_calendar,
         )
 
     def apply_setting_bundle(self, bundle: SettingBundle) -> None:
-        """Apply a bundle while keeping derived world structures consistent."""
-        validate_setting_bundle(bundle, source="World.setting_bundle")
-        previous_bundle = getattr(self, "_setting_bundle", None)
-        previous_locations = list(getattr(self, "grid", {}).values())
-        self._set_setting_bundle_metadata(bundle)
-        if hasattr(self, "grid"):
-            topology_changed = (
-                previous_bundle is None
-                or self._topology_signature(previous_bundle) != self._topology_signature(bundle)
-            )
-            if topology_changed:
-                self._build_default_map(previous_locations=previous_locations)
-                self._normalize_references_after_bundle_change()
-            else:
-                self._refresh_locations_from_site_seeds()
+        apply_world_setting_bundle(
+            self,
+            bundle,
+            clone_bundle=_clone_setting_bundle,
+            clone_calendar=_clone_calendar,
+        )
 
     @staticmethod
     def _topology_signature(bundle: SettingBundle) -> Tuple[Tuple[Any, ...], Tuple[Any, ...]]:
-        world = bundle.world_definition
-        site_signature = tuple(
-            (seed.location_id, seed.region_type, seed.x, seed.y)
-            for seed in world.site_seeds
-        )
-        route_signature = tuple(
-            (
-                seed.route_id,
-                seed.from_site_id,
-                seed.to_site_id,
-                seed.route_type,
-                int(seed.distance),
-                bool(seed.blocked),
-            )
-            for seed in world.route_seeds
-        )
-        return site_signature, route_signature
+        return topology_signature(bundle)
 
     def _refresh_locations_from_site_seeds(self) -> None:
         """Refresh static location metadata when bundle lore changes but topology does not."""
@@ -573,6 +556,58 @@ class World:
             replacement = self._location_state_from_site_seed(seed)
             self._copy_location_runtime_state(existing, replacement)
             self._register_location(replacement)
+
+    @property
+    def language_engine(self) -> LanguageEngine:
+        if self._language_engine is None:
+            self._language_engine = build_language_engine(
+                self._setting_bundle.world_definition,
+                self._language_runtime_states,
+            )
+        return self._language_engine
+
+    def naming_rules_for_identity(
+        self,
+        *,
+        race: str | None = None,
+        tribe: str | None = None,
+        region: str | None = None,
+    ):
+        return self.language_engine.naming_rules_for_identity(race=race, tribe=tribe, region=region)
+
+    def resolve_language_for_identity(
+        self,
+        *,
+        race: str | None = None,
+        tribe: str | None = None,
+        region: str | None = None,
+    ) -> str | None:
+        return resolve_language_display_name(
+            self.language_engine,
+            race=race,
+            tribe=tribe,
+            region=region,
+        )
+
+    def describe_language_lineage(self, language_key: str) -> List[str]:
+        return self.language_engine.describe_language_lineage(language_key)
+
+    def location_endonym(self, location_id: str) -> str | None:
+        return resolve_location_endonym(
+            self._setting_bundle.world_definition,
+            self.language_engine,
+            location_id,
+        )
+
+    def language_status(self) -> List[Dict[str, Any]]:
+        return build_language_status(
+            self._setting_bundle.world_definition,
+            self.language_engine,
+            self.language_evolution_history,
+        )
+
+    def language_evolution_records(self, language_key: str) -> List[LanguageEvolutionRecord]:
+        return evolution_records_for_language(self.language_evolution_history, language_key)
 
     def _register_location(self, loc: LocationState) -> None:
         existing_at_coord = self.grid.get((loc.x, loc.y))
@@ -605,6 +640,8 @@ class World:
 
     def _copy_location_runtime_state(self, source: LocationState, target: LocationState) -> None:
         """Preserve mutable location state across structural rebuilds."""
+        structural_aliases = list(target.aliases)
+        structural_endonym = target.generated_endonym
         target.prosperity = source.prosperity
         target.safety = source.safety
         target.mood = source.mood
@@ -615,9 +652,40 @@ class World:
         target.visited = source.visited
         target.controlling_faction_id = source.controlling_faction_id
         target.recent_event_ids = list(source.recent_event_ids)
-        target.aliases = list(source.aliases)
+        target.aliases = list(dict.fromkeys(structural_aliases + list(source.aliases)))
+        target.generated_endonym = structural_endonym
         target.memorial_ids = list(source.memorial_ids)
         target.live_traces = [dict(trace) for trace in source.live_traces]
+
+    def _refresh_generated_endonyms(
+        self,
+        stale_endonyms_by_location_id: Dict[str, str] | None = None,
+    ) -> None:
+        refresh_world_generated_endonyms(
+            self,
+            stale_endonyms_by_location_id=stale_endonyms_by_location_id,
+        )
+
+    def _derive_language_evolution_record(self, language_key: str, year: int) -> LanguageEvolutionRecord | None:
+        return self.language_engine.derive_evolution_record(
+            language_key,
+            year=year,
+            evolution_history=self.language_evolution_history,
+        )
+
+    def _apply_language_evolution_record(self, record: LanguageEvolutionRecord) -> bool:
+        updated_runtime_states = apply_language_evolution_record(
+            self.language_engine,
+            self._language_runtime_states,
+            record,
+        )
+        if updated_runtime_states is None:
+            return False
+        self._language_runtime_states = updated_runtime_states
+        return True
+
+    def _maybe_evolve_languages_for_year(self, year: int) -> None:
+        advance_world_languages_for_year(self, year)
 
     def _build_default_map(self, previous_locations: Optional[List[LocationState]] = None) -> None:
         """Rebuild the world from the active setting bundle's site seeds.
@@ -824,7 +892,7 @@ class World:
     def _location_state_from_site_seed(self, seed: Any) -> LocationState:
         """Build a LocationState from a bundle site seed."""
         defaults = self.location_state_defaults(seed.location_id, seed.region_type)
-        return LocationState(
+        location = LocationState(
             id=seed.location_id,
             canonical_name=seed.name,
             description=seed.description,
@@ -833,6 +901,10 @@ class World:
             y=seed.y,
             **defaults,
         )
+        endonym = self.location_endonym(seed.location_id)
+        if endonym and endonym != location.canonical_name:
+            location.generated_endonym = endonym
+        return location
 
     def _build_terrain_from_grid(self, *, explicit_route_graph: Optional[bool] = None) -> None:
         """Generate terrain, sites, and routes from the current grid.
@@ -1496,7 +1568,9 @@ class World:
         )
 
     def advance_time(self, years: int = 1) -> None:
-        self.year += years
+        for _ in range(max(0, int(years))):
+            self.year += 1
+            self._maybe_evolve_languages_for_year(self.year)
 
     def latest_absolute_day_before_or_on(self, year: int, month: int) -> int:
         """Return the latest known absolute day on or before a given report period."""
@@ -1687,39 +1761,7 @@ class World:
         overlay_serialized_route_state(self.routes, serialized_routes)
 
     def to_dict(self) -> Dict[str, Any]:
-        lore_text = self._setting_bundle.world_definition.lore_text
-        result: Dict[str, Any] = {
-            "name": self.name,
-            "lore": lore_text,
-            "width": self.width,
-            "height": self.height,
-            "year": self.year,
-            "grid": [loc.to_dict() for loc in self.grid.values()],
-            "event_records": [r.to_dict() for r in self.event_records],
-            "rumors": [r.to_dict() for r in self.rumors],
-            "rumor_archive": [r.to_dict() for r in self.rumor_archive],
-            "active_adventures": [run.to_dict() for run in self.active_adventures],
-            "completed_adventures": [run.to_dict() for run in self.completed_adventures],
-            "memorials": {k: v.to_dict() for k, v in self.memorials.items()},
-            "calendar_baseline": self.calendar_baseline.to_dict(),
-            "calendar_history": [entry.to_dict() for entry in self.calendar_history],
-        }
-        bundle_backed_topology = self._setting_bundle is not None and self._grid_matches_bundle_seeds()
-        # PR-G: persist terrain/site/route layers for non-bundle-backed worlds.
-        # Bundle-backed worlds persist route state separately from the
-        # canonical bundle topology to avoid conflicting sources of truth.
-        if self.terrain_map is not None and not bundle_backed_topology:
-            result["terrain_map"] = self.terrain_map.to_dict()
-        if self.sites and not bundle_backed_topology:
-            result["sites"] = [s.to_dict() for s in self.sites]
-        if self.routes:
-            result["routes"] = [r.to_dict() for r in self.routes]
-        # PR-G2: persist atlas layout
-        if self.atlas_layout is not None:
-            result["atlas_layout"] = self.atlas_layout.to_dict()
-        if self._setting_bundle is not None:
-            result["setting_bundle"] = self._setting_bundle.to_dict()
-        return result
+        return serialize_world_state(self)
 
     def _location_state_from_dict(self, data: Dict[str, Any]) -> LocationState:
         """Restore LocationState using the active bundle for missing defaults."""
@@ -1746,6 +1788,7 @@ class World:
             controlling_faction_id=data.get("controlling_faction_id"),
             recent_event_ids=_string_list_payload(data.get("recent_event_ids", []), field_name="recent_event_ids"),
             aliases=_string_list_payload(data.get("aliases", []), field_name="aliases"),
+            generated_endonym=str(data.get("generated_endonym", "")),
             memorial_ids=_string_list_payload(data.get("memorial_ids", []), field_name="memorial_ids"),
             live_traces=_trace_list_payload(data.get("live_traces", []), field_name="live_traces"),
         )
@@ -1764,9 +1807,6 @@ class World:
         If no terrain data is present in *data*, terrain/site/routes
         are derived from the loaded grid via ``_build_terrain_from_grid()``.
         """
-        from .adventure import AdventureRun
-        from .rumor import Rumor
-
         world = cls(
             name=data["name"],
             lore=data.get("lore"),
@@ -1775,95 +1815,14 @@ class World:
             year=data.get("year", 1000),
             _skip_defaults=True,
         )
-        serialized_grid = list(data.get("grid", []))
-        bundle_backed_structure = False
-        if "setting_bundle" in data:
-            world._set_setting_bundle_metadata(
-                bundle_from_dict_validated(
-                    data["setting_bundle"],
-                    source="embedded world.setting_bundle",
-                )
-            )
-            if world._serialized_grid_is_compatible_with_active_bundle(serialized_grid):
-                bundle_backed_structure = True
-                world._build_default_map()
-                world._overlay_serialized_grid_runtime_state(serialized_grid)
-            else:
-                world._register_serialized_grid_locations(serialized_grid)
-        else:
-            world._register_serialized_grid_locations(serialized_grid)
-        world.event_log = list(data.get("event_log", []))
-        world.event_records = [
-            WorldEventRecord.from_dict(r) for r in data.get("event_records", [])
-        ]
-        for record in world.event_records:
-            record.location_id = world.normalize_location_id(record.location_id)
-        world.rumors = [
-            Rumor.from_dict(r) for r in data.get("rumors", [])
-        ]
-        for rumor in world.rumors:
-            rumor.source_location_id = world.normalize_location_id(rumor.source_location_id)
-        world.rumor_archive = [
-            Rumor.from_dict(r) for r in data.get("rumor_archive", [])
-        ]
-        for rumor in world.rumor_archive:
-            rumor.source_location_id = world.normalize_location_id(rumor.source_location_id)
-        world.active_adventures = [
-            AdventureRun.from_dict(run) for run in data.get("active_adventures", [])
-        ]
-        world.completed_adventures = [
-            AdventureRun.from_dict(run) for run in data.get("completed_adventures", [])
-        ]
-        for run in world.active_adventures + world.completed_adventures:
-            run.origin = world.normalize_location_id(run.origin) or run.origin
-            run.destination = world.normalize_location_id(run.destination) or run.destination
-        world.memorials = {
-            k: MemorialRecord.from_dict(v) for k, v in data.get("memorials", {}).items()
-        }
-        world.calendar_baseline = CalendarDefinition.from_dict(
-            data.get(
-                "calendar_baseline",
-                world.setting_bundle.world_definition.calendar.to_dict(),
-            )
+        return hydrate_world_state(
+            world,
+            data,
+            memorial_record_cls=MemorialRecord,
+            world_event_record_cls=WorldEventRecord,
+            calendar_change_record_cls=CalendarChangeRecord,
+            clone_calendar=_clone_calendar,
         )
-        world.calendar_history = [
-            CalendarChangeRecord.from_dict(item)
-            for item in data.get("calendar_history", [])
-        ]
-
-        # PR-G: when the active bundle already defines the authoritative site set,
-        # rebuild topology from that grid so stale serialized routes cannot
-        # override the active bundle graph. Otherwise restore serialized topology.
-        if bundle_backed_structure:
-            world._build_terrain_from_grid()
-            world._overlay_serialized_route_state(data.get("routes", []))
-            world._rebuild_route_index()
-        elif "terrain_map" in data:
-            world._apply_topology_state(
-                restore_serialized_topology(
-                    terrain_map_data=data["terrain_map"],
-                    site_data=list(data.get("sites", [])),
-                    route_data=list(data.get("routes", [])),
-                    normalize_location_id=world.normalize_location_id,
-                    location_index=world._location_id_index,
-                )
-            )
-        else:
-            world._build_terrain_from_grid()
-
-        # PR-G2: restore atlas layout if present, otherwise backfill it
-        # from the loaded terrain/site data so fresh v7 saves and older
-        # partially-upgraded saves converge on the same state shape.
-        if "atlas_layout" in data:
-            world.atlas_layout = AtlasLayout.from_dict(data["atlas_layout"])
-        else:
-            world.atlas_layout = world._build_atlas_layout_from_current_state()
-
-        if "calendar_baseline" not in data:
-            world.calendar_baseline = _clone_calendar(world.setting_bundle.world_definition.calendar)
-
-        world.normalize_after_load()
-        return world
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"World(name={self.name!r}, year={self.year}, characters={len(self.characters)})"

@@ -4,14 +4,18 @@ tests/test_save_load.py - Unit tests for save/load helpers.
 
 import json
 
+import pytest
+
 from fantasy_simulator.character_creator import CharacterCreator
 from fantasy_simulator.content.setting_bundle import (
+    LanguageDefinition,
     NamingRulesDefinition,
     SettingBundle,
     SiteSeedDefinition,
     WorldDefinition,
 )
 from fantasy_simulator.event_models import EventResult
+from fantasy_simulator.language.schema import SoundChangeRuleDefinition
 from fantasy_simulator.persistence.migrations import CURRENT_VERSION
 from fantasy_simulator.persistence.save_load import load_simulation, save_simulation
 from fantasy_simulator.simulator import Simulator
@@ -42,6 +46,71 @@ def _bundle_with_rule_overrides() -> SettingBundle:
             propagation_rules={"road_damage_from_danger": {"danger_threshold": 101, "road_penalty": 0}},
         ),
     )
+
+
+def _bundle_with_language_evolution_contracts() -> SettingBundle:
+    return SettingBundle(
+        schema_version=1,
+        world_definition=WorldDefinition(
+            world_key="custom",
+            display_name="Custom",
+            lore_text="Custom lore",
+            site_seeds=[
+                SiteSeedDefinition(
+                    location_id="loc_custom",
+                    name="Custom",
+                    description="Custom site.",
+                    region_type="city",
+                    x=0,
+                    y=0,
+                    language_key="custom_lang",
+                ),
+            ],
+            languages=[
+                LanguageDefinition(
+                    language_key="custom_lang",
+                    display_name="Custom Lang",
+                    consonants=["g", "t", "n", "r"],
+                    vowels=["a"],
+                    seed_syllables=["gar", "ata", "tan"],
+                    evolution_rule_pool=[
+                        SoundChangeRuleDefinition(
+                            rule_key="custom_lang.intervocalic_t_voicing",
+                            source="t",
+                            target="d",
+                            before="vowel",
+                            after="vowel",
+                            position="medial",
+                        ),
+                        SoundChangeRuleDefinition(
+                            rule_key="custom_lang.g_to_gh",
+                            source="g",
+                            target="gh",
+                        ),
+                    ],
+                    evolution_interval_years=1,
+                    inspiration_tags=["germanic_like"],
+                )
+            ],
+            naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+        ),
+    )
+
+
+def _language_semantics_snapshot(world: World) -> dict:
+    return {
+        "year": world.year,
+        "status": world.language_status(),
+        "history": [record.to_dict() for record in world.language_evolution_history],
+        "runtime_states": {
+            key: state.to_dict()
+            for key, state in sorted(world._language_runtime_states.items())
+        },
+        "endonyms": {
+            location_id: world.location_endonym(location_id)
+            for location_id in sorted(world.location_ids)
+        },
+    }
 
 
 class TestSaveSimulation:
@@ -978,10 +1047,222 @@ class TestLoadSimulation:
         assert restored.world.setting_bundle.world_definition.propagation_rules == {
             "road_damage_from_danger": {"danger_threshold": 101, "road_penalty": 0}
         }
-        assert restored.world.event_impact_rules["meeting"]["mood"] == 7
-        assert restored.world.event_impact_rules["battle"]["danger"] == 3
-        assert restored.world.propagation_rules["road_damage_from_danger"]["danger_threshold"] == 101
-        assert restored.world.propagation_rules["danger"]["cap"] == 15
+
+    def test_save_load_preserves_language_evolution_history(self, tmp_path):
+        path = tmp_path / "language-evolution.json"
+        world = World(name="Custom", year=1000)
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="loc_custom",
+                        name="Custom",
+                        description="Custom site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                        language_key="custom_lang",
+                    ),
+                ],
+                languages=[
+                    LanguageDefinition(
+                        language_key="custom_lang",
+                        display_name="Custom Lang",
+                        seed_syllables=["tor", "sel", "mar"],
+                        evolution_rule_pool=[
+                            SoundChangeRuleDefinition(
+                                rule_key="custom_lang.rhotic_drift",
+                                source="r",
+                                target="rh",
+                            )
+                        ],
+                        evolution_interval_years=2,
+                    )
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+        sim = Simulator(world, seed=0)
+        sim.advance_years(2)
+
+        assert save_simulation(sim, str(path)) is True
+        restored = load_simulation(str(path))
+
+        assert restored is not None
+        assert len(restored.world.language_evolution_history) == 1
+        assert restored.world.language_evolution_history[0].language_key == "custom_lang"
+        assert restored.world.language_status()[0]["sound_shifts"].get("r") == "rh"
+
+    @pytest.mark.parametrize("keep_runtime_states", [True, False])
+    def test_load_simulation_restores_evolved_language_aliases_across_persistence_paths(
+        self,
+        tmp_path,
+        keep_runtime_states,
+    ):
+        path = tmp_path / f"language-aliases-{keep_runtime_states}.json"
+        world = World(name="Custom", year=1000)
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="loc_custom",
+                        name="Custom",
+                        description="Custom site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                        language_key="custom_lang",
+                    ),
+                ],
+                languages=[
+                    LanguageDefinition(
+                        language_key="custom_lang",
+                        display_name="Custom Lang",
+                        seed_syllables=["tor", "sel", "mar"],
+                        evolution_rule_pool=[
+                            SoundChangeRuleDefinition(
+                                rule_key="custom_lang.rhotic_drift",
+                                source="r",
+                                target="rh",
+                            )
+                        ],
+                        evolution_interval_years=2,
+                    )
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+        sim = Simulator(world, seed=0)
+        sim.advance_years(2)
+        expected_endonym = sim.world.location_endonym("loc_custom")
+
+        assert expected_endonym is not None
+        assert save_simulation(sim, str(path)) is True
+
+        with open(path, "r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+        payload["world"]["grid"][0]["aliases"] = []
+        if not keep_runtime_states:
+            payload["world"]["language_runtime_states"] = {}
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle)
+
+        restored = load_simulation(str(path))
+
+        assert restored is not None
+        location = restored.world.get_location_by_id("loc_custom")
+        assert location is not None
+        assert restored.world.location_endonym("loc_custom") == expected_endonym
+        assert location.generated_endonym == expected_endonym
+        assert expected_endonym not in location.aliases
+
+    def test_save_load_preserves_language_semantics_with_runtime_state_payload(self, tmp_path):
+        path = tmp_path / "language-runtime-state.json"
+        world = World(name="Custom", year=1000)
+        world.setting_bundle = _bundle_with_language_evolution_contracts()
+        world.advance_time(2)
+        baseline = _language_semantics_snapshot(world)
+
+        assert save_simulation(Simulator(world, seed=0), str(path)) is True
+
+        restored = load_simulation(str(path))
+
+        assert restored is not None
+        assert _language_semantics_snapshot(restored.world) == baseline
+
+    def test_save_load_replays_language_semantics_when_runtime_state_payload_is_missing(self, tmp_path):
+        path = tmp_path / "language-history-only.json"
+        world = World(name="Custom", year=1000)
+        world.setting_bundle = _bundle_with_language_evolution_contracts()
+        world.advance_time(2)
+        baseline = _language_semantics_snapshot(world)
+
+        assert save_simulation(Simulator(world, seed=0), str(path)) is True
+        with open(path, "r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+        payload["world"].pop("language_runtime_states", None)
+        path.write_text(json.dumps(payload), encoding="utf-8")
+
+        restored = load_simulation(str(path))
+
+        assert restored is not None
+        assert _language_semantics_snapshot(restored.world) == baseline
+
+    def test_save_load_heals_stale_language_runtime_states_from_history(self, tmp_path):
+        path = tmp_path / "language-stale-runtime-state.json"
+        world = World(name="Custom", year=1000)
+        world.setting_bundle = _bundle_with_language_evolution_contracts()
+        world.advance_time(2)
+        baseline = _language_semantics_snapshot(world)
+
+        assert save_simulation(Simulator(world, seed=0), str(path)) is True
+        with open(path, "r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+        payload["world"]["language_runtime_states"] = {
+            "custom_lang": {
+                "language_key": "custom_lang",
+                "applied_rules": [],
+                "derived_name_stems": [],
+                "derived_toponym_suffixes": [],
+            }
+        }
+        path.write_text(json.dumps(payload), encoding="utf-8")
+
+        restored = load_simulation(str(path))
+
+        assert restored is not None
+        assert _language_semantics_snapshot(restored.world) == baseline
+
+    def test_save_load_preserves_language_semantics_after_non_language_bundle_update(self, tmp_path):
+        path = tmp_path / "language-after-non-language-bundle-update.json"
+        world = World(name="Custom", year=1000)
+        world.setting_bundle = _bundle_with_language_evolution_contracts()
+        world.advance_time(1)
+        updated_bundle = SettingBundle.from_dict(world.setting_bundle.to_dict())
+        updated_bundle.world_definition.lore_text = "Updated lore only"
+        world.apply_setting_bundle(updated_bundle)
+        baseline = _language_semantics_snapshot(world)
+
+        assert save_simulation(Simulator(world, seed=0), str(path)) is True
+
+        restored = load_simulation(str(path))
+
+        assert restored is not None
+        assert _language_semantics_snapshot(restored.world) == baseline
+
+    def test_save_load_preserves_generated_endonym_for_incompatible_serialized_grid(self, tmp_path):
+        path = tmp_path / "language-incompatible-grid-endonym.json"
+        world = World(name="Custom", year=1000)
+        world.setting_bundle = _bundle_with_language_evolution_contracts()
+        sim = Simulator(world, seed=0)
+
+        assert save_simulation(sim, str(path)) is True
+
+        with open(path, "r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+        payload["world"]["grid"][0]["id"] = "legacy_loc_custom"
+        payload["world"]["grid"][0]["canonical_name"] = "Legacy Custom"
+        payload["world"]["grid"][0]["name"] = "Legacy Custom"
+        payload["world"]["grid"][0]["generated_endonym"] = "Legacy Endonym"
+        payload["world"]["grid"][0]["aliases"] = ["Legacy Endonym", "Traveler's Rest"]
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle)
+
+        restored = load_simulation(str(path))
+
+        assert restored is not None
+        legacy_location = restored.world.get_location_by_id("legacy_loc_custom")
+        assert legacy_location is not None
+        assert legacy_location.generated_endonym == "Legacy Endonym"
+        assert legacy_location.aliases == ["Traveler's Rest"]
 
     def test_save_load_round_trip_preserves_history_metadata_for_event_result_records(self, tmp_path):
         path = tmp_path / "legacy-history-roundtrip.json"

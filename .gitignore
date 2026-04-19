@@ -2,6 +2,7 @@ __pycache__/
 *.py[cod]
 *.pyo
 .pytest_cache/
+.worktrees/
 .claude/worktrees/
 .claude/settings.local.json
 .history/

@@ -8,6 +8,12 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Mapping
 
+from ..language.schema import (
+    VALID_SOUND_CHANGE_CONTEXTS,
+    VALID_SOUND_CHANGE_POSITIONS,
+    SoundChangeRuleDefinition,
+    sound_change_rules_from_payload,
+)
 from ..rule_override_resolution import (
     resolve_event_impact_rule_overrides,
     resolve_propagation_rule_overrides,
@@ -231,6 +237,8 @@ class SiteSeedDefinition:
     x: int
     y: int
     tags: List[str] = field(default_factory=list)
+    language_key: str = ""
+    native_name: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -241,6 +249,8 @@ class SiteSeedDefinition:
             "x": int(self.x),
             "y": int(self.y),
             "tags": list(self.tags),
+            "language_key": self.language_key,
+            "native_name": self.native_name,
         }
 
     def as_world_data_entry(self) -> tuple[str, str, str, str, int, int]:
@@ -267,6 +277,8 @@ class SiteSeedDefinition:
             x=int(data.get("x", 0)),
             y=int(data.get("y", 0)),
             tags=_string_list_payload(data.get("tags", []), field_name="tags"),
+            language_key=str(data.get("language_key", "")),
+            native_name=str(data.get("native_name", "")),
         )
 
 
@@ -346,6 +358,185 @@ class NamingRulesDefinition:
 
 
 @dataclass
+class LanguageDefinition:
+    """Serializable prototype language description for generated naming and vocabulary."""
+
+    language_key: str
+    display_name: str
+    parent_key: str = ""
+    seed_syllables: List[str] = field(default_factory=list)
+    consonants: List[str] = field(default_factory=list)
+    vowels: List[str] = field(default_factory=list)
+    front_vowels: List[str] = field(default_factory=list)
+    back_vowels: List[str] = field(default_factory=list)
+    liquid_consonants: List[str] = field(default_factory=list)
+    nasal_consonants: List[str] = field(default_factory=list)
+    fricative_consonants: List[str] = field(default_factory=list)
+    stop_consonants: List[str] = field(default_factory=list)
+    syllable_templates: List[str] = field(default_factory=list)
+    male_suffixes: List[str] = field(default_factory=list)
+    female_suffixes: List[str] = field(default_factory=list)
+    neutral_suffixes: List[str] = field(default_factory=list)
+    surname_suffixes: List[str] = field(default_factory=list)
+    name_stems: List[str] = field(default_factory=list)
+    given_name_patterns: List[str] = field(default_factory=list)
+    surname_patterns: List[str] = field(default_factory=list)
+    toponym_stems: List[str] = field(default_factory=list)
+    toponym_suffixes: List[str] = field(default_factory=list)
+    toponym_patterns: List[str] = field(default_factory=list)
+    sound_shifts: Dict[str, str] = field(default_factory=dict)
+    sound_change_rules: List[SoundChangeRuleDefinition] = field(default_factory=list)
+    evolution_rule_pool: List[SoundChangeRuleDefinition] = field(default_factory=list)
+    inspiration_tags: List[str] = field(default_factory=list)
+    lexicon_size: int = 24
+    evolution_interval_years: int = 0
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "language_key": self.language_key,
+            "display_name": self.display_name,
+            "parent_key": self.parent_key,
+            "seed_syllables": list(self.seed_syllables),
+            "consonants": list(self.consonants),
+            "vowels": list(self.vowels),
+            "front_vowels": list(self.front_vowels),
+            "back_vowels": list(self.back_vowels),
+            "liquid_consonants": list(self.liquid_consonants),
+            "nasal_consonants": list(self.nasal_consonants),
+            "fricative_consonants": list(self.fricative_consonants),
+            "stop_consonants": list(self.stop_consonants),
+            "syllable_templates": list(self.syllable_templates),
+            "male_suffixes": list(self.male_suffixes),
+            "female_suffixes": list(self.female_suffixes),
+            "neutral_suffixes": list(self.neutral_suffixes),
+            "surname_suffixes": list(self.surname_suffixes),
+            "name_stems": list(self.name_stems),
+            "given_name_patterns": list(self.given_name_patterns),
+            "surname_patterns": list(self.surname_patterns),
+            "toponym_stems": list(self.toponym_stems),
+            "toponym_suffixes": list(self.toponym_suffixes),
+            "toponym_patterns": list(self.toponym_patterns),
+            "sound_shifts": {str(source): str(target) for source, target in self.sound_shifts.items()},
+            "sound_change_rules": [rule.to_dict() for rule in self.sound_change_rules],
+            "evolution_rule_pool": [rule.to_dict() for rule in self.evolution_rule_pool],
+            "inspiration_tags": list(self.inspiration_tags),
+            "lexicon_size": int(self.lexicon_size),
+            "evolution_interval_years": int(self.evolution_interval_years),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "LanguageDefinition":
+        raw_sound_shifts = data.get("sound_shifts", {})
+        if raw_sound_shifts is None:
+            raw_sound_shifts = {}
+        if not isinstance(raw_sound_shifts, Mapping):
+            raise ValueError("sound_shifts must be an object")
+        return cls(
+            language_key=data["language_key"],
+            display_name=data.get("display_name", data["language_key"]),
+            parent_key=data.get("parent_key", ""),
+            seed_syllables=_string_list_payload(data.get("seed_syllables", []), field_name="seed_syllables"),
+            consonants=_string_list_payload(data.get("consonants", []), field_name="consonants"),
+            vowels=_string_list_payload(data.get("vowels", []), field_name="vowels"),
+            front_vowels=_string_list_payload(data.get("front_vowels", []), field_name="front_vowels"),
+            back_vowels=_string_list_payload(data.get("back_vowels", []), field_name="back_vowels"),
+            liquid_consonants=_string_list_payload(
+                data.get("liquid_consonants", []),
+                field_name="liquid_consonants",
+            ),
+            nasal_consonants=_string_list_payload(
+                data.get("nasal_consonants", []),
+                field_name="nasal_consonants",
+            ),
+            fricative_consonants=_string_list_payload(
+                data.get("fricative_consonants", []),
+                field_name="fricative_consonants",
+            ),
+            stop_consonants=_string_list_payload(
+                data.get("stop_consonants", []),
+                field_name="stop_consonants",
+            ),
+            syllable_templates=_string_list_payload(
+                data.get("syllable_templates", []),
+                field_name="syllable_templates",
+            ),
+            male_suffixes=_string_list_payload(data.get("male_suffixes", []), field_name="male_suffixes"),
+            female_suffixes=_string_list_payload(data.get("female_suffixes", []), field_name="female_suffixes"),
+            neutral_suffixes=_string_list_payload(data.get("neutral_suffixes", []), field_name="neutral_suffixes"),
+            surname_suffixes=_string_list_payload(data.get("surname_suffixes", []), field_name="surname_suffixes"),
+            name_stems=_string_list_payload(data.get("name_stems", []), field_name="name_stems"),
+            given_name_patterns=_string_list_payload(
+                data.get("given_name_patterns", []),
+                field_name="given_name_patterns",
+            ),
+            surname_patterns=_string_list_payload(
+                data.get("surname_patterns", []),
+                field_name="surname_patterns",
+            ),
+            toponym_stems=_string_list_payload(data.get("toponym_stems", []), field_name="toponym_stems"),
+            toponym_suffixes=_string_list_payload(
+                data.get("toponym_suffixes", []),
+                field_name="toponym_suffixes",
+            ),
+            toponym_patterns=_string_list_payload(
+                data.get("toponym_patterns", []),
+                field_name="toponym_patterns",
+            ),
+            sound_shifts={str(source): str(target) for source, target in raw_sound_shifts.items()},
+            sound_change_rules=sound_change_rules_from_payload(
+                data.get("sound_change_rules", []),
+                field_name="sound_change_rules",
+            ),
+            evolution_rule_pool=sound_change_rules_from_payload(
+                data.get("evolution_rule_pool", []),
+                field_name="evolution_rule_pool",
+            ),
+            inspiration_tags=_string_list_payload(data.get("inspiration_tags", []), field_name="inspiration_tags"),
+            lexicon_size=max(8, int(data.get("lexicon_size", 24))),
+            evolution_interval_years=max(0, int(data.get("evolution_interval_years", 0))),
+        )
+
+
+@dataclass
+class LanguageCommunityDefinition:
+    """Selectors that map race/tribe/region identity to a language."""
+
+    community_key: str
+    display_name: str
+    language_key: str
+    races: List[str] = field(default_factory=list)
+    tribes: List[str] = field(default_factory=list)
+    regions: List[str] = field(default_factory=list)
+    priority: int = 0
+    is_lingua_franca: bool = False
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "community_key": self.community_key,
+            "display_name": self.display_name,
+            "language_key": self.language_key,
+            "races": list(self.races),
+            "tribes": list(self.tribes),
+            "regions": list(self.regions),
+            "priority": int(self.priority),
+            "is_lingua_franca": bool(self.is_lingua_franca),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "LanguageCommunityDefinition":
+        return cls(
+            community_key=data["community_key"],
+            display_name=data.get("display_name", data["community_key"]),
+            language_key=data["language_key"],
+            races=_string_list_payload(data.get("races", []), field_name="races"),
+            tribes=_string_list_payload(data.get("tribes", []), field_name="tribes"),
+            regions=_string_list_payload(data.get("regions", []), field_name="regions"),
+            priority=int(data.get("priority", 0)),
+            is_lingua_franca=bool(data.get("is_lingua_franca", False)),
+        )
+
+
+@dataclass
 class WorldDefinition:
     """Static lore metadata for a world setting bundle."""
 
@@ -361,6 +552,8 @@ class WorldDefinition:
     site_seeds: List[SiteSeedDefinition] = field(default_factory=list)
     route_seeds: List[RouteSeedDefinition] = field(default_factory=list)
     naming_rules: NamingRulesDefinition = field(default_factory=NamingRulesDefinition)
+    languages: List[LanguageDefinition] = field(default_factory=list)
+    language_communities: List[LanguageCommunityDefinition] = field(default_factory=list)
     event_impact_rules: Dict[str, Dict[str, int]] = field(default_factory=dict)
     propagation_rules: Dict[str, Dict[str, Any]] = field(default_factory=dict)
 
@@ -378,6 +571,8 @@ class WorldDefinition:
             "site_seeds": [seed.to_dict() for seed in self.site_seeds],
             "route_seeds": [seed.to_dict() for seed in self.route_seeds],
             "naming_rules": self.naming_rules.to_dict(),
+            "languages": [language.to_dict() for language in self.languages],
+            "language_communities": [community.to_dict() for community in self.language_communities],
             "event_impact_rules": {
                 kind: {attr: int(delta) for attr, delta in deltas.items()}
                 for kind, deltas in self.event_impact_rules.items()
@@ -418,6 +613,14 @@ class WorldDefinition:
                 for item in data.get("route_seeds", [])
             ],
             naming_rules=NamingRulesDefinition.from_dict(data.get("naming_rules", {})),
+            languages=[
+                LanguageDefinition.from_dict(item)
+                for item in data.get("languages", [])
+            ],
+            language_communities=[
+                LanguageCommunityDefinition.from_dict(item)
+                for item in data.get("language_communities", [])
+            ],
             event_impact_rules=_copy_rule_overrides(
                 data.get("event_impact_rules", {}),
                 field_name="world_definition.event_impact_rules",
@@ -517,6 +720,18 @@ def _backfill_route_seeds_if_missing(
     ]
 
 
+def _known_community_race_names(world: WorldDefinition) -> set[str]:
+    """Return race names allowed in language community selectors."""
+    known_races = {race.name for race in world.races}
+    if world.world_key == "aethoria":
+        default_world = _default_aethoria_bundle_data().get("world_definition", {})
+        for race_data in default_world.get("races", []):
+            race_name = str(race_data.get("name", ""))
+            if race_name:
+                known_races.add(race_name)
+    return known_races
+
+
 def validate_setting_bundle(bundle: SettingBundle, *, source: str) -> None:
     world = bundle.world_definition
     if bundle.schema_version < 1:
@@ -540,6 +755,20 @@ def validate_setting_bundle(bundle: SettingBundle, *, source: str) -> None:
     if duplicate_jobs:
         raise ValueError(
             f"Setting bundle {source} contains duplicate job names: {', '.join(duplicate_jobs)}"
+        )
+
+    language_keys = [language.language_key for language in world.languages]
+    duplicate_language_keys = _duplicate_values(language_keys)
+    if duplicate_language_keys:
+        raise ValueError(
+            f"Setting bundle {source} contains duplicate language keys: {', '.join(duplicate_language_keys)}"
+        )
+
+    community_keys = [community.community_key for community in world.language_communities]
+    duplicate_community_keys = _duplicate_values(community_keys)
+    if duplicate_community_keys:
+        raise ValueError(
+            f"Setting bundle {source} contains duplicate language community keys: {', '.join(duplicate_community_keys)}"
         )
 
     site_ids = [seed.location_id for seed in world.site_seeds]
@@ -610,6 +839,130 @@ def validate_setting_bundle(bundle: SettingBundle, *, source: str) -> None:
         raise ValueError(f"Setting bundle {source} must provide first_names_female when naming rules are defined")
     if has_first_name_rules and not naming.last_names:
         raise ValueError(f"Setting bundle {source} must provide last_names when naming rules are defined")
+
+    language_index = {language.language_key: language for language in world.languages}
+    for language in world.languages:
+        if not language.language_key:
+            raise ValueError(f"Setting bundle {source} must define language_key for each language")
+        if not language.display_name:
+            raise ValueError(f"Setting bundle {source} must define display_name for each language")
+        if language.parent_key and language.parent_key not in language_index:
+            raise ValueError(
+                f"Setting bundle {source} references unknown parent language: {language.parent_key}"
+            )
+        overlap = set(language.consonants) & set(language.vowels)
+        if overlap:
+            raise ValueError(
+                f"Setting bundle {source} has overlapping consonants/vowels in {language.language_key}: "
+                f"{', '.join(sorted(overlap))}"
+            )
+        for feature_name, feature_values, allowed_values in (
+            ("front_vowels", language.front_vowels, language.vowels),
+            ("back_vowels", language.back_vowels, language.vowels),
+            ("liquid_consonants", language.liquid_consonants, language.consonants),
+            ("nasal_consonants", language.nasal_consonants, language.consonants),
+            ("fricative_consonants", language.fricative_consonants, language.consonants),
+            ("stop_consonants", language.stop_consonants, language.consonants),
+        ):
+            unknown_values = [value for value in feature_values if value not in allowed_values]
+            if unknown_values:
+                raise ValueError(
+                    f"Setting bundle {source} has {feature_name} outside the base inventory in "
+                    f"{language.language_key}: {', '.join(sorted(unknown_values))}"
+                )
+        if language.evolution_interval_years < 0:
+            raise ValueError(
+                f"Setting bundle {source} has negative evolution_interval_years in {language.language_key}"
+            )
+        for rule_group_name, rules in (
+            ("sound_change_rules", language.sound_change_rules),
+            ("evolution_rule_pool", language.evolution_rule_pool),
+        ):
+            seen_rule_keys: set[str] = set()
+            for index, rule in enumerate(rules):
+                if not rule.source:
+                    raise ValueError(
+                        f"Setting bundle {source} has empty sound change source in {language.language_key}: "
+                        f"{rule_group_name}[{index}]"
+                    )
+                if rule.position not in VALID_SOUND_CHANGE_POSITIONS:
+                    raise ValueError(
+                        f"Setting bundle {source} has invalid sound change position in {language.language_key}: "
+                        f"{rule.position}"
+                    )
+                if rule.before not in VALID_SOUND_CHANGE_CONTEXTS or rule.after not in VALID_SOUND_CHANGE_CONTEXTS:
+                    raise ValueError(
+                        f"Setting bundle {source} has invalid sound change context in {language.language_key}: "
+                        f"{rule.before}/{rule.after}"
+                    )
+                if rule.rule_key:
+                    if rule.rule_key in seen_rule_keys:
+                        raise ValueError(
+                            f"Setting bundle {source} has duplicate sound change rule_key in "
+                            f"{language.language_key}: {rule.rule_key}"
+                        )
+                    seen_rule_keys.add(rule.rule_key)
+        for pattern_group_name, patterns in (
+            ("given_name_patterns", language.given_name_patterns),
+            ("surname_patterns", language.surname_patterns),
+            ("toponym_patterns", language.toponym_patterns),
+        ):
+            for pattern in patterns:
+                if any(marker not in "RrLXY" for marker in pattern):
+                    raise ValueError(
+                        f"Setting bundle {source} has invalid {pattern_group_name} token in "
+                        f"{language.language_key}: {pattern}"
+                    )
+        for template in language.syllable_templates:
+            if any(marker not in "CV" for marker in template):
+                raise ValueError(
+                    f"Setting bundle {source} has invalid syllable template in "
+                    f"{language.language_key}: {template}"
+                )
+
+    visiting: set[str] = set()
+    visited: set[str] = set()
+
+    def _visit_language(language_key: str) -> None:
+        if language_key in visited:
+            return
+        if language_key in visiting:
+            raise ValueError(f"Setting bundle {source} contains cyclic language inheritance")
+        visiting.add(language_key)
+        parent_key = language_index[language_key].parent_key
+        if parent_key:
+            _visit_language(parent_key)
+        visiting.remove(language_key)
+        visited.add(language_key)
+
+    for language_key in language_index:
+        _visit_language(language_key)
+
+    known_community_races = _known_community_race_names(world)
+    for community in world.language_communities:
+        if community.language_key not in language_index:
+            raise ValueError(
+                f"Setting bundle {source} references unknown language community target: {community.language_key}"
+            )
+        unknown_races = [race for race in community.races if race not in known_community_races]
+        if unknown_races:
+            raise ValueError(
+                f"Setting bundle {source} references unknown community races: {', '.join(unknown_races)}"
+            )
+        unknown_regions = [
+            region for region in community.regions
+            if region not in site_ids
+        ]
+        if unknown_regions:
+            raise ValueError(
+                f"Setting bundle {source} references unknown community regions: {', '.join(unknown_regions)}"
+            )
+
+    for seed in world.site_seeds:
+        if seed.language_key and seed.language_key not in language_index:
+            raise ValueError(
+                f"Setting bundle {source} references unknown site language: {seed.language_key}"
+            )
 
     event_impact_overrides = {
         str(kind): {str(attr): delta for attr, delta in deltas.items()}

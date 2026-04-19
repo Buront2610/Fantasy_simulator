@@ -279,6 +279,7 @@
         "name": "Frostpeak Summit",
         "description": "A jagged mountain crowned with eternal ice.",
         "region_type": "mountain",
+        "language_key": "khazic",
         "x": 0,
         "y": 0
       },
@@ -287,6 +288,7 @@
         "name": "The Grey Pass",
         "description": "A treacherous alpine pass haunted by wind spirits.",
         "region_type": "mountain",
+        "language_key": "khazic",
         "x": 1,
         "y": 0
       },
@@ -295,6 +297,7 @@
         "name": "Skyveil Monastery",
         "description": "A cliffside monastery where monks study the ley-lines.",
         "region_type": "village",
+        "language_key": "quenic",
         "x": 2,
         "y": 0
       },
@@ -303,6 +306,7 @@
         "name": "Ironvein Mine",
         "description": "A deep mine rich in enchanted ore — and old curses.",
         "region_type": "dungeon",
+        "language_key": "khazic",
         "x": 3,
         "y": 0
       },
@@ -311,6 +315,7 @@
         "name": "Stormwatch Keep",
         "description": "A fortress overlooking the northern sea.",
         "region_type": "mountain",
+        "language_key": "aethic_common",
         "x": 4,
         "y": 0
       },
@@ -319,6 +324,7 @@
         "name": "Thornwood",
         "description": "A dense forest that hums with restless magic.",
         "region_type": "forest",
+        "language_key": "sindral",
         "x": 0,
         "y": 1
       },
@@ -327,6 +333,7 @@
         "name": "Ashenvale",
         "description": "Charred woodland recovering from a decade-old wildfire.",
         "region_type": "forest",
+        "language_key": "sindral",
         "x": 1,
         "y": 1
       },
@@ -335,6 +342,7 @@
         "name": "Silverbrook",
         "description": "A prosperous trading town built on a swift silver river.",
         "region_type": "city",
+        "language_key": "aethic_common",
         "x": 2,
         "y": 1
       },
@@ -343,6 +351,7 @@
         "name": "Goblin Warrens",
         "description": "A network of tunnels teeming with mischievous creatures.",
         "region_type": "dungeon",
+        "language_key": "orcish_steppe",
         "x": 3,
         "y": 1
       },
@@ -351,6 +360,7 @@
         "name": "Eastwatch Tower",
         "description": "A lone watchtower staffed by a rotating ranger garrison.",
         "region_type": "village",
+        "language_key": "aethic_common",
         "x": 4,
         "y": 1
       },
@@ -359,6 +369,7 @@
         "name": "Elderroot Forest",
         "description": "An ancient forest whose trees remember the Cataclysm.",
         "region_type": "forest",
+        "language_key": "quenic",
         "x": 0,
         "y": 2
       },
@@ -367,6 +378,7 @@
         "name": "Millhaven",
         "description": "A quiet farming village known for its legendary apple wine.",
         "region_type": "village",
+        "language_key": "aethic_common",
         "x": 1,
         "y": 2
       },
@@ -375,6 +387,7 @@
         "name": "Aethoria Capital",
         "description": "The grand capital — heart of trade, politics, and intrigue.",
         "region_type": "city",
+        "language_key": "aethic_common",
         "x": 2,
         "y": 2,
         "tags": [
@@ -387,6 +400,7 @@
         "name": "Sunken Ruins",
         "description": "Ruins of a pre-Cataclysm city, half-swallowed by the earth.",
         "region_type": "dungeon",
+        "language_key": "proto_quenic",
         "x": 3,
         "y": 2
       },
@@ -395,6 +409,7 @@
         "name": "Saltmarsh",
         "description": "A fishing village where sailors whisper of sea monsters.",
         "region_type": "village",
+        "language_key": "aethic_common",
         "x": 4,
         "y": 2
       },
@@ -403,6 +418,7 @@
         "name": "Dragonbone Ridge",
         "description": "A ridge littered with the bones of ancient dragons.",
         "region_type": "mountain",
+        "language_key": "proto_quenic",
         "x": 0,
         "y": 3
       },
@@ -411,6 +427,7 @@
         "name": "Dusty Crossroads",
         "description": "A well-worn junction where merchants rest and rumours spread.",
         "region_type": "plains",
+        "language_key": "aethic_common",
         "x": 1,
         "y": 3
       },
@@ -419,6 +436,7 @@
         "name": "Hearthglow Town",
         "description": "A warm, welcoming town renowned for its healers' guild.",
         "region_type": "city",
+        "language_key": "aethic_common",
         "x": 2,
         "y": 3
       },
@@ -427,6 +445,7 @@
         "name": "Mirefen Swamp",
         "description": "A murky swamp hiding both treasure and terrible dangers.",
         "region_type": "dungeon",
+        "language_key": "orcish_steppe",
         "x": 3,
         "y": 3
       },
@@ -435,6 +454,7 @@
         "name": "Dawnport",
         "description": "A busy harbour city that never truly sleeps.",
         "region_type": "city",
+        "language_key": "aethic_common",
         "x": 4,
         "y": 3
       },
@@ -443,6 +463,7 @@
         "name": "Sunbaked Plains",
         "description": "Vast golden plains scorched by an unrelenting sun.",
         "region_type": "plains",
+        "language_key": "orcish_steppe",
         "x": 0,
         "y": 4
       },
@@ -451,6 +472,7 @@
         "name": "Sandstone Outpost",
         "description": "A small desert outpost at the edge of the known world.",
         "region_type": "village",
+        "language_key": "orcish_steppe",
         "x": 1,
         "y": 4
       },
@@ -459,6 +481,7 @@
         "name": "The Verdant Vale",
         "description": "A lush valley sheltered from harsh winds — a true paradise.",
         "region_type": "village",
+        "language_key": "sindral",
         "x": 2,
         "y": 4
       },
@@ -467,6 +490,7 @@
         "name": "Obsidian Crater",
         "description": "A massive crater from the Cataclysm, still faintly glowing.",
         "region_type": "dungeon",
+        "language_key": "proto_quenic",
         "x": 3,
         "y": 4
       },
@@ -475,6 +499,7 @@
         "name": "Coral Cove",
         "description": "A hidden cove home to a secretive community of sea-mages.",
         "region_type": "city",
+        "language_key": "quenic",
         "x": 4,
         "y": 4
       }
@@ -617,6 +642,325 @@
         "Yarrow",
         "Zephyrhaven"
       ]
-    }
+    },
+    "languages": [
+      {
+        "language_key": "elder_speech",
+        "display_name": "Elder Speech",
+        "seed_syllables": ["al", "dor", "el", "gal", "ith", "mir", "sil", "thal"],
+        "consonants": ["d", "l", "m", "n", "r", "s", "th", "v"],
+        "vowels": ["a", "e", "i", "o", "ae", "ia"],
+        "syllable_templates": ["CV", "CVC", "VC"],
+        "male_suffixes": ["ar", "ion", "or"],
+        "female_suffixes": ["a", "iel", "wen"],
+        "neutral_suffixes": ["el", "ir", "is"],
+        "surname_suffixes": ["dor", "las", "mir"],
+        "name_stems": ["al", "el", "mir", "sil", "thal"],
+        "toponym_suffixes": ["dor", "mir", "thal"],
+        "lexicon_size": 26,
+        "evolution_interval_years": 0
+      },
+      {
+        "language_key": "proto_quenic",
+        "display_name": "Proto Quenic",
+        "parent_key": "elder_speech",
+        "seed_syllables": ["quel", "nor", "sai"],
+        "sound_shifts": {
+          "th": "s",
+          "dor": "ndor",
+          "ae": "e"
+        },
+        "male_suffixes": ["ion", "or", "ar"],
+        "female_suffixes": ["ie", "iel", "esse"],
+        "neutral_suffixes": ["el", "is", "in"],
+        "surname_suffixes": ["ndor", "riel", "var"],
+        "name_stems": ["quel", "nor", "sai", "el", "var"],
+        "toponym_suffixes": ["ndor", "riel", "var"],
+        "inspiration_tags": ["romance_like"],
+        "evolution_rule_pool": [
+          {
+            "rule_key": "proto_quenic.rhotic_strengthening",
+            "source": "r",
+            "target": "rh",
+            "position": "medial",
+            "description": "Courtly pronunciation strengthens medial rhotics."
+          }
+        ],
+        "lexicon_size": 28,
+        "evolution_interval_years": 160
+      },
+      {
+        "language_key": "quenic",
+        "display_name": "Quenic",
+        "parent_key": "proto_quenic",
+        "seed_syllables": ["lume", "nare", "sere"],
+        "sound_shifts": {
+          "nd": "n",
+          "qu": "c",
+          "ai": "e"
+        },
+        "male_suffixes": ["ion", "ian", "or"],
+        "female_suffixes": ["iel", "ira", "esse"],
+        "neutral_suffixes": ["ien", "is", "el"],
+        "surname_suffixes": ["riel", "dhel", "nor"],
+        "name_stems": ["lum", "nar", "ser", "cel", "ril"],
+        "toponym_suffixes": ["riel", "dhel", "nor"],
+        "inspiration_tags": ["romance_like"],
+        "evolution_rule_pool": [
+          {
+            "rule_key": "quenic.sibilant_softening",
+            "source": "s",
+            "target": "th",
+            "before": "vowel",
+            "after": "vowel",
+            "position": "medial",
+            "description": "Intervocalic sibilants soften in cultivated Quenic."
+          },
+          {
+            "rule_key": "quenic.high_vowel_lowering",
+            "source": "i",
+            "target": "e",
+            "before": "consonant",
+            "position": "medial",
+            "description": "High vowels relax in unstressed medial syllables."
+          }
+        ],
+        "lexicon_size": 30,
+        "evolution_interval_years": 120
+      },
+      {
+        "language_key": "sindral",
+        "display_name": "Sindral",
+        "parent_key": "proto_quenic",
+        "seed_syllables": ["bran", "thel", "gwyn"],
+        "consonants": ["b", "d", "f", "g", "l", "m", "n", "r", "s", "th", "w"],
+        "sound_shifts": {
+          "qu": "gw",
+          "c": "s",
+          "o": "a"
+        },
+        "male_suffixes": ["on", "ar", "yn"],
+        "female_suffixes": ["eth", "iel", "wen"],
+        "neutral_suffixes": ["en", "is", "yn"],
+        "surname_suffixes": ["wyn", "thal", "bryn"],
+        "name_stems": ["bran", "thel", "gwyn", "syl", "ael"],
+        "toponym_suffixes": ["wyn", "thal", "bryn"],
+        "inspiration_tags": ["celtic_like"],
+        "evolution_rule_pool": [
+          {
+            "rule_key": "sindral.final_liquid_smoothing",
+            "source": "r",
+            "target": "l",
+            "position": "final",
+            "description": "Word-final liquids smooth in woodland Sindral."
+          }
+        ],
+        "lexicon_size": 30,
+        "evolution_interval_years": 90
+      },
+      {
+        "language_key": "proto_aethic",
+        "display_name": "Proto Aethic",
+        "seed_syllables": ["bar", "cal", "dor", "fen", "mar", "tor", "wyn"],
+        "consonants": ["b", "c", "d", "f", "g", "h", "l", "m", "n", "r", "s", "t", "w"],
+        "vowels": ["a", "e", "i", "o", "u", "ea"],
+        "syllable_templates": ["CV", "CVC", "CV"],
+        "male_suffixes": ["an", "ric", "or"],
+        "female_suffixes": ["a", "is", "eth"],
+        "neutral_suffixes": ["en", "in", "yn"],
+        "surname_suffixes": ["ward", "mere", "stone"],
+        "name_stems": ["bar", "cal", "dor", "mar", "tor"],
+        "toponym_suffixes": ["ford", "mere", "stead"],
+        "lexicon_size": 28,
+        "evolution_interval_years": 0
+      },
+      {
+        "language_key": "aethic_common",
+        "display_name": "Aethic Common",
+        "parent_key": "proto_aethic",
+        "seed_syllables": ["ash", "bryn", "vale"],
+        "sound_shifts": {
+          "ea": "e",
+          "tor": "ter",
+          "wyn": "win"
+        },
+        "male_suffixes": ["en", "ric", "or"],
+        "female_suffixes": ["a", "ra", "yn"],
+        "neutral_suffixes": ["en", "is", "yn"],
+        "surname_suffixes": ["wood", "stone", "mere"],
+        "name_stems": ["ash", "bryn", "vale", "elm", "cor"],
+        "toponym_suffixes": ["ford", "mere", "wick"],
+        "inspiration_tags": ["germanic_like"],
+        "evolution_rule_pool": [
+          {
+            "rule_key": "aethic_common.rhotic_frication",
+            "source": "r",
+            "target": "rh",
+            "position": "medial",
+            "description": "Prestige dialects fricate medial rhotics."
+          }
+        ],
+        "lexicon_size": 30,
+        "evolution_interval_years": 80
+      },
+      {
+        "language_key": "khazic",
+        "display_name": "Khazic",
+        "seed_syllables": ["bar", "dur", "grim", "kaz", "thor", "zul"],
+        "consonants": ["b", "d", "g", "k", "m", "r", "th", "z"],
+        "vowels": ["a", "i", "o", "u"],
+        "syllable_templates": ["CVC", "CV", "CVC"],
+        "male_suffixes": ["in", "or", "um"],
+        "female_suffixes": ["a", "ia", "yn"],
+        "neutral_suffixes": ["im", "in", "um"],
+        "surname_suffixes": ["forge", "delve", "vein"],
+        "name_stems": ["bar", "dur", "grim", "kaz", "thor"],
+        "toponym_suffixes": ["dum", "kar", "drum"],
+        "inspiration_tags": ["germanic_like"],
+        "evolution_rule_pool": [
+          {
+            "rule_key": "khazic.deep_vowel_backing",
+            "source": "u",
+            "target": "o",
+            "position": "medial",
+            "description": "Back vowels lower in cavern speech."
+          }
+        ],
+        "lexicon_size": 24,
+        "evolution_interval_years": 140
+      },
+      {
+        "language_key": "orcish_steppe",
+        "display_name": "Orcish Steppe Tongue",
+        "seed_syllables": ["gor", "krag", "mok", "ur", "zug"],
+        "consonants": ["g", "k", "m", "r", "t", "z"],
+        "vowels": ["a", "o", "u"],
+        "syllable_templates": ["CVC", "CV", "CVC"],
+        "male_suffixes": ["ak", "or", "ug"],
+        "female_suffixes": ["a", "ra", "uga"],
+        "neutral_suffixes": ["ok", "ur", "ug"],
+        "surname_suffixes": ["fang", "scar", "maw"],
+        "name_stems": ["gor", "krag", "mok", "zug", "ur"],
+        "toponym_suffixes": ["gar", "mok", "zug"],
+        "inspiration_tags": ["turkic_like"],
+        "evolution_rule_pool": [
+          {
+            "rule_key": "orcish_steppe.gh_to_w",
+            "source": "gh",
+            "target": "w",
+            "position": "medial",
+            "description": "Harsh fricatives glide over time in steppe speech."
+          }
+        ],
+        "lexicon_size": 22,
+        "evolution_interval_years": 70
+      }
+    ],
+    "language_communities": [
+      {
+        "community_key": "aethic_heartlands",
+        "display_name": "Aethic Heartlands",
+        "language_key": "aethic_common",
+        "regions": [
+          "loc_stormwatch_keep",
+          "loc_silverbrook",
+          "loc_eastwatch_tower",
+          "loc_millhaven",
+          "loc_aethoria_capital",
+          "loc_saltmarsh",
+          "loc_dusty_crossroads",
+          "loc_hearthglow_town",
+          "loc_dawnport"
+        ],
+        "priority": 40
+      },
+      {
+        "community_key": "aethic_lowlands",
+        "display_name": "Aethic Lowlands",
+        "language_key": "aethic_common",
+        "races": ["Human", "Halfling", "Tiefling"],
+        "priority": 20,
+        "is_lingua_franca": true
+      },
+      {
+        "community_key": "high_elven_courts",
+        "display_name": "High Elven Courts",
+        "language_key": "quenic",
+        "races": ["Elf"],
+        "regions": [
+          "loc_skyveil_monastery",
+          "loc_elderroot_forest",
+          "loc_coral_cove"
+        ],
+        "priority": 10
+      },
+      {
+        "community_key": "thornwood_sindral",
+        "display_name": "Thornwood Sindral",
+        "language_key": "sindral",
+        "races": ["Elf"],
+        "regions": [
+          "loc_thornwood",
+          "loc_ashenvale",
+          "loc_the_verdant_vale"
+        ],
+        "priority": 30
+      },
+      {
+        "community_key": "northern_holds",
+        "display_name": "Northern Holds",
+        "language_key": "khazic",
+        "regions": [
+          "loc_frostpeak_summit",
+          "loc_the_grey_pass",
+          "loc_ironvein_mine"
+        ],
+        "priority": 35
+      },
+      {
+        "community_key": "dwarven_holds",
+        "display_name": "Dwarven Holds",
+        "language_key": "khazic",
+        "races": ["Dwarf"],
+        "priority": 25
+      },
+      {
+        "community_key": "frontier_steppe",
+        "display_name": "Frontier Steppe",
+        "language_key": "orcish_steppe",
+        "regions": [
+          "loc_goblin_warrens",
+          "loc_mirefen_swamp",
+          "loc_sunbaked_plains",
+          "loc_sandstone_outpost"
+        ],
+        "priority": 35
+      },
+      {
+        "community_key": "orcish_clans",
+        "display_name": "Orcish Clans",
+        "language_key": "orcish_steppe",
+        "races": ["Orc"],
+        "priority": 25
+      },
+      {
+        "community_key": "dragonbone_reaches",
+        "display_name": "Dragonbone Reaches",
+        "language_key": "proto_quenic",
+        "regions": [
+          "loc_dragonbone_ridge",
+          "loc_sunken_ruins",
+          "loc_obsidian_crater"
+        ],
+        "priority": 35
+      },
+      {
+        "community_key": "dragonborn_courts",
+        "display_name": "Dragonborn Courts",
+        "language_key": "proto_quenic",
+        "races": ["Dragonborn"],
+        "priority": 15
+      }
+    ]
   }
 }

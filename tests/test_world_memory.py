@@ -245,10 +245,12 @@ class TestAddAlias:
 
     def test_different_aliases_all_added_within_cap(self):
         world = _make_world()
+        loc = world.get_location_by_id("loc_aethoria_capital")
+        assert loc is not None
+        loc.aliases = []
         world.add_alias("loc_aethoria_capital", "Alias A")
         world.add_alias("loc_aethoria_capital", "Alias B")
         world.add_alias("loc_aethoria_capital", "Alias C")
-        loc = world.get_location_by_id("loc_aethoria_capital")
         assert "Alias A" in loc.aliases
         assert "Alias B" in loc.aliases
         assert "Alias C" in loc.aliases
@@ -965,10 +967,13 @@ class TestApplyWorldMemory:
         mixin.world = world
         mixin.id_rng = random.Random(1)
 
+        dest = world.get_location_by_id("loc_thornwood")
+        assert dest is not None
+        dest.aliases = []
+
         mixin._apply_world_memory(run)
 
         # Live trace at destination
-        dest = world.get_location_by_id("loc_thornwood")
         assert len(dest.live_traces) == 1
         # Memorial created
         assert len(world.memorials) == 1
@@ -1152,9 +1157,12 @@ class TestApplyWorldMemory:
         mixin.world = world
         mixin.id_rng = random.Random(2)
 
+        dest = world.get_location_by_id("loc_thornwood")
+        assert dest is not None
+        dest.aliases = []
+
         mixin._apply_world_memory(run)
 
-        dest = world.get_location_by_id("loc_thornwood")
         assert len(dest.live_traces) == 1
         assert len(world.memorials) == 0
         assert len(dest.aliases) == 0

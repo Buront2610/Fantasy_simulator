@@ -468,6 +468,7 @@ TEXT_JA: Dict[str, str] = {
     'alias_notable_site': '{name} の発見地',
     # 地点詳細ビューの UI ラベル
     'location_detail_header': '地点詳細 - {name}',
+    'location_endonym_label': '現地名',
     'location_aliases_label': '別称',
     'location_live_traces_label': '最近の訪問者',
     'location_memorials_label': '記念碑',
@@ -533,6 +534,7 @@ TEXT_JA: Dict[str, str] = {
     'map_region_focus_rumor': '噂: {location} では話題が熱い',
     'map_region_focus_landmark': 'ランドマーク: {location} には土地の記憶が残る',
     'map_region_focus_landmark_memorial': '記念碑: {location} には記憶を留める碑がある',
+    'map_region_focus_landmark_endonym': '現地名: {location} は {endonym} と呼ばれている',
     'map_region_focus_landmark_alias': '別称: {location} には別の呼び名がある',
     'map_region_focus_landmark_trace': '痕跡: {location} には最近の往来が残る',
     'map_region_focus_landmark_death': '死地: {location} では最近死者が出た',
@@ -572,6 +574,7 @@ TEXT_JA: Dict[str, str] = {
     'atlas_mode_compact': 'コンパクトアトラス（狭幅）',
     'atlas_mode_minimal': 'ミニマル（テキストのみ）',
     'map_region_landmarks': 'ランドマーク＆世界の記憶',
+    'map_landmark_endonym': '現地名',
     'map_landmark_alias': '別名',
     'map_landmark_memorial': '記念碑',
     'map_landmark_trace': '最近の出来事',

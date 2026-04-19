@@ -4,6 +4,7 @@ character_creator.py - Interactive and programmatic character creation.
 
 from __future__ import annotations
 
+import json
 import random
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
@@ -11,6 +12,7 @@ from .character import Character, random_stats
 from .content.setting_bundle import NamingRulesDefinition, SettingBundle, default_aethoria_bundle
 from .content.world_data import ALL_SKILLS
 from .i18n import tr, tr_term
+from .language_engine import LanguageEngine
 
 if TYPE_CHECKING:
     from .ui.ui_context import UIContext
@@ -107,6 +109,8 @@ class CharacterCreator:
     def __init__(self, setting_bundle: SettingBundle | None = None) -> None:
         self.setting_bundle = setting_bundle
         self._fallback_bundle: SettingBundle | None = None
+        self._language_engine: LanguageEngine | None = None
+        self._language_engine_signature: str = ""
 
     def _default_bundle(self) -> SettingBundle:
         """Return a cached default bundle snapshot for compatibility fallbacks."""
@@ -138,6 +142,55 @@ class CharacterCreator:
             first_names_non_binary=non_binary,
             last_names=last_names,
         )
+
+    def naming_rules_for_identity(
+        self,
+        *,
+        race: str | None = None,
+        tribe: str | None = None,
+        region: str | None = None,
+    ) -> NamingRulesDefinition:
+        if self._bundle_prefers_explicit_naming_rules():
+            return self.naming_rules
+        language_rules = self._language_engine_for_bundle().naming_rules_for_identity(
+            race=race,
+            tribe=tribe,
+            region=region,
+        )
+        if language_rules is not None:
+            return language_rules
+        return self.naming_rules
+
+    def _bundle_prefers_explicit_naming_rules(self) -> bool:
+        """Return whether explicit bundle naming rules should override generated languages."""
+        if self.setting_bundle is None:
+            return False
+        authored = self.setting_bundle.world_definition.naming_rules.to_dict()
+        default = self._default_bundle().world_definition.naming_rules.to_dict()
+        if authored == default:
+            return False
+        return any(authored.get(field_name) for field_name in (
+            "first_names_male",
+            "first_names_female",
+            "first_names_non_binary",
+            "last_names",
+        ))
+
+    def _language_engine_for_bundle(self) -> LanguageEngine:
+        bundle = self._effective_bundle()
+        signature = json.dumps(
+            {
+                "languages": [language.to_dict() for language in bundle.world_definition.languages],
+                "language_communities": [
+                    community.to_dict() for community in bundle.world_definition.language_communities
+                ],
+            },
+            sort_keys=True,
+        )
+        if self._language_engine is None or self._language_engine_signature != signature:
+            self._language_engine = LanguageEngine(bundle.world_definition)
+            self._language_engine_signature = signature
+        return self._language_engine
 
     @property
     def race_entries(self) -> List[tuple[str, str, Dict[str, int]]]:
@@ -243,7 +296,14 @@ class CharacterCreator:
         out.print_line(char.stat_block())
         return char
 
-    def create_random(self, name: Optional[str] = None, rng: Any = random) -> Character:
+    def create_random(
+        self,
+        name: Optional[str] = None,
+        rng: Any = random,
+        *,
+        tribe: str | None = None,
+        region: str | None = None,
+    ) -> Character:
         race_entries, job_entries = self._require_race_and_job_entries()
         gender = rng.choice(_GENDERS)
         race_entry = rng.choice(race_entries)
@@ -255,7 +315,11 @@ class CharacterCreator:
         job_skills = job_entry[2]
 
         age = rng.randint(16, 55)
-        char_name = name or _random_name(gender, self.naming_rules, rng=rng)
+        char_name = name or _random_name(
+            gender,
+            self.naming_rules_for_identity(race=race, tribe=tribe, region=region),
+            rng=rng,
+        )
         stats = random_stats(base=25, spread=45, race_bonuses=race_bonuses, rng=rng)
 
         skills: Dict[str, int] = {}
@@ -274,7 +338,15 @@ class CharacterCreator:
         char.add_history(tr("history_born_into_world", race=tr_term(race), job=tr_term(job)))
         return char
 
-    def create_from_template(self, template_name: str, name: Optional[str] = None, rng: Any = random) -> Character:
+    def create_from_template(
+        self,
+        template_name: str,
+        name: Optional[str] = None,
+        rng: Any = random,
+        *,
+        tribe: str | None = None,
+        region: str | None = None,
+    ) -> Character:
         key = template_name.lower().strip()
         if not self._supports_aethoria_templates():
             raise ValueError("Character templates are only available for Aethoria-compatible bundles")
@@ -286,7 +358,11 @@ class CharacterCreator:
         race = tmpl["race"]
         job = tmpl["job"]
         gender = rng.choice(_GENDERS)
-        char_name = name or _random_name(gender, self.naming_rules, rng=rng)
+        char_name = name or _random_name(
+            gender,
+            self.naming_rules_for_identity(race=race, tribe=tribe, region=region),
+            rng=rng,
+        )
         age = rng.randint(20, 40)
 
         stats = {k: max(1, min(100, v + rng.randint(-5, 5))) for k, v in tmpl["base_stats"].items()}
