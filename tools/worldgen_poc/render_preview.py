@@ -11,8 +11,6 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from fantasy_simulator.worldgen import WorldgenConfig, build_ascii_preview, generate_world
-
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -24,6 +22,8 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+    from fantasy_simulator.worldgen import WorldgenConfig, build_ascii_preview, generate_world
+
     args = parse_args()
     world = generate_world(
         WorldgenConfig(
