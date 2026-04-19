@@ -563,6 +563,7 @@ def _landmark_focus_text(
     memorials_by_site: Dict[str, List[str]],
     aliases_by_site: Dict[str, List[str]],
     traces_by_site: Dict[str, List[str]],
+    endonyms_by_site: Dict[str, str],
 ) -> Optional[str]:
     """Build a typed landmark summary line for one site."""
     # Memorials / aliases may come from explicit detail payloads or from the
@@ -574,6 +575,12 @@ def _landmark_focus_text(
         return tr("map_region_focus_landmark_alias", location=cell.canonical_name)
     if traces_by_site.get(cell.location_id):
         return tr("map_region_focus_landmark_trace", location=cell.canonical_name)
+    if endonyms_by_site.get(cell.location_id):
+        return tr(
+            "map_region_focus_landmark_endonym",
+            location=cell.canonical_name,
+            endonym=endonyms_by_site[cell.location_id],
+        )
     if cell.recent_death_site:
         return tr("map_region_focus_landmark_death", location=cell.canonical_name)
     return None
@@ -585,6 +592,7 @@ def _pick_landmark_target(
     memorials_by_site: Dict[str, List[str]],
     aliases_by_site: Dict[str, List[str]],
     traces_by_site: Dict[str, List[str]],
+    endonyms_by_site: Dict[str, str],
 ) -> Optional[MapCellInfo]:
     """Prefer explicit memory on the center site, then any landmark signal nearby."""
     center_memory_target = next(
@@ -601,6 +609,7 @@ def _pick_landmark_target(
         (
             cell for cell in visible_cells
             if _cell_has_landmark_indicators(cell, memorials_by_site, aliases_by_site, traces_by_site)
+            or endonyms_by_site.get(cell.location_id)
         ),
         None,
     )
@@ -715,6 +724,7 @@ def render_region_map(
     site_memorials: Optional[Dict[str, List[str]]] = None,
     site_aliases: Optional[Dict[str, List[str]]] = None,
     site_traces: Optional[Dict[str, List[str]]] = None,
+    site_endonyms: Optional[Dict[str, str]] = None,
 ) -> str:
     """Render a zoomed region map around a selected site.
 
@@ -889,15 +899,17 @@ def render_region_map(
     memorials = site_memorials or {}
     aliases = site_aliases or {}
     traces = site_traces or {}
+    endonyms = site_endonyms or {}
     landmark_target = _pick_landmark_target(
         visible_cells,
         center_location_id,
         memorials,
         aliases,
         traces,
+        endonyms,
     )
     if landmark_target is not None:
-        landmark_text = _landmark_focus_text(landmark_target, memorials, aliases, traces)
+        landmark_text = _landmark_focus_text(landmark_target, memorials, aliases, traces, endonyms)
         if landmark_text:
             standout_lines.append(landmark_text)
 
@@ -941,7 +953,7 @@ def render_region_map(
                 f" ({tr_term(r.route_type)}){blocked}"
             )
 
-    # --- World memory: landmarks (memorials, aliases, traces) ---
+    # --- Landmark context: native names and world memory ---
     has_memory = False
     for cell in sorted(info.cells.values(), key=lambda c: (c.y, c.x)):
         if not (x_min <= cell.x <= x_max and y_min <= cell.y <= y_max):
@@ -950,13 +962,16 @@ def render_region_map(
         mem_items = memorials.get(loc_id, [])
         ali_items = aliases.get(loc_id, [])
         tra_items = traces.get(loc_id, [])
-        if not mem_items and not ali_items and not tra_items:
+        endonym = endonyms.get(loc_id, "")
+        if not mem_items and not ali_items and not tra_items and not endonym:
             continue
         if not has_memory:
             lines.append("")
             lines.append(f"  {tr('map_region_landmarks')}:")
             has_memory = True
         lines.append(f"    {cell.canonical_name}:")
+        if endonym:
+            lines.append(f"      {tr('map_landmark_endonym')}: {endonym}")
         if ali_items:
             lines.append(f"      {tr('map_landmark_alias')}: {', '.join(ali_items[:3])}")
         for mem in mem_items[:2]:
@@ -977,6 +992,7 @@ def render_location_detail(
     memorials: Optional[List[str]] = None,
     aliases: Optional[List[str]] = None,
     live_traces: Optional[List[str]] = None,
+    generated_endonym: Optional[str] = None,
 ) -> str:
     """Render a detailed single-site view with AA panel.
 
@@ -1047,6 +1063,10 @@ def render_location_detail(
         lines.append(f"  |{_fit(f' {markers_label}: {overlay_line}', w)}|")
         lines.append(border)
 
+    if generated_endonym:
+        endonym_label = tr('location_endonym_label')
+        lines.append(f"  |{_fit(f' {endonym_label}: {generated_endonym}', w)}|")
+
     # Aliases
     if aliases:
         aliases_label = tr('location_aliases_label')
@@ -1067,7 +1087,7 @@ def render_location_detail(
         for trace in live_traces[:5]:
             lines.append(f"  |{_fit(f'   - {trace}', w)}|")
 
-    if aliases or memorials or live_traces:
+    if generated_endonym or aliases or memorials or live_traces:
         lines.append(border)
 
     return "\n".join(lines)

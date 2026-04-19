@@ -6,7 +6,7 @@ core world aggregate so ``world.py`` can stay focused on world state wiring.
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Iterable, List, Sequence
+from typing import Any, Dict, Iterable, List, Sequence
 
 from .content.setting_bundle import WorldDefinition
 from .language.engine import LanguageEngine
@@ -87,6 +87,16 @@ def language_status(
     statuses: List[Dict[str, Any]] = []
     for language in world_definition.languages:
         profile = language_engine.profile(language.language_key)
+        runtime_state = language_engine.runtime_state(language.language_key)
+        effective_rules = language_engine.effective_sound_change_rules(
+            language.language_key,
+            include_lineage=True,
+        )
+        recent_records = [
+            record.to_dict()
+            for record in evolution_history
+            if record.language_key == language.language_key
+        ][-5:]
         evolution_count = sum(
             1 for record in evolution_history if record.language_key == language.language_key
         )
@@ -97,6 +107,24 @@ def language_status(
                 "lineage": list(profile.lineage),
                 "sample_given_names": profile.naming_rules.first_names_male[:3],
                 "sample_surnames": profile.naming_rules.last_names[:3],
+                "sample_forms": {
+                    "given_names": profile.naming_rules.first_names_male[:3],
+                    "surnames": profile.naming_rules.last_names[:3],
+                    "lexicon": profile.lexicon[:5],
+                    "toponym": language_engine.generate_toponym(
+                        language.language_key,
+                        seed_key=f"status:{language.language_key}",
+                        region_type="status",
+                    ),
+                },
+                "applied_rules": [rule.to_dict() for rule in runtime_state.applied_rules],
+                "effective_rules": [rule.to_dict() for rule in effective_rules],
+                "runtime_state": {
+                    "applied_rule_count": len(runtime_state.applied_rules),
+                    "derived_name_stems": list(runtime_state.derived_name_stems),
+                    "derived_toponym_suffixes": list(runtime_state.derived_toponym_suffixes),
+                },
+                "recent_evolution_records": recent_records,
                 "sound_shifts": language_engine.effective_sound_shift_map(language.language_key),
                 "evolution_interval_years": int(language.evolution_interval_years),
                 "evolution_count": evolution_count,
@@ -117,18 +145,38 @@ def evolution_records_for_language(
     ]
 
 
-def refresh_generated_endonym_aliases(
+def refresh_generated_endonyms(
     *,
     locations: Iterable[Any],
-    max_aliases: int,
-    endonym_resolver: Callable[[str], str | None],
+    endonym_resolver,
+    stale_endonyms_by_location_id: Dict[str, str] | None = None,
 ) -> None:
-    """Ensure generated endonyms are present as aliases on live locations."""
+    """Refresh per-location generated endonyms without consuming alias slots."""
+    stale_endonyms_by_location_id = stale_endonyms_by_location_id or {}
     for location in locations:
+        stale_endonym = stale_endonyms_by_location_id.get(location.id, "")
         endonym = endonym_resolver(location.id)
-        if endonym and endonym != location.canonical_name and endonym not in location.aliases:
-            if len(location.aliases) < max_aliases:
-                location.aliases.append(endonym)
+        if endonym is None and not stale_endonym:
+            generated_endonym = getattr(location, "generated_endonym", "")
+        else:
+            generated_endonym = endonym if endonym and endonym != location.canonical_name else ""
+        aliases_to_remove = {value for value in (stale_endonym, generated_endonym) if value}
+        if aliases_to_remove:
+            location.aliases = [alias for alias in location.aliases if alias not in aliases_to_remove]
+        location.generated_endonym = generated_endonym
+
+
+def refresh_world_generated_endonyms(
+    world: Any,
+    *,
+    stale_endonyms_by_location_id: Dict[str, str] | None = None,
+) -> None:
+    """Apply generated-endonym refresh to a world aggregate."""
+    refresh_generated_endonyms(
+        locations=world.grid.values(),
+        endonym_resolver=world.location_endonym,
+        stale_endonyms_by_location_id=stale_endonyms_by_location_id,
+    )
 
 
 def derive_evolution_record(
@@ -198,3 +246,20 @@ def maybe_evolve_languages_for_year(
         next_history.append(record)
         changed = True
     return next_history, next_runtime_states, changed
+
+
+def advance_world_languages_for_year(world: Any, year: int) -> None:
+    """Coordinate yearly language evolution for a world aggregate."""
+    next_history, next_runtime_states, changed = maybe_evolve_languages_for_year(
+        world_definition=world._setting_bundle.world_definition,
+        language_engine=world.language_engine,
+        language_origin_year=world.language_origin_year,
+        evolution_history=world.language_evolution_history,
+        runtime_states=world._language_runtime_states,
+        year=year,
+    )
+    world.language_evolution_history = next_history
+    world._language_runtime_states = next_runtime_states
+    if changed:
+        world._language_engine = None
+        refresh_world_generated_endonyms(world)

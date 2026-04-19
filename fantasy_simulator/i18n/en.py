@@ -472,6 +472,7 @@ TEXT_EN: Dict[str, str] = {
     'alias_notable_site': "{name}'s Discovery",
     # Location detail view UI labels
     'location_detail_header': 'LOCATION DETAIL - {name}',
+    'location_endonym_label': 'Native name',
     'location_aliases_label': 'Known as',
     'location_live_traces_label': 'Recent visitors',
     'location_memorials_label': 'Memorials',
@@ -537,6 +538,7 @@ TEXT_EN: Dict[str, str] = {
     'map_region_focus_rumor': 'Rumor: {location} is buzzing with talk',
     'map_region_focus_landmark': 'Landmark: {location} carries local memory',
     'map_region_focus_landmark_memorial': 'Memorial: {location} holds a lasting memorial',
+    'map_region_focus_landmark_endonym': 'Endonym: {location} is locally called {endonym}',
     'map_region_focus_landmark_alias': 'Alias: {location} is known by another name',
     'map_region_focus_landmark_trace': 'Trace: {location} shows recent movement',
     'map_region_focus_landmark_death': 'Death-site: {location} saw a recent death',
@@ -576,6 +578,7 @@ TEXT_EN: Dict[str, str] = {
     'atlas_mode_compact': 'Compact atlas (narrow)',
     'atlas_mode_minimal': 'Minimal (text only)',
     'map_region_landmarks': 'Landmarks & World Memory',
+    'map_landmark_endonym': 'Native name',
     'map_landmark_alias': 'Also known as',
     'map_landmark_memorial': 'Memorial',
     'map_landmark_trace': 'Recent',

@@ -11,20 +11,20 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from .event_models import WorldEventRecord
 from .i18n import tr
-from .language.engine import LanguageEngine
+from .language.engine import LanguageEngine, fallback_evolution_targets
 from .language.state import LanguageEvolutionRecord, LanguageRuntimeState
 from .rule_override_resolution import (
     clone_default_event_impact_rules,
     clone_default_propagation_rules,
 )
 from .world_language import (
+    advance_world_languages_for_year,
     apply_evolution_record as apply_language_evolution_record,
     build_language_engine,
     evolution_records_for_language,
     language_status as build_language_status,
     location_endonym as resolve_location_endonym,
-    maybe_evolve_languages_for_year,
-    refresh_generated_endonym_aliases,
+    refresh_world_generated_endonyms,
     resolve_language_display_name,
 )
 from .world_event_log import (
@@ -272,6 +272,7 @@ class LocationState:
     controlling_faction_id: Optional[str] = None
     recent_event_ids: List[str] = field(default_factory=list)
     aliases: List[str] = field(default_factory=list)
+    generated_endonym: str = ""
     memorial_ids: List[str] = field(default_factory=list)
     live_traces: List[Dict[str, Any]] = field(default_factory=list)
 
@@ -344,6 +345,7 @@ class LocationState:
             "controlling_faction_id": self.controlling_faction_id,
             "recent_event_ids": list(self.recent_event_ids),
             "aliases": list(self.aliases),
+            "generated_endonym": self.generated_endonym,
             "memorial_ids": list(self.memorial_ids),
             "live_traces": [dict(trace) for trace in self.live_traces],
         }
@@ -389,6 +391,7 @@ class LocationState:
             controlling_faction_id=data.get("controlling_faction_id"),
             recent_event_ids=_string_list_payload(data.get("recent_event_ids", []), field_name="recent_event_ids"),
             aliases=_string_list_payload(data.get("aliases", []), field_name="aliases"),
+            generated_endonym=str(data.get("generated_endonym", "")),
             memorial_ids=_string_list_payload(data.get("memorial_ids", []), field_name="memorial_ids"),
             live_traces=_trace_list_payload(data.get("live_traces", []), field_name="live_traces"),
         )
@@ -399,36 +402,7 @@ class World:
 
     WATCHED_ACTOR_TAG_PREFIX = "watched_actor:"
     WATCHED_ACTOR_INFERRED_TAG = "watched_actor_inferred"
-    LANGUAGE_SHIFT_CANDIDATES: Dict[str, List[str]] = {
-        "k": ["ch", "kh"],
-        "kh": ["ch", "h"],
-        "ch": ["sh", "s"],
-        "g": ["gh", "y"],
-        "gh": ["y", "w"],
-        "t": ["th", "s"],
-        "d": ["dh", "z"],
-        "dh": ["z", "d"],
-        "s": ["sh", "th"],
-        "sh": ["s", "ch"],
-        "th": ["s", "d"],
-        "v": ["w", "f"],
-        "r": ["rh", "l"],
-        "rh": ["r", "l"],
-        "a": ["ae", "e"],
-        "e": ["ei", "i"],
-        "ei": ["i", "e"],
-        "i": ["ie", "e"],
-        "ie": ["i", "ye"],
-        "o": ["ou", "u"],
-        "ou": ["u", "o"],
-        "u": ["oo", "o"],
-        "oo": ["u", "ou"],
-        "ae": ["e", "ai"],
-        "ai": ["e", "ae"],
-        "ia": ["ya", "ie"],
-        "ya": ["ia", "a"],
-        "ea": ["e", "ia"],
-    }
+    LANGUAGE_SHIFT_CANDIDATES: Dict[str, List[str]] = fallback_evolution_targets()
 
     def __init__(
         self,
@@ -667,6 +641,7 @@ class World:
     def _copy_location_runtime_state(self, source: LocationState, target: LocationState) -> None:
         """Preserve mutable location state across structural rebuilds."""
         structural_aliases = list(target.aliases)
+        structural_endonym = target.generated_endonym
         target.prosperity = source.prosperity
         target.safety = source.safety
         target.mood = source.mood
@@ -678,14 +653,17 @@ class World:
         target.controlling_faction_id = source.controlling_faction_id
         target.recent_event_ids = list(source.recent_event_ids)
         target.aliases = list(dict.fromkeys(structural_aliases + list(source.aliases)))
+        target.generated_endonym = structural_endonym
         target.memorial_ids = list(source.memorial_ids)
         target.live_traces = [dict(trace) for trace in source.live_traces]
 
-    def _refresh_generated_endonym_aliases(self) -> None:
-        refresh_generated_endonym_aliases(
-            locations=self.grid.values(),
-            max_aliases=self.MAX_ALIASES,
-            endonym_resolver=self.location_endonym,
+    def _refresh_generated_endonyms(
+        self,
+        stale_endonyms_by_location_id: Dict[str, str] | None = None,
+    ) -> None:
+        refresh_world_generated_endonyms(
+            self,
+            stale_endonyms_by_location_id=stale_endonyms_by_location_id,
         )
 
     def _derive_language_evolution_record(self, language_key: str, year: int) -> LanguageEvolutionRecord | None:
@@ -707,19 +685,7 @@ class World:
         return True
 
     def _maybe_evolve_languages_for_year(self, year: int) -> None:
-        next_history, next_runtime_states, changed = maybe_evolve_languages_for_year(
-            world_definition=self._setting_bundle.world_definition,
-            language_engine=self.language_engine,
-            language_origin_year=self.language_origin_year,
-            evolution_history=self.language_evolution_history,
-            runtime_states=self._language_runtime_states,
-            year=year,
-        )
-        self.language_evolution_history = next_history
-        self._language_runtime_states = next_runtime_states
-        if changed:
-            self._language_engine = None
-            self._refresh_generated_endonym_aliases()
+        advance_world_languages_for_year(self, year)
 
     def _build_default_map(self, previous_locations: Optional[List[LocationState]] = None) -> None:
         """Rebuild the world from the active setting bundle's site seeds.
@@ -937,7 +903,7 @@ class World:
         )
         endonym = self.location_endonym(seed.location_id)
         if endonym and endonym != location.canonical_name:
-            location.aliases.append(endonym)
+            location.generated_endonym = endonym
         return location
 
     def _build_terrain_from_grid(self, *, explicit_route_graph: Optional[bool] = None) -> None:
@@ -1822,6 +1788,7 @@ class World:
             controlling_faction_id=data.get("controlling_faction_id"),
             recent_event_ids=_string_list_payload(data.get("recent_event_ids", []), field_name="recent_event_ids"),
             aliases=_string_list_payload(data.get("aliases", []), field_name="aliases"),
+            generated_endonym=str(data.get("generated_endonym", "")),
             memorial_ids=_string_list_payload(data.get("memorial_ids", []), field_name="memorial_ids"),
             live_traces=_trace_list_payload(data.get("live_traces", []), field_name="live_traces"),
         )

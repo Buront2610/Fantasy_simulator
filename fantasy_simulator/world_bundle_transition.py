@@ -82,6 +82,10 @@ def apply_setting_bundle(
     previous_bundle = getattr(world, "_setting_bundle", None)
     previous_language_signature = language_signature(world._setting_bundle.world_definition)
     previous_locations = list(getattr(world, "grid", {}).values())
+    previous_generated_endonyms = {
+        location.id: world.location_endonym(location.id) or ""
+        for location in previous_locations
+    }
     set_setting_bundle_metadata(
         world,
         bundle,
@@ -104,3 +108,7 @@ def apply_setting_bundle(
             world._normalize_references_after_bundle_change()
         else:
             world._refresh_locations_from_site_seeds()
+        if previous_language_signature != next_language_signature:
+            world._refresh_generated_endonyms(
+                stale_endonyms_by_location_id=previous_generated_endonyms,
+            )

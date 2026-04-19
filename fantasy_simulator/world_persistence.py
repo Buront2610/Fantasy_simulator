@@ -127,14 +127,17 @@ def hydrate_world_state(
         LanguageEvolutionRecord.from_dict(item)
         for item in data.get("language_evolution_history", [])
     ]
-    world._language_runtime_states = {
+    persisted_runtime_states = {
         key: LanguageRuntimeState.from_dict(value)
         for key, value in dict(data.get("language_runtime_states", {})).items()
     }
+    world._language_runtime_states = {}
     world._language_engine = None
-    if not world._language_runtime_states:
+    if world.language_evolution_history:
         for record in world.language_evolution_history:
             world._apply_language_evolution_record(record)
+    else:
+        world._language_runtime_states = persisted_runtime_states
 
     if bundle_backed_structure:
         world._build_terrain_from_grid()
@@ -161,5 +164,6 @@ def hydrate_world_state(
     if "calendar_baseline" not in data:
         world.calendar_baseline = clone_calendar(world.setting_bundle.world_definition.calendar)
 
+    world._refresh_generated_endonyms()
     world.normalize_after_load()
     return world

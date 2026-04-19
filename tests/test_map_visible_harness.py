@@ -90,9 +90,8 @@ def _restore_locale():
 
 def _assert_seeded_map_visible_bundle(bundle: dict[str, list[str]]) -> None:
     assert bundle["overview"][0] == "  === WORLD OVERVIEW: Aethoria (Year: 1002) ==="
-    assert "      a = Has alias" in bundle["overview"]
-    assert any("The Verdant Vale - village [!a]" in line for line in bundle["overview"])
-    assert any("Aethoria Capital - city [!$a]" in line for line in bundle["overview"])
+    assert any("The Verdant Vale - village" in line for line in bundle["overview"])
+    assert any("Aethoria Capital - city" in line for line in bundle["overview"])
 
     assert bundle["region"][:5] == [
         "  === REGION MAP: The Verdant Vale ===",
@@ -101,9 +100,9 @@ def _assert_seeded_map_visible_bundle(bundle: dict[str, list[str]]) -> None:
         "    3|DDHMD|",
         "    4|SS@OC|",
     ]
-    assert "    - Alias: The Verdant Vale is known by another name" in bundle["region"]
     assert "  Landmarks & World Memory:" in bundle["region"]
-    assert any("Also known as: Branthethal" in line for line in bundle["region"])
+    assert any("Native name: Branthethal" in line for line in bundle["region"])
+    assert any("Native name: Branthethal" in line for line in bundle["region"])
 
     assert bundle["detail"][:10] == [
         "  | V The Verdant Vale (village)                     |",
@@ -117,13 +116,14 @@ def _assert_seeded_map_visible_bundle(bundle: dict[str, list[str]]) -> None:
         "  | Mood: calm (51)                                  |",
         "  | Rumor heat: 20 (low)                             |",
     ]
-    assert "  | Markers: Has alias                               |" in bundle["detail"]
-    assert "  | Known as: Branthethal                            |" in bundle["detail"]
+    assert "  | Native name: Branthethal                         |" in bundle["detail"]
+    assert "  | Markers: Has alias                               |" not in bundle["detail"]
 
 
 def _assert_memory_heavy_bundle(bundle: dict[str, list[str]]) -> None:
     assert "    - Memorial: The Verdant Vale holds a lasting memorial" in bundle["region"]
-    assert "      Also known as: Branthethal, The Lantern Vale" in bundle["region"]
+    assert "      Native name: Branthethal" in bundle["region"]
+    assert "      Also known as: The Lantern Vale" in bundle["region"]
     assert "      Memorial: [Year 1001] Here rests Aldric." in bundle["region"]
     assert "      Recent: Lysara passed through at dawn" in bundle["region"]
 
@@ -140,7 +140,8 @@ def _assert_memory_heavy_bundle(bundle: dict[str, list[str]]) -> None:
         "  | Rumor heat: 20 (low)                             |",
     ]
     assert "  | Markers: Memorial present, Has alias, Recent d...|" in bundle["detail"]
-    assert "  | Known as: Branthethal, The Lantern Vale          |" in bundle["detail"]
+    assert "  | Native name: Branthethal                         |" in bundle["detail"]
+    assert "  | Known as: The Lantern Vale                       |" in bundle["detail"]
     assert "  |   [Year 1001] Here rests Aldric.                 |" in bundle["detail"]
     assert "  |   - Lysara passed through at dawn                |" in bundle["detail"]
 

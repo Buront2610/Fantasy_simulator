@@ -18,6 +18,7 @@ from fantasy_simulator.content.setting_bundle import (
 )
 from fantasy_simulator.i18n import set_locale
 from fantasy_simulator.language.schema import SoundChangeRuleDefinition
+from fantasy_simulator.language.state import LanguageEvolutionRecord
 from fantasy_simulator.rumor import Rumor
 from fantasy_simulator.terrain import RouteEdge
 from fantasy_simulator.world import LocationState, MemorialRecord, World
@@ -501,6 +502,8 @@ class TestWorld:
 
         assert world.resolve_language_for_identity(race="Human") == "Aethic Common"
         assert world.resolve_language_for_identity(race="Elf", region="loc_thornwood") == "Sindral"
+        assert world.resolve_language_for_identity(race="Human", region="loc_thornwood") == "Aethic Common"
+        assert world.resolve_language_for_identity() == "Aethic Common"
 
     def test_world_describes_language_lineage(self):
         world = World()
@@ -513,7 +516,8 @@ class TestWorld:
         thornwood = world.get_location_by_id("loc_thornwood")
 
         assert thornwood is not None
-        assert world.location_endonym("loc_thornwood") in thornwood.aliases
+        assert thornwood.generated_endonym == world.location_endonym("loc_thornwood")
+        assert thornwood.generated_endonym not in thornwood.aliases
         assert world.location_endonym("loc_thornwood") != thornwood.canonical_name
 
     def test_location_endonym_uses_toponym_specific_stems(self):
@@ -550,6 +554,21 @@ class TestWorld:
         )
 
         assert world.location_endonym("loc_custom") == "Torum"
+
+    def test_generated_endonym_does_not_consume_memory_alias_cap(self):
+        world = World()
+        thornwood = world.get_location_by_id("loc_thornwood")
+
+        assert thornwood is not None
+        assert thornwood.generated_endonym
+
+        thornwood.aliases = []
+        for index in range(world.MAX_ALIASES):
+            world.add_alias("loc_thornwood", f"Alias {index}")
+
+        assert len(thornwood.aliases) == world.MAX_ALIASES
+        assert thornwood.generated_endonym == world.location_endonym("loc_thornwood")
+        assert thornwood.generated_endonym not in thornwood.aliases
 
     def test_bundle_update_preserves_runtime_aliases_and_adds_new_endonym_alias(self):
         world = World(name="Custom")
@@ -601,7 +620,8 @@ class TestWorld:
         updated_location = world.get_location_by_id("loc_custom")
         assert updated_location is not None
         assert "Traveler's Rest" in updated_location.aliases
-        assert "Seleth" in updated_location.aliases
+        assert updated_location.generated_endonym == "Seleth"
+        assert "Seleth" not in updated_location.aliases
 
     def test_language_evolution_applies_at_interval_and_records_history(self):
         world = World(name="Custom", year=1000)
@@ -777,6 +797,62 @@ class TestWorld:
         assert world.language_evolution_history[0].rule_key != world.language_evolution_history[1].rule_key
         assert world.setting_bundle.world_definition.languages[0].sound_shifts == {}
         assert world.language_status()[0]["sound_shifts"].get("g") == "gh"
+
+    def test_language_status_includes_debug_runtime_details(self):
+        world = World(name="Custom", year=1000)
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                languages=[
+                    LanguageDefinition(
+                        language_key="proto_lang",
+                        display_name="Proto Lang",
+                        seed_syllables=["ata"],
+                        sound_shifts={"a": "e"},
+                    ),
+                    LanguageDefinition(
+                        language_key="child_lang",
+                        display_name="Child Lang",
+                        parent_key="proto_lang",
+                        seed_syllables=["tana"],
+                        sound_change_rules=[
+                            SoundChangeRuleDefinition(
+                                rule_key="child_lang.t_to_d",
+                                source="t",
+                                target="d",
+                                after="vowel",
+                            )
+                        ],
+                    ),
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+        record = LanguageEvolutionRecord(
+            year=1001,
+            language_key="child_lang",
+            source_token="s",
+            target_token="sh",
+            rule_key="child_lang.s_to_sh",
+            rule_position="initial",
+            rule_description="Initial palatalization.",
+        )
+        assert world._apply_language_evolution_record(record) is True
+        world.language_evolution_history.append(record)
+
+        status = next(item for item in world.language_status() if item["language_key"] == "child_lang")
+
+        assert [rule["rule_key"] for rule in status["effective_rules"]] == [
+            "legacy:proto_lang:a>e",
+            "child_lang.t_to_d",
+            "child_lang.s_to_sh",
+        ]
+        assert status["runtime_state"]["applied_rule_count"] == 1
+        assert status["recent_evolution_records"][0]["rule_key"] == "child_lang.s_to_sh"
+        assert status["sample_forms"]["toponym"]
 
     def test_structured_sound_change_rules_apply_conditionally_in_runtime_profiles(self):
         world = World(name="Custom", year=1000)

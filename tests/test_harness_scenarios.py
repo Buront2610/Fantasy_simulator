@@ -315,7 +315,6 @@ def _assert_seeded_acceptance_bundle(bundle: dict[str, Any], *, locale: str) -> 
         ]
         assert bundle["monthly_rumors"][-1] == "    Total events: 0"
         assert any(line.startswith("    • ") for line in bundle["summary_lines"])
-        assert "  | Markers: Has alias                               |" in bundle["detail_lines"]
     else:
         assert bundle["summary_lines"][0] == "  シミュレーション要約 - Aethoria"
         assert bundle["summary_lines"][1] == "  最終年: 1002"
@@ -329,7 +328,6 @@ def _assert_seeded_acceptance_bundle(bundle: dict[str, Any], *, locale: str) -> 
         ]
         assert bundle["monthly_rumors"][-1] == "    イベント総数: 0"
         assert any(line.startswith("    • ") for line in bundle["summary_lines"])
-        assert "  | マーカー: 別称あり                               |" in bundle["detail_lines"]
 
 
 def _assert_projection_contract(contract: dict[str, Any]) -> None:
@@ -360,10 +358,9 @@ def _assert_projection_contract(contract: dict[str, Any]) -> None:
     ]
     assert contract["detail_projection"] == {
         "location_id": "loc_elderroot_forest",
-        "memory_tags": ("alias",),
+        "memory_tags": (),
     }
-    assert len(contract["memory_tags"]) == 25
-    assert all(tags == ("alias",) for _loc_id, tags in contract["memory_tags"])
+    assert contract["memory_tags"] == []
     assert contract["report_selection"]["yearly"]["total_events"] == 11
     assert contract["report_selection"]["yearly"]["deaths_this_year"] == 0
     assert contract["report_selection"]["monthly"] == {

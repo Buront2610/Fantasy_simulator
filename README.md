@@ -77,7 +77,8 @@ dependency container, renderer modules, and presenter/view-model helpers. The
 current roadmap is maintained in
 [`docs/implementation_plan.md`](docs/implementation_plan.md), and the current
 repo-level guardrails are summarized in
-[`docs/architecture.md`](docs/architecture.md).
+[`docs/architecture.md`](docs/architecture.md). Language authoring and debug
+contracts live in [`docs/language_engine.md`](docs/language_engine.md).
 
 **Compatibility note (PR-A):** CLI launch (`python -m fantasy_simulator` and
 `python main.py`) and save/load compatibility are preserved. However, old
@@ -176,6 +177,12 @@ fantasy_simulator/          # Main package
   narrative/
     context.py              # Minimal NarrativeContext helpers for memorials / aliases
     template_history.py     # Template cooldown / selection helper
+  language/
+    schema.py               # Structured language and sound-change schema helpers
+    phonology.py            # Token-aware sound change application and feature classes
+    state.py                # Runtime language state and evolution history DTOs
+    presets.py              # Historically inspired rule pools
+    engine.py               # Naming, lexicon, toponym, and evolution engine
   content/
     world_data.py           # Legacy compatibility projections + shared skill catalog
   i18n/
@@ -187,6 +194,7 @@ tests/                      # Automated tests
 docs/
   implementation_plan.md    # Implementation roadmap and phase order
   architecture.md           # Current architectural guardrails and canonical data rules
+  language_engine.md        # Language package authoring/debug contracts
   td_backlog_status.md      # TD-1〜TD-4 audit snapshot (done/remaining)
   contexts/                 # Short task-mode context docs for implementation/review
   session_handoffs/         # Template + latest repo-local handoff notes

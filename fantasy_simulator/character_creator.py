@@ -150,6 +150,8 @@ class CharacterCreator:
         tribe: str | None = None,
         region: str | None = None,
     ) -> NamingRulesDefinition:
+        if self._bundle_prefers_explicit_naming_rules():
+            return self.naming_rules
         language_rules = self._language_engine_for_bundle().naming_rules_for_identity(
             race=race,
             tribe=tribe,
@@ -158,6 +160,21 @@ class CharacterCreator:
         if language_rules is not None:
             return language_rules
         return self.naming_rules
+
+    def _bundle_prefers_explicit_naming_rules(self) -> bool:
+        """Return whether explicit bundle naming rules should override generated languages."""
+        if self.setting_bundle is None:
+            return False
+        authored = self.setting_bundle.world_definition.naming_rules.to_dict()
+        default = self._default_bundle().world_definition.naming_rules.to_dict()
+        if authored == default:
+            return False
+        return any(authored.get(field_name) for field_name in (
+            "first_names_male",
+            "first_names_female",
+            "first_names_non_binary",
+            "last_names",
+        ))
 
     def _language_engine_for_bundle(self) -> LanguageEngine:
         bundle = self._effective_bundle()

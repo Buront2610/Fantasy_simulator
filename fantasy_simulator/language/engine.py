@@ -66,6 +66,11 @@ _FALLBACK_EVOLUTION_TARGETS: Dict[str, List[str]] = {
 }
 
 
+def fallback_evolution_targets() -> Dict[str, List[str]]:
+    """Expose fallback drift candidates from a single source of truth."""
+    return {source: list(targets) for source, targets in _FALLBACK_EVOLUTION_TARGETS.items()}
+
+
 def _stable_seed(*parts: str) -> int:
     digest = hashlib.sha256("|".join(parts).encode("utf-8")).digest()
     return int.from_bytes(digest[:8], "big")
@@ -158,38 +163,28 @@ class LanguageEngine:
         tribe: str | None = None,
         region: str | None = None,
     ) -> LanguageDefinition | None:
+        provided_selectors = {
+            key: value
+            for key, value in {
+                "race": race,
+                "tribe": tribe,
+                "region": region,
+            }.items()
+            if value is not None
+        }
         best_match: LanguageCommunityDefinition | None = None
-        best_rank = (-1, -1)
-        for community in self.world_definition.language_communities:
-            matched_dimensions = 0
-            selector_count = 0
-            if community.races:
-                selector_count += 1
-                if race not in community.races:
+        best_rank = (-1, -1, -1, -1)
+        if provided_selectors:
+            for community in self.world_definition.language_communities:
+                rank = self._community_match_rank(community, provided_selectors)
+                if rank is None:
                     continue
-                matched_dimensions += 1
-            if community.tribes:
-                selector_count += 1
-                if tribe not in community.tribes:
-                    continue
-                matched_dimensions += 1
-            if community.regions:
-                selector_count += 1
-                if region not in community.regions:
-                    continue
-                matched_dimensions += 1
-            if selector_count == 0 and not community.is_lingua_franca:
-                continue
-            rank = (matched_dimensions, community.priority)
-            if rank > best_rank:
-                best_rank = rank
-                best_match = community
+                if rank > best_rank:
+                    best_rank = rank
+                    best_match = community
 
         if best_match is not None:
             return self._language_index.get(best_match.language_key)
-
-        if race is not None or tribe is not None or region is not None:
-            return None
 
         lingua_francas = [
             community
@@ -203,6 +198,41 @@ class LanguageEngine:
         if len(self.world_definition.languages) == 1:
             return self.world_definition.languages[0]
         return None
+
+    @staticmethod
+    def _community_match_rank(
+        community: LanguageCommunityDefinition,
+        provided_selectors: Mapping[str, str],
+    ) -> tuple[int, int, int, int] | None:
+        selector_values = {
+            "race": list(community.races),
+            "tribe": list(community.tribes),
+            "region": list(community.regions),
+        }
+        if not any(selector_values.values()):
+            return None
+        matched_dimensions = 0
+        extra_constraints = 0
+        for selector, allowed_values in selector_values.items():
+            provided_value = provided_selectors.get(selector)
+            if provided_value is None:
+                if allowed_values:
+                    extra_constraints += 1
+                continue
+            if not allowed_values:
+                continue
+            if provided_value not in allowed_values:
+                return None
+            matched_dimensions += 1
+        if matched_dimensions == 0:
+            return None
+        is_exact_match = matched_dimensions == len(provided_selectors) and extra_constraints == 0
+        return (
+            1 if is_exact_match else 0,
+            matched_dimensions,
+            -extra_constraints,
+            community.priority,
+        )
 
     def naming_rules_for_identity(
         self,
@@ -310,6 +340,19 @@ class LanguageEngine:
                 continue
             mapping[rule.source] = rule.target
         return mapping
+
+    def effective_sound_change_rules(
+        self,
+        language_key: str,
+        *,
+        include_lineage: bool = False,
+    ) -> List[SoundChangeRuleDefinition]:
+        language = self._language_index[language_key]
+        rules: List[SoundChangeRuleDefinition] = []
+        if include_lineage and language.parent_key:
+            rules.extend(self.effective_sound_change_rules(language.parent_key, include_lineage=True))
+        rules.extend(self._effective_sound_change_rules(language))
+        return rules
 
     def derive_evolution_record(
         self,
@@ -476,7 +519,7 @@ class LanguageEngine:
         source = rng.choice(candidates)
         targets = [
             target
-            for target in _FALLBACK_EVOLUTION_TARGETS[source]
+            for target in fallback_evolution_targets()[source]
             if effective_map.get(source) != target
         ]
         if not targets:
