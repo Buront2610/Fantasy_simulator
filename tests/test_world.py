@@ -1056,6 +1056,78 @@ class TestWorld:
         assert world.memorials["mem_1"].location_id == "hub_primary"
         assert world.get_location_by_id("hub_primary").memorial_ids == ["mem_1"]
 
+    def test_setting_bundle_assignment_rebuilds_recent_event_ids_after_event_location_repair(self):
+        from fantasy_simulator.events import WorldEventRecord
+
+        world = World(name="Custom")
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="hub_primary",
+                        name="Clockwork Hub",
+                        description="Primary site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                    ),
+                    SiteSeedDefinition(
+                        location_id="hub_secondary",
+                        name="Second Hub",
+                        description="Secondary site.",
+                        region_type="city",
+                        x=1,
+                        y=0,
+                    ),
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+        primary = world.get_location_by_id("hub_primary")
+        secondary = world.get_location_by_id("hub_secondary")
+        assert primary is not None
+        assert secondary is not None
+        world.event_records = [
+            WorldEventRecord(
+                record_id="r1",
+                kind="battle",
+                year=1001,
+                location_id="hub_secondary",
+                description="Skirmish at the second hub",
+            )
+        ]
+        primary.recent_event_ids = ["stale"]
+        secondary.recent_event_ids = ["r1"]
+
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="hub_primary",
+                        name="Clockwork Hub",
+                        description="Primary site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                    ),
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+
+        repaired_primary = world.get_location_by_id("hub_primary")
+        assert repaired_primary is not None
+        assert world.event_records[0].location_id is None
+        assert repaired_primary.recent_event_ids == []
+
     def test_random_location_raises_clear_error_for_empty_world(self):
         world = World()
         world.setting_bundle = SettingBundle(

@@ -8,15 +8,24 @@ import random
 import uuid
 from typing import Any, Callable, Dict, List, Optional
 
-from .i18n import tr, tr_term
+from .character_domain import (
+    CharacterAbilities,
+    CharacterNarrativeState,
+    Relationship,
+    VALID_INJURY_STATUSES,
+    build_relationship_details,
+    clamp_relationship_score,
+    clamp_skill_level,
+    expand_relationship_details,
+)
 from .content.world_data import NAME_TO_LOCATION_ID, fallback_location_id
+from .i18n import tr, tr_term
 
 
 class Character:
     """Represents a living (or deceased) inhabitant of the world."""
 
-    # Valid injury status values (design §8: healthy → injured → serious → dying → dead)
-    VALID_INJURY_STATUSES = ("none", "injured", "serious", "dying")
+    VALID_INJURY_STATUSES = VALID_INJURY_STATUSES
 
     def __init__(
         self,
@@ -45,6 +54,7 @@ class Character:
         injury_status: str = "none",
         active_adventure_id: Optional[str] = None,
         relation_tags: Optional[Dict[str, List[str]]] = None,
+        relation_tag_sources: Optional[Dict[str, List[str]]] = None,
         rng: Any = None,
     ) -> None:
         if char_id:
@@ -53,46 +63,137 @@ class Character:
             self.char_id = format(rng.getrandbits(32), "08x")
         else:
             self.char_id = uuid.uuid4().hex[:8]
-        self.name: str = name
-        self.age: int = age
-        self.gender: str = gender
-        self.race: str = race
-        self.job: str = job
 
-        self.strength: int = self._clamp(strength)
-        self.intelligence: int = self._clamp(intelligence)
-        self.dexterity: int = self._clamp(dexterity)
-        self.wisdom: int = self._clamp(wisdom)
-        self.charisma: int = self._clamp(charisma)
-        self.constitution: int = self._clamp(constitution)
+        self.name = name
+        self.age = age
+        self.gender = gender
+        self.race = race
+        self.job = job
 
-        self.skills: Dict[str, int] = skills if skills is not None else {}
-        self.relationships: Dict[str, int] = relationships if relationships is not None else {}
-        self.alive: bool = alive
-        self.location_id: str = location_id
-        self.favorite: bool = favorite
-        self.spotlighted: bool = spotlighted
-        self.playable: bool = playable
-        self.history: List[str] = history if history is not None else []
-        self.spouse_id: Optional[str] = spouse_id
-        self.injury_status: str = injury_status if injury_status in self.VALID_INJURY_STATUSES else "none"
-        self.active_adventure_id: Optional[str] = active_adventure_id
-        # Structured relationship tags (design §7.4): maps char_id -> list of tags
-        # e.g. {"abc123": ["friend", "savior"], "def456": ["rival"]}
-        self.relation_tags: Dict[str, List[str]] = (
-            relation_tags if relation_tags is not None else {}
+        self._abilities = CharacterAbilities(
+            strength=strength,
+            intelligence=intelligence,
+            dexterity=dexterity,
+            wisdom=wisdom,
+            charisma=charisma,
+            constitution=constitution,
         )
-        # Source event IDs for each (char_id, tag) pair (design §7.4)
-        # e.g. {("abc123", "friend"): ["evt_001"], ("def456", "rival"): ["evt_002"]}
-        self.relation_tag_sources: Dict[str, List[str]] = {}
+
+        self.skills: Dict[str, int] = {
+            skill: clamp_skill_level(level)
+            for skill, level in (skills or {}).items()
+        }
+        self.relationships: Dict[str, int] = {
+            target_id: clamp_relationship_score(score)
+            for target_id, score in (relationships or {}).items()
+        }
+        self.alive = alive
+        self.location_id = location_id
+        self.favorite = favorite
+        self.spotlighted = spotlighted
+        self.playable = playable
+        self.history: List[str] = list(history or [])
+        self.spouse_id = spouse_id
+        self.injury_status = injury_status if injury_status in self.VALID_INJURY_STATUSES else "none"
+        self.active_adventure_id = active_adventure_id
+        self.relation_tags: Dict[str, List[str]] = {
+            target_id: list(tags)
+            for target_id, tags in (relation_tags or {}).items()
+        }
+        self.relation_tag_sources: Dict[str, List[str]] = {
+            key: list(values)
+            for key, values in (relation_tag_sources or {}).items()
+        }
 
     @staticmethod
     def _clamp(value: int, lo: int = 1, hi: int = 100) -> int:
-        return max(lo, min(hi, value))
+        return max(lo, min(hi, int(value)))
+
+    @property
+    def abilities(self) -> CharacterAbilities:
+        return CharacterAbilities(
+            strength=self.strength,
+            intelligence=self.intelligence,
+            dexterity=self.dexterity,
+            wisdom=self.wisdom,
+            charisma=self.charisma,
+            constitution=self.constitution,
+        )
+
+    @property
+    def narrative_state(self) -> CharacterNarrativeState:
+        return CharacterNarrativeState(
+            favorite=self.favorite,
+            spotlighted=self.spotlighted,
+            playable=self.playable,
+            history=list(self.history),
+            spouse_id=self.spouse_id,
+            injury_status=self.injury_status,
+            active_adventure_id=self.active_adventure_id,
+        )
+
+    @property
+    def relationship_details(self) -> Dict[str, Relationship]:
+        return build_relationship_details(
+            self.relationships,
+            self.relation_tags,
+            self.relation_tag_sources,
+        )
+
+    def get_relationship_state(self, other_id: str) -> Relationship:
+        return self.relationship_details.get(other_id, Relationship(target_id=other_id))
+
+    @property
+    def strength(self) -> int:
+        return self._abilities.strength
+
+    @strength.setter
+    def strength(self, value: int) -> None:
+        self._abilities = CharacterAbilities(**{**self._abilities.to_dict(), "strength": value})
+
+    @property
+    def intelligence(self) -> int:
+        return self._abilities.intelligence
+
+    @intelligence.setter
+    def intelligence(self, value: int) -> None:
+        self._abilities = CharacterAbilities(**{**self._abilities.to_dict(), "intelligence": value})
+
+    @property
+    def dexterity(self) -> int:
+        return self._abilities.dexterity
+
+    @dexterity.setter
+    def dexterity(self, value: int) -> None:
+        self._abilities = CharacterAbilities(**{**self._abilities.to_dict(), "dexterity": value})
+
+    @property
+    def wisdom(self) -> int:
+        return self._abilities.wisdom
+
+    @wisdom.setter
+    def wisdom(self, value: int) -> None:
+        self._abilities = CharacterAbilities(**{**self._abilities.to_dict(), "wisdom": value})
+
+    @property
+    def charisma(self) -> int:
+        return self._abilities.charisma
+
+    @charisma.setter
+    def charisma(self, value: int) -> None:
+        self._abilities = CharacterAbilities(**{**self._abilities.to_dict(), "charisma": value})
+
+    @property
+    def constitution(self) -> int:
+        return self._abilities.constitution
+
+    @constitution.setter
+    def constitution(self, value: int) -> None:
+        self._abilities = CharacterAbilities(**{**self._abilities.to_dict(), "constitution": value})
 
     @property
     def combat_power(self) -> int:
-        return (self.strength * 2 + self.dexterity + self.constitution) // 4
+        return self.abilities.combat_power
 
     @property
     def max_age(self) -> int:
@@ -108,15 +209,11 @@ class Character:
         return lifespans.get(self.race, 80)
 
     def apply_stat_delta(self, deltas: Dict[str, int]) -> None:
-        stat_names = {"strength", "intelligence", "dexterity", "wisdom", "charisma", "constitution"}
-        for stat, delta in deltas.items():
-            if stat in stat_names:
-                current = getattr(self, stat)
-                setattr(self, stat, self._clamp(current + delta))
+        self._abilities = self._abilities.apply_delta(deltas)
 
     def level_up_skill(self, skill_name: str, amount: int = 1) -> str:
         current = self.skills.get(skill_name, 0)
-        new_level = min(10, current + amount)
+        new_level = clamp_skill_level(current + amount)
         self.skills[skill_name] = new_level
         if new_level > current:
             return tr("skill_improved", name=self.name, skill=skill_name, level=new_level)
@@ -124,20 +221,14 @@ class Character:
 
     @property
     def is_dying(self) -> bool:
-        """True if this character is in the dying stage (SI-11: alive=True while dying)."""
         return self.alive and self.injury_status == "dying"
 
     def worsen_injury(self) -> str:
-        """Advance injury one stage: none→injured→serious→dying. Returns new status."""
         progression = {"none": "injured", "injured": "serious", "serious": "dying"}
         self.injury_status = progression.get(self.injury_status, self.injury_status)
         return self.injury_status
 
     def add_relation_tag(self, other_id: str, tag: str, source_event_id: Optional[str] = None) -> None:
-        """Add a relation tag for another character (idempotent).
-
-        Optionally records the source event that caused this tag (design §7.4).
-        """
         tags = self.relation_tags.setdefault(other_id, [])
         if tag not in tags:
             tags.append(tag)
@@ -148,22 +239,16 @@ class Character:
                 sources.append(source_event_id)
 
     def has_relation_tag(self, other_id: str, tag: str) -> bool:
-        """Check if a relation tag exists for another character."""
         return tag in self.relation_tags.get(other_id, [])
 
     def get_relation_tags(self, other_id: str) -> List[str]:
-        """Return all relation tags for another character."""
         return list(self.relation_tags.get(other_id, []))
 
     def update_relationship(self, other_id: str, delta: int) -> None:
         current = self.relationships.get(other_id, 0)
-        self.relationships[other_id] = max(-100, min(100, current + delta))
+        self.relationships[other_id] = clamp_relationship_score(current + delta)
 
     def update_mutual_relationship(self, other: "Character", delta: int, delta_other: Optional[int] = None) -> None:
-        """Update relationships symmetrically between two characters.
-
-        If *delta_other* is None, both sides receive *delta*.
-        """
         self.update_relationship(other.char_id, delta)
         other.update_relationship(self.char_id, delta_other if delta_other is not None else delta)
 
@@ -175,11 +260,6 @@ class Character:
 
     @property
     def location_display_name(self) -> str:
-        """Derive a human-readable name from location_id.
-
-        This is a fallback for contexts where World is not available.
-        Prefer ``world.location_name(char.location_id)`` when possible.
-        """
         lid = self.location_id
         if not lid:
             return ""
@@ -188,6 +268,12 @@ class Character:
         return lid.replace("_", " ").title()
 
     def to_dict(self) -> Dict[str, Any]:
+        abilities_payload = self.abilities.to_dict()
+        narrative_payload = self.narrative_state.to_dict()
+        relationship_payload = {
+            target_id: detail.to_dict()
+            for target_id, detail in self.relationship_details.items()
+        }
         return {
             "char_id": self.char_id,
             "name": self.name,
@@ -195,23 +281,15 @@ class Character:
             "gender": self.gender,
             "race": self.race,
             "job": self.job,
-            "strength": self.strength,
-            "intelligence": self.intelligence,
-            "dexterity": self.dexterity,
-            "wisdom": self.wisdom,
-            "charisma": self.charisma,
-            "constitution": self.constitution,
-            "skills": self.skills,
-            "relationships": self.relationships,
+            **abilities_payload,
+            "abilities": abilities_payload,
+            "skills": dict(self.skills),
+            "relationships": dict(self.relationships),
+            "relationship_details": relationship_payload,
             "alive": self.alive,
             "location_id": self.location_id,
-            "favorite": self.favorite,
-            "spotlighted": self.spotlighted,
-            "playable": self.playable,
-            "history": self.history,
-            "spouse_id": self.spouse_id,
-            "injury_status": self.injury_status,
-            "active_adventure_id": self.active_adventure_id,
+            **narrative_payload,
+            "narrative_state": narrative_payload,
             "relation_tags": {k: list(v) for k, v in self.relation_tags.items()},
             "relation_tag_sources": {k: list(v) for k, v in self.relation_tag_sources.items()},
         }
@@ -223,12 +301,27 @@ class Character:
         *,
         location_resolver: Callable[[str], str] | None = None,
     ) -> "Character":
-        # Clamp skill levels to [0, 10] and relationships to [-100, 100]
-        raw_skills = data.get("skills", {})
-        skills = {k: max(0, min(10, v)) for k, v in raw_skills.items()}
-        raw_rels = data.get("relationships", {})
-        relationships = {k: max(-100, min(100, v)) for k, v in raw_rels.items()}
-        # Support both old "location" and new "location_id" keys
+        ability_payload = data.get("abilities", {})
+        narrative_payload = data.get("narrative_state", {})
+        skills = {
+            k: clamp_skill_level(v)
+            for k, v in data.get("skills", {}).items()
+        }
+        relationships = {
+            k: clamp_relationship_score(v)
+            for k, v in data.get("relationships", {}).items()
+        }
+        relation_tags = {
+            k: list(v) for k, v in data.get("relation_tags", {}).items()
+        }
+        relation_tag_sources = {
+            k: list(v) for k, v in data.get("relation_tag_sources", {}).items()
+        }
+        if data.get("relationship_details"):
+            relationships, relation_tags, relation_tag_sources = expand_relationship_details(
+                data["relationship_details"]
+            )
+
         location_id = data.get("location_id")
         if location_id is None:
             old_name = data.get("location", "Aethoria Capital")
@@ -236,38 +329,37 @@ class Character:
                 location_id = location_resolver(old_name)
             else:
                 location_id = NAME_TO_LOCATION_ID.get(old_name, fallback_location_id(old_name))
-        char = cls(
+
+        return cls(
             name=data["name"],
             age=data["age"],
             gender=data["gender"],
             race=data["race"],
             job=data["job"],
-            strength=data.get("strength", 10),
-            intelligence=data.get("intelligence", 10),
-            dexterity=data.get("dexterity", 10),
-            wisdom=data.get("wisdom", 10),
-            charisma=data.get("charisma", 10),
-            constitution=data.get("constitution", 10),
+            strength=ability_payload.get("strength", data.get("strength", 10)),
+            intelligence=ability_payload.get("intelligence", data.get("intelligence", 10)),
+            dexterity=ability_payload.get("dexterity", data.get("dexterity", 10)),
+            wisdom=ability_payload.get("wisdom", data.get("wisdom", 10)),
+            charisma=ability_payload.get("charisma", data.get("charisma", 10)),
+            constitution=ability_payload.get("constitution", data.get("constitution", 10)),
             skills=skills,
             relationships=relationships,
             alive=data.get("alive", True),
             location_id=location_id,
-            favorite=data.get("favorite", False),
-            spotlighted=data.get("spotlighted", False),
-            playable=data.get("playable", False),
-            history=data.get("history", []),
+            favorite=narrative_payload.get("favorite", data.get("favorite", False)),
+            spotlighted=narrative_payload.get("spotlighted", data.get("spotlighted", False)),
+            playable=narrative_payload.get("playable", data.get("playable", False)),
+            history=narrative_payload.get("history", data.get("history", [])),
             char_id=data.get("char_id"),
-            spouse_id=data.get("spouse_id"),
-            injury_status=data.get("injury_status", "none"),
-            active_adventure_id=data.get("active_adventure_id"),
-            relation_tags={
-                k: list(v) for k, v in data.get("relation_tags", {}).items()
-            },
+            spouse_id=narrative_payload.get("spouse_id", data.get("spouse_id")),
+            injury_status=narrative_payload.get("injury_status", data.get("injury_status", "none")),
+            active_adventure_id=narrative_payload.get(
+                "active_adventure_id",
+                data.get("active_adventure_id"),
+            ),
+            relation_tags=relation_tags,
+            relation_tag_sources=relation_tag_sources,
         )
-        char.relation_tag_sources = {
-            k: list(v) for k, v in data.get("relation_tag_sources", {}).items()
-        }
-        return char
 
     def __repr__(self) -> str:  # pragma: no cover
         status = "alive" if self.alive else "deceased"

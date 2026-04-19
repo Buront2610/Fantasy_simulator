@@ -51,6 +51,11 @@ from .world_load_normalizer import (
     normalize_after_load as normalize_loaded_world_state,
     rebuild_recent_event_ids,
 )
+from .world_reference_repair import (
+    backfill_watched_actor_tags,
+    normalize_world_references_after_structure_change,
+    repair_world_location_references,
+)
 from .world_persistence import (
     hydrate_world_state,
     serialize_world_state,
@@ -820,47 +825,17 @@ class World:
         fallback_location_id = None
         if self._location_id_index:
             fallback_location_id = self._default_resident_location_id()
-        for character in self.characters:
-            character.location_id = (
-                self._repair_location_reference(
-                    character.location_id,
-                    required=True,
-                    fallback_location_id=fallback_location_id,
-                )
-                or ""
-            )
-        for record in self.event_records:
-            record.location_id = self._repair_location_reference(record.location_id)
-        for rumor in self.rumors:
-            rumor.source_location_id = self._repair_location_reference(rumor.source_location_id)
-        for rumor in self.rumor_archive:
-            rumor.source_location_id = self._repair_location_reference(rumor.source_location_id)
-        for run in self.active_adventures + self.completed_adventures:
-            run.origin = (
-                self._repair_location_reference(
-                    run.origin,
-                    required=True,
-                    fallback_location_id=fallback_location_id,
-                )
-                or ""
-            )
-            run.destination = (
-                self._repair_location_reference(
-                    run.destination,
-                    required=True,
-                    fallback_location_id=fallback_location_id,
-                )
-                or ""
-            )
-        for memorial in self.memorials.values():
-            memorial.location_id = (
-                self._repair_location_reference(
-                    memorial.location_id,
-                    required=True,
-                    fallback_location_id=fallback_location_id,
-                )
-                or ""
-            )
+        repair_world_location_references(
+            characters=self.characters,
+            event_records=self.event_records,
+            rumors=self.rumors,
+            rumor_archive=self.rumor_archive,
+            active_adventures=self.active_adventures,
+            completed_adventures=self.completed_adventures,
+            memorials=self.memorials,
+            repair_location_reference=self._repair_location_reference,
+            fallback_location_id=fallback_location_id,
+        )
 
     def _rebuild_location_memorial_ids(self) -> None:
         """Rebuild per-location memorial indices from canonical memorial records."""
@@ -872,14 +847,16 @@ class World:
 
     def _normalize_references_after_bundle_change(self) -> None:
         """Repair references after replacing the active setting bundle."""
-        self._repair_location_references()
-        self._rebuild_location_memorial_ids()
-        self.rebuild_char_index()
-        self.ensure_valid_character_locations()
-        self.rebuild_adventure_index()
-        self.rebuild_recent_event_ids()
-        if self.event_records:
-            self.rebuild_compatibility_event_log()
+        normalize_world_references_after_structure_change(
+            repair_location_references=self._repair_location_references,
+            rebuild_location_memorial_ids=self._rebuild_location_memorial_ids,
+            rebuild_char_index=self.rebuild_char_index,
+            ensure_valid_character_locations=self.ensure_valid_character_locations,
+            rebuild_adventure_index=self.rebuild_adventure_index,
+            rebuild_recent_event_ids=self.rebuild_recent_event_ids,
+            rebuild_compatibility_event_log=self.rebuild_compatibility_event_log,
+            has_event_records=bool(self.event_records),
+        )
 
     def location_state_defaults(self, location_id: str, region_type: str) -> Dict[str, int]:
         """Return location defaults using the active bundle's site tags."""
@@ -1231,26 +1208,12 @@ class World:
             for character in self.characters
             if character.favorite or character.spotlighted or character.playable
         }
-        if not watched_actor_ids:
-            return
-
-        for record in self.event_records:
-            if any(tag.startswith(self.WATCHED_ACTOR_TAG_PREFIX) for tag in record.tags):
-                continue
-            actor_ids = [record.primary_actor_id] + list(record.secondary_actor_ids)
-            watched_tags = [
-                f"{self.WATCHED_ACTOR_TAG_PREFIX}{actor_id}"
-                for actor_id in actor_ids
-                if actor_id and actor_id in watched_actor_ids
-            ]
-            if watched_tags:
-                record.tags = list(
-                    dict.fromkeys(
-                        list(record.tags)
-                        + watched_tags
-                        + [self.WATCHED_ACTOR_INFERRED_TAG]
-                    )
-                )
+        backfill_watched_actor_tags(
+            event_records=self.event_records,
+            watched_actor_ids=watched_actor_ids,
+            watched_actor_tag_prefix=self.WATCHED_ACTOR_TAG_PREFIX,
+            inferred_tag=self.WATCHED_ACTOR_INFERRED_TAG,
+        )
 
     def add_adventure(self, run: AdventureRun) -> None:
         self.active_adventures.append(run)

@@ -557,6 +557,52 @@ class WorldDefinition:
     event_impact_rules: Dict[str, Dict[str, int]] = field(default_factory=dict)
     propagation_rules: Dict[str, Dict[str, Any]] = field(default_factory=dict)
 
+    def site_seed_index(self) -> Dict[str, SiteSeedDefinition]:
+        """Return location_id -> site seed lookup for authoring helpers."""
+        return {seed.location_id: seed for seed in self.site_seeds}
+
+    def site_seed_by_id(self, location_id: str) -> SiteSeedDefinition | None:
+        """Return the site seed for a given location id, if present."""
+        return self.site_seed_index().get(location_id)
+
+    def resident_site_ids(self) -> List[str]:
+        """Return site ids tagged as reasonable resident defaults."""
+        return [
+            seed.location_id
+            for seed in self.site_seeds
+            if "default_resident" in seed.tags
+        ]
+
+    def capital_site_ids(self) -> List[str]:
+        """Return site ids tagged as capitals."""
+        return [
+            seed.location_id
+            for seed in self.site_seeds
+            if "capital" in seed.tags
+        ]
+
+    def site_counts_by_region_type(self) -> Dict[str, int]:
+        """Return a stable region-type breakdown for authoring inspection."""
+        counts: Dict[str, int] = {}
+        for seed in self.site_seeds:
+            counts[seed.region_type] = counts.get(seed.region_type, 0) + 1
+        return dict(sorted(counts.items()))
+
+    def route_counts_by_type(self) -> Dict[str, int]:
+        """Return a stable route-type breakdown for authoring inspection."""
+        counts: Dict[str, int] = {}
+        for seed in self.route_seeds:
+            counts[seed.route_type] = counts.get(seed.route_type, 0) + 1
+        return dict(sorted(counts.items()))
+
+    def community_keys_by_region(self) -> Dict[str, List[str]]:
+        """Return region -> community keys mapping for bundle swap review."""
+        mapping: Dict[str, List[str]] = {}
+        for community in self.language_communities:
+            for region_id in community.regions:
+                mapping.setdefault(region_id, []).append(community.community_key)
+        return {region_id: sorted(keys) for region_id, keys in sorted(mapping.items())}
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "world_key": self.world_key,
@@ -651,6 +697,45 @@ class SettingBundle:
             schema_version=int(data.get("schema_version", 1)),
             world_definition=WorldDefinition.from_dict(data["world_definition"]),
         )
+
+
+@dataclass(frozen=True)
+class SettingBundleAuthoringSummary:
+    """Stable, non-UI summary for bundle inspection and swap review."""
+
+    world_key: str
+    display_name: str
+    site_count: int
+    route_count: int
+    language_count: int
+    resident_site_ids: List[str] = field(default_factory=list)
+    capital_site_ids: List[str] = field(default_factory=list)
+    site_counts_by_region_type: Dict[str, int] = field(default_factory=dict)
+    route_counts_by_type: Dict[str, int] = field(default_factory=dict)
+    language_keys: List[str] = field(default_factory=list)
+    community_keys_by_region: Dict[str, List[str]] = field(default_factory=dict)
+    sites_with_native_names: List[str] = field(default_factory=list)
+
+
+def build_setting_bundle_authoring_summary(bundle: SettingBundle) -> SettingBundleAuthoringSummary:
+    """Return a compact summary suitable for authoring and swap validation."""
+    world = bundle.world_definition
+    return SettingBundleAuthoringSummary(
+        world_key=world.world_key,
+        display_name=world.display_name,
+        site_count=len(world.site_seeds),
+        route_count=len(world.route_seeds),
+        language_count=len(world.languages),
+        resident_site_ids=world.resident_site_ids(),
+        capital_site_ids=world.capital_site_ids(),
+        site_counts_by_region_type=world.site_counts_by_region_type(),
+        route_counts_by_type=world.route_counts_by_type(),
+        language_keys=sorted(language.language_key for language in world.languages),
+        community_keys_by_region=world.community_keys_by_region(),
+        sites_with_native_names=sorted(
+            seed.location_id for seed in world.site_seeds if seed.native_name
+        ),
+    )
 
 
 def default_calendar_definition() -> CalendarDefinition:
@@ -826,6 +911,8 @@ def validate_setting_bundle(bundle: SettingBundle, *, source: str) -> None:
             raise ValueError(
                 f"Setting bundle {source} route {route.route_id} references an unknown site seed"
             )
+        if route.distance < 1:
+            raise ValueError(f"Setting bundle {source} route {route.route_id} must have distance >= 1")
 
     naming = world.naming_rules
     has_first_name_rules = (
@@ -959,6 +1046,10 @@ def validate_setting_bundle(bundle: SettingBundle, *, source: str) -> None:
             )
 
     for seed in world.site_seeds:
+        if seed.native_name and not seed.language_key:
+            raise ValueError(
+                f"Setting bundle {source} site {seed.location_id} defines native_name without language_key"
+            )
         if seed.language_key and seed.language_key not in language_index:
             raise ValueError(
                 f"Setting bundle {source} references unknown site language: {seed.language_key}"

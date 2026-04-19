@@ -35,6 +35,7 @@ def test_event_result_round_trip_and_defensive_copy() -> None:
         affected_characters=["a", "b"],
         stat_changes={"a": {"strength": 1}},
         event_type="battle",
+        summary_key="events.battle.summary",
         year=1001,
         metadata=payload,
     )
@@ -57,6 +58,7 @@ def test_world_event_record_round_trip_and_defensive_copy() -> None:
         year=1001,
         month=3,
         day=12,
+        summary_key="events.battle.summary",
         impacts=[{"delta": {"danger": 1}}],
         tags=["combat"],
     )
@@ -193,6 +195,7 @@ def test_world_event_record_from_event_result_to_event_result_round_trip() -> No
         affected_characters=["c1", "c2"],
         stat_changes={"c1": {"strength": -2}},
         event_type="battle",
+        summary_key="events.battle.summary",
         year=1002,
         metadata={"key": "value", "nested": {"flag": True}},
     )
@@ -206,10 +209,42 @@ def test_world_event_record_from_event_result_to_event_result_round_trip() -> No
     projected = record.to_event_result()
     assert projected.description == source.description
     assert projected.event_type == source.event_type
+    assert projected.summary_key == source.summary_key
     assert projected.year == source.year
     assert projected.affected_characters == source.affected_characters
     assert projected.stat_changes == source.stat_changes
     assert projected.metadata == source.metadata
+
+
+def test_world_event_record_from_event_result_uses_metadata_summary_key_fallback() -> None:
+    source = EventResult(
+        description="A meeting happened",
+        affected_characters=["c1"],
+        event_type="meeting",
+        year=1002,
+        metadata={"summary_key": "events.meeting.summary"},
+    )
+
+    record = WorldEventRecord.from_event_result(source)
+
+    assert record.summary_key == "events.meeting.summary"
+
+
+def test_world_event_record_rejects_non_string_summary_key_at_load_boundary() -> None:
+    malformed = {
+        "record_id": "r_summary",
+        "kind": "battle",
+        "year": 1001,
+        "description": "Malformed summary key",
+        "summary_key": {"bad": True},
+    }
+
+    try:
+        WorldEventRecord.from_dict(malformed)
+    except ValueError as exc:
+        assert "summary_key" in str(exc)
+    else:
+        raise AssertionError("Expected non-string summary_key to fail fast")
 
 
 def test_world_event_record_preserves_migrated_legacy_event_result_payload() -> None:

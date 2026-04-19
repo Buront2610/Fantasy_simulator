@@ -198,6 +198,41 @@ class TestAdvanceDays:
         assert sim.current_day == 1
 
 
+class TestDailyPhasePipeline:
+    """The daily engine should expose an explicit chronological phase plan."""
+
+    def test_day_phase_plan_includes_boundary_phases_only_when_needed(self):
+        sim = Simulator(_build_seeded_world(67, n_chars=2), events_per_year=0, seed=67)
+
+        first_day = sim._build_day_phase_context(1, 1)
+        mid_month_day = sim._build_day_phase_context(1, 2)
+        last_day = sim._build_day_phase_context(1, sim.world.days_in_month(1))
+
+        assert [phase.name for phase in sim._day_phase_plan(first_day)] == [
+            "month_start",
+            "dying_resolution",
+            "natural_health",
+            "injury_recovery",
+            "adventure",
+            "random_events",
+        ]
+        assert [phase.name for phase in sim._day_phase_plan(mid_month_day)] == [
+            "dying_resolution",
+            "natural_health",
+            "injury_recovery",
+            "adventure",
+            "random_events",
+        ]
+        assert [phase.name for phase in sim._day_phase_plan(last_day)] == [
+            "dying_resolution",
+            "natural_health",
+            "injury_recovery",
+            "adventure",
+            "random_events",
+            "month_end",
+        ]
+
+
 # ---------------------------------------------------------------------------
 # Monthly event timestamps
 # ---------------------------------------------------------------------------

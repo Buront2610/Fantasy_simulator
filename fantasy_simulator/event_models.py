@@ -42,11 +42,12 @@ class EventResult:
     affected_characters: List[str] = field(default_factory=list)
     stat_changes: Dict[str, Dict[str, int]] = field(default_factory=dict)
     event_type: str = "generic"
+    summary_key: str = ""
     year: int = 0
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        payload = {
             "description": self.description,
             "affected_characters": list(self.affected_characters),
             "stat_changes": deepcopy(self.stat_changes),
@@ -54,6 +55,9 @@ class EventResult:
             "year": self.year,
             "metadata": deepcopy(self.metadata),
         }
+        if self.summary_key:
+            payload["summary_key"] = self.summary_key
+        return payload
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "EventResult":
@@ -62,6 +66,7 @@ class EventResult:
             affected_characters=list(data.get("affected_characters", [])),
             stat_changes=deepcopy(data.get("stat_changes", {})),
             event_type=data.get("event_type", "generic"),
+            summary_key=data.get("summary_key", ""),
             year=data.get("year", 0),
             metadata=deepcopy(data.get("metadata", {})),
         )
@@ -84,6 +89,7 @@ class WorldEventRecord:
     severity: int = 1
     visibility: str = "public"
     calendar_key: str = ""
+    summary_key: str = ""
     tags: List[str] = field(default_factory=list)
     impacts: List[Dict[str, Any]] = field(default_factory=list)
     legacy_event_result: Optional[Dict[str, Any]] = None
@@ -111,6 +117,7 @@ class WorldEventRecord:
             "severity": self.severity,
             "visibility": self.visibility,
             "calendar_key": self.calendar_key,
+            "summary_key": self.summary_key,
             "tags": list(self.tags),
             "impacts": deepcopy(self.impacts),
         }
@@ -151,6 +158,8 @@ class WorldEventRecord:
                     raise ValueError("legacy_event_result stat deltas must be integers")
         if not isinstance(projected.event_type, str):
             raise ValueError("legacy_event_result.event_type must be a string")
+        if not isinstance(projected.summary_key, str):
+            raise ValueError("legacy_event_result.summary_key must be a string")
         if not isinstance(projected.year, int) or isinstance(projected.year, bool):
             raise ValueError("legacy_event_result.year must be an integer")
         if not isinstance(projected.metadata, dict):
@@ -222,6 +231,7 @@ class WorldEventRecord:
             severity=cls._validate_int_payload(data.get("severity", 1), "severity"),
             visibility=cls._validate_string_payload(data.get("visibility", "public"), "visibility"),
             calendar_key=cls._validate_string_payload(data.get("calendar_key", ""), "calendar_key"),
+            summary_key=cls._validate_string_payload(data.get("summary_key", ""), "summary_key"),
             tags=cls._validate_string_list_payload(data.get("tags", []), "tags"),
             impacts=cls._validate_impacts_payload(data.get("impacts", [])),
             legacy_event_result=cls._validate_legacy_event_result_payload(data.get("legacy_event_result")),
@@ -240,6 +250,7 @@ class WorldEventRecord:
         day: int = 1,
         absolute_day: int = 0,
         calendar_key: str = "",
+        summary_key: str = "",
     ) -> "WorldEventRecord":
         """Create a WorldEventRecord from an EventResult."""
         primary = result.affected_characters[0] if result.affected_characters else None
@@ -260,6 +271,7 @@ class WorldEventRecord:
             description=result.description,
             severity=severity,
             calendar_key=calendar_key,
+            summary_key=summary_key or result.summary_key or result.metadata.get("summary_key", ""),
             legacy_event_result=legacy_event_result,
         )
 
@@ -274,11 +286,13 @@ class WorldEventRecord:
             projected.description = self.description
             projected.affected_characters = affected_characters
             projected.event_type = self.kind
+            projected.summary_key = self.summary_key
             projected.year = self.year
             return projected
         return EventResult(
             description=self.description,
             affected_characters=affected_characters,
             event_type=self.kind,
+            summary_key=self.summary_key,
             year=self.year,
         )
