@@ -410,6 +410,24 @@ class TestSerialization:
         assert restored.relation_tags == {"ally_001": ["friend", "savior"]}
         assert restored.relation_tag_sources["ally_001:friend"] == ["evt_001"]
 
+    def test_from_dict_prefers_nested_payload_over_flat_legacy_fields(self):
+        data = {
+            "name": "Priority",
+            "age": 30,
+            "gender": "Male",
+            "race": "Human",
+            "job": "Warrior",
+            "strength": 15,
+            "favorite": False,
+            "abilities": {"strength": 77},
+            "narrative_state": {"favorite": True},
+        }
+
+        restored = Character.from_dict(data)
+
+        assert restored.strength == 77
+        assert restored.favorite is True
+
 
 # ---------------------------------------------------------------------------
 # random_stats helper

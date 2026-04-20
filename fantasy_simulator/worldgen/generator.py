@@ -28,6 +28,16 @@ class WorldgenConfig:
     seed: int = 0
     site_candidate_limit: int = 12
 
+    def __post_init__(self) -> None:
+        if not isinstance(self.width, int) or isinstance(self.width, bool) or self.width < 3:
+            raise ValueError("width must be an integer >= 3")
+        if not isinstance(self.height, int) or isinstance(self.height, bool) or self.height < 3:
+            raise ValueError("height must be an integer >= 3")
+        if not isinstance(self.site_candidate_limit, int) or isinstance(self.site_candidate_limit, bool):
+            raise ValueError("site_candidate_limit must be an integer")
+        if self.site_candidate_limit < 1:
+            raise ValueError("site_candidate_limit must be >= 1")
+
 
 @dataclass(slots=True)
 class GeneratedWorld:
@@ -144,7 +154,7 @@ def _site_score(cell: TerrainCell, neighbors: Iterable[TerrainCell]) -> Tuple[in
         rationale.append("stable_water_supply")
 
     neighbor_biomes = {neighbor.biome for neighbor in neighbors}
-    if "coast" in neighbor_biomes or "river" in neighbor_biomes:
+    if "coast" in neighbor_biomes:
         score += 12
         rationale.append("trade_water_access")
         if site_type == "city":

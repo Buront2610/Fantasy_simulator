@@ -330,6 +330,9 @@ class Character:
             else:
                 location_id = NAME_TO_LOCATION_ID.get(old_name, fallback_location_id(old_name))
 
+        # Compatibility contract:
+        # - nested payloads (abilities/narrative_state) are authoritative when present
+        # - flat legacy keys are fallback-only for old snapshots
         return cls(
             name=data["name"],
             age=data["age"],

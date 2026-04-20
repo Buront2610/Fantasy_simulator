@@ -21,6 +21,8 @@ from ..reports import (
     generate_monthly_report,
     generate_yearly_report,
 )
+from ..ui.presenters import LocationPresenter
+from ..ui.view_models import build_location_observation_view
 
 
 class QueryMixin:
@@ -134,73 +136,15 @@ class QueryMixin:
 
     def get_location_observation(self, location_id: str) -> str:
         """Return an inspectable local observation summary for one location."""
-        location = self.world.get_location_by_id(location_id)
-        if location is None:
+        try:
+            observation = build_location_observation_view(self.world, location_id)
+        except ValueError:
             return tr("map_detail_not_found", location=location_id)
-
         lines: List[str] = []
-        if location.generated_endonym:
-            lines.append(f"  {tr('location_endonym_label')}: {location.generated_endonym}")
+        if observation.resident_names:
+            lines.append(f"  {tr('map_population')}: {', '.join(observation.resident_names)}")
             lines.append("")
-
-        residents = [character.name for character in self.world.get_characters_at_location(location_id)]
-        if residents:
-            lines.append(f"  {tr('map_population')}: {', '.join(residents)}")
-            lines.append("")
-
-        lines.append(f"  {tr('location_aliases_label')}:")
-        lines.append(f"    {', '.join(location.aliases)}" if location.aliases else "    -")
-        lines.append("")
-
-        lines.append(f"  {tr('location_memorials_label')}:")
-        memorials = self.world.get_memorials_for_location(location_id)
-        if memorials:
-            for memorial in memorials:
-                lines.append(f"    {tr('memorial_entry', year=memorial.year, epitaph=memorial.epitaph)}")
-        else:
-            lines.append(f"    {tr('no_memorials')}")
-        lines.append("")
-
-        lines.append(f"  {tr('location_live_traces_label')}:")
-        if location.live_traces:
-            for trace in reversed(location.live_traces[-5:]):
-                lines.append(f"    - {trace.get('text', '')}")
-        else:
-            lines.append(f"    {tr('no_live_traces')}")
-        lines.append("")
-
-        lines.append(f"  {tr('location_recent_events_label')}:")
-        event_lookup = {record.record_id: record for record in self.world.event_records}
-        recent_records = [
-            event_lookup[record_id]
-            for record_id in reversed(location.recent_event_ids[-5:])
-            if record_id in event_lookup
-        ]
-        if recent_records:
-            for record in recent_records:
-                lines.append(
-                    f"    - {tr('location_recent_event_entry', year=record.year, description=record.description)}"
-                )
-        else:
-            lines.append(f"    {tr('no_recent_events')}")
-
-        routes = self.world.get_routes_for_site(location_id)
-        if routes:
-            lines.append("")
-            lines.append(f"  {tr('map_region_routes')}:")
-            for route in routes[:5]:
-                other_location_id = route.to_site_id if route.from_site_id == location_id else route.from_site_id
-                blocked = f" {tr('route_blocked')}" if route.blocked else ""
-                lines.append(
-                        f"    - {self.world.location_name(other_location_id)} ({tr_term(route.route_type)}){blocked}"
-                )
-
-        rumors = self.get_active_rumors(location_id=location_id, limit=3)
-        if rumors:
-            lines.append("")
-            lines.append(f"  {tr('rumor_section_title')}:")
-            for rumor in rumors:
-                lines.append(f"    - {rumor}")
+        lines.extend(LocationPresenter.render_observation_sections(observation))
         return "\n".join(lines)
 
     def get_character_story(self, char_id: str) -> str:

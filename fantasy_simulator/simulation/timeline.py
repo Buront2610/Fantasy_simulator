@@ -15,6 +15,7 @@ from ..rumor import age_rumors, generate_rumors_for_period, trim_rumors
 from .calendar import annual_probability_to_fraction, distributed_budget
 from .timeline_pipeline import (
     DayPhaseContext,
+    DayPhaseKind,
     build_day_phase_context,
     build_day_phase_plan,
 )
@@ -94,9 +95,18 @@ class TimelineMixin:
         day_context = self._build_day_phase_context(month, day)
         self.current_month = day_context.month
         self.current_day = day_context.day
+        phase_handlers = {
+            DayPhaseKind.MONTH_START: self._run_month_start_phase,
+            DayPhaseKind.DYING_RESOLUTION: self._run_dying_resolution_phase,
+            DayPhaseKind.NATURAL_HEALTH: self._run_natural_health_phase,
+            DayPhaseKind.INJURY_RECOVERY: self._run_injury_recovery_phase,
+            DayPhaseKind.ADVENTURE: self._run_adventure_phase,
+            DayPhaseKind.RANDOM_EVENTS: self._run_random_event_phase,
+            DayPhaseKind.MONTH_END: self._run_month_end_phase,
+        }
         try:
             for phase in self._day_phase_plan(day_context):
-                getattr(self, phase.handler_name)(day_context)
+                phase_handlers[phase.kind](day_context)
         finally:
             self._finish_day(day_context)
 

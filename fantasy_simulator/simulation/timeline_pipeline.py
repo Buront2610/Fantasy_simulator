@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 
 
 @dataclass(frozen=True, slots=True)
@@ -17,12 +18,21 @@ class DayPhaseContext:
     is_month_end: bool
 
 
+class DayPhaseKind(str, Enum):
+    MONTH_START = "month_start"
+    DYING_RESOLUTION = "dying_resolution"
+    NATURAL_HEALTH = "natural_health"
+    INJURY_RECOVERY = "injury_recovery"
+    ADVENTURE = "adventure"
+    RANDOM_EVENTS = "random_events"
+    MONTH_END = "month_end"
+
+
 @dataclass(frozen=True, slots=True)
 class DayPhase:
-    """A named day-processing phase bound to a mixin method name."""
+    """A named day-processing phase."""
 
-    name: str
-    handler_name: str
+    kind: DayPhaseKind
 
 
 def build_day_phase_context(
@@ -48,16 +58,16 @@ def build_day_phase_plan(day_context: DayPhaseContext) -> list[DayPhase]:
     """Return explicit chronological phases for a single in-world day."""
     phases: list[DayPhase] = []
     if day_context.is_month_start:
-        phases.append(DayPhase("month_start", "_run_month_start_phase"))
+        phases.append(DayPhase(DayPhaseKind.MONTH_START))
     phases.extend(
         [
-            DayPhase("dying_resolution", "_run_dying_resolution_phase"),
-            DayPhase("natural_health", "_run_natural_health_phase"),
-            DayPhase("injury_recovery", "_run_injury_recovery_phase"),
-            DayPhase("adventure", "_run_adventure_phase"),
-            DayPhase("random_events", "_run_random_event_phase"),
+            DayPhase(DayPhaseKind.DYING_RESOLUTION),
+            DayPhase(DayPhaseKind.NATURAL_HEALTH),
+            DayPhase(DayPhaseKind.INJURY_RECOVERY),
+            DayPhase(DayPhaseKind.ADVENTURE),
+            DayPhase(DayPhaseKind.RANDOM_EVENTS),
         ]
     )
     if day_context.is_month_end:
-        phases.append(DayPhase("month_end", "_run_month_end_phase"))
+        phases.append(DayPhase(DayPhaseKind.MONTH_END))
     return phases
