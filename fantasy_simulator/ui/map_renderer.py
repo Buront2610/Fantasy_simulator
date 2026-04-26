@@ -716,45 +716,42 @@ def render_world_overview(info: MapRenderInfo) -> str:
 # PR-G2 Layer 2: Region Map
 # ------------------------------------------------------------------
 
-def render_region_map(
-    info: MapRenderInfo,
-    center_location_id: str,
-    radius: int = 2,
-    *,
-    site_memorials: Optional[Dict[str, List[str]]] = None,
-    site_aliases: Optional[Dict[str, List[str]]] = None,
-    site_traces: Optional[Dict[str, List[str]]] = None,
-    site_endonyms: Optional[Dict[str, str]] = None,
-) -> str:
-    """Render a zoomed region map around a selected site.
+RegionBounds = Tuple[int, int, int, int]
 
-    Shows a (2*radius+1) square excerpt of the terrain grid centred
-    on the site's coordinates, with route connections and per-site
-    status summaries.
-    """
-    # Find the centre cell
-    center_cell: Optional[MapCellInfo] = None
+
+def _find_region_center_cell(info: MapRenderInfo, center_location_id: str) -> Optional[MapCellInfo]:
+    """Return the selected centre cell, if present."""
     for cell in info.cells.values():
         if cell.location_id == center_location_id:
-            center_cell = cell
-            break
-    if center_cell is None:
-        return f"  {tr('map_region_not_found', location=center_location_id)}"
+            return cell
+    return None
 
+
+def _region_bounds(info: MapRenderInfo, center_cell: MapCellInfo, radius: int) -> RegionBounds:
+    """Return inclusive map bounds for a region excerpt."""
     cx, cy = center_cell.x, center_cell.y
-    lines: List[str] = []
-    lines.append(
-        f"  === {tr('map_region_title')}: {center_cell.canonical_name} ==="
+    return (
+        max(0, cx - radius),
+        min(info.width - 1, cx + radius),
+        max(0, cy - radius),
+        min(info.height - 1, cy + radius),
     )
-    lines.append("")
 
-    # Build the zoomed grid
-    x_min = max(0, cx - radius)
-    x_max = min(info.width - 1, cx + radius)
-    y_min = max(0, cy - radius)
-    y_max = min(info.height - 1, cy + radius)
 
-    # Build a mini-canvas for route lines
+def _visible_region_cells(info: MapRenderInfo, bounds: RegionBounds) -> List[MapCellInfo]:
+    """Return site cells inside the region bounds in render order."""
+    x_min, x_max, y_min, y_max = bounds
+    return [
+        cell for cell in sorted(info.cells.values(), key=lambda c: (c.y, c.x))
+        if x_min <= cell.x <= x_max and y_min <= cell.y <= y_max
+    ]
+
+
+def _build_region_route_layer(info: MapRenderInfo, bounds: RegionBounds) -> Dict[Tuple[int, int], str]:
+    """Build route glyphs for routes whose endpoints are both visible."""
+    from .atlas_renderer import _bresenham, _ROUTE_LINE
+
+    x_min, x_max, y_min, y_max = bounds
     rw = x_max - x_min + 1
     rh = y_max - y_min + 1
     route_layer: Dict[Tuple[int, int], str] = {}
@@ -763,34 +760,25 @@ def render_region_map(
         if x_min <= cell.x <= x_max and y_min <= cell.y <= y_max:
             site_positions.add((cell.x - x_min, cell.y - y_min))
 
-    from .atlas_renderer import _bresenham, _ROUTE_LINE
-    # Build location_id → position lookup for efficient route resolution
     cell_pos: Dict[str, Tuple[int, int]] = {
         c.location_id: (c.x, c.y) for c in info.cells.values()
-    }
-    cells_by_id: Dict[str, MapCellInfo] = {
-        c.location_id: c for c in info.cells.values()
     }
     for route in info.routes:
         fp = cell_pos.get(route.from_site_id)
         tp = cell_pos.get(route.to_site_id)
         if not fp or not tp:
             continue
-        # Both endpoints must be in the visible region
         if not (x_min <= fp[0] <= x_max and y_min <= fp[1] <= y_max):
             continue
         if not (x_min <= tp[0] <= x_max and y_min <= tp[1] <= y_max):
             continue
         path = _bresenham(fp[0] - x_min, fp[1] - y_min, tp[0] - x_min, tp[1] - y_min)
-        # Route-type specific chars with direction awareness
-        rtype = route.route_type
-        chars = _ROUTE_LINE.get(rtype, ("-", "|", "/", "\\"))
+        chars = _ROUTE_LINE.get(route.route_type, ("-", "|", "/", "\\"))
         if route.blocked:
             chars = ("x", "x", "x", "x")
         for i, (px, py) in enumerate(path):
             if (px, py) in site_positions or not (0 <= px < rw and 0 <= py < rh):
                 continue
-            # Direction from previous point
             if i > 0:
                 ddx = px - path[i - 1][0]
                 ddy = py - path[i - 1][1]
@@ -808,8 +796,18 @@ def render_region_map(
             else:
                 ch = chars[3]
             route_layer[(px, py)] = ch
+    return route_layer
 
-    # Column header
+
+def _append_region_grid(
+    lines: List[str],
+    info: MapRenderInfo,
+    center_location_id: str,
+    bounds: RegionBounds,
+    route_layer: Dict[Tuple[int, int], str],
+) -> None:
+    """Append the region map grid."""
+    x_min, x_max, y_min, y_max = bounds
     col_nums = "".join(f"{x % 10}" for x in range(x_min, x_max + 1))
     lines.append(f"      {col_nums}")
     region_border = "     +" + "-" * (x_max - x_min + 1) + "+"
@@ -833,10 +831,15 @@ def render_region_map(
 
     lines.append(region_border)
 
-    # Collect routes from centre
+
+def _center_route_connections(
+    routes: List[RouteRenderInfo],
+    center_location_id: str,
+) -> Tuple[Set[str], Set[str]]:
+    """Return open and blocked route destinations connected to the centre."""
     connected_open_ids: Set[str] = set()
     connected_blocked_ids: Set[str] = set()
-    for route in info.routes:
+    for route in routes:
         if route.from_site_id == center_location_id:
             if route.blocked:
                 connected_blocked_ids.add(route.to_site_id)
@@ -847,12 +850,31 @@ def render_region_map(
                 connected_blocked_ids.add(route.from_site_id)
             else:
                 connected_open_ids.add(route.from_site_id)
+    return connected_open_ids, connected_blocked_ids
 
-    # --- Routes in this region ---
-    region_routes = [
-        r for r in info.routes
-        if r.from_site_id == center_location_id or r.to_site_id == center_location_id
+
+def _center_region_routes(routes: List[RouteRenderInfo], center_location_id: str) -> List[RouteRenderInfo]:
+    """Return routes directly connected to the centre site."""
+    return [
+        route for route in routes
+        if route.from_site_id == center_location_id or route.to_site_id == center_location_id
     ]
+
+
+def _region_focus_lines(
+    visible_cells: List[MapCellInfo],
+    center_cell: MapCellInfo,
+    region_routes: List[RouteRenderInfo],
+    cells_by_id: Dict[str, MapCellInfo],
+    connected_open_ids: Set[str],
+    connected_blocked_ids: Set[str],
+    memorials: Dict[str, List[str]],
+    aliases: Dict[str, List[str]],
+    traces: Dict[str, List[str]],
+    endonyms: Dict[str, str],
+) -> List[str]:
+    """Build the standout focus lines for a region."""
+    center_location_id = center_cell.location_id
     standout_lines: List[str] = []
     standout_route = _pick_standout_route(region_routes, center_location_id, cells_by_id)
     if standout_route is not None:
@@ -866,10 +888,6 @@ def render_region_map(
             ).rstrip()
         )
 
-    visible_cells = [
-        cell for cell in sorted(info.cells.values(), key=lambda c: (c.y, c.x))
-        if x_min <= cell.x <= x_max and y_min <= cell.y <= y_max
-    ]
     danger_target = _pick_region_danger_target(
         visible_cells,
         center_cell,
@@ -896,10 +914,6 @@ def render_region_map(
     if rumor_target is not None:
         standout_lines.append(tr("map_region_focus_rumor", location=rumor_target.canonical_name))
 
-    memorials = site_memorials or {}
-    aliases = site_aliases or {}
-    traces = site_traces or {}
-    endonyms = site_endonyms or {}
     landmark_target = _pick_landmark_target(
         visible_cells,
         center_location_id,
@@ -912,15 +926,28 @@ def render_region_map(
         landmark_text = _landmark_focus_text(landmark_target, memorials, aliases, traces, endonyms)
         if landmark_text:
             standout_lines.append(landmark_text)
+    return standout_lines
 
-    if standout_lines:
-        lines.append("")
-        lines.append(f"  {tr('map_region_focus')}:")
-        for item in standout_lines[:_MAX_REGION_STANDOUT_ITEMS]:
-            lines.append(f"    - {item}")
-        lines.append("")
 
-    # --- Nearby sites detail ---
+def _append_region_focus(lines: List[str], standout_lines: List[str]) -> None:
+    """Append the focus section when there is anything to show."""
+    if not standout_lines:
+        return
+    lines.append("")
+    lines.append(f"  {tr('map_region_focus')}:")
+    for item in standout_lines[:_MAX_REGION_STANDOUT_ITEMS]:
+        lines.append(f"    - {item}")
+    lines.append("")
+
+
+def _append_nearby_sites(
+    lines: List[str],
+    visible_cells: List[MapCellInfo],
+    center_location_id: str,
+    connected_open_ids: Set[str],
+    connected_blocked_ids: Set[str],
+) -> None:
+    """Append nearby site detail lines."""
     lines.append(f"  {tr('map_region_nearby')}:")
 
     for cell in visible_cells:
@@ -942,22 +969,37 @@ def render_region_map(
             f" D:{danger_str} T:{traffic_str} R:{rumor_str}{overlay_str}"
         )
 
-    if region_routes:
-        lines.append(f"  {tr('map_region_routes')}:")
-        for r in region_routes:
-            blocked = f" {tr('route_blocked')}" if r.blocked else ""
-            from_name = _route_endpoint_name(cells_by_id, r.from_site_id)
-            to_name = _route_endpoint_name(cells_by_id, r.to_site_id)
-            lines.append(
-                f"    {from_name} <-> {to_name}"
-                f" ({tr_term(r.route_type)}){blocked}"
-            )
 
-    # --- Landmark context: native names and world memory ---
+def _append_region_routes(
+    lines: List[str],
+    region_routes: List[RouteRenderInfo],
+    cells_by_id: Dict[str, MapCellInfo],
+) -> None:
+    """Append route detail lines."""
+    if not region_routes:
+        return
+    lines.append(f"  {tr('map_region_routes')}:")
+    for route in region_routes:
+        blocked = f" {tr('route_blocked')}" if route.blocked else ""
+        from_name = _route_endpoint_name(cells_by_id, route.from_site_id)
+        to_name = _route_endpoint_name(cells_by_id, route.to_site_id)
+        lines.append(
+            f"    {from_name} <-> {to_name}"
+            f" ({tr_term(route.route_type)}){blocked}"
+        )
+
+
+def _append_region_landmarks(
+    lines: List[str],
+    visible_cells: List[MapCellInfo],
+    memorials: Dict[str, List[str]],
+    aliases: Dict[str, List[str]],
+    traces: Dict[str, List[str]],
+    endonyms: Dict[str, str],
+) -> None:
+    """Append native names and world-memory landmark context."""
     has_memory = False
-    for cell in sorted(info.cells.values(), key=lambda c: (c.y, c.x)):
-        if not (x_min <= cell.x <= x_max and y_min <= cell.y <= y_max):
-            continue
+    for cell in visible_cells:
         loc_id = cell.location_id
         mem_items = memorials.get(loc_id, [])
         ali_items = aliases.get(loc_id, [])
@@ -978,6 +1020,65 @@ def render_region_map(
             lines.append(f"      {tr('map_landmark_memorial')}: {mem}")
         for tra in tra_items[:2]:
             lines.append(f"      {tr('map_landmark_trace')}: {tra}")
+
+
+def render_region_map(
+    info: MapRenderInfo,
+    center_location_id: str,
+    radius: int = 2,
+    *,
+    site_memorials: Optional[Dict[str, List[str]]] = None,
+    site_aliases: Optional[Dict[str, List[str]]] = None,
+    site_traces: Optional[Dict[str, List[str]]] = None,
+    site_endonyms: Optional[Dict[str, str]] = None,
+) -> str:
+    """Render a zoomed region map around a selected site.
+
+    Shows a (2*radius+1) square excerpt of the terrain grid centred
+    on the site's coordinates, with route connections and per-site
+    status summaries.
+    """
+    center_cell = _find_region_center_cell(info, center_location_id)
+    if center_cell is None:
+        return f"  {tr('map_region_not_found', location=center_location_id)}"
+
+    lines: List[str] = []
+    lines.append(
+        f"  === {tr('map_region_title')}: {center_cell.canonical_name} ==="
+    )
+    lines.append("")
+
+    cells_by_id: Dict[str, MapCellInfo] = {
+        c.location_id: c for c in info.cells.values()
+    }
+    bounds = _region_bounds(info, center_cell, radius)
+    route_layer = _build_region_route_layer(info, bounds)
+    _append_region_grid(lines, info, center_location_id, bounds, route_layer)
+
+    connected_open_ids, connected_blocked_ids = _center_route_connections(info.routes, center_location_id)
+    region_routes = _center_region_routes(info.routes, center_location_id)
+    visible_cells = _visible_region_cells(info, bounds)
+
+    memorials = site_memorials or {}
+    aliases = site_aliases or {}
+    traces = site_traces or {}
+    endonyms = site_endonyms or {}
+    standout_lines = _region_focus_lines(
+        visible_cells,
+        center_cell,
+        region_routes,
+        cells_by_id,
+        connected_open_ids,
+        connected_blocked_ids,
+        memorials,
+        aliases,
+        traces,
+        endonyms,
+    )
+    _append_region_focus(lines, standout_lines)
+    _append_nearby_sites(lines, visible_cells, center_location_id, connected_open_ids, connected_blocked_ids)
+    _append_region_routes(lines, region_routes, cells_by_id)
+    _append_region_landmarks(lines, visible_cells, memorials, aliases, traces, endonyms)
 
     return "\n".join(lines)
 
