@@ -20,6 +20,7 @@ dev = [
 ui = [
     "rich",
     "prompt_toolkit",
+    "wcwidth>=0.2.13",
 ]
 
 [tool.setuptools.packages.find]

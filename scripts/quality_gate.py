@@ -37,6 +37,7 @@ DEFAULT_EXCLUDES = [
     "node_modules",
     "__pycache__",
     ".claude",
+    ".worktrees",
 ]
 
 
@@ -64,6 +65,24 @@ def _flake8_command(targets: Sequence[str]) -> CommandSpec:
             "--jobs",
             "1",
             "--max-line-length=120",
+            f"--exclude={exclude_value}",
+            *targets,
+        ],
+    )
+
+
+def _complexity_command(targets: Sequence[str]) -> CommandSpec:
+    exclude_value = ",".join(DEFAULT_EXCLUDES)
+    return CommandSpec(
+        label="complexity",
+        argv=[
+            sys.executable,
+            "-m",
+            "flake8",
+            "--jobs",
+            "1",
+            "--max-line-length=120",
+            "--max-complexity=25",
             f"--exclude={exclude_value}",
             *targets,
         ],
@@ -118,6 +137,7 @@ def build_profile_commands(profile: str, pytest_targets: Sequence[str] | None = 
     if profile == "strict":
         commands.append(_pytest_command(STANDARD_TARGETS))
         commands.append(_flake8_command(LINT_TARGETS))
+        commands.append(_complexity_command(LINT_TARGETS))
         commands.append(_mypy_command(TYPECHECK_TARGETS))
         commands.append(_pytest_command([]))
         return commands

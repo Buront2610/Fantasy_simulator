@@ -5,9 +5,19 @@ ui_helpers.py - Display formatting and input utilities for the CLI.
 from __future__ import annotations
 
 import unicodedata
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from ..i18n import tr
+
+try:
+    from wcwidth import wcwidth as _imported_wcwidth
+    from wcwidth import wcswidth as _imported_wcswidth
+except ImportError:  # pragma: no cover - depends on optional ui extra
+    _wcwidth: Any = None
+    _wcswidth: Any = None
+else:
+    _wcwidth = _imported_wcwidth
+    _wcswidth = _imported_wcswidth
 
 
 def _c(text: str, code: str) -> str:
@@ -57,12 +67,26 @@ def _pause(message: str = "") -> None:
 
 
 def display_width(text: str) -> int:
+    if _wcswidth is not None:
+        width = _wcswidth(text)
+        return max(width, 0)
+
     width = 0
     for char in text:
-        if unicodedata.combining(char):
-            continue
-        width += 2 if unicodedata.east_asian_width(char) in ("F", "W") else 1
+        width += _char_display_width(char)
     return width
+
+
+def _char_display_width(char: str) -> int:
+    if _wcwidth is not None:
+        return max(_wcwidth(char), 0)
+    return _fallback_char_display_width(char)
+
+
+def _fallback_char_display_width(char: str) -> int:
+    if unicodedata.combining(char):
+        return 0
+    return 2 if unicodedata.east_asian_width(char) in ("F", "W") else 1
 
 
 def fit_display_width(text: str, width: int, suffix: str = "...") -> str:
@@ -82,9 +106,7 @@ def fit_display_width(text: str, width: int, suffix: str = "...") -> str:
     used_width = 0
     limit = width - suffix_width
     for char in text:
-        char_width = 2 if unicodedata.east_asian_width(char) in ("F", "W") else 1
-        if unicodedata.combining(char):
-            char_width = 0
+        char_width = _char_display_width(char)
         if used_width + char_width > limit:
             break
         kept.append(char)
