@@ -90,6 +90,7 @@ def build_location_observation_view(
     rumor_limit: int = 3,
     event_limit: int = 5,
     route_limit: int = 5,
+    include_empty_traces: bool = False,
 ) -> LocationObservationView:
     """Return an inspectable snapshot of one location's current local context."""
     location = world.get_location_by_id(location_id)
@@ -103,7 +104,7 @@ def build_location_observation_view(
     traces = [
         trace.get("text", "")
         for trace in reversed(location.live_traces[-event_limit:])
-        if trace.get("text")
+        if include_empty_traces or trace.get("text")
     ]
 
     record_lookup = {record.record_id: record for record in getattr(world, "event_records", [])}
@@ -176,6 +177,58 @@ def render_location_observation_sections(view: LocationObservationView) -> List[
         lines.append(f"    {tr('no_live_traces')}")
 
     lines.append("")
+    lines.append(f"  {tr('location_recent_events_label')}:")
+    if view.recent_events:
+        for event in view.recent_events:
+            lines.append(f"    - {event}")
+    else:
+        lines.append(f"    {tr('no_recent_events')}")
+
+    if view.connected_routes:
+        lines.append("")
+        lines.append(f"  {tr('map_region_routes')}:")
+        for route in view.connected_routes:
+            lines.append(f"    - {route}")
+
+    if view.rumors:
+        lines.append("")
+        lines.append(f"  {tr('rumor_section_title')}:")
+        for rumor in view.rumors:
+            lines.append(f"    - {render_rumor_brief(rumor)}")
+    return lines
+
+
+def render_query_location_observation_sections(view: LocationObservationView) -> List[str]:
+    """Render the legacy Simulator location observation query text."""
+    lines: List[str] = []
+    if view.generated_endonym:
+        lines.append(f"  {tr('location_endonym_label')}: {view.generated_endonym}")
+        lines.append("")
+
+    if view.resident_names:
+        lines.append(f"  {tr('map_population')}: {', '.join(view.resident_names)}")
+        lines.append("")
+
+    lines.append(f"  {tr('location_aliases_label')}:")
+    lines.append(f"    {', '.join(view.aliases)}" if view.aliases else "    -")
+    lines.append("")
+
+    lines.append(f"  {tr('location_memorials_label')}:")
+    if view.memorials:
+        for memorial in view.memorials:
+            lines.append(f"    {memorial}")
+    else:
+        lines.append(f"    {tr('no_memorials')}")
+    lines.append("")
+
+    lines.append(f"  {tr('location_live_traces_label')}:")
+    if view.traces:
+        for trace in view.traces:
+            lines.append(f"    - {trace}")
+    else:
+        lines.append(f"    {tr('no_live_traces')}")
+    lines.append("")
+
     lines.append(f"  {tr('location_recent_events_label')}:")
     if view.recent_events:
         for event in view.recent_events:

@@ -817,8 +817,7 @@ def _known_community_race_names(world: WorldDefinition) -> set[str]:
     return known_races
 
 
-def validate_setting_bundle(bundle: SettingBundle, *, source: str) -> None:
-    world = bundle.world_definition
+def _validate_bundle_identity(bundle: SettingBundle, world: WorldDefinition, *, source: str) -> None:
     if bundle.schema_version < 1:
         raise ValueError(f"Setting bundle {source} has invalid schema_version: {bundle.schema_version}")
     if not world.world_key:
@@ -828,6 +827,8 @@ def validate_setting_bundle(bundle: SettingBundle, *, source: str) -> None:
     if not world.lore_text:
         raise ValueError(f"Setting bundle {source} must define world_definition.lore_text")
 
+
+def _validate_bundle_unique_names(world: WorldDefinition, *, source: str) -> None:
     race_names = [race.name for race in world.races]
     duplicate_races = _duplicate_values(race_names)
     if duplicate_races:
@@ -856,6 +857,8 @@ def validate_setting_bundle(bundle: SettingBundle, *, source: str) -> None:
             f"Setting bundle {source} contains duplicate language community keys: {', '.join(duplicate_community_keys)}"
         )
 
+
+def _validate_site_seeds(world: WorldDefinition, *, source: str) -> tuple[List[str], set[str]]:
     site_ids = [seed.location_id for seed in world.site_seeds]
     duplicate_site_ids = _duplicate_values(site_ids)
     if duplicate_site_ids:
@@ -887,6 +890,10 @@ def validate_setting_bundle(bundle: SettingBundle, *, source: str) -> None:
     if any(seed.x < 0 or seed.y < 0 for seed in world.site_seeds):
         raise ValueError(f"Setting bundle {source} contains negative site seed coordinates")
 
+    return site_ids, canonical_ids
+
+
+def _validate_route_seeds(world: WorldDefinition, canonical_ids: set[str], *, source: str) -> None:
     route_ids = [seed.route_id for seed in world.route_seeds]
     duplicate_route_ids = _duplicate_values(route_ids)
     if duplicate_route_ids:
@@ -914,6 +921,8 @@ def validate_setting_bundle(bundle: SettingBundle, *, source: str) -> None:
         if route.distance < 1:
             raise ValueError(f"Setting bundle {source} route {route.route_id} must have distance >= 1")
 
+
+def _validate_naming_rules(world: WorldDefinition, *, source: str) -> None:
     naming = world.naming_rules
     has_first_name_rules = (
         naming.first_names_male
@@ -927,86 +936,82 @@ def validate_setting_bundle(bundle: SettingBundle, *, source: str) -> None:
     if has_first_name_rules and not naming.last_names:
         raise ValueError(f"Setting bundle {source} must provide last_names when naming rules are defined")
 
-    language_index = {language.language_key: language for language in world.languages}
-    for language in world.languages:
-        if not language.language_key:
-            raise ValueError(f"Setting bundle {source} must define language_key for each language")
-        if not language.display_name:
-            raise ValueError(f"Setting bundle {source} must define display_name for each language")
-        if language.parent_key and language.parent_key not in language_index:
-            raise ValueError(
-                f"Setting bundle {source} references unknown parent language: {language.parent_key}"
-            )
-        overlap = set(language.consonants) & set(language.vowels)
-        if overlap:
-            raise ValueError(
-                f"Setting bundle {source} has overlapping consonants/vowels in {language.language_key}: "
-                f"{', '.join(sorted(overlap))}"
-            )
-        for feature_name, feature_values, allowed_values in (
-            ("front_vowels", language.front_vowels, language.vowels),
-            ("back_vowels", language.back_vowels, language.vowels),
-            ("liquid_consonants", language.liquid_consonants, language.consonants),
-            ("nasal_consonants", language.nasal_consonants, language.consonants),
-            ("fricative_consonants", language.fricative_consonants, language.consonants),
-            ("stop_consonants", language.stop_consonants, language.consonants),
-        ):
-            unknown_values = [value for value in feature_values if value not in allowed_values]
-            if unknown_values:
-                raise ValueError(
-                    f"Setting bundle {source} has {feature_name} outside the base inventory in "
-                    f"{language.language_key}: {', '.join(sorted(unknown_values))}"
-                )
-        if language.evolution_interval_years < 0:
-            raise ValueError(
-                f"Setting bundle {source} has negative evolution_interval_years in {language.language_key}"
-            )
-        for rule_group_name, rules in (
-            ("sound_change_rules", language.sound_change_rules),
-            ("evolution_rule_pool", language.evolution_rule_pool),
-        ):
-            seen_rule_keys: set[str] = set()
-            for index, rule in enumerate(rules):
-                if not rule.source:
-                    raise ValueError(
-                        f"Setting bundle {source} has empty sound change source in {language.language_key}: "
-                        f"{rule_group_name}[{index}]"
-                    )
-                if rule.position not in VALID_SOUND_CHANGE_POSITIONS:
-                    raise ValueError(
-                        f"Setting bundle {source} has invalid sound change position in {language.language_key}: "
-                        f"{rule.position}"
-                    )
-                if rule.before not in VALID_SOUND_CHANGE_CONTEXTS or rule.after not in VALID_SOUND_CHANGE_CONTEXTS:
-                    raise ValueError(
-                        f"Setting bundle {source} has invalid sound change context in {language.language_key}: "
-                        f"{rule.before}/{rule.after}"
-                    )
-                if rule.rule_key:
-                    if rule.rule_key in seen_rule_keys:
-                        raise ValueError(
-                            f"Setting bundle {source} has duplicate sound change rule_key in "
-                            f"{language.language_key}: {rule.rule_key}"
-                        )
-                    seen_rule_keys.add(rule.rule_key)
-        for pattern_group_name, patterns in (
-            ("given_name_patterns", language.given_name_patterns),
-            ("surname_patterns", language.surname_patterns),
-            ("toponym_patterns", language.toponym_patterns),
-        ):
-            for pattern in patterns:
-                if any(marker not in "RrLXY" for marker in pattern):
-                    raise ValueError(
-                        f"Setting bundle {source} has invalid {pattern_group_name} token in "
-                        f"{language.language_key}: {pattern}"
-                    )
-        for template in language.syllable_templates:
-            if any(marker not in "CV" for marker in template):
-                raise ValueError(
-                    f"Setting bundle {source} has invalid syllable template in "
-                    f"{language.language_key}: {template}"
-                )
 
+def _validate_language_features(language: LanguageDefinition, *, source: str) -> None:
+    overlap = set(language.consonants) & set(language.vowels)
+    if overlap:
+        raise ValueError(
+            f"Setting bundle {source} has overlapping consonants/vowels in {language.language_key}: "
+            f"{', '.join(sorted(overlap))}"
+        )
+    for feature_name, feature_values, allowed_values in (
+        ("front_vowels", language.front_vowels, language.vowels),
+        ("back_vowels", language.back_vowels, language.vowels),
+        ("liquid_consonants", language.liquid_consonants, language.consonants),
+        ("nasal_consonants", language.nasal_consonants, language.consonants),
+        ("fricative_consonants", language.fricative_consonants, language.consonants),
+        ("stop_consonants", language.stop_consonants, language.consonants),
+    ):
+        unknown_values = [value for value in feature_values if value not in allowed_values]
+        if unknown_values:
+            raise ValueError(
+                f"Setting bundle {source} has {feature_name} outside the base inventory in "
+                f"{language.language_key}: {', '.join(sorted(unknown_values))}"
+            )
+
+
+def _validate_language_sound_change_rules(language: LanguageDefinition, *, source: str) -> None:
+    for rule_group_name, rules in (
+        ("sound_change_rules", language.sound_change_rules),
+        ("evolution_rule_pool", language.evolution_rule_pool),
+    ):
+        seen_rule_keys: set[str] = set()
+        for index, rule in enumerate(rules):
+            if not rule.source:
+                raise ValueError(
+                    f"Setting bundle {source} has empty sound change source in {language.language_key}: "
+                    f"{rule_group_name}[{index}]"
+                )
+            if rule.position not in VALID_SOUND_CHANGE_POSITIONS:
+                raise ValueError(
+                    f"Setting bundle {source} has invalid sound change position in {language.language_key}: "
+                    f"{rule.position}"
+                )
+            if rule.before not in VALID_SOUND_CHANGE_CONTEXTS or rule.after not in VALID_SOUND_CHANGE_CONTEXTS:
+                raise ValueError(
+                    f"Setting bundle {source} has invalid sound change context in {language.language_key}: "
+                    f"{rule.before}/{rule.after}"
+                )
+            if rule.rule_key:
+                if rule.rule_key in seen_rule_keys:
+                    raise ValueError(
+                        f"Setting bundle {source} has duplicate sound change rule_key in "
+                        f"{language.language_key}: {rule.rule_key}"
+                    )
+                seen_rule_keys.add(rule.rule_key)
+
+
+def _validate_language_patterns(language: LanguageDefinition, *, source: str) -> None:
+    for pattern_group_name, patterns in (
+        ("given_name_patterns", language.given_name_patterns),
+        ("surname_patterns", language.surname_patterns),
+        ("toponym_patterns", language.toponym_patterns),
+    ):
+        for pattern in patterns:
+            if any(marker not in "RrLXY" for marker in pattern):
+                raise ValueError(
+                    f"Setting bundle {source} has invalid {pattern_group_name} token in "
+                    f"{language.language_key}: {pattern}"
+                )
+    for template in language.syllable_templates:
+        if any(marker not in "CV" for marker in template):
+            raise ValueError(
+                f"Setting bundle {source} has invalid syllable template in "
+                f"{language.language_key}: {template}"
+            )
+
+
+def _validate_language_inheritance(language_index: Dict[str, LanguageDefinition], *, source: str) -> None:
     visiting: set[str] = set()
     visited: set[str] = set()
 
@@ -1025,6 +1030,37 @@ def validate_setting_bundle(bundle: SettingBundle, *, source: str) -> None:
     for language_key in language_index:
         _visit_language(language_key)
 
+
+def _validate_languages(world: WorldDefinition, *, source: str) -> Dict[str, LanguageDefinition]:
+    language_index = {language.language_key: language for language in world.languages}
+    for language in world.languages:
+        if not language.language_key:
+            raise ValueError(f"Setting bundle {source} must define language_key for each language")
+        if not language.display_name:
+            raise ValueError(f"Setting bundle {source} must define display_name for each language")
+        if language.parent_key and language.parent_key not in language_index:
+            raise ValueError(
+                f"Setting bundle {source} references unknown parent language: {language.parent_key}"
+            )
+        _validate_language_features(language, source=source)
+        if language.evolution_interval_years < 0:
+            raise ValueError(
+                f"Setting bundle {source} has negative evolution_interval_years in {language.language_key}"
+            )
+        _validate_language_sound_change_rules(language, source=source)
+        _validate_language_patterns(language, source=source)
+
+    _validate_language_inheritance(language_index, source=source)
+    return language_index
+
+
+def _validate_language_communities(
+    world: WorldDefinition,
+    language_index: Dict[str, LanguageDefinition],
+    site_ids: List[str],
+    *,
+    source: str,
+) -> None:
     known_community_races = _known_community_race_names(world)
     for community in world.language_communities:
         if community.language_key not in language_index:
@@ -1045,6 +1081,13 @@ def validate_setting_bundle(bundle: SettingBundle, *, source: str) -> None:
                 f"Setting bundle {source} references unknown community regions: {', '.join(unknown_regions)}"
             )
 
+
+def _validate_site_language_references(
+    world: WorldDefinition,
+    language_index: Dict[str, LanguageDefinition],
+    *,
+    source: str,
+) -> None:
     for seed in world.site_seeds:
         if seed.native_name and not seed.language_key:
             raise ValueError(
@@ -1055,6 +1098,8 @@ def validate_setting_bundle(bundle: SettingBundle, *, source: str) -> None:
                 f"Setting bundle {source} references unknown site language: {seed.language_key}"
             )
 
+
+def _validate_rule_overrides(world: WorldDefinition, *, source: str) -> None:
     event_impact_overrides = {
         str(kind): {str(attr): delta for attr, delta in deltas.items()}
         for kind, deltas in world.event_impact_rules.items()
@@ -1072,6 +1117,19 @@ def validate_setting_bundle(bundle: SettingBundle, *, source: str) -> None:
         merge_propagation_rule_overrides(propagation_overrides)
     except ValueError as exc:
         raise ValueError(f"Setting bundle {source} has invalid world_definition.propagation_rules: {exc}") from exc
+
+
+def validate_setting_bundle(bundle: SettingBundle, *, source: str) -> None:
+    world = bundle.world_definition
+    _validate_bundle_identity(bundle, world, source=source)
+    _validate_bundle_unique_names(world, source=source)
+    site_ids, canonical_ids = _validate_site_seeds(world, source=source)
+    _validate_route_seeds(world, canonical_ids, source=source)
+    _validate_naming_rules(world, source=source)
+    language_index = _validate_languages(world, source=source)
+    _validate_language_communities(world, language_index, site_ids, source=source)
+    _validate_site_language_references(world, language_index, source=source)
+    _validate_rule_overrides(world, source=source)
 
 
 def bundle_from_dict_validated(data: Dict[str, Any], *, source: str) -> SettingBundle:

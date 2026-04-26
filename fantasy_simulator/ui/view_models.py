@@ -92,8 +92,11 @@ def build_notification_views(records: List["WorldEventRecord"]) -> List[Notifica
 
 
 def build_monthly_report_card_view(world: "World", year: int, month: int) -> MonthlyReportCardView:
-    event_records = getattr(world, "event_records", [])
-    records = [r for r in event_records if r.year == year and r.month == month]
+    if hasattr(world, "get_events_by_month"):
+        records = world.get_events_by_month(year, month)
+    else:
+        event_records = getattr(world, "event_records", [])
+        records = [r for r in event_records if r.year == year and r.month == month]
     record_calendar_key = next(
         (record.calendar_key for record in records if getattr(record, "calendar_key", "")),
         "",

@@ -1398,6 +1398,27 @@ class TestWorld:
         assert len(world.get_events_by_year(1001)) == 2
         assert len(world.get_events_by_year(1002)) == 1
 
+    def test_event_record_indexes_cover_month_and_kind(self):
+        from fantasy_simulator.events import WorldEventRecord
+        world = World()
+        world.record_event(WorldEventRecord(kind="battle", year=1001, month=2))
+        world.record_event(WorldEventRecord(kind="battle", year=1001, month=3))
+        world.record_event(WorldEventRecord(kind="meeting", year=1001, month=2))
+
+        assert [record.kind for record in world.get_events_by_month(1001, 2)] == ["battle", "meeting"]
+        assert [record.month for record in world.get_events_by_kind("battle")] == [2, 3]
+
+    def test_event_record_indexes_notice_direct_compatibility_mutation(self):
+        from fantasy_simulator.events import WorldEventRecord
+        world = World()
+        world.event_records.append(WorldEventRecord(record_id="r1", kind="battle", year=1001, month=2))
+
+        assert len(world.get_events_by_year(1001)) == 1
+
+        world.event_records.append(WorldEventRecord(record_id="r2", kind="meeting", year=1001, month=2))
+
+        assert [record.record_id for record in world.get_events_by_month(1001, 2)] == ["r1", "r2"]
+
     def test_event_records_in_to_dict_round_trip(self):
         from fantasy_simulator.events import WorldEventRecord
         world = World()

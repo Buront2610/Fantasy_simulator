@@ -59,11 +59,13 @@ def test_standard_profile_can_prepend_changed_area_pytest():
 
 def test_strict_profile_includes_targeted_lint_and_full_pytest():
     commands = build_profile_commands("strict")
-    assert [command.label for command in commands] == ["pytest", "flake8", "mypy", "pytest"]
+    assert [command.label for command in commands] == ["pytest", "flake8", "complexity", "mypy", "pytest"]
     assert "." in commands[1].argv
-    assert "fantasy_simulator/worldgen" in commands[2].argv
-    assert "tools/worldgen_poc" in commands[2].argv
-    assert len(commands[3].argv) == 4
+    assert "--max-complexity=25" in commands[2].argv
+    assert "." in commands[2].argv
+    assert "fantasy_simulator/worldgen" in commands[3].argv
+    assert "tools/worldgen_poc" in commands[3].argv
+    assert len(commands[4].argv) == 4
 
 
 def test_pyproject_includes_type_gate_scaffolding():

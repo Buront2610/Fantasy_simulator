@@ -6,7 +6,7 @@ TD-3 responsibility split: isolate event-driven world state mutations from
 
 from __future__ import annotations
 
-from typing import Callable, Dict, List, Mapping, MutableMapping, Optional, Protocol
+from typing import Callable, Dict, List, Mapping, MutableMapping, Optional, Protocol, Set
 
 from .event_models import WorldEventRecord
 from .rule_override_resolution import (
@@ -70,6 +70,7 @@ def append_canonical_event_record(
     location_index: MutableMapping[str, SupportsEventIndex],
     grid: MutableMapping[object, SupportsEventIndex],
     max_event_records: int,
+    existing_record_ids: Optional[Set[str]] = None,
 ) -> WorldEventRecord:
     """Append an event record and maintain related per-location indexes.
 
@@ -85,10 +86,16 @@ def append_canonical_event_record(
         cloned["location_id"] = None
         stored_record = WorldEventRecord.from_dict(cloned)
 
-    if any(existing.record_id == stored_record.record_id for existing in event_records):
+    if existing_record_ids is not None:
+        duplicate = stored_record.record_id in existing_record_ids
+    else:
+        duplicate = any(existing.record_id == stored_record.record_id for existing in event_records)
+    if duplicate:
         raise ValueError(f"Duplicate event record ID: {stored_record.record_id!r}")
 
     event_records.append(stored_record)
+    if existing_record_ids is not None:
+        existing_record_ids.add(stored_record.record_id)
 
     if stored_record.location_id is not None:
         location = location_index[stored_record.location_id]
@@ -100,6 +107,8 @@ def append_canonical_event_record(
 
     del event_records[:-max_event_records]
     surviving_ids = {item.record_id for item in event_records}
+    if existing_record_ids is not None:
+        existing_record_ids.intersection_update(surviving_ids)
     for location in grid.values():
         if location.recent_event_ids:
             location.recent_event_ids = [

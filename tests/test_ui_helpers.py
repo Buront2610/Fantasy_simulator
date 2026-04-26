@@ -6,6 +6,7 @@ import unittest
 
 from unittest.mock import patch
 
+import fantasy_simulator.ui.ui_helpers as ui_helpers
 from fantasy_simulator.ui.ui_helpers import (
     HEADER,
     _c,
@@ -16,6 +17,8 @@ from fantasy_simulator.ui.ui_helpers import (
     bold,
     cyan,
     dim,
+    display_width,
+    fit_display_width,
     green,
     red,
     yellow,
@@ -62,6 +65,34 @@ class TestLayoutHelpers(unittest.TestCase):
 
     def test_header_contains_title(self) -> None:
         self.assertIn("FANTASY SIMULATOR", HEADER)
+
+
+class TestDisplayWidthHelpers(unittest.TestCase):
+    """Terminal display width helpers."""
+
+    def test_display_width_counts_cjk_as_two_columns(self) -> None:
+        self.assertEqual(display_width("A界B"), 4)
+
+    def test_fit_display_width_preserves_target_width_with_cjk(self) -> None:
+        result = fit_display_width("勇者アレクサンドリア", 10)
+
+        self.assertEqual(display_width(result), 10)
+        self.assertIn("...", result)
+
+    def test_display_width_uses_wcwidth_when_available(self) -> None:
+        with patch.object(ui_helpers, "_wcswidth", return_value=2):
+            self.assertEqual(display_width("❤️"), 2)
+
+    def test_fit_display_width_uses_wcwidth_character_widths(self) -> None:
+        def fake_wcwidth(char: str) -> int:
+            return 2 if char == "·" else 1
+
+        with patch.object(ui_helpers, "_wcswidth", None), patch.object(
+            ui_helpers,
+            "_wcwidth",
+            side_effect=fake_wcwidth,
+        ):
+            self.assertEqual(fit_display_width("a·b", 3, suffix=""), "a·")
 
 
 class TestRenderMenu(unittest.TestCase):
