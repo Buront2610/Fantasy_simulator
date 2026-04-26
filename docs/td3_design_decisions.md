@@ -58,5 +58,5 @@ compatibility field として限定保持する。
   `World` が active bundle から rules を読み込み helper に渡す。
 - helper 側は bundled default rules を fallback として保持する。
 
-**Remaining TODO (PR-J/PR-K 前提)**:
+**Roadmap extension (PR-K 前提)**:
 - era/faction modifier を rule evaluator の入力として注入可能にする。

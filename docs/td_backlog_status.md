@@ -1,9 +1,9 @@
-# TD-1〜TD-4 Backlog Status (Audit)
+# TD-1〜TD-4 Backlog Status (Closed Audit)
 
-最終更新: 2026-04-16
+最終更新: 2026-04-26
 
 このメモは `docs/implementation_plan.md` の TD-1〜TD-4 について、
-「現時点で残っているもの」を先に確認してから実装を進めるための監査ログ。
+負債解消 PR の完了条件と、完了後も維持する guardrail を記録する監査ログ。
 
 ## Invariants for this cleanup batch
 
@@ -26,7 +26,7 @@
   - compatibility projection: `Simulator.history` (`world.event_records -> EventResult`)
   - legacy adapter call: `QueryMixin.events_by_type()`
 
-### Remaining
+### Current debt status
 
 - なし（保存フォーマットは canonical `event_records` を正規保持し、
   `event_log` / `history` は runtime projection へ縮退済み）。
@@ -41,10 +41,11 @@
   明示エラーにする。
 - `world_data` の lore/race/job/default site seed は legacy projection として制約テストで管理。
 
-### Remaining
+### Current debt status
 
-- authoring 用の bundle 差し替え UX（複数 world package 運用）は未完。
-- `ALL_SKILLS` は共有カタログとして `world_data` 依存を継続（非 lore/race/job 領域）。
+- なし。
+- authoring 用の bundle 差し替え UX（複数 world package 運用）は PR-J の機能作業。
+- `ALL_SKILLS` は共有カタログとして `world_data` 依存を継続するが、非 lore/race/job 領域の互換カタログであり、この負債解消対象からは外す。
 
 ## TD-3 Responsibility Split (`world.py` / `events.py`)
 
@@ -60,9 +61,10 @@
 - 既存互換API（`from fantasy_simulator.events import ...`, `World.log_event()`, `World.record_event()`）は維持。
 - legacy field の扱い / import 正規ルート / mutable copy 方針は `docs/td3_design_decisions.md` に記録。
 
-### Remaining
+### Current debt status
 
-- era/faction modifier を rules evaluator に注入する仕組みは未完。
+- なし。
+- era/faction modifier を rules evaluator へ注入する仕組みは PR-K の動的世界変化機能で扱う。
 
 ## TD-4 Guardrails / Harness / Docs
 
@@ -79,6 +81,6 @@
   memorial-heavy world memory snapshot を production の screen helper 経路で固定し、
   save-load-midyear 後の map-visible 同値性も `tests/test_map_visible_harness.py` で固定。
 
-### Remaining
+### Current debt status
 
 - なし。
