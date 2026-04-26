@@ -33,6 +33,31 @@ def test_get_active_rumors_can_filter_to_one_location():
     assert lines == ["Forest rumor (certain)"]
 
 
+def test_get_active_rumors_filters_expired_before_limiting():
+    world = World()
+    world.rumors.extend(
+        [
+            Rumor(
+                id="rumor_expired",
+                description="Expired rumor",
+                reliability="doubtful",
+                age_in_months=999,
+            ),
+            Rumor(
+                id="rumor_active",
+                description="Active rumor",
+                reliability="certain",
+                age_in_months=1,
+            ),
+        ]
+    )
+    sim = Simulator(world, events_per_year=0, adventure_steps_per_year=0, seed=7)
+
+    lines = sim.get_active_rumors(limit=1)
+
+    assert lines == ["Active rumor (certain)"]
+
+
 def test_get_location_observation_surfaces_recent_events_and_rumors():
     world = World()
     world.record_event(

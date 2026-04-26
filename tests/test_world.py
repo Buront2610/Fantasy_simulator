@@ -1424,28 +1424,32 @@ class TestWorld:
         world = World()
         capital = world.get_location_by_id("loc_aethoria_capital")
         assert capital is not None
-        capital.live_traces.append({"kind": "omen", "value": 1})
+        capital.live_traces.append({"kind": "omen", "value": 1, "nested": {"flag": True}})
 
         payload = world.to_dict()
         capital_payload = next(loc for loc in payload["grid"] if loc["id"] == "loc_aethoria_capital")
         capital_payload["live_traces"][0]["value"] = 99
+        capital_payload["live_traces"][0]["nested"]["flag"] = False
 
         assert capital.live_traces[0]["value"] == 1
+        assert capital.live_traces[0]["nested"]["flag"] is True
 
     def test_world_from_dict_deep_copies_live_traces(self):
         world = World()
         capital = world.get_location_by_id("loc_aethoria_capital")
         assert capital is not None
-        capital.live_traces.append({"kind": "omen", "value": 1})
+        capital.live_traces.append({"kind": "omen", "value": 1, "nested": {"flag": True}})
         payload = world.to_dict()
 
         restored = World.from_dict(payload)
         capital_payload = next(loc for loc in payload["grid"] if loc["id"] == "loc_aethoria_capital")
         capital_payload["live_traces"][0]["value"] = 99
+        capital_payload["live_traces"][0]["nested"]["flag"] = False
 
         restored_capital = restored.get_location_by_id("loc_aethoria_capital")
         assert restored_capital is not None
         assert restored_capital.live_traces[0]["value"] == 1
+        assert restored_capital.live_traces[0]["nested"]["flag"] is True
 
     def test_custom_calendar_round_trips_with_world(self):
         world = World()

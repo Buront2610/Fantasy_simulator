@@ -270,7 +270,10 @@ class WorldEventRecord:
         legacy_event_result = None
         if result.stat_changes or result.metadata:
             legacy_event_result = result.to_dict()
-        resolved_summary_key = summary_key or result.summary_key or result.metadata.get("summary_key", "")
+        metadata_summary_key = result.metadata.get("summary_key", "")
+        if not isinstance(metadata_summary_key, str):
+            raise ValueError("summary_key must be a string when provided in metadata")
+        resolved_summary_key = summary_key or result.summary_key or metadata_summary_key
         cls._validate_summary_key(resolved_summary_key)
         return cls(
             record_id=record_id or generate_record_id(rng),

@@ -10,19 +10,53 @@ resolver callback injected by the caller.
 
 from __future__ import annotations
 
-from typing import Any, Callable, Iterable, Mapping
+from typing import Callable, Iterable, Mapping, Protocol
+
+
+class CharacterLocationReference(Protocol):
+    location_id: str
+
+
+class OptionalLocationReference(Protocol):
+    location_id: str | None
+
+
+class RumorLocationReference(Protocol):
+    source_location_id: str | None
+
+
+class AdventureLocationReference(Protocol):
+    origin: str
+    destination: str
+
+
+class WatchedActorRecord(Protocol):
+    tags: list[str]
+    primary_actor_id: str | None
+    secondary_actor_ids: list[str]
+
+
+class LocationReferenceResolver(Protocol):
+    def __call__(
+        self,
+        location_id: str | None,
+        *,
+        required: bool = False,
+        fallback_location_id: str | None = None,
+    ) -> str | None:
+        ...
 
 
 def repair_world_location_references(
     *,
-    characters: Iterable[Any],
-    event_records: Iterable[Any],
-    rumors: Iterable[Any],
-    rumor_archive: Iterable[Any],
-    active_adventures: Iterable[Any],
-    completed_adventures: Iterable[Any],
-    memorials: Mapping[str, Any],
-    repair_location_reference: Callable[..., str | None],
+    characters: Iterable[CharacterLocationReference],
+    event_records: Iterable[OptionalLocationReference],
+    rumors: Iterable[RumorLocationReference],
+    rumor_archive: Iterable[RumorLocationReference],
+    active_adventures: Iterable[AdventureLocationReference],
+    completed_adventures: Iterable[AdventureLocationReference],
+    memorials: Mapping[str, CharacterLocationReference],
+    repair_location_reference: LocationReferenceResolver,
     fallback_location_id: str | None,
 ) -> None:
     """Repair all persisted location-backed references against the live world."""
@@ -116,7 +150,7 @@ def normalize_world_references_after_structure_change(
 
 def backfill_watched_actor_tags(
     *,
-    event_records: Iterable[Any],
+    event_records: Iterable[WatchedActorRecord],
     watched_actor_ids: set[str],
     watched_actor_tag_prefix: str,
     inferred_tag: str,

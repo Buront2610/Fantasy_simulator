@@ -428,6 +428,30 @@ class TestSerialization:
         assert restored.strength == 77
         assert restored.favorite is True
 
+    def test_narrative_state_rejects_malformed_history_payload(self):
+        try:
+            CharacterNarrativeState.from_dict({"history": "not-a-list"})
+        except ValueError as exc:
+            assert "history" in str(exc)
+        else:
+            raise AssertionError("Expected malformed history payload to fail fast")
+
+    def test_narrative_state_rejects_non_bool_flags(self):
+        try:
+            CharacterNarrativeState.from_dict({"favorite": "false"})
+        except ValueError as exc:
+            assert "favorite" in str(exc)
+        else:
+            raise AssertionError("Expected malformed favorite payload to fail fast")
+
+    def test_relationship_rejects_malformed_tags_payload(self):
+        try:
+            Relationship.from_dict("ally_001", {"tags": "friend"})
+        except ValueError as exc:
+            assert "tags" in str(exc)
+        else:
+            raise AssertionError("Expected malformed relationship tags to fail fast")
+
 
 # ---------------------------------------------------------------------------
 # random_stats helper

@@ -10,9 +10,8 @@ The Simulator class is composed from several mixins, each in its own module:
 - queries.py: Summary, report, story, and event-log access
 
 ``world.event_records`` is the canonical event store by policy.  ``history``
-and ``event_log`` are maintained as compatibility adapters and are still
-persisted.  Reducing to a single persisted representation is planned for
-future PRs.
+and ``event_log`` are runtime compatibility adapters projected from canonical
+records for older query paths.
 
 Import the assembled Simulator from this package::
 

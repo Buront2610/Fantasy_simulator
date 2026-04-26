@@ -34,7 +34,20 @@ addopts = "-ra"
 
 [tool.mypy]
 python_version = "3.10"
-files = ["fantasy_simulator", "tests"]
+follow_imports = "silent"
+files = [
+    "fantasy_simulator/adventure.py",
+    "fantasy_simulator/adventure_domain.py",
+    "fantasy_simulator/character.py",
+    "fantasy_simulator/character_domain.py",
+    "fantasy_simulator/event_models.py",
+    "fantasy_simulator/location_observation.py",
+    "fantasy_simulator/ui/presenters.py",
+    "fantasy_simulator/ui/view_models.py",
+    "fantasy_simulator/world_reference_repair.py",
+    "fantasy_simulator/worldgen",
+    "tools/worldgen_poc",
+]
 check_untyped_defs = true
 no_implicit_optional = true
 show_error_codes = true

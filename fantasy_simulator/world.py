@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import random
 from collections import deque
+from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
@@ -146,7 +147,7 @@ def _trace_list_payload(payload: Any, *, field_name: str) -> List[Dict[str, Any]
         return []
     if not isinstance(payload, list) or any(not isinstance(item, dict) for item in payload):
         raise ValueError(f"{field_name} must be a list of dicts")
-    return [dict(item) for item in payload]
+    return [deepcopy(item) for item in payload]
 
 
 @dataclass(slots=True)
@@ -352,7 +353,7 @@ class LocationState:
             "aliases": list(self.aliases),
             "generated_endonym": self.generated_endonym,
             "memorial_ids": list(self.memorial_ids),
-            "live_traces": [dict(trace) for trace in self.live_traces],
+            "live_traces": [deepcopy(trace) for trace in self.live_traces],
         }
 
     @classmethod

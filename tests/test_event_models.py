@@ -230,6 +230,23 @@ def test_world_event_record_from_event_result_uses_metadata_summary_key_fallback
     assert record.summary_key == "events.meeting.summary"
 
 
+def test_world_event_record_rejects_non_string_metadata_summary_key() -> None:
+    source = EventResult(
+        description="A meeting happened",
+        affected_characters=["c1"],
+        event_type="meeting",
+        year=1002,
+        metadata={"summary_key": {"bad": True}},
+    )
+
+    try:
+        WorldEventRecord.from_event_result(source)
+    except ValueError as exc:
+        assert "summary_key" in str(exc)
+    else:
+        raise AssertionError("Expected metadata summary_key to fail fast")
+
+
 def test_world_event_record_rejects_non_string_summary_key_at_load_boundary() -> None:
     malformed = {
         "record_id": "r_summary",

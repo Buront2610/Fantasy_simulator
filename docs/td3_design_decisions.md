@@ -9,7 +9,7 @@
 
 **理由**:
 - canonical-first の event record を主に保ちつつ、older saves の backward-load
-  compatibility と legacy adapter の exact projection を維持するため。
+  compatibility と legacy `EventResult` adapter の exact projection を維持するため。
 - runtime の互換 adapter (`Simulator.history`, compatibility log formatter) は
   canonical fields を優先しつつ、必要な場合のみ persisted compatibility payload を使う。
 

@@ -38,6 +38,12 @@ def test_generate_world_extracts_bounded_site_candidates() -> None:
         assert world.terrain_map.get(candidate.x, candidate.y) is not None
 
 
+def test_generate_world_minimum_config_still_extracts_site_candidate() -> None:
+    world = generate_world(WorldgenConfig(width=3, height=3, seed=0, site_candidate_limit=5))
+
+    assert len(world.site_candidates) >= 1
+
+
 def test_ascii_preview_matches_world_dimensions() -> None:
     world = generate_world(WorldgenConfig(width=13, height=9, seed=5, site_candidate_limit=4))
 

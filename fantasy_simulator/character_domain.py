@@ -29,6 +29,35 @@ def clamp_relationship_score(value: int) -> int:
     return max(-100, min(100, int(value)))
 
 
+def _bool_payload(payload: Any, *, field_name: str) -> bool:
+    if not isinstance(payload, bool):
+        raise ValueError(f"{field_name} must be a boolean")
+    return payload
+
+
+def _optional_string_payload(payload: Any, *, field_name: str) -> Optional[str]:
+    if payload is None:
+        return None
+    if not isinstance(payload, str):
+        raise ValueError(f"{field_name} must be a string when provided")
+    return payload
+
+
+def _string_list_payload(payload: Any, *, field_name: str) -> List[str]:
+    if not isinstance(payload, list) or any(not isinstance(item, str) for item in payload):
+        raise ValueError(f"{field_name} must be a list of strings")
+    return list(payload)
+
+
+def _string_list_mapping_payload(payload: Any, *, field_name: str) -> Dict[str, List[str]]:
+    if not isinstance(payload, Mapping):
+        raise ValueError(f"{field_name} must be a mapping of string lists")
+    return {
+        str(key): _string_list_payload(value, field_name=f"{field_name}.{key}")
+        for key, value in payload.items()
+    }
+
+
 @dataclass(frozen=True)
 class CharacterAbilities:
     strength: int = 10
@@ -98,13 +127,16 @@ class CharacterNarrativeState:
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> "CharacterNarrativeState":
         return cls(
-            favorite=bool(data.get("favorite", False)),
-            spotlighted=bool(data.get("spotlighted", False)),
-            playable=bool(data.get("playable", False)),
-            history=list(data.get("history", [])),
-            spouse_id=data.get("spouse_id"),
-            injury_status=data.get("injury_status", "none"),
-            active_adventure_id=data.get("active_adventure_id"),
+            favorite=_bool_payload(data.get("favorite", False), field_name="favorite"),
+            spotlighted=_bool_payload(data.get("spotlighted", False), field_name="spotlighted"),
+            playable=_bool_payload(data.get("playable", False), field_name="playable"),
+            history=_string_list_payload(data.get("history", []), field_name="history"),
+            spouse_id=_optional_string_payload(data.get("spouse_id"), field_name="spouse_id"),
+            injury_status=str(data.get("injury_status", "none")),
+            active_adventure_id=_optional_string_payload(
+                data.get("active_adventure_id"),
+                field_name="active_adventure_id",
+            ),
         )
 
 
@@ -141,11 +173,8 @@ class Relationship:
         return cls(
             target_id=target_id,
             score=data.get("score", 0),
-            tags=list(data.get("tags", [])),
-            tag_sources={
-                str(tag): _unique_strings(source_ids)
-                for tag, source_ids in data.get("tag_sources", {}).items()
-            },
+            tags=_string_list_payload(data.get("tags", []), field_name="tags"),
+            tag_sources=_string_list_mapping_payload(data.get("tag_sources", {}), field_name="tag_sources"),
         )
 
     @classmethod

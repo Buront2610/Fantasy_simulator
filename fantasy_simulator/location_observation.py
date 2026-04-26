@@ -51,10 +51,10 @@ def build_rumor_summary_views(
         rumors.extend(getattr(world, "rumor_archive", []))
     if location_id is not None:
         rumors = [rumor for rumor in rumors if rumor.source_location_id == location_id]
+    rumors = [rumor for rumor in rumors if not rumor.is_expired]
 
     rumors.sort(
         key=lambda rumor: (
-            rumor.is_expired,
             rumor.age_in_months,
             -rumor.year_created,
             -rumor.month_created,
@@ -80,7 +80,6 @@ def build_rumor_summary_views(
             spread_level=rumor.spread_level,
         )
         for rumor in rumors
-        if not rumor.is_expired
     ]
 
 

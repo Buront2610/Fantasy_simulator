@@ -21,7 +21,12 @@ from ..reports import (
     generate_monthly_report,
     generate_yearly_report,
 )
-from ..location_observation import build_location_observation_view, render_location_observation_sections
+from ..location_observation import (
+    build_location_observation_view,
+    build_rumor_summary_views,
+    render_location_observation_sections,
+    render_rumor_brief,
+)
 
 
 class QueryMixin:
@@ -110,28 +115,15 @@ class QueryMixin:
         limit: Optional[int] = None,
     ) -> List[str]:
         """Return formatted rumor lines, optionally filtered to one location."""
-        rumors = list(self.world.rumors)
-        if include_archive:
-            rumors.extend(self.world.rumor_archive)
-        if location_id is not None:
-            rumors = [rumor for rumor in rumors if rumor.source_location_id == location_id]
-        rumors = [rumor for rumor in rumors if not rumor.is_expired]
-        rumors.sort(
-            key=lambda rumor: (
-                rumor.age_in_months,
-                -rumor.year_created,
-                -rumor.month_created,
-                rumor.id,
+        return [
+            render_rumor_brief(rumor)
+            for rumor in build_rumor_summary_views(
+                self.world,
+                location_id=location_id,
+                include_archive=include_archive,
+                limit=limit,
             )
-        )
-        if limit is not None:
-            rumors = rumors[: max(0, limit)]
-
-        lines: List[str] = []
-        for rumor in rumors:
-            reliability_label = tr(f"rumor_reliability_{rumor.reliability}")
-            lines.append(f"{rumor.description} ({reliability_label})")
-        return lines
+        ]
 
     def get_location_observation(self, location_id: str) -> str:
         """Return an inspectable local observation summary for one location."""

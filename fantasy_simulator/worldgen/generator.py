@@ -172,15 +172,19 @@ def _site_score(cell: TerrainCell, neighbors: Iterable[TerrainCell]) -> Tuple[in
 def _derive_site_candidates(terrain_map: TerrainMap, *, seed: int, limit: int) -> List[SiteCandidate]:
     rng = random.Random(seed ^ 0xA57E)
     ranked: List[Tuple[int, float, TerrainCell, List[str], str]] = []
+    fallback_ranked: List[Tuple[int, float, TerrainCell, List[str], str]] = []
     for (x, y), cell in terrain_map.cells.items():
         if cell.biome in {"ocean", "swamp"}:
             continue
         neighbors = terrain_map.neighbors(x, y)
         score, rationale, site_type = _site_score(cell, neighbors)
         if score < 45:
+            fallback_ranked.append((score, rng.random(), cell, rationale or ["minimum_viable_site"], site_type))
             continue
         ranked.append((score, rng.random(), cell, rationale, site_type))
 
+    if not ranked:
+        ranked = fallback_ranked
     ranked.sort(key=lambda item: (item[0], item[1]), reverse=True)
     chosen: List[SiteCandidate] = []
     occupied: set[Tuple[int, int]] = set()

@@ -34,7 +34,8 @@ form that tests can enforce.
 - `World.event_records` is the canonical structured event store.
 - `WorldEventRecord` is canonical-first; optional compatibility payloads
   (`legacy_event_result` / `legacy_event_log_entry`) may still be persisted
-  in-record only to preserve backward-load adapter behavior.
+  in-record only to preserve backward-load behavior and exact legacy
+  `EventResult` adapter projection while those compatibility APIs exist.
 - `World.event_log` is a compatibility display buffer derived from canonical
   events.
 - `Simulator.history` is a legacy `EventResult` adapter projected from

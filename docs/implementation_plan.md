@@ -96,7 +96,7 @@
   ただし NPC 行動・依頼生成等の content-rich な sub-month loop は後続で拡張する
 - ~~5×5 盤面から離脱した可変サイズ world、terrain / site / route 分離、worldgen PoC は未着手である~~
   → PR-G1 で `World(width, height)`、`terrain_map` / `sites` / `routes`、schema v6 migration を導入済み。
-  worldgen PoC 自体は未着手
+  TD-1〜TD-4 で deterministic worldgen PoC と preview tool も追加済み
 - ~~高密度 AA マップは未着手であり、現状の地図は依然として「簡易表示」段階に留まる~~
   → PR-G2 で atlas overview / region drill-down / location detail / compact / minimal 表示を導入済み
 - ただし現状の観測 UI は依然として「文字列を順に流す CLI」の延長にあり、固定レイアウト、意味色、
@@ -108,8 +108,8 @@
   へ移行済み。いっぽう `content/world_data.py` は互換 projection を引き続き保持しているため、
   lore / race / job / location seed の新規参照は bundle 側に寄せ、legacy projection の
   許可先を段階的に縮退する必要がある
-- worldgen PoC（seed 固定 terrain generation、外部比較、generated world importer）は未着手であるが、
-  これは mainline の観測 UI 改善とは切り分けて進める
+- worldgen PoC（seed 固定 terrain generation / preview）は導入済みである。
+  外部比較や generated world importer は mainline の観測 UI 改善とは切り分けた後続検証として進める
 
 ### 3.3 現在の判断
 
@@ -184,7 +184,8 @@ TD-1〜TD-4 の進行中に、観測 UI と authoring まわりでは次の debt
 | `summary_key` を含む `WorldEventRecord` 表現の拡張 | 実装済み | TD-1〜TD-4 |
 | 薄い Rich シェル（固定レイアウト、見出し、余白、強調、意味色、操作導線） | 実装済み | PR-H2 |
 | `NarrativeContext` 拡張 | 実装済み（relation tags / reports / world memory 接続 + relation candidate map / chooser 分離完了） | PR-I |
-| worldgen PoC / seed 固定 terrain preview / 外部比較 | 未着手 | PR-G3 / PR-G4 |
+| worldgen PoC / seed 固定 terrain preview | 実装済み | TD-1〜TD-4 |
+| worldgen 外部比較 / generated world importer | 未着手 | PR-G3 / PR-G4 |
 | region の richer local semantics（門、市場、掲示板、河川、事故地点、痕跡の詳細化） | 未完 | 後続拡張 |
 
 ---
