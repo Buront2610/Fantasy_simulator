@@ -8,6 +8,14 @@ from typing import Any, Dict, List
 from .schema import SoundChangeRuleDefinition, sound_change_rules_from_payload
 
 
+def _string_list_payload(payload: Any, *, field_name: str) -> List[str]:
+    if payload is None:
+        return []
+    if not isinstance(payload, list) or any(not isinstance(item, str) for item in payload):
+        raise ValueError(f"{field_name} must be a list of strings")
+    return list(payload)
+
+
 @dataclass
 class LanguageEvolutionRecord:
     """A deterministic language innovation applied at a specific year."""
@@ -95,6 +103,12 @@ class LanguageRuntimeState:
                 data.get("applied_rules", []),
                 field_name="language_runtime_state.applied_rules",
             ),
-            derived_name_stems=[str(value) for value in data.get("derived_name_stems", [])],
-            derived_toponym_suffixes=[str(value) for value in data.get("derived_toponym_suffixes", [])],
+            derived_name_stems=_string_list_payload(
+                data.get("derived_name_stems", []),
+                field_name="language_runtime_state.derived_name_stems",
+            ),
+            derived_toponym_suffixes=_string_list_payload(
+                data.get("derived_toponym_suffixes", []),
+                field_name="language_runtime_state.derived_toponym_suffixes",
+            ),
         )
