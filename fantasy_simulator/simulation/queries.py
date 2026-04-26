@@ -21,8 +21,7 @@ from ..reports import (
     generate_monthly_report,
     generate_yearly_report,
 )
-from ..ui.presenters import LocationPresenter
-from ..ui.view_models import build_location_observation_view
+from ..location_observation import build_location_observation_view, render_location_observation_sections
 
 
 class QueryMixin:
@@ -144,7 +143,7 @@ class QueryMixin:
         if observation.resident_names:
             lines.append(f"  {tr('map_population')}: {', '.join(observation.resident_names)}")
             lines.append("")
-        lines.extend(LocationPresenter.render_observation_sections(observation))
+        lines.extend(render_location_observation_sections(observation))
         return "\n".join(lines)
 
     def get_character_story(self, char_id: str) -> str:

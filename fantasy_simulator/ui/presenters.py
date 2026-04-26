@@ -8,12 +8,16 @@ from __future__ import annotations
 from typing import List
 
 from ..i18n import tr
+from ..location_observation import (
+    LocationObservationView,
+    RumorSummaryView,
+    render_location_observation_sections,
+    render_rumor_brief,
+)
 from .view_models import (
     AdventureSummaryView,
     LocationHistoryView,
-    LocationObservationView,
     MonthlyReportCardView,
-    RumorSummaryView,
 )
 
 
@@ -43,60 +47,13 @@ class LocationPresenter:
 
     @staticmethod
     def render_observation_sections(view: LocationObservationView) -> List[str]:
-        lines: List[str] = []
-        if view.generated_endonym:
-            lines.append(f"  {tr('location_endonym_label')}: {view.generated_endonym}")
-            lines.append("")
-
-        lines.append(f"  {tr('location_aliases_label')}:")
-        if view.aliases:
-            lines.append(f"    {', '.join(view.aliases)}")
-        else:
-            lines.append("    -")
-
-        lines.append("")
-        lines.append(f"  {tr('location_memorials_label')}:")
-        if view.memorials:
-            for memorial in view.memorials:
-                lines.append(f"    {memorial}")
-        else:
-            lines.append(f"    {tr('no_memorials')}")
-
-        lines.append("")
-        lines.append(f"  {tr('location_live_traces_label')}:")
-        if view.traces:
-            for trace in view.traces:
-                lines.append(f"    - {trace}")
-        else:
-            lines.append(f"    {tr('no_live_traces')}")
-
-        lines.append("")
-        lines.append(f"  {tr('location_recent_events_label')}:")
-        if view.recent_events:
-            for event in view.recent_events:
-                lines.append(f"    - {event}")
-        else:
-            lines.append(f"    {tr('no_recent_events')}")
-
-        if view.connected_routes:
-            lines.append("")
-            lines.append(f"  {tr('map_region_routes')}:")
-            for route in view.connected_routes:
-                lines.append(f"    - {route}")
-
-        if view.rumors:
-            lines.append("")
-            lines.append(f"  {tr('rumor_section_title')}:")
-            for rumor in view.rumors:
-                lines.append(f"    - {RumorPresenter.render_brief(rumor)}")
-        return lines
+        return render_location_observation_sections(view)
 
 
 class RumorPresenter:
     @staticmethod
     def render_brief(view: RumorSummaryView) -> str:
-        reliability = tr(f"rumor_reliability_{view.reliability}")
-        return f"{view.description} ({reliability})"
+        return render_rumor_brief(view)
 
 
 class ReportPresenter:

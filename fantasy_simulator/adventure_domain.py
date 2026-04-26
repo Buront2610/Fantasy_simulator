@@ -124,6 +124,20 @@ class AdventureRunLike(Protocol):
     supply_state: str
     danger_level: int
 
+    @property
+    def is_resolved(self) -> bool:
+        ...
+
+    @property
+    def is_party(self) -> bool:
+        ...
+
+    def _record(self, summary: str, detail: str) -> None:
+        ...
+
+    def _clear_member_adventures(self, world: "World") -> None:
+        ...
+
 
 def validate_adventure_run_payload(run: AdventureRunLike) -> None:
     if run.policy not in ALL_POLICIES:
