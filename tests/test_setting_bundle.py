@@ -9,6 +9,7 @@ from fantasy_simulator.content.setting_bundle import (
     LanguageCommunityDefinition,
     LanguageDefinition,
     SettingBundle,
+    SettingEntryInspection,
     WorldDefinition,
     build_setting_bundle_authoring_summary,
     bundle_from_dict_validated,
@@ -71,14 +72,53 @@ def test_setting_bundle_round_trip():
     assert restored == bundle
 
 
+def test_world_definition_exposes_typed_culture_and_faction_inspection_entries():
+    world_def = WorldDefinition(
+        world_key="custom",
+        display_name="Custom Realm",
+        lore_text="Custom lore",
+        cultures=["Skyfolk", "River Clans"],
+        factions=["Wardens", "Dawn-Court"],
+    )
+
+    assert world_def.culture_entries() == [
+        SettingEntryInspection("culture", "skyfolk", "Skyfolk"),
+        SettingEntryInspection("culture", "river_clans", "River Clans"),
+    ]
+    assert world_def.faction_entries() == [
+        SettingEntryInspection("faction", "wardens", "Wardens"),
+        SettingEntryInspection("faction", "dawn_court", "Dawn-Court"),
+    ]
+
+
+def test_setting_bundle_authoring_summary_includes_culture_and_faction_keys():
+    bundle = SettingBundle(
+        schema_version=1,
+        world_definition=WorldDefinition(
+            world_key="custom",
+            display_name="Custom Realm",
+            lore_text="Custom lore",
+            cultures=["Skyfolk", "River Clans"],
+            factions=["Wardens", "Dawn-Court"],
+        ),
+    )
+
+    summary = build_setting_bundle_authoring_summary(bundle)
+
+    assert summary.culture_count == 2
+    assert summary.faction_count == 2
+    assert summary.culture_keys == ["river_clans", "skyfolk"]
+    assert summary.faction_keys == ["dawn_court", "wardens"]
+
+
 def test_default_aethoria_bundle_has_minimal_phase_i_slots():
     bundle = default_aethoria_bundle()
 
     assert bundle.schema_version == 1
     assert bundle.world_definition.world_key == "aethoria"
     assert bundle.world_definition.era == "Age of Embers"
-    assert bundle.world_definition.cultures == []
-    assert bundle.world_definition.factions == []
+    assert bundle.world_definition.culture_entries()
+    assert bundle.world_definition.faction_entries()
     assert bundle.world_definition.races
     assert bundle.world_definition.jobs
     assert bundle.world_definition.site_seeds
@@ -731,6 +771,99 @@ def test_bundle_from_dict_rejects_string_cultures_and_factions() -> None:
         raise AssertionError("Expected malformed cultures/factions payload to fail fast")
 
 
+def test_bundle_validation_rejects_duplicate_cultures_and_factions() -> None:
+    payload = {
+        "schema_version": 1,
+        "world_definition": {
+            "world_key": "duplicate_groups",
+            "display_name": "Duplicate Groups",
+            "lore_text": "Malformed",
+            "cultures": ["Archivists", "Archivists"],
+            "factions": ["Keepers"],
+            "site_seeds": [],
+        },
+    }
+
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "duplicate culture names" in str(exc)
+    else:
+        raise AssertionError("Expected duplicate cultures to fail fast")
+
+    payload["world_definition"]["cultures"] = ["Archivists"]
+    payload["world_definition"]["factions"] = ["Keepers", "Keepers"]
+
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "duplicate faction names" in str(exc)
+    else:
+        raise AssertionError("Expected duplicate factions to fail fast")
+
+
+def test_bundle_validation_rejects_duplicate_culture_and_faction_inspection_keys() -> None:
+    payload = {
+        "schema_version": 1,
+        "world_definition": {
+            "world_key": "duplicate_group_keys",
+            "display_name": "Duplicate Group Keys",
+            "lore_text": "Malformed",
+            "cultures": ["Dawn-Court", "Dawn Court"],
+            "factions": ["Keepers"],
+            "site_seeds": [],
+        },
+    }
+
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "duplicate culture inspection keys" in str(exc)
+    else:
+        raise AssertionError("Expected duplicate culture keys to fail fast")
+
+    payload["world_definition"]["cultures"] = ["Archivists"]
+    payload["world_definition"]["factions"] = ["Dawn-Court", "Dawn Court"]
+
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "duplicate faction inspection keys" in str(exc)
+    else:
+        raise AssertionError("Expected duplicate faction keys to fail fast")
+
+
+def test_bundle_validation_rejects_blank_cultures_and_factions() -> None:
+    payload = {
+        "schema_version": 1,
+        "world_definition": {
+            "world_key": "blank_groups",
+            "display_name": "Blank Groups",
+            "lore_text": "Malformed",
+            "cultures": [""],
+            "factions": ["Keepers"],
+            "site_seeds": [],
+        },
+    }
+
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "blank culture names" in str(exc)
+    else:
+        raise AssertionError("Expected blank cultures to fail fast")
+
+    payload["world_definition"]["cultures"] = ["Archivists"]
+    payload["world_definition"]["factions"] = ["  "]
+
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "blank faction names" in str(exc)
+    else:
+        raise AssertionError("Expected blank factions to fail fast")
+
+
 def test_load_setting_bundle_reports_duplicate_race_names(tmp_path):
     bundle_path = tmp_path / "invalid-duplicate-races.json"
     bundle_path.write_text(
@@ -881,10 +1014,29 @@ def test_bundle_authoring_summary_exposes_region_route_and_language_breakdowns()
     assert summary.route_count == len(bundle.world_definition.route_seeds)
     assert "loc_aethoria_capital" in summary.capital_site_ids
     assert "loc_aethoria_capital" in summary.resident_site_ids
+    assert summary.culture_count == len(bundle.world_definition.cultures)
+    assert summary.faction_count == len(bundle.world_definition.factions)
+    assert "aethic_heartlanders" in summary.culture_keys
+    assert "aethorian_crown_council" in summary.faction_keys
     assert summary.site_counts_by_region_type["city"] >= 1
     assert summary.route_counts_by_type["road"] >= 1
     assert "aethic_common" in summary.language_keys
     assert "loc_thornwood" in summary.community_keys_by_region
+
+
+def test_aethoria_bundle_authoring_coverage_has_language_for_each_site():
+    bundle = default_aethoria_bundle()
+    world = bundle.world_definition
+    language_keys = {language.language_key for language in world.languages}
+    community_regions = {
+        region_id
+        for community in world.language_communities
+        for region_id in community.regions
+    }
+
+    for seed in world.site_seeds:
+        assert seed.language_key in language_keys
+        assert seed.location_id in community_regions
 
 
 def test_bundle_validation_rejects_native_name_without_language_key() -> None:
