@@ -13,8 +13,7 @@ from __future__ import annotations
 from typing import Dict, List, Optional
 
 from ..event_models import EventResult, WorldEventRecord
-from ..i18n import tr, tr_term
-from ..narrative.constants import EVENT_KINDS_FATAL
+from ..i18n import tr
 from ..reports import (
     format_monthly_report,
     format_yearly_report,
@@ -24,9 +23,10 @@ from ..reports import (
 from ..location_observation import (
     build_location_observation_view,
     build_rumor_summary_views,
-    render_location_observation_sections,
+    render_query_location_observation_sections,
     render_rumor_brief,
 )
+from .query_presenters import render_character_story, render_simulation_summary
 
 
 class QueryMixin:
@@ -49,36 +49,15 @@ class QueryMixin:
         for rec in records:
             type_counts[rec.kind] = type_counts.get(rec.kind, 0) + 1
 
-        lines = [
-            "=" * 60,
-            f"  {tr('summary_title', world=self.world.name)}",
-            f"  {tr('final_year')}: {self.world.year}",
-            "=" * 60,
-            f"  {tr('total_events'):<22}: {total}",
-            f"  {tr('characters_alive'):<22}: {alive}",
-            f"  {tr('characters_deceased'):<22}: {dead}",
-            "",
-            f"  {tr('event_breakdown')}:",
-        ]
-        for etype, count in sorted(type_counts.items(), key=lambda x: -x[1]):
-            i18n_key = f"event_type_{etype}"
-            localized_type = tr(i18n_key)
-            if localized_type == i18n_key:
-                localized_type = etype.replace("_", " ").capitalize()
-            lines.append(f"    {localized_type:<20} {count:>4} {tr('times_suffix')}")
-
-        lines.append("")
-        lines.append(f"  {tr('notable_moments')}:")
-        dramatic = [
-            rec for rec in records
-            if rec.kind in EVENT_KINDS_FATAL or rec.kind in {"marriage", "discovery"}
-        ]
-        shown = dramatic[:5] if len(dramatic) >= 5 else dramatic
-        for rec in shown:
-            lines.append(f"    • {rec.description}")
-
-        lines.append("=" * 60)
-        return "\n".join(lines)
+        return render_simulation_summary(
+            world_name=self.world.name,
+            year=self.world.year,
+            total_events=total,
+            alive_count=alive,
+            deceased_count=dead,
+            type_counts=type_counts,
+            records=records,
+        )
 
     def get_monthly_report(self, year: int, month: int) -> str:
         """Generate and format a monthly report for the given year and month."""
@@ -128,15 +107,14 @@ class QueryMixin:
     def get_location_observation(self, location_id: str) -> str:
         """Return an inspectable local observation summary for one location."""
         try:
-            observation = build_location_observation_view(self.world, location_id)
+            observation = build_location_observation_view(
+                self.world,
+                location_id,
+                include_empty_traces=True,
+            )
         except ValueError:
             return tr("map_detail_not_found", location=location_id)
-        lines: List[str] = []
-        if observation.resident_names:
-            lines.append(f"  {tr('map_population')}: {', '.join(observation.resident_names)}")
-            lines.append("")
-        lines.extend(render_location_observation_sections(observation))
-        return "\n".join(lines)
+        return "\n".join(render_query_location_observation_sections(observation))
 
     def get_character_story(self, char_id: str) -> str:
         """Return the life story of a single character.
@@ -150,12 +128,6 @@ class QueryMixin:
         if char is None:
             return tr("no_character_found", char_id=char_id)
 
-        lines = [
-            "─" * 50,
-            f"  {tr('story_of', name=char.name)}",
-            f"  {tr_term(char.race)} {tr_term(char.job)}",
-            "─" * 50,
-        ]
         event_history = sorted(
             self.world.get_events_by_actor(char_id),
             key=lambda record: (
@@ -168,30 +140,30 @@ class QueryMixin:
             ),
         )
         seen_entries = set()
+        story_entries: List[str] = []
         if event_history:
             for record in event_history:
-                lines.append(f"  • {record.description}")
+                story_entries.append(record.description)
                 seen_entries.add(record.description)
             for entry in char.history:
                 if entry in seen_entries:
                     continue
-                lines.append(f"  • {entry}")
+                story_entries.append(entry)
         elif char.history:
             for entry in char.history:
-                lines.append(f"  • {entry}")
-        else:
-            lines.append(f"  {tr('no_notable_events')}")
+                story_entries.append(entry)
 
-        lines.append("")
         char_name_lookup = {world_char.char_id: world_char.name for world_char in self.world.characters}
-        lines.append(
-            char.stat_block(
+        return render_character_story(
+            name=char.name,
+            race=char.race,
+            job=char.job,
+            entries=story_entries,
+            stat_block=char.stat_block(
                 char_name_lookup=char_name_lookup,
                 location_resolver=self.world.location_name,
-            )
+            ),
         )
-        lines.append("─" * 50)
-        return "\n".join(lines)
 
     def get_all_stories(self, only_alive: bool = False) -> str:
         """Return stories for all characters, optionally filtering to the living."""
@@ -227,7 +199,8 @@ class QueryMixin:
         """Return WorldEventRecord entries matching the given kind.
 
         This is the canonical replacement for ``events_by_type()``, reading
-        from ``world.event_records`` directly.  Linear scan is acceptable
-        for typical simulation sizes (hundreds of records per run).
+        from the world's derived canonical event index when available.
         """
+        if hasattr(self.world, "get_events_by_kind"):
+            return self.world.get_events_by_kind(kind)
         return [rec for rec in self.world.event_records if rec.kind == kind]
