@@ -5,8 +5,29 @@
     "display_name": "Aethoria",
     "lore_text": "Welcome to AETHORIA — a continent shaped by ancient magic and forgotten wars.\n\nLong ago, the Arcane Cataclysm tore the sky open for seven days and seven nights,\nleaving behind ley-lines of wild mana that pulse through mountain, forest, and sea.\nThe Great Kingdoms rose and fell atop these ley-lines, and the scars of those\ncivilizations are still visible in crumbling ruins and cursed dungeons scattered\nacross the land.\n\nToday, an uneasy peace holds among the city-states. Adventurers roam freely,\nseeking fortune and glory — or simply trying to survive in a world where the next\nmonster, war, or natural disaster is never far away.\n\nThe current era is called the Age of Embers: old powers are fading, new ones are\nrising, and destiny waits for those bold enough to seize it.",
     "era": "Age of Embers",
-    "cultures": [],
-    "factions": [],
+    "cultures": [
+      "Aethic Heartlanders",
+      "Aethic Lowlanders",
+      "High Quenic Courts",
+      "Thornwood Sindral Circles",
+      "Northern Khazic Holds",
+      "Frontier Steppe Clans",
+      "Dragonbone Reaches",
+      "Dawnport and Saltmarsh Mariners",
+      "Coral Cove Sea-Mages"
+    ],
+    "factions": [
+      "Aethorian Crown Council",
+      "Stormwatch Wardens",
+      "Silverbrook Merchant League",
+      "Hearthglow Healers' Guild",
+      "Skyveil Ley Monks",
+      "Ironvein Delvers' Compact",
+      "Thornwood Circle",
+      "Sandstone Frontier Clans",
+      "Dawnport Harbor Council",
+      "Coral Cove Conclave"
+    ],
     "calendar": {
       "calendar_key": "aethorian_reckoning",
       "display_name": "Aethorian Reckoning",

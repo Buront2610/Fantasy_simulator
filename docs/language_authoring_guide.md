@@ -57,6 +57,20 @@ Parent changes affect inherited vocabulary because the child derives from the pa
 
 `inspiration_tags` are flavor presets, not strict reconstructions of real languages. They are intended to bias phonological drift and naming feel, not to emulate a living language exactly.
 
+## Cultures And Factions
+
+`WorldDefinition.cultures` and `WorldDefinition.factions` are currently flat
+authoring-name lists. Until a structured culture/faction schema lands, keep
+entries conservative and align them with existing language communities,
+site seeds, and location-state concepts such as `controlling_faction_id`.
+
+For Aethoria, the first pass mirrors the established language/community map:
+Aethic heartlands and lowlands, Quenic courts, Sindral woodland circles,
+Khazic northern holds, frontier steppe clans, Dragonbone reaches, and coastal
+mariner or sea-mage communities. Faction names should likewise be anchored to
+existing seeded sites or professions rather than introducing new geopolitical
+history ahead of PR-K.
+
 ## Debugging
 
 Use `World.language_status()` when reviewing a generated language. The status payload is expected to include:

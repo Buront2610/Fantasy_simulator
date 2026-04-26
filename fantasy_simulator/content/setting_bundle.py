@@ -41,6 +41,11 @@ def _duplicate_values(items: List[str]) -> List[str]:
     return duplicates
 
 
+def _setting_entry_key(name: str) -> str:
+    """Return a stable inspection key for lightweight named setting entries."""
+    return name.strip().lower().replace(" ", "_").replace("-", "_").replace("'", "")
+
+
 def _copy_rule_overrides(raw_rules: Any, *, field_name: str) -> Dict[str, Dict[str, Any]]:
     """Normalize nested override tables without coercing payload types."""
     if raw_rules is None:
@@ -536,6 +541,15 @@ class LanguageCommunityDefinition:
         )
 
 
+@dataclass(frozen=True)
+class SettingEntryInspection:
+    """Typed inspection view for lightweight setting entries backed by names."""
+
+    entry_type: str
+    key: str
+    display_name: str
+
+
 @dataclass
 class WorldDefinition:
     """Static lore metadata for a world setting bundle."""
@@ -579,6 +593,28 @@ class WorldDefinition:
             seed.location_id
             for seed in self.site_seeds
             if "capital" in seed.tags
+        ]
+
+    def culture_entries(self) -> List[SettingEntryInspection]:
+        """Return typed culture inspection entries while preserving legacy storage."""
+        return [
+            SettingEntryInspection(
+                entry_type="culture",
+                key=_setting_entry_key(culture),
+                display_name=culture,
+            )
+            for culture in self.cultures
+        ]
+
+    def faction_entries(self) -> List[SettingEntryInspection]:
+        """Return typed faction inspection entries while preserving legacy storage."""
+        return [
+            SettingEntryInspection(
+                entry_type="faction",
+                key=_setting_entry_key(faction),
+                display_name=faction,
+            )
+            for faction in self.factions
         ]
 
     def site_counts_by_region_type(self) -> Dict[str, int]:
@@ -708,8 +744,12 @@ class SettingBundleAuthoringSummary:
     site_count: int
     route_count: int
     language_count: int
+    culture_count: int = 0
+    faction_count: int = 0
     resident_site_ids: List[str] = field(default_factory=list)
     capital_site_ids: List[str] = field(default_factory=list)
+    culture_keys: List[str] = field(default_factory=list)
+    faction_keys: List[str] = field(default_factory=list)
     site_counts_by_region_type: Dict[str, int] = field(default_factory=dict)
     route_counts_by_type: Dict[str, int] = field(default_factory=dict)
     language_keys: List[str] = field(default_factory=list)
@@ -726,8 +766,12 @@ def build_setting_bundle_authoring_summary(bundle: SettingBundle) -> SettingBund
         site_count=len(world.site_seeds),
         route_count=len(world.route_seeds),
         language_count=len(world.languages),
+        culture_count=len(world.cultures),
+        faction_count=len(world.factions),
         resident_site_ids=world.resident_site_ids(),
         capital_site_ids=world.capital_site_ids(),
+        culture_keys=sorted(entry.key for entry in world.culture_entries()),
+        faction_keys=sorted(entry.key for entry in world.faction_entries()),
         site_counts_by_region_type=world.site_counts_by_region_type(),
         route_counts_by_type=world.route_counts_by_type(),
         language_keys=sorted(language.language_key for language in world.languages),
@@ -829,6 +873,38 @@ def _validate_bundle_identity(bundle: SettingBundle, world: WorldDefinition, *, 
 
 
 def _validate_bundle_unique_names(world: WorldDefinition, *, source: str) -> None:
+    blank_cultures = [culture for culture in world.cultures if not culture.strip()]
+    if blank_cultures:
+        raise ValueError(f"Setting bundle {source} contains blank culture names")
+
+    duplicate_cultures = _duplicate_values(world.cultures)
+    if duplicate_cultures:
+        raise ValueError(
+            f"Setting bundle {source} contains duplicate culture names: {', '.join(duplicate_cultures)}"
+        )
+    duplicate_culture_keys = _duplicate_values([entry.key for entry in world.culture_entries()])
+    if duplicate_culture_keys:
+        raise ValueError(
+            f"Setting bundle {source} contains duplicate culture inspection keys: "
+            f"{', '.join(duplicate_culture_keys)}"
+        )
+
+    blank_factions = [faction for faction in world.factions if not faction.strip()]
+    if blank_factions:
+        raise ValueError(f"Setting bundle {source} contains blank faction names")
+
+    duplicate_factions = _duplicate_values(world.factions)
+    if duplicate_factions:
+        raise ValueError(
+            f"Setting bundle {source} contains duplicate faction names: {', '.join(duplicate_factions)}"
+        )
+    duplicate_faction_keys = _duplicate_values([entry.key for entry in world.faction_entries()])
+    if duplicate_faction_keys:
+        raise ValueError(
+            f"Setting bundle {source} contains duplicate faction inspection keys: "
+            f"{', '.join(duplicate_faction_keys)}"
+        )
+
     race_names = [race.name for race in world.races]
     duplicate_races = _duplicate_values(race_names)
     if duplicate_races:
