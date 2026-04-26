@@ -295,6 +295,8 @@ class TestWorldLoreUsesBackends(unittest.TestCase):
         # Must have wrapped text (world lore)
         wrapped = [c for c in out.calls if c[0] == "print_wrapped"]
         self.assertTrue(len(wrapped) > 0, "World lore was not sent through print_wrapped")
+        headings = [call[1] for call in out.calls if call[0] == "print_heading"]
+        self.assertTrue(any("Languages" in heading for heading in headings))
 
     def test_lore_output_prefers_world_setting_bundle(self) -> None:
         from fantasy_simulator.content.setting_bundle import JobDefinition, RaceDefinition, default_aethoria_bundle

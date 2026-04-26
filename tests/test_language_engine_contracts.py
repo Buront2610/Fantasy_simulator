@@ -1,5 +1,7 @@
 """Contract tests for language fallback resolution and debug status output."""
 
+import pytest
+
 from fantasy_simulator.content.setting_bundle import (
     LanguageCommunityDefinition,
     LanguageDefinition,
@@ -242,3 +244,64 @@ def test_language_status_exposes_debug_fallback_and_runtime_details():
     assert child_status["recent_evolution_records"] == [evolution_history[0].to_dict()]
     assert set(child_status["sample_forms"]) == {"given_names", "surnames", "lexicon", "toponym"}
     assert child_status["sample_forms"]["lexicon"]
+
+
+def test_child_surface_forms_apply_lineage_sound_changes():
+    world_definition = _world_definition(
+        languages=[
+            LanguageDefinition(
+                language_key="proto",
+                display_name="Proto",
+                sound_shifts={"a": "e"},
+            ),
+            LanguageDefinition(
+                language_key="child",
+                display_name="Child",
+                parent_key="proto",
+            ),
+        ],
+    )
+    engine = LanguageEngine(world_definition)
+
+    assert engine.evolve_surface_form("child", "ata") == "ete"
+
+
+def test_child_effective_sound_shift_map_includes_lineage_shifts():
+    world_definition = _world_definition(
+        languages=[
+            LanguageDefinition(
+                language_key="proto",
+                display_name="Proto",
+                sound_shifts={"a": "e"},
+            ),
+            LanguageDefinition(
+                language_key="child",
+                display_name="Child",
+                parent_key="proto",
+                sound_shifts={"t": "d"},
+            ),
+        ],
+    )
+    engine = LanguageEngine(world_definition)
+
+    assert engine.effective_sound_shift_map("child") == {"a": "e", "t": "d"}
+
+
+def test_language_runtime_state_rejects_string_stem_payloads():
+    with pytest.raises(ValueError, match="derived_name_stems"):
+        LanguageRuntimeState.from_dict(
+            {
+                "language_key": "child",
+                "derived_name_stems": "dar",
+                "derived_toponym_suffixes": [],
+            }
+        )
+
+    with pytest.raises(ValueError, match="derived_toponym_suffixes"):
+        LanguageRuntimeState.from_dict(
+            {
+                "language_key": "child",
+                "derived_name_stems": [],
+                "derived_toponym_suffixes": "eth",
+            }
+        )

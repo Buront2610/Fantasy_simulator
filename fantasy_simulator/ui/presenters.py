@@ -56,6 +56,33 @@ class RumorPresenter:
         return render_rumor_brief(view)
 
 
+class LanguagePresenter:
+    @staticmethod
+    def render_status(status: dict) -> List[str]:
+        samples = status.get("sample_forms", {})
+        lineage = " > ".join(status.get("lineage", []))
+        lines = [
+            f"  {status.get('display_name', status.get('language_key', ''))}",
+            f"    {tr('language_lineage_label')}: {lineage}",
+        ]
+        given_names = ", ".join(samples.get("given_names", []))
+        surnames = ", ".join(samples.get("surnames", []))
+        lexicon = ", ".join(samples.get("lexicon", []))
+        if given_names:
+            lines.append(f"    {tr('language_given_names_label')}: {given_names}")
+        if surnames:
+            lines.append(f"    {tr('language_surnames_label')}: {surnames}")
+        if lexicon:
+            lines.append(f"    {tr('language_lexicon_label')}: {lexicon}")
+        if samples.get("toponym"):
+            lines.append(f"    {tr('language_toponym_label')}: {samples['toponym']}")
+        lines.append(
+            f"    {tr('language_evolution_count_label')}: "
+            f"{status.get('evolution_count', 0)}"
+        )
+        return lines
+
+
 class ReportPresenter:
     @staticmethod
     def render_monthly_card(card: MonthlyReportCardView) -> List[str]:

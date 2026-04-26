@@ -23,7 +23,7 @@ from ..i18n import set_locale, tr, tr_term
 from ..persistence.save_load import load_simulation, save_simulation
 from ..simulator import Simulator
 from ..world import World
-from .presenters import AdventurePresenter, LocationPresenter, ReportPresenter, RumorPresenter
+from .presenters import AdventurePresenter, LanguagePresenter, LocationPresenter, ReportPresenter, RumorPresenter
 from .ui_helpers import fit_display_width
 from .view_models import (
     AdventureSummaryView,
@@ -1124,7 +1124,24 @@ def screen_world_lore(ctx: UIContext | None = None, *, world: World | None = Non
         out.print_line(f"    {tr('primary_skills_label')}: {skills_str}")
         out.print_wrapped(job_description)
         out.print_line()
+    language_statuses = world.language_status() if world is not None else _build_default_language_status(bundle)
+    if language_statuses:
+        out.print_heading(f"  {tr('languages_header')}")
+        out.print_separator()
+        for status in language_statuses:
+            for line in LanguagePresenter.render_status(status):
+                out.print_line(line)
+            out.print_line()
     ctx.inp.pause()
+
+
+def _build_default_language_status(bundle: Any) -> List[dict]:
+    """Build language status for bundle lore without requiring a simulated world."""
+    from ..language.engine import LanguageEngine
+    from ..world_language import language_status
+
+    engine = LanguageEngine(bundle.world_definition)
+    return language_status(bundle.world_definition, engine, [])
 
 
 def _party_display_names(world: World, run: Any, max_shown: int = 3) -> str:
