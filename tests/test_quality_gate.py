@@ -1,6 +1,11 @@
 """Tests for the profile-based quality gate runner."""
 
+from pathlib import Path
+
 from scripts.quality_gate import build_profile_commands
+
+
+PYPROJECT_TEXT = (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(encoding="utf-8")
 
 
 def test_minimal_profile_defaults_to_smoke_target():
@@ -54,6 +59,16 @@ def test_standard_profile_can_prepend_changed_area_pytest():
 
 def test_strict_profile_includes_targeted_lint_and_full_pytest():
     commands = build_profile_commands("strict")
-    assert [command.label for command in commands] == ["pytest", "flake8", "pytest"]
-    assert "fantasy_simulator" in commands[1].argv
-    assert len(commands[2].argv) == 4
+    assert [command.label for command in commands] == ["pytest", "flake8", "mypy", "pytest"]
+    assert "." in commands[1].argv
+    assert "fantasy_simulator/worldgen" in commands[2].argv
+    assert "tools/worldgen_poc" in commands[2].argv
+    assert len(commands[3].argv) == 4
+
+
+def test_pyproject_includes_type_gate_scaffolding():
+    assert "[tool.mypy]" in PYPROJECT_TEXT
+    assert 'follow_imports = "silent"' in PYPROJECT_TEXT
+    assert '"fantasy_simulator/worldgen"' in PYPROJECT_TEXT
+    assert '"tools/worldgen_poc"' in PYPROJECT_TEXT
+    assert "check_untyped_defs = true" in PYPROJECT_TEXT

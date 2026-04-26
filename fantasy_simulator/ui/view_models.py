@@ -9,9 +9,31 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, TYPE_CHECKING
 
+from ..i18n import tr
+from ..location_observation import (
+    LocationObservationView,
+    RumorSummaryView,
+    build_location_observation_view,
+    build_rumor_summary_views,
+)
+
 if TYPE_CHECKING:
     from ..events import WorldEventRecord
     from ..world import World
+
+
+__all__ = [
+    "AdventureSummaryView",
+    "LocationHistoryView",
+    "LocationObservationView",
+    "MonthlyReportCardView",
+    "NotificationItemView",
+    "RumorSummaryView",
+    "build_location_observation_view",
+    "build_monthly_report_card_view",
+    "build_notification_views",
+    "build_rumor_summary_views",
+]
 
 
 @dataclass
@@ -44,6 +66,7 @@ class MonthlyReportCardView:
     highlighted_locations: List[str] = field(default_factory=list)
     completed_adventures: List[str] = field(default_factory=list)
     new_memory_items: List[str] = field(default_factory=list)
+    hot_rumors: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -112,6 +135,14 @@ def build_monthly_report_card_view(world: "World", year: int, month: int) -> Mon
     else:
         month_label = str(month)
 
+    hot_rumors: List[str] = []
+    if hasattr(world, "event_records") and hasattr(world, "rumors") and hasattr(world, "location_name"):
+        hot_rumors = [
+            f"{rumor.description} ({tr(f'rumor_reliability_{rumor.reliability}')})"
+            for rumor in getattr(world, "rumors", [])
+            if not rumor.is_expired and rumor.year_created == year and rumor.month_created == month
+        ][:2]
+
     return MonthlyReportCardView(
         year=year,
         month=month,
@@ -120,4 +151,5 @@ def build_monthly_report_card_view(world: "World", year: int, month: int) -> Mon
         highlighted_locations=location_highlights,
         completed_adventures=completed_adventures[:3],
         new_memory_items=new_memory[:3],
+        hot_rumors=hot_rumors,
     )

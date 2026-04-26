@@ -8,7 +8,17 @@ from __future__ import annotations
 from typing import List
 
 from ..i18n import tr
-from .view_models import AdventureSummaryView, LocationHistoryView, MonthlyReportCardView
+from ..location_observation import (
+    LocationObservationView,
+    RumorSummaryView,
+    render_location_observation_sections,
+    render_rumor_brief,
+)
+from .view_models import (
+    AdventureSummaryView,
+    LocationHistoryView,
+    MonthlyReportCardView,
+)
 
 
 class AdventurePresenter:
@@ -35,6 +45,16 @@ class LocationPresenter:
         tag_str = f"  [{', '.join(tags)}]" if tags else ""
         return f"  {index:>2}. {view.location_name} ({view.region_type}){tag_str}"
 
+    @staticmethod
+    def render_observation_sections(view: LocationObservationView) -> List[str]:
+        return render_location_observation_sections(view)
+
+
+class RumorPresenter:
+    @staticmethod
+    def render_brief(view: RumorSummaryView) -> str:
+        return render_rumor_brief(view)
+
 
 class ReportPresenter:
     @staticmethod
@@ -48,4 +68,6 @@ class ReportPresenter:
             lines.append(tr("monthly_report_card_adventures", items=" | ".join(card.completed_adventures)))
         if card.new_memory_items:
             lines.append(tr("monthly_report_card_memory", items=" | ".join(card.new_memory_items)))
+        if card.hot_rumors:
+            lines.append(f"  {tr('report_section_rumors')}: {' | '.join(card.hot_rumors)}")
         return lines

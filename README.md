@@ -215,7 +215,7 @@ docs/
   implementation_plan.md    # Implementation roadmap and phase order
   architecture.md           # Current architectural guardrails and canonical data rules
   language_engine.md        # Language package authoring/debug contracts
-  td_backlog_status.md      # TD-1〜TD-4 audit snapshot (done/remaining)
+  td_backlog_status.md      # TD-1〜TD-4 audit snapshot (closed/current guardrails)
   contexts/                 # Short task-mode context docs for implementation/review
   session_handoffs/         # Template + latest repo-local handoff notes
   subagent_contract.md      # Delegation format for subagent tasks
@@ -281,13 +281,13 @@ supports:
 
 ## Near-Term Priorities
 
-- Resolve the current technical-debt backlog (canonical event-store adapters,
-  bundle-owned world seeds, responsibility splits, and guardrail/doc sync)
-  before PR-J / PR-K
+- Treat the TD-1〜TD-4 technical-debt backlog as closed: canonical event-store
+  adapters, bundle-owned world seeds, responsibility splits, and guardrail/doc
+  sync now have tests around their intended boundaries.
 - Continue world setting authoring work toward the first formal
-  `SettingBundle` pass (PR-J) once the debt cleanup lands
+  `SettingBundle` pass and then dynamic world-change work (PR-J / PR-K).
 - Treat worldgen PoC work as parallel technical validation, not the next
-  blocking mainline milestone
+  blocking mainline milestone.
 
 For the full roadmap (NarrativeContext, SettingBundle, worldbuilding, dynamic
 world changes, etc.), see `docs/implementation_plan.md`.

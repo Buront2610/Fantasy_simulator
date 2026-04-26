@@ -30,10 +30,7 @@ STANDARD_TARGETS = [
 ]
 
 LINT_TARGETS = [
-    "main.py",
-    "fantasy_simulator",
-    "tests",
-    "scripts/quality_gate.py",
+    ".",
 ]
 
 DEFAULT_EXCLUDES = [
@@ -73,6 +70,34 @@ def _flake8_command(targets: Sequence[str]) -> CommandSpec:
     )
 
 
+TYPECHECK_TARGETS = [
+    "fantasy_simulator/adventure.py",
+    "fantasy_simulator/adventure_domain.py",
+    "fantasy_simulator/character.py",
+    "fantasy_simulator/character_domain.py",
+    "fantasy_simulator/event_models.py",
+    "fantasy_simulator/location_observation.py",
+    "fantasy_simulator/ui/presenters.py",
+    "fantasy_simulator/ui/view_models.py",
+    "fantasy_simulator/world_reference_repair.py",
+    "fantasy_simulator/worldgen",
+    "tools/worldgen_poc",
+]
+
+
+def _mypy_command(targets: Sequence[str]) -> CommandSpec:
+    return CommandSpec(
+        label="mypy",
+        argv=[
+            sys.executable,
+            "-m",
+            "mypy",
+            "--follow-imports=silent",
+            *targets,
+        ],
+    )
+
+
 def build_profile_commands(profile: str, pytest_targets: Sequence[str] | None = None) -> List[CommandSpec]:
     """Return the commands associated with a quality gate profile."""
     targets = list(pytest_targets or [])
@@ -93,6 +118,7 @@ def build_profile_commands(profile: str, pytest_targets: Sequence[str] | None = 
     if profile == "strict":
         commands.append(_pytest_command(STANDARD_TARGETS))
         commands.append(_flake8_command(LINT_TARGETS))
+        commands.append(_mypy_command(TYPECHECK_TARGETS))
         commands.append(_pytest_command([]))
         return commands
 

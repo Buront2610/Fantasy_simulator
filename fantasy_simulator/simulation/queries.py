@@ -21,6 +21,12 @@ from ..reports import (
     generate_monthly_report,
     generate_yearly_report,
 )
+from ..location_observation import (
+    build_location_observation_view,
+    build_rumor_summary_views,
+    render_location_observation_sections,
+    render_rumor_brief,
+)
 
 
 class QueryMixin:
@@ -101,15 +107,36 @@ class QueryMixin:
         """Generate and format a yearly report for the most recent completed year."""
         return self.get_yearly_report(self.get_latest_completed_report_year())
 
-    def get_active_rumors(self) -> List[str]:
-        """Return formatted strings for currently active rumors."""
+    def get_active_rumors(
+        self,
+        location_id: Optional[str] = None,
+        *,
+        include_archive: bool = False,
+        limit: Optional[int] = None,
+    ) -> List[str]:
+        """Return formatted rumor lines, optionally filtered to one location."""
+        return [
+            render_rumor_brief(rumor)
+            for rumor in build_rumor_summary_views(
+                self.world,
+                location_id=location_id,
+                include_archive=include_archive,
+                limit=limit,
+            )
+        ]
+
+    def get_location_observation(self, location_id: str) -> str:
+        """Return an inspectable local observation summary for one location."""
+        try:
+            observation = build_location_observation_view(self.world, location_id)
+        except ValueError:
+            return tr("map_detail_not_found", location=location_id)
         lines: List[str] = []
-        for rumor in self.world.rumors:
-            if rumor.is_expired:
-                continue
-            reliability_label = tr(f"rumor_reliability_{rumor.reliability}")
-            lines.append(f"{rumor.description} ({reliability_label})")
-        return lines
+        if observation.resident_names:
+            lines.append(f"  {tr('map_population')}: {', '.join(observation.resident_names)}")
+            lines.append("")
+        lines.extend(render_location_observation_sections(observation))
+        return "\n".join(lines)
 
     def get_character_story(self, char_id: str) -> str:
         """Return the life story of a single character.

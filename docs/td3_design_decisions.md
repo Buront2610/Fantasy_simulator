@@ -9,7 +9,7 @@
 
 **理由**:
 - canonical-first の event record を主に保ちつつ、older saves の backward-load
-  compatibility と legacy adapter の exact projection を維持するため。
+  compatibility と legacy `EventResult` adapter の exact projection を維持するため。
 - runtime の互換 adapter (`Simulator.history`, compatibility log formatter) は
   canonical fields を優先しつつ、必要な場合のみ persisted compatibility payload を使う。
 
@@ -58,5 +58,5 @@ compatibility field として限定保持する。
   `World` が active bundle から rules を読み込み helper に渡す。
 - helper 側は bundled default rules を fallback として保持する。
 
-**Remaining TODO (PR-J/PR-K 前提)**:
+**Roadmap extension (PR-K 前提)**:
 - era/faction modifier を rule evaluator の入力として注入可能にする。

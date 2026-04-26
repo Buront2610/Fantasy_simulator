@@ -13,6 +13,12 @@ from typing import Dict, List
 from ..i18n import tr
 from ..rumor import age_rumors, generate_rumors_for_period, trim_rumors
 from .calendar import annual_probability_to_fraction, distributed_budget
+from .timeline_pipeline import (
+    DayPhaseContext,
+    DayPhaseKind,
+    build_day_phase_context,
+    build_day_phase_plan,
+)
 
 
 class TimelineMixin:
@@ -86,74 +92,131 @@ class TimelineMixin:
 
     def _run_day(self, month: int, day: int) -> None:
         """Process a single in-world day in chronological order."""
-        year_fraction_per_day = 1.0 / self.world.days_per_year
-        self.current_month = month
-        self.current_day = day
-        if day == 1:
-            self._apply_seasonal_modifiers(month)
+        day_context = self._build_day_phase_context(month, day)
+        self.current_month = day_context.month
+        self.current_day = day_context.day
+        phase_handlers = {
+            DayPhaseKind.MONTH_START: self._run_month_start_phase,
+            DayPhaseKind.DYING_RESOLUTION: self._run_dying_resolution_phase,
+            DayPhaseKind.NATURAL_HEALTH: self._run_natural_health_phase,
+            DayPhaseKind.INJURY_RECOVERY: self._run_injury_recovery_phase,
+            DayPhaseKind.ADVENTURE: self._run_adventure_phase,
+            DayPhaseKind.RANDOM_EVENTS: self._run_random_event_phase,
+            DayPhaseKind.MONTH_END: self._run_month_end_phase,
+        }
         try:
-            self._resolve_dying_characters()
-
-            for char in list(self.world.characters):
-                active_adventure_id = char.active_adventure_id
-                result = self.event_system.check_natural_death(
-                    char,
-                    self.world,
-                    rng=self.rng,
-                    year_fraction=year_fraction_per_day,
-                )
-                if result is not None:
-                    if result.event_type == "condition_worsened" and char.favorite:
-                        self._favorites_worsened_this_year.add(char.char_id)
-                    self._record_event(result, location_id=char.location_id)
-                    if result.event_type == "death" and active_adventure_id is not None:
-                        self._finalize_completed_adventure_death(active_adventure_id)
-
-            self._recover_injuries(year_fraction=year_fraction_per_day)
-
-            self._maybe_start_adventure(year_fraction=year_fraction_per_day)
-            adventure_steps = self._adventure_steps_for_day()
-            if adventure_steps > 0:
-                self._advance_adventures(steps=adventure_steps)
-
-            for _ in range(self._events_for_day(month, day)):
-                result = self.event_system.generate_random_event(
-                    self.world.characters, self.world, rng=self.rng
-                )
-                if result is None:
-                    break
-                primary_id = result.affected_characters[0] if result.affected_characters else None
-                primary_char = self.world.get_character_by_id(primary_id) if primary_id else None
-                loc_id = primary_char.location_id if primary_char else None
-                self._record_event(result, location_id=loc_id)
-
-            if day == self.world.days_in_month(month):
-                active, expired = age_rumors(self.world.rumors, months=1)
-                self.world.rumors = active
-                self.world.rumor_archive.extend(expired)
-
-                new_rumors = generate_rumors_for_period(
-                    self.world,
-                    year=self.world.year,
-                    month=month,
-                    max_rumors=3,
-                    rng=self.rng,
-                )
-                self.world.rumors.extend(new_rumors)
-
-                propagation_months = self._propagation_month_window(month)
-                if propagation_months > 0:
-                    self.world.propagate_state(months=propagation_months)
-
-                kept, trimmed = trim_rumors(self.world.rumors)
-                self.world.rumors = kept
-                self.world.rumor_archive.extend(trimmed)
-
-                if month == self.world.months_per_year:
-                    self._age_characters()
+            for phase in self._day_phase_plan(day_context):
+                phase_handlers[phase.kind](day_context)
         finally:
-            if day == self.world.days_in_month(month):
-                self._revert_seasonal_modifiers()
+            self._finish_day(day_context)
+
+    def _build_day_phase_context(self, month: int, day: int) -> DayPhaseContext:
+        """Build immutable date metadata shared by daily processing phases."""
+        return build_day_phase_context(
+            month=month,
+            day=day,
+            days_in_month=self.world.days_in_month(month),
+            days_per_year=self.world.days_per_year,
+        )
+
+    def _day_phase_plan(self, day_context: DayPhaseContext):
+        """Return the explicit chronological pipeline for one in-world day."""
+        return build_day_phase_plan(day_context)
+
+    def _finish_day(self, day_context: DayPhaseContext) -> None:
+        """Run cleanup that must happen even if a day phase raises."""
+        if day_context.is_month_end:
+            self._revert_seasonal_modifiers()
+
+    def _run_month_start_phase(self, day_context: DayPhaseContext) -> None:
+        """Apply month-opening effects before other daily activity."""
+        self._apply_seasonal_modifiers(day_context.month)
+
+    def _run_dying_resolution_phase(self, day_context: DayPhaseContext) -> None:
+        """Resolve existing dying states before new daily checks occur."""
+        self._resolve_dying_characters(year_fraction=day_context.year_fraction_per_day)
+
+    def _run_natural_health_phase(self, day_context: DayPhaseContext) -> None:
+        """Process daily natural death and condition-worsening checks."""
+        for char in list(self.world.characters):
+            self._process_natural_health_check(char, day_context.year_fraction_per_day)
+
+    def _process_natural_health_check(self, char, year_fraction: float) -> None:
+        """Run the daily natural-health check for a single character."""
+        active_adventure_id = char.active_adventure_id
+        result = self.event_system.check_natural_death(
+            char,
+            self.world,
+            rng=self.rng,
+            year_fraction=year_fraction,
+        )
+        if result is None:
+            return
+        if result.event_type == "condition_worsened" and char.favorite:
+            self._favorites_worsened_this_year.add(char.char_id)
+        self._record_event(result, location_id=char.location_id)
+        if result.event_type == "death" and active_adventure_id is not None:
+            self._finalize_completed_adventure_death(active_adventure_id)
+
+    def _run_injury_recovery_phase(self, day_context: DayPhaseContext) -> None:
+        """Apply non-fatal injury recovery after daily health degradation."""
+        self._recover_injuries(year_fraction=day_context.year_fraction_per_day)
+
+    def _run_adventure_phase(self, day_context: DayPhaseContext) -> None:
+        """Start and advance adventures after health changes settle."""
+        self._maybe_start_adventure(year_fraction=day_context.year_fraction_per_day)
+        adventure_steps = self._adventure_steps_for_day()
+        if adventure_steps > 0:
+            self._advance_adventures(steps=adventure_steps)
+
+    def _run_random_event_phase(self, day_context: DayPhaseContext) -> None:
+        """Generate free-form random events after deterministic daily systems."""
+        for _ in range(self._events_for_day(day_context.month, day_context.day)):
+            result = self.event_system.generate_random_event(
+                self.world.characters, self.world, rng=self.rng
+            )
+            if result is None:
+                break
+            primary_id = result.affected_characters[0] if result.affected_characters else None
+            primary_char = self.world.get_character_by_id(primary_id) if primary_id else None
+            loc_id = primary_char.location_id if primary_char else None
+            self._record_event(result, location_id=loc_id)
+
+    def _run_month_end_phase(self, day_context: DayPhaseContext) -> None:
+        """Run month-closing rumor, propagation, and year-end updates."""
+        self._run_month_end_rumor_phase(day_context.month)
+        self._run_month_end_state_phase(day_context.month)
+        self._run_year_end_phase(day_context.month)
+
+    def _run_month_end_rumor_phase(self, month: int) -> None:
+        """Age, generate, and trim rumors at month end."""
+        active, expired = age_rumors(self.world.rumors, months=1)
+        self.world.rumors = active
+        self.world.rumor_archive.extend(expired)
+
+        new_rumors = generate_rumors_for_period(
+            self.world,
+            year=self.world.year,
+            month=month,
+            max_rumors=3,
+            rng=self.rng,
+        )
+        self.world.rumors.extend(new_rumors)
+
+        kept, trimmed = trim_rumors(self.world.rumors)
+        self.world.rumors = kept
+        self.world.rumor_archive.extend(trimmed)
+
+    def _run_month_end_state_phase(self, month: int) -> None:
+        """Propagate world state on configured month-end intervals."""
+        propagation_months = self._propagation_month_window(month)
+        if propagation_months > 0:
+            self.world.propagate_state(months=propagation_months)
+
+    def _run_year_end_phase(self, month: int) -> None:
+        """Advance annual character aging only at the last month of the year."""
+        if month == self.world.months_per_year:
+            self._age_characters()
 
     def _age_characters(self) -> None:
         """Advance every living character by one year exactly once per 360 days."""
@@ -163,8 +226,13 @@ class TimelineMixin:
             result = self.event_system.event_aging(char, self.world, rng=self.rng)
             self._record_event(result, location_id=char.location_id)
 
-    def _resolve_dying_characters(self) -> None:
+    def _resolve_dying_characters(self, year_fraction: float | None = None) -> None:
         """Give dying characters a daily chance at rescue, decline, or stasis."""
+        effective_year_fraction = (
+            1.0 / self.world.days_per_year
+            if year_fraction is None
+            else year_fraction
+        )
         for char in list(self.world.characters):
             if not char.alive or char.injury_status != "dying":
                 continue
@@ -173,7 +241,7 @@ class TimelineMixin:
                 char,
                 self.world,
                 rng=self.rng,
-                year_fraction=1.0 / self.world.days_per_year,
+                year_fraction=effective_year_fraction,
             )
             if result is not None:
                 self._record_event(result, location_id=char.location_id)

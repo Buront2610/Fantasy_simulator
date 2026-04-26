@@ -1056,6 +1056,78 @@ class TestWorld:
         assert world.memorials["mem_1"].location_id == "hub_primary"
         assert world.get_location_by_id("hub_primary").memorial_ids == ["mem_1"]
 
+    def test_setting_bundle_assignment_rebuilds_recent_event_ids_after_event_location_repair(self):
+        from fantasy_simulator.events import WorldEventRecord
+
+        world = World(name="Custom")
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="hub_primary",
+                        name="Clockwork Hub",
+                        description="Primary site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                    ),
+                    SiteSeedDefinition(
+                        location_id="hub_secondary",
+                        name="Second Hub",
+                        description="Secondary site.",
+                        region_type="city",
+                        x=1,
+                        y=0,
+                    ),
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+        primary = world.get_location_by_id("hub_primary")
+        secondary = world.get_location_by_id("hub_secondary")
+        assert primary is not None
+        assert secondary is not None
+        world.event_records = [
+            WorldEventRecord(
+                record_id="r1",
+                kind="battle",
+                year=1001,
+                location_id="hub_secondary",
+                description="Skirmish at the second hub",
+            )
+        ]
+        primary.recent_event_ids = ["stale"]
+        secondary.recent_event_ids = ["r1"]
+
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="hub_primary",
+                        name="Clockwork Hub",
+                        description="Primary site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                    ),
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+
+        repaired_primary = world.get_location_by_id("hub_primary")
+        assert repaired_primary is not None
+        assert world.event_records[0].location_id is None
+        assert repaired_primary.recent_event_ids == []
+
     def test_random_location_raises_clear_error_for_empty_world(self):
         world = World()
         world.setting_bundle = SettingBundle(
@@ -1352,28 +1424,32 @@ class TestWorld:
         world = World()
         capital = world.get_location_by_id("loc_aethoria_capital")
         assert capital is not None
-        capital.live_traces.append({"kind": "omen", "value": 1})
+        capital.live_traces.append({"kind": "omen", "value": 1, "nested": {"flag": True}})
 
         payload = world.to_dict()
         capital_payload = next(loc for loc in payload["grid"] if loc["id"] == "loc_aethoria_capital")
         capital_payload["live_traces"][0]["value"] = 99
+        capital_payload["live_traces"][0]["nested"]["flag"] = False
 
         assert capital.live_traces[0]["value"] == 1
+        assert capital.live_traces[0]["nested"]["flag"] is True
 
     def test_world_from_dict_deep_copies_live_traces(self):
         world = World()
         capital = world.get_location_by_id("loc_aethoria_capital")
         assert capital is not None
-        capital.live_traces.append({"kind": "omen", "value": 1})
+        capital.live_traces.append({"kind": "omen", "value": 1, "nested": {"flag": True}})
         payload = world.to_dict()
 
         restored = World.from_dict(payload)
         capital_payload = next(loc for loc in payload["grid"] if loc["id"] == "loc_aethoria_capital")
         capital_payload["live_traces"][0]["value"] = 99
+        capital_payload["live_traces"][0]["nested"]["flag"] = False
 
         restored_capital = restored.get_location_by_id("loc_aethoria_capital")
         assert restored_capital is not None
         assert restored_capital.live_traces[0]["value"] == 1
+        assert restored_capital.live_traces[0]["nested"]["flag"] is True
 
     def test_custom_calendar_round_trips_with_world(self):
         world = World()

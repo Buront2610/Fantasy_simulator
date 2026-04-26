@@ -103,6 +103,35 @@ def test_adventure_run_round_trip_serialization():
     assert restored.pending_choice.default_option == "retreat"
 
 
+def test_adventure_run_rejects_invalid_policy():
+    try:
+        AdventureRun(
+            character_id="hero1",
+            character_name="Aldric",
+            origin="loc_aethoria_capital",
+            destination="loc_thornwood",
+            year_started=1000,
+            member_ids=["hero1"],
+            policy="invalid_policy",
+        )
+    except ValueError as exc:
+        assert "policy" in str(exc)
+    else:
+        raise AssertionError("Expected invalid policy to fail fast")
+
+
+def test_adventure_run_normalizes_empty_member_ids_to_character_id():
+    run = AdventureRun(
+        character_id="hero1",
+        character_name="Aldric",
+        origin="loc_aethoria_capital",
+        destination="loc_thornwood",
+        year_started=1000,
+        member_ids=[],
+    )
+    assert run.member_ids == ["hero1"]
+
+
 def test_travel_step_can_enter_waiting_for_choice_state():
     world = World()
     char = _make_character()
