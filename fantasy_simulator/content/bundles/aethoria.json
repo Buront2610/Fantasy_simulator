@@ -301,6 +301,7 @@
         "description": "A jagged mountain crowned with eternal ice.",
         "region_type": "mountain",
         "language_key": "khazic",
+        "native_name": "Kazdrum",
         "x": 0,
         "y": 0
       },
@@ -319,6 +320,7 @@
         "description": "A cliffside monastery where monks study the ley-lines.",
         "region_type": "village",
         "language_key": "quenic",
+        "native_name": "Lumenor",
         "x": 2,
         "y": 0
       },
@@ -346,6 +348,7 @@
         "description": "A dense forest that hums with restless magic.",
         "region_type": "forest",
         "language_key": "sindral",
+        "native_name": "Thelbryn",
         "x": 0,
         "y": 1
       },
@@ -364,6 +367,7 @@
         "description": "A prosperous trading town built on a swift silver river.",
         "region_type": "city",
         "language_key": "aethic_common",
+        "native_name": "Silvermere",
         "x": 2,
         "y": 1
       },
@@ -409,6 +413,7 @@
         "description": "The grand capital — heart of trade, politics, and intrigue.",
         "region_type": "city",
         "language_key": "aethic_common",
+        "native_name": "Aethorstead",
         "x": 2,
         "y": 2,
         "tags": [
@@ -422,6 +427,7 @@
         "description": "Ruins of a pre-Cataclysm city, half-swallowed by the earth.",
         "region_type": "dungeon",
         "language_key": "proto_quenic",
+        "native_name": "Sairiel",
         "x": 3,
         "y": 2
       },
@@ -476,6 +482,7 @@
         "description": "A busy harbour city that never truly sleeps.",
         "region_type": "city",
         "language_key": "aethic_common",
+        "native_name": "Dawnwick",
         "x": 4,
         "y": 3
       },
@@ -494,6 +501,7 @@
         "description": "A small desert outpost at the edge of the known world.",
         "region_type": "village",
         "language_key": "orcish_steppe",
+        "native_name": "Kraggar",
         "x": 1,
         "y": 4
       },
@@ -521,6 +529,7 @@
         "description": "A hidden cove home to a secretive community of sea-mages.",
         "region_type": "city",
         "language_key": "quenic",
+        "native_name": "Celdhel",
         "x": 4,
         "y": 4
       }

@@ -777,7 +777,7 @@ def build_setting_bundle_authoring_summary(bundle: SettingBundle) -> SettingBund
         language_keys=sorted(language.language_key for language in world.languages),
         community_keys_by_region=world.community_keys_by_region(),
         sites_with_native_names=sorted(
-            seed.location_id for seed in world.site_seeds if seed.native_name
+            seed.location_id for seed in world.site_seeds if seed.native_name.strip()
         ),
     )
 
@@ -1165,7 +1165,7 @@ def _validate_site_language_references(
     source: str,
 ) -> None:
     for seed in world.site_seeds:
-        if seed.native_name and not seed.language_key:
+        if seed.native_name.strip() and not seed.language_key:
             raise ValueError(
                 f"Setting bundle {source} site {seed.location_id} defines native_name without language_key"
             )

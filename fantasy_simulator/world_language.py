@@ -62,8 +62,9 @@ def location_endonym(
     for seed in world_definition.site_seeds:
         if seed.location_id != location_id:
             continue
-        if seed.native_name:
-            return seed.native_name
+        native_name = seed.native_name.strip()
+        if native_name:
+            return native_name
         language_key = seed.language_key
         if not language_key:
             language = language_engine.resolve_language(region=location_id)

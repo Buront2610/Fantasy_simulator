@@ -164,6 +164,20 @@ def hydrate_world_state(
     if "calendar_baseline" not in data:
         world.calendar_baseline = clone_calendar(world.setting_bundle.world_definition.calendar)
 
-    world._refresh_generated_endonyms()
+    if "setting_bundle" in data:
+        world._refresh_generated_endonyms()
+    else:
+        for location in world.grid.values():
+            generated_endonym = location.generated_endonym.strip()
+            if generated_endonym:
+                location.generated_endonym = generated_endonym
+                location.aliases = [
+                    alias for alias in location.aliases if alias != generated_endonym
+                ]
+                continue
+            endonym = world.location_endonym(location.id)
+            location.generated_endonym = (
+                endonym if endonym and endonym != location.canonical_name else ""
+            )
     world.normalize_after_load()
     return world

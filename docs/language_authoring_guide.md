@@ -34,6 +34,18 @@ engine now scores compatible communities instead of failing eagerly.
 Generated endonyms are not memory aliases and are stored separately on
 `LocationState.generated_endonym`.
 
+Authoring policy:
+
+- Add authored `native_name` values only for sites whose local form should be
+  stable setting canon, such as capitals, major cities, sacred sites, or named
+  regional landmarks.
+- Match each authored form to the site's existing `language_key`; do not add or
+  change language keys just to justify a local name.
+- Keep uncertain or minor sites unset so the language engine can continue to
+  provide generated endonyms.
+- Treat `native_name` as display flavor only. Do not use it to rename
+  `location_id`, canonical `name`, routes, save data, or schema fields.
+
 UI policy:
 
 - Canonical name stays primary.
