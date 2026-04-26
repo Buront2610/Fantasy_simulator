@@ -71,6 +71,7 @@ from .world_event_state import (
     apply_event_impact_to_location,
     append_canonical_event_record,
 )
+from .world_event_index import EventHistoryIndex
 from .world_calendar import (
     advance_calendar_position as advance_calendar_position_for_calendar,
     apply_calendar_definition_history,
@@ -446,6 +447,7 @@ class World:
         # - event_log projects from canonical history when records exist.
         self._display_event_log: List[str] = []
         self.event_records: List[WorldEventRecord] = []
+        self._event_index = EventHistoryIndex()
         self.event_impact_rules: Dict[str, Dict[str, int]] = clone_default_event_impact_rules()
         self.propagation_rules: Dict[str, Dict[str, Any]] = clone_default_propagation_rules()
         self.rumors: List[Rumor] = []
@@ -1597,6 +1599,7 @@ class World:
 
         Returns the canonical stored record (may be a normalized copy).
         """
+        self._event_index.ensure_current(self.event_records)
         actor_ids = [record.primary_actor_id] + list(record.secondary_actor_ids)
         watched_tags: List[str] = []
         for actor_id in actor_ids:
@@ -1616,7 +1619,9 @@ class World:
             location_index=self._location_id_index,
             grid=self.grid,
             max_event_records=self.MAX_EVENT_RECORDS,
+            existing_record_ids=self._event_index.record_ids,
         )
+        self._event_index.invalidate()
         self._display_event_log = []
         return stored_record
 
@@ -1669,18 +1674,23 @@ class World:
 
     def get_events_by_location(self, location_id: str) -> List[WorldEventRecord]:
         """Return all event records for a specific location."""
-        return [r for r in self.event_records if r.location_id == location_id]
+        return self._event_index.by_location_id(self.event_records, location_id)
 
     def get_events_by_actor(self, char_id: str) -> List[WorldEventRecord]:
         """Return all event records involving a specific character."""
-        return [
-            r for r in self.event_records
-            if r.primary_actor_id == char_id or char_id in r.secondary_actor_ids
-        ]
+        return self._event_index.by_actor_id(self.event_records, char_id)
 
     def get_events_by_year(self, year: int) -> List[WorldEventRecord]:
         """Return all event records for a specific year."""
-        return [r for r in self.event_records if r.year == year]
+        return self._event_index.by_year_value(self.event_records, year)
+
+    def get_events_by_month(self, year: int, month: int) -> List[WorldEventRecord]:
+        """Return all event records for a specific in-world month."""
+        return self._event_index.by_month_value(self.event_records, year, month)
+
+    def get_events_by_kind(self, kind: str) -> List[WorldEventRecord]:
+        """Return all event records for a specific canonical event kind."""
+        return self._event_index.by_kind_value(self.event_records, kind)
 
     def render_map(self, highlight_location: Optional[str] = None) -> str:
         """Return a stable ASCII grid of the world map.

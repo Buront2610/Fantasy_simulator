@@ -16,6 +16,7 @@ from .content.world_data import (
     DISCOVERY_ITEMS,
     JOURNEY_EVENTS,
 )
+from .death_resolution import handle_death_side_effects, mark_character_dead
 from .event_models import EventResult, WorldEventRecord, generate_record_id
 from .i18n import tr, tr_term
 from .simulation.calendar import annual_probability_to_fraction
@@ -377,27 +378,10 @@ class EventSystem:
         respect to spouse cleanup because it checks ``char.spouse_id`` and
         ``spouse.spouse_id`` before mutating anything.
         """
-        if char.spouse_id:
-            spouse = world.get_character_by_id(char.spouse_id)
-            if spouse and spouse.alive and spouse.spouse_id == char.char_id:
-                spouse.update_relationship(char.char_id, -50)
-                spouse.add_history(tr("history_lost_spouse", year=world.year, name=char.name))
-                spouse.spouse_id = None
+        handle_death_side_effects(char, world)
 
     def event_death(self, char: Character, world: World, rng: Any = random) -> EventResult:
-        char.alive = False
-        # Clean up any active adventure before clearing the ID (SI-5)
-        if char.active_adventure_id is not None:
-            adventure_id = char.active_adventure_id
-            run = world.get_adventure_by_id(adventure_id)
-            if run is not None and not run.is_resolved:
-                run.state = "resolved"
-                run.outcome = "death"
-                run.resolution_year = world.year
-                run.pending_choice = None
-                world.complete_adventure(adventure_id)
-        char.active_adventure_id = None
-        self.handle_death_side_effects(char, world)
+        mark_character_dead(char, world)
 
         cause_options = [
             tr("death_cause_old_age"),

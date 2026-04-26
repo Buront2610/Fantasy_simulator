@@ -149,10 +149,7 @@ def generate_monthly_report(
     state (location, alive, injury) is mixed in, so past-month reports
     remain stable.
     """
-    records = [
-        r for r in world.event_records
-        if r.year == year and r.month == month
-    ]
+    records = world.get_events_by_month(year, month)
     record_calendar_key = next((r.calendar_key for r in records if r.calendar_key), "")
     month_label = world.month_display_name_for_date(
         year,
@@ -268,7 +265,7 @@ def generate_yearly_report(
     appear in that year's event records.  Death counts are derived from
     fatal event records, not from current world state.
     """
-    records = [r for r in world.event_records if r.year == year]
+    records = world.get_events_by_year(year)
 
     deaths_this_year = sum(1 for r in records if r.kind in EVENT_KINDS_FATAL)
 
