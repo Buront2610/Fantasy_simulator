@@ -100,10 +100,10 @@ python main.py
 python -m pytest tests/ -v
 
 # Lint
-flake8 --max-line-length=120 --exclude=node_modules,__pycache__ .
+flake8 --max-line-length=120 --exclude=node_modules,__pycache__,.claude,.worktrees .
 
 # 一括検証
-flake8 --max-line-length=120 --exclude=node_modules,__pycache__ . && python -m pytest tests/ -v
+flake8 --max-line-length=120 --exclude=node_modules,__pycache__,.claude,.worktrees . && python -m pytest tests/ -v
 ```
 
 ## NEVER
