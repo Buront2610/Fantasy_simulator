@@ -6,11 +6,14 @@ import re
 from pathlib import Path
 
 from fantasy_simulator.persistence.migrations import CURRENT_VERSION
+from scripts.quality_gate import DEFAULT_EXCLUDES
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 README_TEXT = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
 AGENTS_TEXT = (PROJECT_ROOT / "AGENTS.md").read_text(encoding="utf-8")
+CLAUDE_TEXT = (PROJECT_ROOT / "CLAUDE.md").read_text(encoding="utf-8")
+CLAUDE_VALIDATE_TEXT = (PROJECT_ROOT / ".claude" / "commands" / "validate.md").read_text(encoding="utf-8")
 PYPROJECT_TEXT = (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
 REQUIREMENTS_DEV_TEXT = (PROJECT_ROOT / "requirements-dev.txt").read_text(encoding="utf-8")
 PLAN_TEXT = (PROJECT_ROOT / "docs" / "implementation_plan.md").read_text(encoding="utf-8")
@@ -28,6 +31,7 @@ def test_readme_schema_version_matches_current_migration_version() -> None:
 
 def test_agent_doc_schema_version_matches_current_migration_version() -> None:
     assert f"現行 schema v{CURRENT_VERSION}" in AGENTS_TEXT
+    assert f"現行 v{CURRENT_VERSION}" in CLAUDE_TEXT
 
 
 def test_next_version_doc_mentions_current_schema_version() -> None:
@@ -63,14 +67,27 @@ def test_readme_points_to_implementation_plan_for_roadmap() -> None:
 
 def test_readme_and_plan_agree_on_next_step() -> None:
     assert "technical-debt backlog as closed" in README_TEXT
-    assert "TD-1〜TD-4" in PLAN_TEXT
+    assert "TD-1〜TD-4 の負債解消は完了済み" in PLAN_TEXT
+    assert "次に着手すべき実装は **TD-1〜TD-4 の負債解消**" not in PLAN_TEXT
     assert "PR-J / PR-K" in README_TEXT
 
 
 def test_ui_plan_does_not_conflict_with_implementation_plan_next_step() -> None:
-    assert "TD-1〜TD-4" in PLAN_TEXT
-    assert "TD-1〜TD-4" in UI_PLAN_TEXT
-    assert "PR-I は完了" in UI_PLAN_TEXT
+    assert "PR-J: 世界観設定整理と初期 Setting Bundle 構築 ← **次はここ**" in PLAN_TEXT
+    assert "次段は PR-J で世界観 authoring へ進み、その後 PR-K で動的世界変化へ入る" in UI_PLAN_TEXT
+    assert "次段は TD-1〜TD-4" not in UI_PLAN_TEXT
+    assert "PR-H2、PR-I、TD-1〜TD-4 の負債解消は完了" in UI_PLAN_TEXT
+
+
+def test_agent_validation_commands_exclude_local_worktrees() -> None:
+    expected_exclude = f"--exclude={','.join(DEFAULT_EXCLUDES)}"
+    for doc_text in (AGENTS_TEXT, CLAUDE_TEXT, CLAUDE_VALIDATE_TEXT):
+        assert expected_exclude in doc_text
+        assert "--exclude=node_modules,__pycache__ ." not in doc_text
+
+
+def test_claude_doc_mentions_focused_mypy_in_ci() -> None:
+    assert "focused mypy" in CLAUDE_TEXT
 
 
 def test_implementation_plan_reflects_bundle_migration_status_for_world_lore_screen() -> None:

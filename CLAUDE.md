@@ -9,7 +9,7 @@ Python CLI世界・生活シミュレーション。ファンタジー世界「A
 - **Language**: Python 3.10+
 - **Testing**: pytest
 - **Linting**: flake8 (max-line-length=120) — CIで強制（`.github/workflows/test.yml`）
-- **CI**: GitHub Actions (Python 3.10/3.11/3.12) — `pip install pytest flake8` → lint → test
+- **CI**: GitHub Actions (Python 3.10/3.11/3.12) — `pip install -e ".[dev]"` → lint → focused mypy → test
 - **Localization**: 自前i18nシステム（英語/日本語）
 
 ## Commands
@@ -25,10 +25,10 @@ python main.py
 python -m pytest tests/ -v
 
 # Lint
-flake8 --max-line-length=120 --exclude=node_modules,__pycache__ .
+flake8 --max-line-length=120 --exclude=node_modules,__pycache__,.claude,.worktrees .
 
 # 検証（Lint + テスト一括）
-flake8 --max-line-length=120 --exclude=node_modules,__pycache__ . && python -m pytest tests/ -v
+flake8 --max-line-length=120 --exclude=node_modules,__pycache__,.claude,.worktrees . && python -m pytest tests/ -v
 ```
 
 ## Architecture
@@ -60,7 +60,7 @@ fantasy_simulator/
 │   └── constants.py                 → narrative 用定数
 ├── persistence/
 │   ├── save_load.py                 → JSON形式のセーブ/ロード
-│   └── migrations.py               → セーブデータのスキーマ移行（現行 v7）
+│   └── migrations.py               → セーブデータのスキーマ移行（現行 v8）
 ├── ui/
 │   ├── screens.py                   → UI画面（メニュー、セットアップ、結果表示）
 │   ├── ui_helpers.py                → 表示ユーティリティ
