@@ -555,6 +555,35 @@ class TestWorld:
 
         assert world.location_endonym("loc_custom") == "Torum"
 
+    def test_blank_native_name_does_not_mask_generated_or_absent_endonym(self):
+        world = World(name="Custom")
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="loc_blank",
+                        name="Blank",
+                        description="Custom site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                        native_name="   ",
+                    ),
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+
+        location = world.get_location_by_id("loc_blank")
+
+        assert world.location_endonym("loc_blank") is None
+        assert location is not None
+        assert location.generated_endonym == ""
+
     def test_generated_endonym_does_not_consume_memory_alias_cap(self):
         world = World()
         thornwood = world.get_location_by_id("loc_thornwood")

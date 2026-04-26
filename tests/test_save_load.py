@@ -1264,6 +1264,32 @@ class TestLoadSimulation:
         assert legacy_location.generated_endonym == "Legacy Endonym"
         assert legacy_location.aliases == ["Traveler's Rest"]
 
+    def test_load_legacy_save_without_bundle_preserves_serialized_generated_endonym(self, tmp_path):
+        path = tmp_path / "legacy-no-bundle-endonym.json"
+        sim = Simulator(World(), seed=0)
+
+        assert save_simulation(sim, str(path)) is True
+
+        with open(path, "r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+        payload["world"].pop("setting_bundle", None)
+        thornwood = next(
+            location for location in payload["world"]["grid"]
+            if location["id"] == "loc_thornwood"
+        )
+        thornwood["generated_endonym"] = "OldGenerated"
+        thornwood["aliases"] = ["OldGenerated", "Deepwood"]
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle)
+
+        restored = load_simulation(str(path))
+
+        assert restored is not None
+        location = restored.world.get_location_by_id("loc_thornwood")
+        assert location is not None
+        assert location.generated_endonym == "OldGenerated"
+        assert location.aliases == ["Deepwood"]
+
     def test_save_load_round_trip_preserves_history_metadata_for_event_result_records(self, tmp_path):
         path = tmp_path / "legacy-history-roundtrip.json"
         sim = Simulator(_make_world(), seed=42)

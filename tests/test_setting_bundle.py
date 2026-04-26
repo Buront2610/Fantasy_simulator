@@ -10,6 +10,7 @@ from fantasy_simulator.content.setting_bundle import (
     LanguageDefinition,
     SettingBundle,
     SettingEntryInspection,
+    SiteSeedDefinition,
     WorldDefinition,
     build_setting_bundle_authoring_summary,
     bundle_from_dict_validated,
@@ -111,6 +112,58 @@ def test_setting_bundle_authoring_summary_includes_culture_and_faction_keys():
     assert summary.faction_keys == ["dawn_court", "wardens"]
 
 
+def test_setting_bundle_authoring_summary_includes_sites_with_native_names():
+    bundle = SettingBundle(
+        schema_version=1,
+        world_definition=WorldDefinition(
+            world_key="custom",
+            display_name="Custom Realm",
+            lore_text="Custom lore",
+            languages=[
+                LanguageDefinition(
+                    language_key="river",
+                    display_name="River Speech",
+                ),
+            ],
+            site_seeds=[
+                SiteSeedDefinition(
+                    location_id="loc_delta",
+                    name="Delta",
+                    description="",
+                    region_type="river",
+                    x=1,
+                    y=0,
+                    language_key="river",
+                    native_name="Darun",
+                ),
+                SiteSeedDefinition(
+                    location_id="loc_bluff",
+                    name="Bluff",
+                    description="",
+                    region_type="hill",
+                    x=0,
+                    y=0,
+                    language_key="river",
+                    native_name="Brenn",
+                ),
+                SiteSeedDefinition(
+                    location_id="loc_plain",
+                    name="Plain",
+                    description="",
+                    region_type="plain",
+                    x=2,
+                    y=0,
+                    native_name="   ",
+                ),
+            ],
+        ),
+    )
+
+    summary = build_setting_bundle_authoring_summary(bundle)
+
+    assert summary.sites_with_native_names == ["loc_bluff", "loc_delta"]
+
+
 def test_default_aethoria_bundle_has_minimal_phase_i_slots():
     bundle = default_aethoria_bundle()
 
@@ -132,6 +185,22 @@ def test_default_aethoria_bundle_has_minimal_phase_i_slots():
     )
     assert "capital" in capital_seed.tags
     assert "default_resident" in capital_seed.tags
+
+
+def test_aethoria_bundle_has_expected_authored_native_names():
+    summary = build_setting_bundle_authoring_summary(default_aethoria_bundle())
+
+    assert summary.sites_with_native_names == [
+        "loc_aethoria_capital",
+        "loc_coral_cove",
+        "loc_dawnport",
+        "loc_frostpeak_summit",
+        "loc_sandstone_outpost",
+        "loc_silverbrook",
+        "loc_skyveil_monastery",
+        "loc_sunken_ruins",
+        "loc_thornwood",
+    ]
 
 
 def test_bundle_validation_rejects_route_seed_with_unknown_site() -> None:
@@ -1067,6 +1136,32 @@ def test_bundle_validation_rejects_native_name_without_language_key() -> None:
         assert "language_key" in str(exc)
     else:
         raise AssertionError("Expected native_name without language_key to fail fast")
+
+
+def test_bundle_validation_treats_blank_native_name_as_absent() -> None:
+    payload = {
+        "schema_version": 1,
+        "world_definition": {
+            "world_key": "blank_native_name",
+            "display_name": "Blank Native Name",
+            "lore_text": "Sparse but valid",
+            "site_seeds": [
+                {
+                    "location_id": "loc_blank",
+                    "name": "Blank",
+                    "native_name": "   ",
+                    "description": "",
+                    "region_type": "city",
+                    "x": 0,
+                    "y": 0,
+                }
+            ],
+        },
+    }
+
+    bundle = bundle_from_dict_validated(payload, source="test bundle")
+
+    assert bundle.world_definition.site_seeds[0].native_name == "   "
 
 
 def test_bundle_validation_rejects_non_positive_route_distance() -> None:
