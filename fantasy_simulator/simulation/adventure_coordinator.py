@@ -116,10 +116,13 @@ class AdventureMixin:
             return
 
         # Apply party data
-        run.member_ids = [m.char_id for m in members]
         run.party_id = generate_adventure_id(self.id_rng)
-        run.policy = select_party_policy(members, self.rng)
-        run.retreat_rule = default_retreat_rule_for_policy(run.policy)
+        selected_policy = select_party_policy(members, self.rng)
+        run.set_party_configuration(
+            member_ids=[m.char_id for m in members],
+            policy=selected_policy,
+            retreat_rule=default_retreat_rule_for_policy(selected_policy),
+        )
         run.supply_state = SUPPLY_FULL
         # danger_level already set in create_adventure_run from destination.danger
 

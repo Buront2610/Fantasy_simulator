@@ -68,3 +68,28 @@ def test_generated_sites_can_project_to_runtime_sites() -> None:
     assert runtime_sites
     assert all(isinstance(site, Site) for site in runtime_sites)
     assert [site.location_id for site in runtime_sites] == [candidate.site_id for candidate in world.site_candidates]
+
+
+def test_worldgen_config_rejects_invalid_dimensions() -> None:
+    try:
+        WorldgenConfig(width=2, height=10)
+    except ValueError as exc:
+        assert "width" in str(exc)
+    else:
+        raise AssertionError("Expected width precondition to fail")
+
+    try:
+        WorldgenConfig(width=10, height=0)
+    except ValueError as exc:
+        assert "height" in str(exc)
+    else:
+        raise AssertionError("Expected height precondition to fail")
+
+
+def test_worldgen_config_rejects_non_positive_site_candidate_limit() -> None:
+    try:
+        WorldgenConfig(width=10, height=10, site_candidate_limit=0)
+    except ValueError as exc:
+        assert "site_candidate_limit" in str(exc)
+    else:
+        raise AssertionError("Expected site_candidate_limit precondition to fail")

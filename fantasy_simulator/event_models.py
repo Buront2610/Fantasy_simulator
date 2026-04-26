@@ -101,6 +101,7 @@ class WorldEventRecord:
         self.month = max(1, int(self.month))
         self.day = max(1, int(self.day))
         self.absolute_day = max(0, int(self.absolute_day))
+        self._validate_summary_key(self.summary_key)
 
     def to_dict(self) -> Dict[str, Any]:
         payload = {
@@ -189,6 +190,17 @@ class WorldEventRecord:
         return payload
 
     @staticmethod
+    def _validate_summary_key(payload: str) -> str:
+        if payload == "":
+            return payload
+        normalized = payload.strip()
+        if normalized != payload:
+            raise ValueError("summary_key must not have leading/trailing whitespace")
+        if "." not in payload or " " in payload:
+            raise ValueError("summary_key must be empty or use dotted-key format like 'events.some_key.summary'")
+        return payload
+
+    @staticmethod
     def _validate_optional_string_payload(payload: Any, field_name: str) -> Optional[str]:
         if payload is None:
             return None
@@ -258,6 +270,8 @@ class WorldEventRecord:
         legacy_event_result = None
         if result.stat_changes or result.metadata:
             legacy_event_result = result.to_dict()
+        resolved_summary_key = summary_key or result.summary_key or result.metadata.get("summary_key", "")
+        cls._validate_summary_key(resolved_summary_key)
         return cls(
             record_id=record_id or generate_record_id(rng),
             kind=result.event_type,
@@ -271,7 +285,7 @@ class WorldEventRecord:
             description=result.description,
             severity=severity,
             calendar_key=calendar_key,
-            summary_key=summary_key or result.summary_key or result.metadata.get("summary_key", ""),
+            summary_key=resolved_summary_key,
             legacy_event_result=legacy_event_result,
         )
 

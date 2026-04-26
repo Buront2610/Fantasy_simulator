@@ -1,4 +1,12 @@
-"""Location-reference repair and normalization helpers for ``World``."""
+"""Location-reference repair and normalization helpers for ``World``.
+
+This module is intentionally orchestration-oriented:
+- it coordinates where normalization should be applied
+- it does not define core location-validity rules itself
+
+Domain rules (e.g., what makes a location valid) remain in ``World`` and the
+resolver callback injected by the caller.
+"""
 
 from __future__ import annotations
 

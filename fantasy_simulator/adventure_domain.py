@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import random
 import uuid
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, Type, TypeVar, cast
 
 from .i18n import tr, tr_term
 
@@ -99,6 +99,63 @@ _SUPPLY_DEGRADE_FULL_TO_LOW = 0.15
 _SUPPLY_DEGRADE_LOW_TO_CRITICAL = 0.20
 
 
+class AdventureRunLike(Protocol):
+    character_id: str
+    character_name: str
+    origin: str
+    destination: str
+    year_started: int
+    adventure_id: str
+    state: str
+    injury_status: str
+    steps_taken: int
+    pending_choice: Any
+    outcome: Optional[str]
+    loot_summary: List[str]
+    summary_log: List[str]
+    detail_log: List[str]
+    resolution_year: Optional[int]
+    injury_member_id: Optional[str]
+    death_member_id: Optional[str]
+    member_ids: List[str]
+    party_id: Optional[str]
+    policy: str
+    retreat_rule: str
+    supply_state: str
+    danger_level: int
+
+    @property
+    def is_resolved(self) -> bool:
+        ...
+
+    @property
+    def is_party(self) -> bool:
+        ...
+
+    def _record(self, summary: str, detail: str) -> None:
+        ...
+
+    def _clear_member_adventures(self, world: "World") -> None:
+        ...
+
+
+def validate_adventure_run_payload(run: AdventureRunLike) -> None:
+    if run.policy not in ALL_POLICIES:
+        raise ValueError(f"policy must be one of {ALL_POLICIES}")
+    if run.retreat_rule not in ALL_RETREAT_RULES:
+        raise ValueError(f"retreat_rule must be one of {ALL_RETREAT_RULES}")
+    if run.supply_state not in (SUPPLY_FULL, SUPPLY_LOW, SUPPLY_CRITICAL):
+        raise ValueError("supply_state must be one of ('full', 'low', 'critical')")
+    if not isinstance(run.danger_level, int) or isinstance(run.danger_level, bool):
+        raise ValueError("danger_level must be an integer")
+    if run.danger_level < 0 or run.danger_level > 100:
+        raise ValueError("danger_level must be between 0 and 100")
+    if not isinstance(run.member_ids, list) or any(not isinstance(member_id, str) for member_id in run.member_ids):
+        raise ValueError("member_ids must be a list of strings")
+    if run.member_ids and run.character_id not in run.member_ids:
+        raise ValueError("member_ids must include character_id")
+
+
 def select_party_policy(members: List["Character"], rng: Any = random) -> str:
     if not members:
         return POLICY_CAUTIOUS
@@ -142,7 +199,7 @@ def default_retreat_rule_for_policy(policy: str) -> str:
 
 
 class AdventurePolicyEngine:
-    def __init__(self, run: Any) -> None:
+    def __init__(self, run: AdventureRunLike) -> None:
         self.run = run
 
     def party_members(self, world: "World") -> List["Character"]:
@@ -233,7 +290,7 @@ TAdventureRun = TypeVar("TAdventureRun")
 
 class AdventureSerialization:
     @staticmethod
-    def to_dict(run: Any) -> Dict[str, Any]:
+    def to_dict(run: AdventureRunLike) -> Dict[str, Any]:
         return {
             "character_id": run.character_id,
             "character_name": run.character_name,
@@ -265,8 +322,10 @@ class AdventureSerialization:
         pending = data.get("pending_choice")
         character_id = data["character_id"]
         member_ids = data.get("member_ids") or [character_id]
+        if not isinstance(member_ids, list) or any(not isinstance(member_id, str) for member_id in member_ids):
+            raise ValueError("member_ids must be a list of strings")
         run_factory = cast(Any, run_cls)
-        return run_factory(
+        run = run_factory(
             character_id=character_id,
             character_name=data["character_name"],
             origin=data["origin"],
@@ -291,10 +350,12 @@ class AdventureSerialization:
             supply_state=data.get("supply_state", SUPPLY_FULL),
             danger_level=data.get("danger_level", 50),
         )
+        validate_adventure_run_payload(run)
+        return run
 
 
 class AdventureChoiceResolver:
-    def __init__(self, run: Any) -> None:
+    def __init__(self, run: AdventureRunLike) -> None:
         self.run = run
 
     def resolve(
@@ -345,7 +406,7 @@ class AdventureChoiceResolver:
 
 
 class AdventureStateMachine:
-    def __init__(self, run: Any, choice_cls: Type[Any]) -> None:
+    def __init__(self, run: AdventureRunLike, choice_cls: Type[Any]) -> None:
         self.run = run
         self.choice_cls = choice_cls
         self.policy = AdventurePolicyEngine(run)

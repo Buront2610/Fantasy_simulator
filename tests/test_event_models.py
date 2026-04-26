@@ -247,6 +247,23 @@ def test_world_event_record_rejects_non_string_summary_key_at_load_boundary() ->
         raise AssertionError("Expected non-string summary_key to fail fast")
 
 
+def test_world_event_record_rejects_invalid_summary_key_shape() -> None:
+    try:
+        WorldEventRecord.from_dict(
+            {
+                "record_id": "r_summary",
+                "kind": "battle",
+                "year": 1001,
+                "description": "Malformed summary key",
+                "summary_key": "not a dotted key",
+            }
+        )
+    except ValueError as exc:
+        assert "summary_key" in str(exc)
+    else:
+        raise AssertionError("Expected malformed summary_key to fail fast")
+
+
 def test_world_event_record_preserves_migrated_legacy_event_result_payload() -> None:
     record = WorldEventRecord.from_dict(
         {

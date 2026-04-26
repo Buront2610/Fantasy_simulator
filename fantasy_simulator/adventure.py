@@ -37,6 +37,7 @@ from .adventure_domain import (
     default_retreat_rule_for_policy,
     generate_adventure_id,
     select_party_policy,
+    validate_adventure_run_payload,
 )
 from .i18n import tr
 
@@ -133,6 +134,11 @@ class AdventureRun:
     supply_state: str = SUPPLY_FULL
     danger_level: int = 50
 
+    def __post_init__(self) -> None:
+        if not self.member_ids:
+            self.member_ids = [self.character_id]
+        validate_adventure_run_payload(self)
+
     @property
     def is_resolved(self) -> bool:
         return self.state == "resolved"
@@ -202,6 +208,12 @@ class AdventureRun:
     def _record(self, summary: str, detail: str) -> None:
         self.summary_log.append(summary)
         self.detail_log.append(detail)
+
+    def set_party_configuration(self, *, member_ids: List[str], policy: str, retreat_rule: str) -> None:
+        self.member_ids = list(member_ids)
+        self.policy = policy
+        self.retreat_rule = retreat_rule
+        validate_adventure_run_payload(self)
 
 
 def create_adventure_run(
