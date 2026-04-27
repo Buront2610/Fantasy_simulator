@@ -164,6 +164,76 @@ def test_setting_bundle_authoring_summary_includes_sites_with_native_names():
     assert summary.sites_with_native_names == ["loc_bluff", "loc_delta"]
 
 
+def test_setting_bundle_authoring_summary_reports_site_language_coverage_gaps():
+    bundle = SettingBundle(
+        schema_version=1,
+        world_definition=WorldDefinition(
+            world_key="custom",
+            display_name="Custom Realm",
+            lore_text="Custom lore",
+            languages=[
+                LanguageDefinition(
+                    language_key="river",
+                    display_name="River Speech",
+                ),
+                LanguageDefinition(
+                    language_key="hill",
+                    display_name="Hill Speech",
+                ),
+            ],
+            site_seeds=[
+                SiteSeedDefinition(
+                    location_id="loc_delta",
+                    name="Delta",
+                    description="",
+                    region_type="river",
+                    x=1,
+                    y=0,
+                    language_key="river",
+                ),
+                SiteSeedDefinition(
+                    location_id="loc_bluff",
+                    name="Bluff",
+                    description="",
+                    region_type="hill",
+                    x=0,
+                    y=0,
+                    language_key="hill",
+                ),
+                SiteSeedDefinition(
+                    location_id="loc_plain",
+                    name="Plain",
+                    description="",
+                    region_type="plain",
+                    x=2,
+                    y=0,
+                ),
+            ],
+            language_communities=[
+                LanguageCommunityDefinition(
+                    community_key="river_folk",
+                    display_name="River Folk",
+                    language_key="river",
+                    regions=["loc_delta"],
+                ),
+                LanguageCommunityDefinition(
+                    community_key="hill_diaspora",
+                    display_name="Hill Diaspora",
+                    language_key="hill",
+                    races=["Human"],
+                ),
+            ],
+        ),
+    )
+
+    summary = build_setting_bundle_authoring_summary(bundle)
+
+    assert summary.language_community_count == 2
+    assert summary.site_ids_without_language_key == ["loc_plain"]
+    assert summary.site_ids_without_language_community == ["loc_bluff", "loc_plain"]
+    assert summary.site_ids_without_matching_language_community == ["loc_bluff"]
+
+
 def test_default_aethoria_bundle_has_minimal_phase_i_slots():
     bundle = default_aethoria_bundle()
 
@@ -1091,6 +1161,10 @@ def test_bundle_authoring_summary_exposes_region_route_and_language_breakdowns()
     assert summary.route_counts_by_type["road"] >= 1
     assert "aethic_common" in summary.language_keys
     assert "loc_thornwood" in summary.community_keys_by_region
+    assert summary.language_community_count == len(bundle.world_definition.language_communities)
+    assert summary.site_ids_without_language_key == []
+    assert summary.site_ids_without_language_community == []
+    assert summary.site_ids_without_matching_language_community == []
 
 
 def test_aethoria_bundle_authoring_coverage_has_language_for_each_site():
