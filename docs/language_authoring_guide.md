@@ -69,6 +69,21 @@ Parent changes affect inherited vocabulary because the child derives from the pa
 
 `inspiration_tags` are flavor presets, not strict reconstructions of real languages. They are intended to bias phonological drift and naming feel, not to emulate a living language exactly.
 
+## Phonological Feature Inventories
+
+Language definitions may include optional feature lists such as
+`front_vowels`, `back_vowels`, `liquid_consonants`, `nasal_consonants`,
+`fricative_consonants`, and `stop_consonants`.
+
+Authoring policy:
+
+- Fill feature lists only from values already present in the same language's
+  `vowels` or `consonants` inventory.
+- Do not add base `vowels` or `consonants` just to support feature metadata on
+  a child language; inherited inventories can remain implicit.
+- Treat feature lists as descriptive authoring metadata unless a future rule
+  explicitly consumes them.
+
 ## Cultures And Factions
 
 `WorldDefinition.cultures` and `WorldDefinition.factions` are currently flat

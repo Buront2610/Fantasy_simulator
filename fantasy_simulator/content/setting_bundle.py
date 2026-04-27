@@ -639,6 +639,41 @@ class WorldDefinition:
                 mapping.setdefault(region_id, []).append(community.community_key)
         return {region_id: sorted(keys) for region_id, keys in sorted(mapping.items())}
 
+    def site_ids_without_language_key(self) -> List[str]:
+        """Return site ids that have no primary authored language."""
+        return sorted(
+            seed.location_id
+            for seed in self.site_seeds
+            if not seed.language_key.strip()
+        )
+
+    def site_ids_without_language_community(self) -> List[str]:
+        """Return site ids not covered by any regional language community."""
+        covered_region_ids = {
+            region_id
+            for community in self.language_communities
+            for region_id in community.regions
+        }
+        return sorted(
+            seed.location_id
+            for seed in self.site_seeds
+            if seed.location_id not in covered_region_ids
+        )
+
+    def site_ids_without_matching_language_community(self) -> List[str]:
+        """Return site ids without a regional community for their primary language."""
+        covered_language_regions = {
+            (community.language_key, region_id)
+            for community in self.language_communities
+            for region_id in community.regions
+        }
+        return sorted(
+            seed.location_id
+            for seed in self.site_seeds
+            if seed.language_key.strip()
+            and (seed.language_key, seed.location_id) not in covered_language_regions
+        )
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "world_key": self.world_key,
@@ -746,6 +781,7 @@ class SettingBundleAuthoringSummary:
     language_count: int
     culture_count: int = 0
     faction_count: int = 0
+    language_community_count: int = 0
     resident_site_ids: List[str] = field(default_factory=list)
     capital_site_ids: List[str] = field(default_factory=list)
     culture_keys: List[str] = field(default_factory=list)
@@ -755,6 +791,9 @@ class SettingBundleAuthoringSummary:
     language_keys: List[str] = field(default_factory=list)
     community_keys_by_region: Dict[str, List[str]] = field(default_factory=dict)
     sites_with_native_names: List[str] = field(default_factory=list)
+    site_ids_without_language_key: List[str] = field(default_factory=list)
+    site_ids_without_language_community: List[str] = field(default_factory=list)
+    site_ids_without_matching_language_community: List[str] = field(default_factory=list)
 
 
 def build_setting_bundle_authoring_summary(bundle: SettingBundle) -> SettingBundleAuthoringSummary:
@@ -768,6 +807,7 @@ def build_setting_bundle_authoring_summary(bundle: SettingBundle) -> SettingBund
         language_count=len(world.languages),
         culture_count=len(world.cultures),
         faction_count=len(world.factions),
+        language_community_count=len(world.language_communities),
         resident_site_ids=world.resident_site_ids(),
         capital_site_ids=world.capital_site_ids(),
         culture_keys=sorted(entry.key for entry in world.culture_entries()),
@@ -779,6 +819,9 @@ def build_setting_bundle_authoring_summary(bundle: SettingBundle) -> SettingBund
         sites_with_native_names=sorted(
             seed.location_id for seed in world.site_seeds if seed.native_name.strip()
         ),
+        site_ids_without_language_key=world.site_ids_without_language_key(),
+        site_ids_without_language_community=world.site_ids_without_language_community(),
+        site_ids_without_matching_language_community=world.site_ids_without_matching_language_community(),
     )
 
 
