@@ -22,6 +22,7 @@ TEXT_JA: Dict[str, str] = {
     'running_simulation_details': 'シミュレーション実行中...（{years}年、年あたり約{events}イベント）',
     'simulation_complete': 'シミュレーションが完了しました。',
     'advancing_simulation': 'シミュレーションを進行中...',
+    'advancing_simulation_years': 'シミュレーションを進行中...（+{years}年）',
     'simulation_advanced_to_year': 'シミュレーションを Year {year} まで進めました。',
     'alive': '生存',
     'pending_choices': '保留中の選択',

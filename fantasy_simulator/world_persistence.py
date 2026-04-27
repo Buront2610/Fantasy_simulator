@@ -2,12 +2,48 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Type
+from typing import Any, Callable, Dict, Mapping, Type
 
 from .content.setting_bundle import CalendarDefinition, bundle_from_dict_validated
 from .language.state import LanguageEvolutionRecord, LanguageRuntimeState
 from .terrain import AtlasLayout
 from .world_topology_state import restore_serialized_topology
+
+
+def _serialized_location_id_aliases(world: Any, serialized_grid: list[Any]) -> Dict[str, str]:
+    """Map serialized location ids to active bundle ids when names still match."""
+    aliases: Dict[str, str] = {}
+    for loc_data in serialized_grid:
+        if not isinstance(loc_data, dict):
+            continue
+        raw_id = loc_data.get("id")
+        if not raw_id:
+            continue
+        raw_id_text = str(raw_id)
+        canonical_name = str(loc_data.get("canonical_name") or loc_data.get("name") or "")
+        normalized = world.normalize_location_id(raw_id_text, location_name=canonical_name)
+        if normalized and normalized in world._location_id_index:
+            aliases[raw_id_text] = normalized
+    return aliases
+
+
+def _normalize_serialized_route_endpoints(
+    serialized_routes: Any,
+    location_id_aliases: Mapping[str, str],
+) -> list[Any]:
+    """Rewrite stale serialized route endpoint ids before strict route-state overlay."""
+    normalized_routes: list[Any] = []
+    for route_data in list(serialized_routes or []):
+        if not isinstance(route_data, dict):
+            normalized_routes.append(route_data)
+            continue
+        normalized = dict(route_data)
+        for key in ("from_site_id", "to_site_id"):
+            value = normalized.get(key)
+            if isinstance(value, str) and value in location_id_aliases:
+                normalized[key] = location_id_aliases[value]
+        normalized_routes.append(normalized)
+    return normalized_routes
 
 
 def serialize_world_state(world: Any) -> Dict[str, Any]:
@@ -141,7 +177,12 @@ def hydrate_world_state(
 
     if bundle_backed_structure:
         world._build_terrain_from_grid()
-        world._overlay_serialized_route_state(data.get("routes", []))
+        route_endpoint_aliases = _serialized_location_id_aliases(world, serialized_grid)
+        serialized_routes = _normalize_serialized_route_endpoints(
+            data.get("routes", []),
+            route_endpoint_aliases,
+        )
+        world._overlay_serialized_route_state(serialized_routes)
         world._rebuild_route_index()
     elif "terrain_map" in data:
         world._apply_topology_state(

@@ -512,6 +512,27 @@ class TestNoPrintLeaks(unittest.TestCase):
         stdout_text = captured.getvalue()
         self.assertEqual(stdout_text, "", f"Leaked to stdout: {stdout_text!r}")
 
+    def test_advance_simulation_heading_is_localized(self) -> None:
+        from fantasy_simulator.ui.screens import _build_default_world, _advance_simulation
+        from fantasy_simulator.simulator import Simulator
+
+        set_locale("ja")
+        try:
+            world = _build_default_world(num_characters=4, seed=42)
+            sim = Simulator(world, events_per_year=2)
+
+            out = RecordingRenderBackend()
+            inp = ScriptedInputBackend()
+            ctx = UIContext(inp=inp, out=out)
+
+            _advance_simulation(sim, 2, ctx=ctx)
+
+            headings = [call[1] for call in out.calls if call[0] == "print_heading"]
+            self.assertTrue(any("+2年" in heading for heading in headings))
+            self.assertNotIn("years", out.text)
+        finally:
+            set_locale("en")
+
     def test_main_exit_produces_no_stdout(self) -> None:
         """main() exit path must not leak to stdout."""
         from fantasy_simulator.main import main

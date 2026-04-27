@@ -98,6 +98,31 @@ mariner or sea-mage communities. Faction names should likewise be anchored to
 existing seeded sites or professions rather than introducing new geopolitical
 history ahead of PR-K.
 
+## Glossary
+
+`WorldDefinition.glossary` is an optional authoring list for stable setting
+terms. It is bundle metadata only; it does not change save data, runtime world
+state, generated language behavior, or canonical ids.
+
+Each glossary entry currently supports:
+
+- `term`: required display term.
+- `definition`: optional short authoring note.
+- `category`: optional broad grouping such as `era`, `history`, `magic`,
+  `calendar`, or `language`.
+
+Authoring policy:
+
+- Keep entries concise and tied to terms already used by lore, calendars,
+  languages, sites, or simulation concepts.
+- Do not use glossary entries to rename ids, sites, races, jobs, factions, or
+  language keys.
+- Avoid blank terms and duplicate terms. Terms that collapse to the same
+  inspection key, such as `Star-Road` and `Star Road`, are treated as
+  duplicates for authoring review.
+- The authoring summary exposes `glossary_count` and sorted `glossary_keys`
+  for bundle swap checks.
+
 ## Debugging
 
 Use `World.language_status()` when reviewing a generated language. The status payload is expected to include:

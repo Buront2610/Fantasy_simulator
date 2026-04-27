@@ -551,6 +551,30 @@ class SettingEntryInspection:
 
 
 @dataclass
+class GlossaryEntryDefinition:
+    """Author-facing term definition for setting-specific lore words."""
+
+    term: str
+    definition: str = ""
+    category: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "term": self.term,
+            "definition": self.definition,
+            "category": self.category,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "GlossaryEntryDefinition":
+        return cls(
+            term=data["term"],
+            definition=str(data.get("definition", "")),
+            category=str(data.get("category", "")),
+        )
+
+
+@dataclass
 class WorldDefinition:
     """Static lore metadata for a world setting bundle."""
 
@@ -560,6 +584,7 @@ class WorldDefinition:
     era: str = ""
     cultures: List[str] = field(default_factory=list)
     factions: List[str] = field(default_factory=list)
+    glossary: List[GlossaryEntryDefinition] = field(default_factory=list)
     calendar: CalendarDefinition = field(default_factory=lambda: default_calendar_definition())
     races: List[RaceDefinition] = field(default_factory=list)
     jobs: List[JobDefinition] = field(default_factory=list)
@@ -615,6 +640,17 @@ class WorldDefinition:
                 display_name=faction,
             )
             for faction in self.factions
+        ]
+
+    def glossary_entries(self) -> List[SettingEntryInspection]:
+        """Return typed glossary inspection entries while preserving authored terms."""
+        return [
+            SettingEntryInspection(
+                entry_type="glossary",
+                key=_setting_entry_key(entry.term),
+                display_name=entry.term,
+            )
+            for entry in self.glossary
         ]
 
     def site_counts_by_region_type(self) -> Dict[str, int]:
@@ -682,6 +718,7 @@ class WorldDefinition:
             "era": self.era,
             "cultures": list(self.cultures),
             "factions": list(self.factions),
+            "glossary": [entry.to_dict() for entry in self.glossary],
             "calendar": self.calendar.to_dict(),
             "races": [race.to_dict() for race in self.races],
             "jobs": [job.to_dict() for job in self.jobs],
@@ -712,6 +749,10 @@ class WorldDefinition:
             era=data.get("era", ""),
             cultures=_string_list_payload(data.get("cultures", []), field_name="cultures"),
             factions=_string_list_payload(data.get("factions", []), field_name="factions"),
+            glossary=[
+                GlossaryEntryDefinition.from_dict(item)
+                for item in data.get("glossary", [])
+            ],
             calendar=calendar,
             races=[
                 RaceDefinition.from_dict(item)
@@ -781,11 +822,13 @@ class SettingBundleAuthoringSummary:
     language_count: int
     culture_count: int = 0
     faction_count: int = 0
+    glossary_count: int = 0
     language_community_count: int = 0
     resident_site_ids: List[str] = field(default_factory=list)
     capital_site_ids: List[str] = field(default_factory=list)
     culture_keys: List[str] = field(default_factory=list)
     faction_keys: List[str] = field(default_factory=list)
+    glossary_keys: List[str] = field(default_factory=list)
     site_counts_by_region_type: Dict[str, int] = field(default_factory=dict)
     route_counts_by_type: Dict[str, int] = field(default_factory=dict)
     language_keys: List[str] = field(default_factory=list)
@@ -807,11 +850,13 @@ def build_setting_bundle_authoring_summary(bundle: SettingBundle) -> SettingBund
         language_count=len(world.languages),
         culture_count=len(world.cultures),
         faction_count=len(world.factions),
+        glossary_count=len(world.glossary),
         language_community_count=len(world.language_communities),
         resident_site_ids=world.resident_site_ids(),
         capital_site_ids=world.capital_site_ids(),
         culture_keys=sorted(entry.key for entry in world.culture_entries()),
         faction_keys=sorted(entry.key for entry in world.faction_entries()),
+        glossary_keys=sorted(entry.key for entry in world.glossary_entries()),
         site_counts_by_region_type=world.site_counts_by_region_type(),
         route_counts_by_type=world.route_counts_by_type(),
         language_keys=sorted(language.language_key for language in world.languages),
@@ -946,6 +991,23 @@ def _validate_bundle_unique_names(world: WorldDefinition, *, source: str) -> Non
         raise ValueError(
             f"Setting bundle {source} contains duplicate faction inspection keys: "
             f"{', '.join(duplicate_faction_keys)}"
+        )
+
+    blank_glossary_terms = [entry.term for entry in world.glossary if not entry.term.strip()]
+    if blank_glossary_terms:
+        raise ValueError(f"Setting bundle {source} contains blank glossary terms")
+
+    glossary_terms = [entry.term for entry in world.glossary]
+    duplicate_glossary_terms = _duplicate_values(glossary_terms)
+    if duplicate_glossary_terms:
+        raise ValueError(
+            f"Setting bundle {source} contains duplicate glossary terms: {', '.join(duplicate_glossary_terms)}"
+        )
+    duplicate_glossary_keys = _duplicate_values([entry.key for entry in world.glossary_entries()])
+    if duplicate_glossary_keys:
+        raise ValueError(
+            f"Setting bundle {source} contains duplicate glossary inspection keys: "
+            f"{', '.join(duplicate_glossary_keys)}"
         )
 
     race_names = [race.name for race in world.races]
