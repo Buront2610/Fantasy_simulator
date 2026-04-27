@@ -284,8 +284,8 @@ supports:
 - Treat the TD-1〜TD-4 technical-debt backlog as closed: canonical event-store
   adapters, bundle-owned world seeds, responsibility splits, and guardrail/doc
   sync now have tests around their intended boundaries.
-- Continue world setting authoring work toward the first formal
-  `SettingBundle` pass and then dynamic world-change work (PR-J / PR-K).
+- PR-J's first formal `SettingBundle` authoring pass is complete; the next
+  mainline milestone is dynamic world-change work (PR-K).
 - Treat worldgen PoC work as parallel technical validation, not the next
   blocking mainline milestone.
 

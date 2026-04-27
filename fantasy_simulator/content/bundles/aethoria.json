@@ -28,6 +28,38 @@
       "Dawnport Harbor Council",
       "Coral Cove Conclave"
     ],
+    "glossary": [
+      {
+        "term": "Age of Embers",
+        "definition": "The current era of Aethoria, marked by fading old powers and rising new ones.",
+        "category": "era"
+      },
+      {
+        "term": "Arcane Cataclysm",
+        "definition": "The ancient magical disaster that tore the sky open and scarred the continent.",
+        "category": "history"
+      },
+      {
+        "term": "Ley-lines",
+        "definition": "Wild mana currents that pulse through Aethoria's mountains, forests, and seas.",
+        "category": "magic"
+      },
+      {
+        "term": "Aethorian Reckoning",
+        "definition": "The standard twelve-month calendar used for Aethorian world simulation.",
+        "category": "calendar"
+      },
+      {
+        "term": "Aethic Common",
+        "definition": "The main lingua franca of the Aethic heartlands and lowlands.",
+        "category": "language"
+      },
+      {
+        "term": "Elder Speech",
+        "definition": "An ancestral language layer behind parts of the Quenic language family.",
+        "category": "language"
+      }
+    ],
     "calendar": {
       "calendar_key": "aethorian_reckoning",
       "display_name": "Aethorian Reckoning",
@@ -533,6 +565,48 @@
         "x": 4,
         "y": 4
       }
+    ],
+    "route_seeds": [
+      {"route_id": "route_001", "from_site_id": "loc_frostpeak_summit", "to_site_id": "loc_the_grey_pass", "route_type": "mountain_pass", "distance": 1, "blocked": false},
+      {"route_id": "route_002", "from_site_id": "loc_frostpeak_summit", "to_site_id": "loc_thornwood", "route_type": "mountain_pass", "distance": 1, "blocked": false},
+      {"route_id": "route_003", "from_site_id": "loc_the_grey_pass", "to_site_id": "loc_skyveil_monastery", "route_type": "mountain_pass", "distance": 1, "blocked": false},
+      {"route_id": "route_004", "from_site_id": "loc_the_grey_pass", "to_site_id": "loc_ashenvale", "route_type": "mountain_pass", "distance": 1, "blocked": false},
+      {"route_id": "route_005", "from_site_id": "loc_skyveil_monastery", "to_site_id": "loc_ironvein_mine", "route_type": "road", "distance": 1, "blocked": false},
+      {"route_id": "route_006", "from_site_id": "loc_skyveil_monastery", "to_site_id": "loc_silverbrook", "route_type": "road", "distance": 1, "blocked": false},
+      {"route_id": "route_007", "from_site_id": "loc_ironvein_mine", "to_site_id": "loc_stormwatch_keep", "route_type": "mountain_pass", "distance": 1, "blocked": false},
+      {"route_id": "route_008", "from_site_id": "loc_ironvein_mine", "to_site_id": "loc_goblin_warrens", "route_type": "road", "distance": 1, "blocked": false},
+      {"route_id": "route_009", "from_site_id": "loc_stormwatch_keep", "to_site_id": "loc_eastwatch_tower", "route_type": "mountain_pass", "distance": 1, "blocked": false},
+      {"route_id": "route_010", "from_site_id": "loc_thornwood", "to_site_id": "loc_ashenvale", "route_type": "road", "distance": 1, "blocked": false},
+      {"route_id": "route_011", "from_site_id": "loc_thornwood", "to_site_id": "loc_elderroot_forest", "route_type": "road", "distance": 1, "blocked": false},
+      {"route_id": "route_012", "from_site_id": "loc_ashenvale", "to_site_id": "loc_silverbrook", "route_type": "road", "distance": 1, "blocked": false},
+      {"route_id": "route_013", "from_site_id": "loc_ashenvale", "to_site_id": "loc_millhaven", "route_type": "road", "distance": 1, "blocked": false},
+      {"route_id": "route_014", "from_site_id": "loc_silverbrook", "to_site_id": "loc_goblin_warrens", "route_type": "road", "distance": 1, "blocked": false},
+      {"route_id": "route_015", "from_site_id": "loc_silverbrook", "to_site_id": "loc_aethoria_capital", "route_type": "road", "distance": 1, "blocked": false},
+      {"route_id": "route_016", "from_site_id": "loc_goblin_warrens", "to_site_id": "loc_eastwatch_tower", "route_type": "road", "distance": 1, "blocked": false},
+      {"route_id": "route_017", "from_site_id": "loc_goblin_warrens", "to_site_id": "loc_sunken_ruins", "route_type": "road", "distance": 1, "blocked": false},
+      {"route_id": "route_018", "from_site_id": "loc_eastwatch_tower", "to_site_id": "loc_saltmarsh", "route_type": "road", "distance": 1, "blocked": false},
+      {"route_id": "route_019", "from_site_id": "loc_elderroot_forest", "to_site_id": "loc_millhaven", "route_type": "road", "distance": 1, "blocked": false},
+      {"route_id": "route_020", "from_site_id": "loc_elderroot_forest", "to_site_id": "loc_dragonbone_ridge", "route_type": "mountain_pass", "distance": 1, "blocked": false},
+      {"route_id": "route_021", "from_site_id": "loc_millhaven", "to_site_id": "loc_aethoria_capital", "route_type": "road", "distance": 1, "blocked": false},
+      {"route_id": "route_022", "from_site_id": "loc_millhaven", "to_site_id": "loc_dusty_crossroads", "route_type": "road", "distance": 1, "blocked": false},
+      {"route_id": "route_023", "from_site_id": "loc_aethoria_capital", "to_site_id": "loc_sunken_ruins", "route_type": "road", "distance": 1, "blocked": false},
+      {"route_id": "route_024", "from_site_id": "loc_aethoria_capital", "to_site_id": "loc_hearthglow_town", "route_type": "road", "distance": 1, "blocked": false},
+      {"route_id": "route_025", "from_site_id": "loc_sunken_ruins", "to_site_id": "loc_saltmarsh", "route_type": "road", "distance": 1, "blocked": false},
+      {"route_id": "route_026", "from_site_id": "loc_sunken_ruins", "to_site_id": "loc_mirefen_swamp", "route_type": "road", "distance": 1, "blocked": false},
+      {"route_id": "route_027", "from_site_id": "loc_saltmarsh", "to_site_id": "loc_dawnport", "route_type": "road", "distance": 1, "blocked": false},
+      {"route_id": "route_028", "from_site_id": "loc_dragonbone_ridge", "to_site_id": "loc_dusty_crossroads", "route_type": "mountain_pass", "distance": 1, "blocked": false},
+      {"route_id": "route_029", "from_site_id": "loc_dragonbone_ridge", "to_site_id": "loc_sunbaked_plains", "route_type": "mountain_pass", "distance": 1, "blocked": false},
+      {"route_id": "route_030", "from_site_id": "loc_dusty_crossroads", "to_site_id": "loc_hearthglow_town", "route_type": "road", "distance": 1, "blocked": false},
+      {"route_id": "route_031", "from_site_id": "loc_dusty_crossroads", "to_site_id": "loc_sandstone_outpost", "route_type": "road", "distance": 1, "blocked": false},
+      {"route_id": "route_032", "from_site_id": "loc_hearthglow_town", "to_site_id": "loc_mirefen_swamp", "route_type": "road", "distance": 1, "blocked": false},
+      {"route_id": "route_033", "from_site_id": "loc_hearthglow_town", "to_site_id": "loc_the_verdant_vale", "route_type": "road", "distance": 1, "blocked": false},
+      {"route_id": "route_034", "from_site_id": "loc_mirefen_swamp", "to_site_id": "loc_dawnport", "route_type": "road", "distance": 1, "blocked": false},
+      {"route_id": "route_035", "from_site_id": "loc_mirefen_swamp", "to_site_id": "loc_obsidian_crater", "route_type": "road", "distance": 1, "blocked": false},
+      {"route_id": "route_036", "from_site_id": "loc_dawnport", "to_site_id": "loc_coral_cove", "route_type": "road", "distance": 1, "blocked": false},
+      {"route_id": "route_037", "from_site_id": "loc_sunbaked_plains", "to_site_id": "loc_sandstone_outpost", "route_type": "road", "distance": 1, "blocked": false},
+      {"route_id": "route_038", "from_site_id": "loc_sandstone_outpost", "to_site_id": "loc_the_verdant_vale", "route_type": "road", "distance": 1, "blocked": false},
+      {"route_id": "route_039", "from_site_id": "loc_the_verdant_vale", "to_site_id": "loc_obsidian_crater", "route_type": "road", "distance": 1, "blocked": false},
+      {"route_id": "route_040", "from_site_id": "loc_obsidian_crater", "to_site_id": "loc_coral_cove", "route_type": "road", "distance": 1, "blocked": false}
     ],
     "naming_rules": {
       "first_names_male": [

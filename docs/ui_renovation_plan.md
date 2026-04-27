@@ -1,15 +1,15 @@
 # UI改造計画書
 
-**最終更新**: 2026-04-26（PR-I と TD-1〜TD-4 の負債解消は完了。次の mainline は PR-J、後続は PR-K）
+**最終更新**: 2026-04-27（PR-J の初期 authoring は完了。次の mainline は PR-K）
 
 この文書は、`Fantasy_simulator` のユーザインタフェース（UI）を現状の簡素な CLI から、物語生成ゲームにふさわしい魅力的な体験へ進化させるための計画書である。前半では現状の問題と目標を整理し、後半では5つの専門領域（世界シミュレーション、運営型シム、インタラクティブ叙述、4X設計、ソフトウェアアーキテクチャ）の視点から提案された改善策をまとめる。最後に採用するライブラリや段階的な実行計画を提示する。
 
 > **関連文書**: 本計画は `docs/implementation_plan.md`（公式な実装順・PR 分割・完了条件の正本）の `location_id` 移行・`WorldEventRecord` 導入・UI 連携規約、および `docs/next_version_plan.md` の `NarrativeContext` / `MapRenderInfo` 設計を前提としている。UI 改造の実装順や着手条件が他文書と衝突する場合は `docs/implementation_plan.md` を優先する。データモデルや migration の詳細はそれぞれの文書を参照のこと。
 >
 > **Textual vNext 詳細設計（RFCドラフト）**: `docs/aethoria_command_center_ui_renovation_plan_vnext.md` を参照。実装順序の正本は `docs/implementation_plan.md`。
-> **現時点の前提**: `docs/implementation_plan.md` 上では PR-I と TD-1〜TD-4 の負債解消までが
+> **現時点の前提**: `docs/implementation_plan.md` 上では PR-J の初期 authoring までが
 > mainline の完了対象であり、region mapの意味化と `NarrativeContext` の第一段も導入済みである。
-> 次の mainline 優先は PR-J とし、PR-K はその後続とする。本書もこの前提で読む。
+> 次段は PR-K で動的世界変化へ入る。本書もこの前提で読む。
 
 ---
 
@@ -267,12 +267,12 @@ map renderer は最低でも次のモードを持つ。
 
 短期的には **Rich + prompt_toolkit + wcwidth** の組み合わせが最も実用的で、既存 CLI を大きく壊さずに観測体験を改善できる。ただし順序は Rich 先行ではなく、**region map の意味論強化を主線、薄い Rich 化を補助線** とする。
 region map の意味論強化は PR-H1 で完了
-PR-H2、PR-I、TD-1〜TD-4 の負債解消は完了しており、次段は PR-J で世界観 authoring へ進み、その後 PR-K で動的世界変化へ入る
+PR-H2、PR-I、TD-1〜TD-4 の負債解消、PR-J の世界観 authoring は完了しており、次段は PR-K で動的世界変化へ入る
 prompt_toolkit と将来の Textual は根本的に異なる入力モデルであるため、prompt_toolkit 依存コードは入力抽象の背後に隔離する。
 
 そのうえで、次段階の map UI は「5×5 地点盤面の豪華化」ではなく、**terrain を持つ world の上に site と route が重なり、さらに world memory が履歴として染み出す観測 UI** として設計する。  
 main の現状では、このうち PR-G1 / PR-G2 に相当する基盤はすでに導入済みであり、
 seed 固定 worldgen PoC も TD-1〜TD-4 で導入済みである。以後の UI 課題は、
-その表示器を PR-J / PR-K の mainline 作業と、並行任意の worldgen 比較実験・より厚い report UI・将来の TUI 基盤へどう接続するかに移っている。
+その表示器を PR-K の mainline 作業と、並行任意の worldgen 比較実験・より厚い report UI・将来の TUI 基盤へどう接続するかに移っている。
 
 AA はそのための手段であり、目的ではない。

@@ -106,7 +106,7 @@ def _advance_simulation(sim: Simulator, years: int, ctx: UIContext | None = None
     out = ctx.out
 
     out.print_line()
-    out.print_heading(f"  {tr('advancing_simulation')} (+{years} years)")
+    out.print_heading(f"  {tr('advancing_simulation_years', years=years)}")
     for _ in range(years):
         sim.advance_years(1)
         pending = len(sim.get_pending_adventure_choices())

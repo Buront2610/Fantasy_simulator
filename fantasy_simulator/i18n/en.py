@@ -22,6 +22,7 @@ TEXT_EN: Dict[str, str] = {
     'running_simulation_details': 'Running simulation... ({years} years, ~{events} events/year)',
     'simulation_complete': 'Simulation complete.',
     'advancing_simulation': 'Advancing simulation...',
+    'advancing_simulation_years': 'Advancing simulation... (+{years} years)',
     'simulation_advanced_to_year': 'Simulation advanced to year {year}.',
     'alive': 'alive',
     'pending_choices': 'pending choices',

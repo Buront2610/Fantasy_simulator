@@ -199,6 +199,39 @@ class TestLoadSimulation:
         assert restored.world.routes[0].route_id == sim.world.routes[0].route_id
         assert restored.world.routes[0].blocked is True
 
+    def test_load_normalizes_bundle_backed_route_endpoint_aliases(self, tmp_path):
+        path = tmp_path / "stale-bundle-route-endpoint.json"
+        sim = Simulator(World(), seed=0)
+        save_simulation(sim, str(path))
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        thornwood = next(
+            location for location in data["world"]["grid"]
+            if location["id"] == "loc_thornwood"
+        )
+        thornwood["id"] = "legacy_thornwood_id"
+        route = next(
+            item for item in data["world"]["routes"]
+            if item["from_site_id"] == "loc_thornwood" or item["to_site_id"] == "loc_thornwood"
+        )
+        if route["from_site_id"] == "loc_thornwood":
+            route["from_site_id"] = "legacy_thornwood_id"
+        else:
+            route["to_site_id"] = "legacy_thornwood_id"
+        route["blocked"] = True
+        route_id = route["route_id"]
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+
+        restored = load_simulation(str(path))
+
+        assert restored is not None
+        restored_route = next(route for route in restored.world.routes if route.route_id == route_id)
+        assert restored_route.blocked is True
+        assert "legacy_thornwood_id" not in {restored_route.from_site_id, restored_route.to_site_id}
+        assert "loc_thornwood" in {restored_route.from_site_id, restored_route.to_site_id}
+
     def test_load_returns_none_for_invalid_bundle_backed_blocked_route_state(self, tmp_path):
         path = tmp_path / "invalid-blocked-route.json"
         sim = Simulator(World(), seed=0)

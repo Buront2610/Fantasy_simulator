@@ -6,6 +6,8 @@ import json
 
 from fantasy_simulator.content.setting_bundle import (
     CalendarDefinition,
+    DEFAULT_AETHORIA_BUNDLE_PATH,
+    GlossaryEntryDefinition,
     LanguageCommunityDefinition,
     LanguageDefinition,
     SettingBundle,
@@ -92,6 +94,28 @@ def test_world_definition_exposes_typed_culture_and_faction_inspection_entries()
     ]
 
 
+def test_world_definition_round_trips_optional_glossary_entries():
+    world_def = WorldDefinition(
+        world_key="custom",
+        display_name="Custom Realm",
+        lore_text="Custom lore",
+        glossary=[
+            GlossaryEntryDefinition(
+                term="Star-Road",
+                definition="A navigable ley path used by skyfarers.",
+                category="cosmology",
+            )
+        ],
+    )
+
+    restored = WorldDefinition.from_dict(world_def.to_dict())
+
+    assert restored == world_def
+    assert restored.glossary_entries() == [
+        SettingEntryInspection("glossary", "star_road", "Star-Road"),
+    ]
+
+
 def test_setting_bundle_authoring_summary_includes_culture_and_faction_keys():
     bundle = SettingBundle(
         schema_version=1,
@@ -110,6 +134,26 @@ def test_setting_bundle_authoring_summary_includes_culture_and_faction_keys():
     assert summary.faction_count == 2
     assert summary.culture_keys == ["river_clans", "skyfolk"]
     assert summary.faction_keys == ["dawn_court", "wardens"]
+
+
+def test_setting_bundle_authoring_summary_includes_glossary_keys():
+    bundle = SettingBundle(
+        schema_version=1,
+        world_definition=WorldDefinition(
+            world_key="custom",
+            display_name="Custom Realm",
+            lore_text="Custom lore",
+            glossary=[
+                GlossaryEntryDefinition(term="Star-Road"),
+                GlossaryEntryDefinition(term="Ember Crown"),
+            ],
+        ),
+    )
+
+    summary = build_setting_bundle_authoring_summary(bundle)
+
+    assert summary.glossary_count == 2
+    assert summary.glossary_keys == ["ember_crown", "star_road"]
 
 
 def test_setting_bundle_authoring_summary_includes_sites_with_native_names():
@@ -249,6 +293,7 @@ def test_default_aethoria_bundle_has_minimal_phase_i_slots():
     assert bundle.world_definition.naming_rules.last_names
     assert bundle.world_definition.languages
     assert bundle.world_definition.language_communities
+    assert bundle.world_definition.glossary
     capital_seed = next(
         seed for seed in bundle.world_definition.site_seeds
         if seed.location_id == "loc_aethoria_capital"
@@ -341,6 +386,35 @@ def test_bundle_validation_preserves_explicitly_empty_route_seeds() -> None:
     bundle = bundle_from_dict_validated(payload, source="test bundle")
 
     assert bundle.world_definition.route_seeds == []
+
+
+def test_aethoria_source_bundle_authors_glossary_and_routes() -> None:
+    data = json.loads(DEFAULT_AETHORIA_BUNDLE_PATH.read_text(encoding="utf-8"))
+    world_data = data["world_definition"]
+
+    assert len(world_data.get("glossary", [])) >= 6
+    assert len(world_data.get("route_seeds", [])) == 40
+    assert world_data["route_seeds"][0] == {
+        "route_id": "route_001",
+        "from_site_id": "loc_frostpeak_summit",
+        "to_site_id": "loc_the_grey_pass",
+        "route_type": "mountain_pass",
+        "distance": 1,
+        "blocked": False,
+    }
+
+
+def test_aethoria_source_route_seeds_match_legacy_backfill() -> None:
+    data = json.loads(DEFAULT_AETHORIA_BUNDLE_PATH.read_text(encoding="utf-8"))
+    authored_routes = data["world_definition"]["route_seeds"]
+    legacy_data = json.loads(json.dumps(data))
+    legacy_data["world_definition"].pop("route_seeds")
+
+    legacy_bundle = bundle_from_dict_validated(legacy_data, source="legacy aethoria bundle")
+
+    assert authored_routes == [
+        route.to_dict() for route in legacy_bundle.world_definition.route_seeds
+    ]
 
 
 def test_bundle_validation_rejects_non_boolean_route_seed_blocked() -> None:
@@ -1003,6 +1077,68 @@ def test_bundle_validation_rejects_blank_cultures_and_factions() -> None:
         raise AssertionError("Expected blank factions to fail fast")
 
 
+def test_bundle_validation_rejects_blank_glossary_terms() -> None:
+    payload = {
+        "schema_version": 1,
+        "world_definition": {
+            "world_key": "blank_glossary",
+            "display_name": "Blank Glossary",
+            "lore_text": "Malformed",
+            "glossary": [
+                {
+                    "term": "  ",
+                    "definition": "Whitespace is not a term.",
+                }
+            ],
+            "site_seeds": [],
+        },
+    }
+
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "blank glossary terms" in str(exc)
+    else:
+        raise AssertionError("Expected blank glossary terms to fail fast")
+
+
+def test_bundle_validation_rejects_duplicate_glossary_terms_and_keys() -> None:
+    payload = {
+        "schema_version": 1,
+        "world_definition": {
+            "world_key": "duplicate_glossary",
+            "display_name": "Duplicate Glossary",
+            "lore_text": "Malformed",
+            "glossary": [
+                {"term": "Star Road", "definition": "First."},
+                {"term": "Star Road", "definition": "Second."},
+            ],
+            "site_seeds": [],
+        },
+    }
+
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "duplicate glossary terms" in str(exc)
+        assert "Star Road" in str(exc)
+    else:
+        raise AssertionError("Expected duplicate glossary terms to fail fast")
+
+    payload["world_definition"]["glossary"] = [
+        {"term": "Star-Road", "definition": "First."},
+        {"term": "Star Road", "definition": "Second."},
+    ]
+
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "duplicate glossary inspection keys" in str(exc)
+        assert "star_road" in str(exc)
+    else:
+        raise AssertionError("Expected duplicate glossary keys to fail fast")
+
+
 def test_load_setting_bundle_reports_duplicate_race_names(tmp_path):
     bundle_path = tmp_path / "invalid-duplicate-races.json"
     bundle_path.write_text(
@@ -1155,8 +1291,11 @@ def test_bundle_authoring_summary_exposes_region_route_and_language_breakdowns()
     assert "loc_aethoria_capital" in summary.resident_site_ids
     assert summary.culture_count == len(bundle.world_definition.cultures)
     assert summary.faction_count == len(bundle.world_definition.factions)
+    assert summary.glossary_count == len(bundle.world_definition.glossary)
     assert "aethic_heartlanders" in summary.culture_keys
     assert "aethorian_crown_council" in summary.faction_keys
+    assert "arcane_cataclysm" in summary.glossary_keys
+    assert "ley_lines" in summary.glossary_keys
     assert summary.site_counts_by_region_type["city"] >= 1
     assert summary.route_counts_by_type["road"] >= 1
     assert "aethic_common" in summary.language_keys
