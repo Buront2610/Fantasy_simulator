@@ -8,16 +8,20 @@ across the full year instead of pinning them to a few scripted months.
 
 from __future__ import annotations
 
-from typing import Dict, List
-
 from ..i18n import tr
-from ..rumor import age_rumors, generate_rumors_for_period, trim_rumors
 from .calendar import annual_probability_to_fraction, distributed_budget
+from .timeline_calendar import propagation_month_window
 from .timeline_pipeline import (
     DayPhaseContext,
     DayPhaseKind,
     build_day_phase_context,
     build_day_phase_plan,
+)
+from .timeline_rumors import generate_and_age_rumors_for_month, generate_and_age_rumors_for_year
+from .timeline_seasons import (
+    SEASONAL_MODIFIERS as DEFAULT_SEASONAL_MODIFIERS,
+    apply_seasonal_modifiers,
+    revert_seasonal_modifiers,
 )
 
 
@@ -37,21 +41,7 @@ class TimelineMixin:
     """
 
     # Seasonal modifiers applied to locations each month (design §5.7).
-    SEASONAL_MODIFIERS: Dict[tuple, Dict[str, int]] = {
-        ("winter", "mountain"): {"danger": +30, "road_condition": -20},
-        ("winter", "forest"): {"danger": +15, "road_condition": -15},
-        ("winter", "sea"): {"traffic": -20},
-        ("winter", "plains"): {"road_condition": -10},
-        ("spring", "village"): {"mood": +10, "traffic": +10},
-        ("spring", "city"): {"mood": +5, "traffic": +10},
-        ("spring", "forest"): {"danger": -10},
-        ("summer", "city"): {"traffic": +20},
-        ("summer", "sea"): {"traffic": +20, "danger": -10},
-        ("summer", "plains"): {"traffic": +15},
-        ("autumn", "plains"): {"danger": +10},
-        ("autumn", "forest"): {"danger": +10},
-        ("autumn", "dungeon"): {"danger": +15},
-    }
+    SEASONAL_MODIFIERS = DEFAULT_SEASONAL_MODIFIERS
 
     # Internal event-generation density multiplier (§B-1).
     SIMULATION_DENSITY: float = 1.0
@@ -190,22 +180,12 @@ class TimelineMixin:
 
     def _run_month_end_rumor_phase(self, month: int) -> None:
         """Age, generate, and trim rumors at month end."""
-        active, expired = age_rumors(self.world.rumors, months=1)
-        self.world.rumors = active
-        self.world.rumor_archive.extend(expired)
-
-        new_rumors = generate_rumors_for_period(
+        generate_and_age_rumors_for_month(
             self.world,
             year=self.world.year,
             month=month,
-            max_rumors=3,
             rng=self.rng,
         )
-        self.world.rumors.extend(new_rumors)
-
-        kept, trimmed = trim_rumors(self.world.rumors)
-        self.world.rumors = kept
-        self.world.rumor_archive.extend(trimmed)
 
     def _run_month_end_state_phase(self, month: int) -> None:
         """Propagate world state on configured month-end intervals."""
@@ -300,55 +280,16 @@ class TimelineMixin:
 
     def _apply_seasonal_modifiers(self, month: int) -> None:
         """Apply seasonal modifiers to locations for the duration of one month."""
-        season = self.world.season_for_month(month)
-        self._active_seasonal_deltas: List[tuple] = []
-        for (s, region), deltas in self.SEASONAL_MODIFIERS.items():
-            if s != season:
-                continue
-            for loc in self.world.grid.values():
-                if loc.region_type != region:
-                    continue
-                for attr, delta in deltas.items():
-                    if not hasattr(loc, attr):
-                        continue
-                    old_val = getattr(loc, attr)
-                    new_val = max(0, min(100, old_val + delta))
-                    setattr(loc, attr, new_val)
-                    self._active_seasonal_deltas.append((loc, attr, new_val - old_val))
+        self._active_seasonal_deltas = apply_seasonal_modifiers(self.world, month)
 
     def _revert_seasonal_modifiers(self) -> None:
         """Revert seasonal modifiers applied by _apply_seasonal_modifiers."""
-        for loc, attr, applied_delta in self._active_seasonal_deltas:
-            old_val = getattr(loc, attr)
-            setattr(loc, attr, max(0, min(100, old_val - applied_delta)))
-        self._active_seasonal_deltas.clear()
+        revert_seasonal_modifiers(self._active_seasonal_deltas)
 
     def _generate_and_age_rumors(self) -> None:
         """Perform the full annual rumor cycle as 12 month-end batches."""
-        for gen_month in range(1, self.world.months_per_year + 1):
-            active, expired = age_rumors(self.world.rumors, months=1)
-            self.world.rumors = active
-            self.world.rumor_archive.extend(expired)
-            new_rumors = generate_rumors_for_period(
-                self.world,
-                year=self.world.year,
-                month=gen_month,
-                max_rumors=3,
-                rng=self.rng,
-            )
-            self.world.rumors.extend(new_rumors)
-            kept, trimmed = trim_rumors(self.world.rumors)
-            self.world.rumors = kept
-            self.world.rumor_archive.extend(trimmed)
+        generate_and_age_rumors_for_year(self.world, rng=self.rng)
 
     def _propagation_month_window(self, month: int) -> int:
         """Return how many months of state propagation to apply at this month-end."""
-        months_per_year = self.world.months_per_year
-        if months_per_year % 4 == 0:
-            interval = max(1, months_per_year // 4)
-            if month % interval == 0:
-                return interval
-            return 0
-        if month == months_per_year:
-            return months_per_year
-        return 0
+        return propagation_month_window(month, self.world.months_per_year)
