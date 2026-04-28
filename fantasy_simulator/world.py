@@ -1,50 +1,27 @@
 """
-world.py - World map, LocationState dataclass, and the World class.
+world.py - World aggregate and compatibility exports.
 """
 
 from __future__ import annotations
 
 import random
-from collections import deque
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from .event_models import WorldEventRecord
-from .i18n import tr
 from .language.engine import LanguageEngine, fallback_evolution_targets
 from .language.state import LanguageEvolutionRecord, LanguageRuntimeState
 from .rule_override_resolution import (
     clone_default_event_impact_rules,
     clone_default_propagation_rules,
 )
-from .world_language import (
-    advance_world_languages_for_year,
-    apply_evolution_record as apply_language_evolution_record,
-    build_language_engine,
-    evolution_records_for_language,
-    language_status as build_language_status,
-    location_endonym as resolve_location_endonym,
-    refresh_world_generated_endonyms,
-    resolve_language_display_name,
-)
-from .world_event_log import (
-    append_display_event_log_entry,
-    compatibility_event_log_view,
-    rebuild_display_event_log,
-    trim_event_log_entries,
-)
+from . import world_language_facade as language_facade
+from . import world_event_log_facade as event_log_facade
 from .world_bundle_transition import (
     apply_setting_bundle as apply_world_setting_bundle,
     set_setting_bundle_metadata,
     topology_signature,
 )
 from .world_location_references import LocationReferenceResolver
-from .world_location_state import (
-    LocationState,
-    _clamp_state,
-    _string_list_payload,
-    _trace_list_payload,
-)
-from .world_records import CalendarChangeRecord, MemorialRecord
 from .world_memory import (
     add_alias as add_location_alias,
     add_live_trace as add_location_live_trace,
@@ -57,6 +34,21 @@ from .world_load_normalizer import (
     normalize_after_load as normalize_loaded_world_state,
     rebuild_recent_event_ids,
 )
+from .world_actor_index import (
+    add_adventure as add_adventure_to_index,
+    add_character as add_character_to_index,
+    characters_at_location,
+    complete_adventure as complete_adventure_in_index,
+    default_resident_location_id,
+    ensure_valid_character_locations as ensure_valid_character_locations_in_index,
+    location_ids as location_ids_for_locations,
+    location_name as location_name_for_id,
+    location_names as location_names_for_locations,
+    mark_location_visited as mark_location_visited_in_index,
+    rebuild_adventure_index as build_adventure_index,
+    rebuild_character_index,
+    remove_character as remove_character_from_index,
+)
 from .world_reference_repair import (
     backfill_watched_actor_tags,
     normalize_world_references_after_structure_change,
@@ -68,31 +60,58 @@ from .world_persistence import (
 )
 from .world_route_graph import (
     ObservableRouteList,
-    rebuild_route_index,
     replace_routes,
     routes_for_site,
 )
 from .world_event_state import (
     apply_event_impact_to_location,
-    append_canonical_event_record,
+)
+from .world_event_history import (
+    latest_absolute_day_before_or_on as latest_event_absolute_day_before_or_on,
+    record_world_event,
+)
+from .world_event_queries import (
+    events_by_actor,
+    events_by_kind,
+    events_by_location,
+    events_by_month,
+    events_by_year,
+)
+from .world_dynamic_changes import (
+    apply_controlling_faction,
+    apply_location_rename,
+    apply_route_blocked_state,
 )
 from .world_event_index import EventHistoryIndex
-from .world_calendar import (
-    advance_calendar_position as advance_calendar_position_for_calendar,
-    apply_calendar_definition_history,
-    calendar_definition_by_key_ref,
-    calendar_definition_for_date_ref,
-    clamp_calendar_position as clamp_calendar_position_for_calendar,
-    default_season,
-    remaining_days_in_year as remaining_days_in_year_for_calendar,
-    season_for_date as season_for_calendar_date,
-    season_for_month as season_for_calendar,
-    months_elapsed_between as months_elapsed_between_for_calendar,
+from . import world_calendar_facade as calendar_facade
+from .world_topology_queries import (
+    connected_site_ids,
+    grid_neighboring_locations,
+    propagation_neighboring_locations,
+    reachable_location_ids as reachable_topology_location_ids,
+    travel_neighboring_locations,
 )
-from .world_state_propagation import (
-    decay_toward_baseline,
-    propagate_state_changes,
+from .world_state_runtime import (
+    decay_world_state,
+    propagate_world_state,
 )
+from .world_location_state import (
+    LocationState,
+    clamp_state as _clamp_state,
+    configure_location_state_resolvers,
+    location_state_from_site_seed,
+)
+from .world_location_structure import (
+    clear_world_structure,
+    copy_location_runtime_state,
+    default_location_entries as default_location_entries_from_seeds,
+    grid_matches_site_seeds,
+    preserved_locations_by_normalized_id,
+    register_location,
+    serialized_grid_is_compatible_with_site_seeds,
+    site_seed_tags,
+)
+from .world_records import CalendarChangeRecord, MemorialRecord
 from .world_topology_state import (
     WorldTopologyState,
     build_atlas_layout_from_topology,
@@ -100,11 +119,13 @@ from .world_topology_state import (
     overlay_serialized_route_state,
     validate_topology_integrity,
 )
+from .world_topology_runtime import (
+    apply_topology_state,
+    route_index_by_site,
+    site_index_by_location,
+)
 from .world_topology import (
     PROPAGATION_TOPOLOGY_TRAVEL,
-    PROPAGATION_TOPOLOGY_GRID,
-    grid_neighbor_ids,
-    route_neighbor_ids,
 )
 from .content.setting_bundle import (
     CalendarDefinition,
@@ -126,6 +147,12 @@ if TYPE_CHECKING:
     from .adventure import AdventureRun
     from .character import Character
     from .rumor import Rumor
+
+
+configure_location_state_resolvers(
+    fallback_resolver=fallback_location_id,
+    defaults_resolver=get_location_state_defaults,
+)
 
 
 def _clone_calendar(calendar: CalendarDefinition) -> CalendarDefinition:
@@ -224,16 +251,11 @@ class World:
         same history in memory. The returned value is a read-only view so direct
         list mutation cannot silently diverge from canonical history.
         """
-        return compatibility_event_log_view(
-            self._display_event_log,
-            self.event_records,
-            max_event_log=self.MAX_EVENT_LOG,
-            translate=tr,
-        )
+        return event_log_facade.event_log_view(self)
 
     @event_log.setter
     def event_log(self, value: List[str]) -> None:
-        self._display_event_log = trim_event_log_entries(value, max_event_log=self.MAX_EVENT_LOG)
+        event_log_facade.set_event_log_entries(self, value)
 
     @property
     def routes(self) -> ObservableRouteList:
@@ -299,12 +321,7 @@ class World:
 
     @property
     def language_engine(self) -> LanguageEngine:
-        if self._language_engine is None:
-            self._language_engine = build_language_engine(
-                self._setting_bundle.world_definition,
-                self._language_runtime_states,
-            )
-        return self._language_engine
+        return language_facade.language_engine(self)
 
     def naming_rules_for_identity(
         self,
@@ -313,7 +330,7 @@ class World:
         tribe: str | None = None,
         region: str | None = None,
     ):
-        return self.language_engine.naming_rules_for_identity(race=race, tribe=tribe, region=region)
+        return language_facade.naming_rules_for_identity(self, race=race, tribe=tribe, region=region)
 
     def resolve_language_for_identity(
         self,
@@ -322,110 +339,53 @@ class World:
         tribe: str | None = None,
         region: str | None = None,
     ) -> str | None:
-        return resolve_language_display_name(
-            self.language_engine,
-            race=race,
-            tribe=tribe,
-            region=region,
-        )
+        return language_facade.resolve_language_for_identity(self, race=race, tribe=tribe, region=region)
 
     def describe_language_lineage(self, language_key: str) -> List[str]:
-        return self.language_engine.describe_language_lineage(language_key)
+        return language_facade.describe_language_lineage(self, language_key)
 
     def location_endonym(self, location_id: str) -> str | None:
-        return resolve_location_endonym(
-            self._setting_bundle.world_definition,
-            self.language_engine,
-            location_id,
-        )
+        return language_facade.location_endonym(self, location_id)
 
     def language_status(self) -> List[Dict[str, Any]]:
-        return build_language_status(
-            self._setting_bundle.world_definition,
-            self.language_engine,
-            self.language_evolution_history,
-        )
+        return language_facade.language_status(self)
 
     def language_evolution_records(self, language_key: str) -> List[LanguageEvolutionRecord]:
-        return evolution_records_for_language(self.language_evolution_history, language_key)
+        return language_facade.language_evolution_records(self, language_key)
 
     def _register_location(self, loc: LocationState) -> None:
-        existing_at_coord = self.grid.get((loc.x, loc.y))
-        if existing_at_coord is not None and existing_at_coord is not loc:
-            self._location_name_index.pop(existing_at_coord.canonical_name, None)
-            self._location_id_index.pop(existing_at_coord.id, None)
-
-        existing_by_id = self._location_id_index.get(loc.id)
-        if existing_by_id is not None and existing_by_id is not loc:
-            self.grid.pop((existing_by_id.x, existing_by_id.y), None)
-            self._location_name_index.pop(existing_by_id.canonical_name, None)
-
-        self.grid[(loc.x, loc.y)] = loc
-        self._location_name_index[loc.canonical_name] = loc
-        self._location_id_index[loc.id] = loc
+        register_location(
+            grid=self.grid,
+            location_name_index=self._location_name_index,
+            location_id_index=self._location_id_index,
+            location=loc,
+        )
 
     def _clear_world_structure(self) -> None:
         """Reset world structures derived from the active location grid."""
-        self.grid.clear()
-        self._location_id_index.clear()
-        self._location_name_index.clear()
-        self.terrain_map = None
-        self.sites = []
-        self.routes = []
-        self._routes_dirty = True
-        self._route_graph_explicit = False
-        self._site_index = {}
-        self._routes_by_site = {}
-        self.atlas_layout = None
+        clear_world_structure(self)
 
     def _copy_location_runtime_state(self, source: LocationState, target: LocationState) -> None:
         """Preserve mutable location state across structural rebuilds."""
-        structural_aliases = list(target.aliases)
-        structural_endonym = target.generated_endonym
-        target.prosperity = source.prosperity
-        target.safety = source.safety
-        target.mood = source.mood
-        target.danger = source.danger
-        target.traffic = source.traffic
-        target.rumor_heat = source.rumor_heat
-        target.road_condition = source.road_condition
-        target.visited = source.visited
-        target.controlling_faction_id = source.controlling_faction_id
-        target.recent_event_ids = list(source.recent_event_ids)
-        target.aliases = list(dict.fromkeys(structural_aliases + list(source.aliases)))
-        target.generated_endonym = structural_endonym
-        target.memorial_ids = list(source.memorial_ids)
-        target.live_traces = [dict(trace) for trace in source.live_traces]
+        copy_location_runtime_state(source, target)
 
     def _refresh_generated_endonyms(
         self,
         stale_endonyms_by_location_id: Dict[str, str] | None = None,
     ) -> None:
-        refresh_world_generated_endonyms(
+        language_facade.refresh_generated_endonyms(
             self,
             stale_endonyms_by_location_id=stale_endonyms_by_location_id,
         )
 
     def _derive_language_evolution_record(self, language_key: str, year: int) -> LanguageEvolutionRecord | None:
-        return self.language_engine.derive_evolution_record(
-            language_key,
-            year=year,
-            evolution_history=self.language_evolution_history,
-        )
+        return language_facade.derive_language_evolution_record(self, language_key=language_key, year=year)
 
     def _apply_language_evolution_record(self, record: LanguageEvolutionRecord) -> bool:
-        updated_runtime_states = apply_language_evolution_record(
-            self.language_engine,
-            self._language_runtime_states,
-            record,
-        )
-        if updated_runtime_states is None:
-            return False
-        self._language_runtime_states = updated_runtime_states
-        return True
+        return language_facade.apply_language_evolution_record(self, record)
 
     def _maybe_evolve_languages_for_year(self, year: int) -> None:
-        advance_world_languages_for_year(self, year)
+        language_facade.maybe_evolve_languages_for_year(self, year)
 
     def _build_default_map(self, previous_locations: Optional[List[LocationState]] = None) -> None:
         """Rebuild the world from the active setting bundle's site seeds.
@@ -436,14 +396,10 @@ class World:
         """
         if previous_locations is None:
             previous_locations = list(self.grid.values())
-        preserved_by_id: Dict[str, LocationState] = {}
-        for location in previous_locations:
-            normalized_id = self.normalize_location_id(
-                location.id,
-                location_name=location.canonical_name,
-            )
-            if normalized_id is not None and normalized_id not in preserved_by_id:
-                preserved_by_id[normalized_id] = location
+        preserved_by_id = preserved_locations_by_normalized_id(
+            previous_locations,
+            normalize_location_id=lambda loc_id, name: self.normalize_location_id(loc_id, location_name=name),
+        )
         self._clear_world_structure()
         for seed in self._setting_bundle.world_definition.site_seeds:
             x, y = seed.x, seed.y
@@ -457,11 +413,11 @@ class World:
 
     def default_location_entries(self) -> List[Tuple[str, str, str, str, int, int]]:
         """Return in-bounds bundle-backed site seeds in the legacy tuple format."""
-        return [
-            seed.as_world_data_entry()
-            for seed in self._setting_bundle.world_definition.site_seeds
-            if 0 <= seed.x < self.width and 0 <= seed.y < self.height
-        ]
+        return default_location_entries_from_seeds(
+            self._setting_bundle.world_definition.site_seeds,
+            width=self.width,
+            height=self.height,
+        )
 
     def _overlay_location_runtime_state_from_dict(self, data: Dict[str, Any]) -> None:
         """Overlay serialized runtime state onto an existing bundle-backed location."""
@@ -483,28 +439,15 @@ class World:
 
     def _serialized_grid_is_compatible_with_active_bundle(self, grid_data: List[Dict[str, Any]]) -> bool:
         """Return whether serialized locations can be mapped onto the active bundle."""
-        if not grid_data:
-            return True
-        bundle_location_ids = {
-            seed.location_id
-            for seed in self._setting_bundle.world_definition.site_seeds
-        }
-        for loc_data in grid_data:
-            canonical_name = loc_data.get("canonical_name") or loc_data.get("name", "")
-            normalized_id = self.normalize_location_id(
-                loc_data.get("id"),
-                location_name=canonical_name,
-            )
-            if normalized_id not in bundle_location_ids:
-                return False
-        return True
+        return serialized_grid_is_compatible_with_site_seeds(
+            grid_data,
+            site_seeds=self._setting_bundle.world_definition.site_seeds,
+            normalize_location_id=lambda loc_id, name: self.normalize_location_id(loc_id, location_name=name),
+        )
 
     def _site_seed_tags(self, location_id: str) -> List[str]:
         """Return semantic tags for a location from the active setting bundle."""
-        for seed in self._setting_bundle.world_definition.site_seeds:
-            if seed.location_id == location_id:
-                return list(seed.tags)
-        return []
+        return site_seed_tags(self._setting_bundle.world_definition.site_seeds, location_id)
 
     def _bundle_location_id_for_name(self, name: str) -> str | None:
         """Resolve a location name through the active setting bundle."""
@@ -603,20 +546,11 @@ class World:
 
     def _location_state_from_site_seed(self, seed: Any) -> LocationState:
         """Build a LocationState from a bundle site seed."""
-        defaults = self.location_state_defaults(seed.location_id, seed.region_type)
-        location = LocationState(
-            id=seed.location_id,
-            canonical_name=seed.name,
-            description=seed.description,
-            region_type=seed.region_type,
-            x=seed.x,
-            y=seed.y,
-            **defaults,
+        return location_state_from_site_seed(
+            seed,
+            defaults_for_location=self.location_state_defaults,
+            endonym_for_location=self.location_endonym,
         )
-        endonym = self.location_endonym(seed.location_id)
-        if endonym and endonym != location.canonical_name:
-            location.generated_endonym = endonym
-        return location
 
     def _build_terrain_from_grid(self, *, explicit_route_graph: Optional[bool] = None) -> None:
         """Generate terrain, sites, and routes from the current grid.
@@ -650,13 +584,7 @@ class World:
 
     def _apply_topology_state(self, topology_state: WorldTopologyState) -> None:
         """Apply a reconstructed topology snapshot to the live world state."""
-        self.terrain_map = topology_state.terrain_map
-        self.sites = topology_state.sites
-        self.routes = topology_state.routes
-        self._rebuild_site_index()
-        self._rebuild_route_index()
-        self._route_graph_explicit = topology_state.route_graph_explicit
-        self.atlas_layout = topology_state.atlas_layout
+        apply_topology_state(self, topology_state)
 
     def _build_atlas_layout_from_current_state(self) -> AtlasLayout:
         """Generate the persistent atlas layout from current terrain/site data."""
@@ -670,7 +598,7 @@ class World:
 
     def _rebuild_site_index(self) -> None:
         """Rebuild the site lookup index keyed by location_id."""
-        self._site_index = {s.location_id: s for s in self.sites}
+        self._site_index = site_index_by_location(self.sites)
 
     def _mark_routes_dirty(self) -> None:
         """Mark cached route adjacency as stale after route mutations."""
@@ -678,7 +606,7 @@ class World:
 
     def _rebuild_route_index(self) -> None:
         """Rebuild route adjacency lists keyed by endpoint location id."""
-        self._routes_by_site = rebuild_route_index(
+        self._routes_by_site = route_index_by_site(
             sites=self.sites,
             routes=self.routes,
             on_change=self._mark_routes_dirty,
@@ -709,36 +637,29 @@ class World:
 
     def get_connected_site_ids(self, location_id: str) -> List[str]:
         """Return location_ids of sites reachable via routes from a site."""
-        return sorted(
-            route_neighbor_ids(location_id, routes=self.get_routes_for_site(location_id)),
+        return connected_site_ids(
+            location_id,
+            get_routes_for_site=self.get_routes_for_site,
         )
 
     def get_grid_neighboring_locations(self, location_id: str) -> List[LocationState]:
         """Return adjacency by physical map grid, regardless of route state."""
-        neighbor_ids = grid_neighbor_ids(
+        return grid_neighboring_locations(
             location_id,
             location_index=self._location_id_index,
             grid=self.grid,
         )
-        return [
-            self._location_id_index[neighbor_id]
-            for neighbor_id in neighbor_ids
-            if neighbor_id in self._location_id_index
-        ]
 
     def get_travel_neighboring_locations(self, location_id: str) -> List[LocationState]:
         """Return neighbors reachable for travel using the travel topology contract."""
-        if self.routes:
-            neighbor_ids = self.get_connected_site_ids(location_id)
-        elif self._route_graph_explicit:
-            neighbor_ids = []
-        else:
-            neighbor_ids = grid_neighbor_ids(location_id, location_index=self._location_id_index, grid=self.grid)
-        return [
-            self._location_id_index[neighbor_id]
-            for neighbor_id in neighbor_ids
-            if neighbor_id in self._location_id_index
-        ]
+        return travel_neighboring_locations(
+            location_id,
+            location_index=self._location_id_index,
+            grid=self.grid,
+            routes=self.routes,
+            route_graph_explicit=self._route_graph_explicit,
+            get_routes_for_site=self.get_routes_for_site,
+        )
 
     def get_propagation_neighboring_locations(
         self,
@@ -760,51 +681,24 @@ class World:
             if include_blocked_routes is None
             else include_blocked_routes
         )
-        if topology_mode == PROPAGATION_TOPOLOGY_TRAVEL:
-            if self.routes:
-                neighbor_ids = sorted(
-                    route_neighbor_ids(
-                        location_id,
-                        routes=self.get_routes_for_site(location_id),
-                        include_blocked=effective_include_blocked_routes,
-                    )
-                )
-            elif self._route_graph_explicit:
-                neighbor_ids = []
-            else:
-                neighbor_ids = grid_neighbor_ids(location_id, location_index=self._location_id_index, grid=self.grid)
-        elif topology_mode == PROPAGATION_TOPOLOGY_GRID:
-            neighbor_ids = grid_neighbor_ids(location_id, location_index=self._location_id_index, grid=self.grid)
-        else:
-            raise ValueError(f"Unsupported propagation topology mode: {topology_mode}")
-        return [
-            self._location_id_index[neighbor_id]
-            for neighbor_id in neighbor_ids
-            if neighbor_id in self._location_id_index
-        ]
+        return propagation_neighboring_locations(
+            location_id,
+            location_index=self._location_id_index,
+            grid=self.grid,
+            routes=self.routes,
+            route_graph_explicit=self._route_graph_explicit,
+            get_routes_for_site=self.get_routes_for_site,
+            topology_mode=topology_mode,
+            include_blocked_routes=effective_include_blocked_routes,
+        )
 
     def reachable_location_ids(self, location_id: str) -> List[str]:
         """Return all reachable location_ids from ``location_id``."""
-        if location_id not in self._location_id_index:
-            return []
-
-        visited = {location_id}
-        queue = deque([location_id])
-        reachable: List[str] = []
-
-        while queue:
-            current = queue.popleft()
-            neighbor_ids = [
-                loc.id for loc in self.get_travel_neighboring_locations(current)
-            ]
-            for neighbor_id in neighbor_ids:
-                if neighbor_id in visited or neighbor_id not in self._location_id_index:
-                    continue
-                visited.add(neighbor_id)
-                reachable.append(neighbor_id)
-                queue.append(neighbor_id)
-
-        return reachable
+        return reachable_topology_location_ids(
+            location_id,
+            location_index=self._location_id_index,
+            get_travel_neighbors=self.get_travel_neighboring_locations,
+        )
 
     def _location_ids_for_site_tag(self, tag: str) -> List[str]:
         """Return in-bounds location_ids for bundle site seeds carrying *tag*."""
@@ -815,78 +709,47 @@ class World:
         ]
 
     def _default_resident_location_id(self) -> str:
-        tagged_defaults = (
-            self._location_ids_for_site_tag("default_resident")
-            or self._location_ids_for_site_tag("capital")
+        return default_resident_location_id(
+            locations=self.grid.values(),
+            location_index=self._location_id_index,
+            location_ids_for_site_tag=self._location_ids_for_site_tag,
         )
-        if tagged_defaults:
-            return sorted(tagged_defaults)[0]
-        non_dungeons = sorted(
-            loc.id for loc in self.grid.values() if loc.region_type != "dungeon"
-        )
-        if non_dungeons:
-            return non_dungeons[0]
-        all_locations = sorted(self._location_id_index)
-        if all_locations:
-            return all_locations[0]
-        raise ValueError("World has no locations.")
 
     def mark_location_visited(self, location_id: str) -> None:
         """Mark a location as visited when it is meaningfully occupied or reached."""
-        location = self._location_id_index.get(location_id)
-        if location is not None:
-            location.visited = True
+        mark_location_visited_in_index(self._location_id_index, location_id)
 
     def ensure_valid_character_locations(self) -> None:
         """Repair invalid location references after loading legacy data."""
-        if not self.characters:
-            return
-        if not self._location_id_index:
-            for character in self.characters:
-                character.location_id = ""
-            return
-        fallback = self._default_resident_location_id()
-        for character in self.characters:
-            if character.location_id not in self._location_id_index:
-                character.location_id = fallback
-            self.mark_location_visited(character.location_id)
+        ensure_valid_character_locations_in_index(
+            characters=self.characters,
+            location_index=self._location_id_index,
+            default_location_id=self._default_resident_location_id,
+            mark_visited=self.mark_location_visited,
+        )
 
     def add_character(self, character: Character, rng: Any = random) -> None:
-        if character.location_id not in self._location_id_index:
-            if not character.location_id:
-                character.location_id = self._default_resident_location_id()
-            else:
-                options = [loc.id for loc in self.grid.values() if loc.region_type != "dungeon"]
-                if options:
-                    character.location_id = rng.choice(options)
-                else:
-                    character.location_id = self._default_resident_location_id()
-        if character.char_id in self._char_index:
-            raise ValueError(
-                f"Duplicate character ID: {character.char_id!r} "
-                f"(existing: {self._char_index[character.char_id].name!r}, "
-                f"new: {character.name!r})"
-            )
-        self.characters.append(character)
-        self._char_index[character.char_id] = character
-        self.mark_location_visited(character.location_id)
+        add_character_to_index(
+            characters=self.characters,
+            character_index=self._char_index,
+            location_index=self._location_id_index,
+            locations=self.grid.values(),
+            character=character,
+            default_location_id=self._default_resident_location_id,
+            mark_visited=self.mark_location_visited,
+            rng=rng,
+        )
 
     def rebuild_char_index(self) -> None:
         """Rebuild the character ID index after external mutations."""
-        index: Dict[str, Character] = {}
-        for c in self.characters:
-            if c.char_id in index:
-                raise ValueError(
-                    f"Duplicate character ID during rebuild: {c.char_id!r} "
-                    f"(existing: {index[c.char_id].name!r}, "
-                    f"duplicate: {c.name!r})"
-                )
-            index[c.char_id] = c
-        self._char_index = index
+        self._char_index = rebuild_character_index(self.characters)
 
     def remove_character(self, char_id: str) -> None:
-        self.characters = [c for c in self.characters if c.char_id != char_id]
-        self._char_index.pop(char_id, None)
+        self.characters = remove_character_from_index(
+            characters=self.characters,
+            character_index=self._char_index,
+            char_id=char_id,
+        )
 
     def get_character_by_id(self, char_id: str) -> Optional[Character]:
         return self._char_index.get(char_id)
@@ -896,12 +759,10 @@ class World:
 
     def rebuild_adventure_index(self) -> None:
         """Rebuild the adventure ID index after loading or external mutations."""
-        index: Dict[str, AdventureRun] = {}
-        for run in self.active_adventures + self.completed_adventures:
-            if run.adventure_id in index:
-                raise ValueError(f"Duplicate adventure ID during rebuild: {run.adventure_id!r}")
-            index[run.adventure_id] = run
-        self._adventure_index = index
+        self._adventure_index = build_adventure_index(
+            self.active_adventures,
+            self.completed_adventures,
+        )
 
     def rebuild_recent_event_ids(self) -> None:
         """Rebuild derived per-location recent_event_ids from structured event records."""
@@ -951,17 +812,18 @@ class World:
         )
 
     def add_adventure(self, run: AdventureRun) -> None:
-        self.active_adventures.append(run)
-        self._adventure_index[run.adventure_id] = run
+        add_adventure_to_index(
+            active_adventures=self.active_adventures,
+            adventure_index=self._adventure_index,
+            run=run,
+        )
 
     def complete_adventure(self, adventure_id: str) -> None:
-        remaining: List[AdventureRun] = []
-        for run in self.active_adventures:
-            if run.adventure_id == adventure_id:
-                self.completed_adventures.append(run)
-            else:
-                remaining.append(run)
-        self.active_adventures = remaining
+        self.active_adventures = complete_adventure_in_index(
+            active_adventures=self.active_adventures,
+            completed_adventures=self.completed_adventures,
+            adventure_id=adventure_id,
+        )
 
     # ------------------------------------------------------------------
     # PR-F: World memory helpers
@@ -1036,6 +898,32 @@ class World:
             max_aliases=self.MAX_ALIASES,
         )
 
+    def rename_location(self, location_id: str, new_name: str) -> str:
+        """Rename a location and keep the previous name as an alias."""
+        old_name = apply_location_rename(
+            self._location_id_index,
+            location_id=location_id,
+            new_name=new_name,
+            max_aliases=self.MAX_ALIASES,
+        )
+        location = self._location_id_index[location_id]
+        if old_name != location.canonical_name:
+            self._location_name_index.pop(old_name, None)
+            self._location_name_index[location.canonical_name] = location
+        return old_name
+
+    def set_location_controlling_faction(self, location_id: str, faction_id: Optional[str]) -> Optional[str]:
+        """Set the controlling faction for a location and return the previous value."""
+        return apply_controlling_faction(
+            self._location_id_index,
+            location_id=location_id,
+            faction_id=faction_id,
+        )
+
+    def set_route_blocked(self, route_id: str, blocked: bool) -> bool:
+        """Set route passability and return the previous blocked state."""
+        return apply_route_blocked_state(self.routes, route_id=route_id, blocked=blocked)
+
     def get_memorials_for_location(self, location_id: str) -> List[MemorialRecord]:
         """Return all ``MemorialRecord`` objects associated with a location."""
         return list(
@@ -1048,11 +936,11 @@ class World:
 
     @property
     def location_names(self) -> List[str]:
-        return sorted(loc.canonical_name for loc in self.grid.values())
+        return location_names_for_locations(self.grid.values())
 
     @property
     def location_ids(self) -> List[str]:
-        return sorted(loc.id for loc in self.grid.values())
+        return location_ids_for_locations(self.grid.values())
 
     def get_location_by_name(self, name: str) -> Optional[LocationState]:
         return self._location_name_index.get(name)
@@ -1061,13 +949,10 @@ class World:
         return self._location_id_index.get(location_id)
 
     def location_name(self, location_id: str) -> str:
-        loc = self._location_id_index.get(location_id)
-        if loc is not None:
-            return loc.canonical_name
-        return tr("unknown_location_with_id", location_id=location_id)
+        return location_name_for_id(self._location_id_index, location_id)
 
     def get_characters_at_location(self, location_id: str) -> List[Character]:
-        return [c for c in self.characters if c.location_id == location_id and c.alive]
+        return characters_at_location(self.characters, location_id)
 
     def get_neighboring_locations(self, location_id: str) -> List[LocationState]:
         """Compatibility alias for travel adjacency."""
@@ -1085,8 +970,8 @@ class World:
         start_calendar_key: str = "",
     ) -> int:
         """Return completed month boundaries between two in-world dates."""
-        return months_elapsed_between_for_calendar(
-            calendar_definition_for_date_ref_fn=self._calendar_definition_for_date_ref,
+        return calendar_facade.months_elapsed_between(
+            self,
             start_year=start_year,
             start_month=start_month,
             end_year=end_year,
@@ -1105,36 +990,35 @@ class World:
         return rng.choice(options)
 
     def _base_calendar_ref(self) -> CalendarDefinition:
-        return self._setting_bundle.world_definition.calendar
+        return calendar_facade.base_calendar_ref(self)
 
     @property
     def calendar_definition(self):
-        return _clone_calendar(self._base_calendar_ref())
+        return calendar_facade.calendar_definition(self, clone_calendar=_clone_calendar)
 
     @property
     def months_per_year(self) -> int:
-        return self._base_calendar_ref().months_per_year
+        return calendar_facade.months_per_year(self)
 
     @property
     def days_per_year(self) -> int:
-        return self._base_calendar_ref().days_per_year
+        return calendar_facade.days_per_year(self)
 
     def days_in_month(self, month: int) -> int:
-        return self._base_calendar_ref().days_in_month(month)
+        return calendar_facade.days_in_month(self, month)
 
     def month_display_name(self, month: int) -> str:
-        return self._base_calendar_ref().month_display_name(month)
+        return calendar_facade.month_display_name(self, month)
 
     def _calendar_definition_by_key_ref(self, calendar_key: str) -> CalendarDefinition:
-        return calendar_definition_by_key_ref(
-            base_calendar=self._base_calendar_ref(),
-            calendar_baseline=self.calendar_baseline,
-            calendar_history=self.calendar_history,
-            calendar_key=calendar_key,
-        )
+        return calendar_facade.calendar_definition_by_key_ref(self, calendar_key)
 
     def calendar_definition_by_key(self, calendar_key: str) -> CalendarDefinition:
-        return _clone_calendar(self._calendar_definition_by_key_ref(calendar_key))
+        return calendar_facade.calendar_definition_by_key(
+            self,
+            calendar_key,
+            clone_calendar=_clone_calendar,
+        )
 
     def _calendar_definition_for_date_ref(
         self,
@@ -1144,10 +1028,8 @@ class World:
         *,
         calendar_key: str = "",
     ) -> CalendarDefinition:
-        return calendar_definition_for_date_ref(
-            base_calendar=self._base_calendar_ref(),
-            calendar_baseline=self.calendar_baseline,
-            calendar_history=self.calendar_history,
+        return calendar_facade.calendar_definition_for_date_ref(
+            self,
             year=year,
             month=month,
             day=day,
@@ -1162,32 +1044,41 @@ class World:
         *,
         calendar_key: str = "",
     ) -> CalendarDefinition:
-        return _clone_calendar(
-            self._calendar_definition_for_date_ref(
-                year,
-                month,
-                day,
-                calendar_key=calendar_key,
-            )
+        return calendar_facade.calendar_definition_for_date(
+            self,
+            year,
+            month,
+            day,
+            calendar_key=calendar_key,
+            clone_calendar=_clone_calendar,
         )
 
     def months_per_year_for_date(
         self, year: int, month: int = 1, day: int = 1, *, calendar_key: str = ""
     ) -> int:
-        return self._calendar_definition_for_date_ref(
-            year, month, day, calendar_key=calendar_key
-        ).months_per_year
+        return calendar_facade.months_per_year_for_date(
+            self,
+            year,
+            month,
+            day,
+            calendar_key=calendar_key,
+        )
 
     def month_display_name_for_date(
         self, year: int, month: int, day: int = 1, *, calendar_key: str = ""
     ) -> str:
-        calendar = self._calendar_definition_for_date_ref(year, month, day, calendar_key=calendar_key)
-        return calendar.month_display_name(month)
+        return calendar_facade.month_display_name_for_date(
+            self,
+            year,
+            month,
+            day,
+            calendar_key=calendar_key,
+        )
 
     @staticmethod
     def get_season(month: int) -> str:
         """Return the default season mapping used by the built-in calendar."""
-        return default_season(month)
+        return calendar_facade.default_season(month)
 
     def season_for_month(self, month: int) -> str:
         """Return the season for a month in the active world definition.
@@ -1196,7 +1087,7 @@ class World:
         month, the simulator falls back to the built-in ordinal month mapping
         used by the default Aethorian calendar.
         """
-        return season_for_calendar(self._base_calendar_ref(), month)
+        return calendar_facade.season_for_month(self, month)
 
     def season_for_date(
         self, year: int, month: int, day: int = 1, *, calendar_key: str = ""
@@ -1207,10 +1098,8 @@ class World:
         irregular calendars without explicit season metadata still resolve to a
         stable season label.
         """
-        return season_for_calendar_date(
-            base_calendar=self._base_calendar_ref(),
-            calendar_baseline=self.calendar_baseline,
-            calendar_history=self.calendar_history,
+        return calendar_facade.season_for_date(
+            self,
             year=year,
             month=month,
             day=day,
@@ -1219,7 +1108,7 @@ class World:
 
     def clamp_calendar_position(self, month: int, day: int) -> Tuple[int, int]:
         """Clamp month/day into the active calendar's valid ranges."""
-        return clamp_calendar_position_for_calendar(self._base_calendar_ref(), month, day)
+        return calendar_facade.clamp_calendar_position(self, month, day)
 
     def apply_calendar_definition(
         self,
@@ -1236,11 +1125,10 @@ class World:
         imports, migrations, or timeline reconstruction can stamp the
         historical date of the transition in ``calendar_history``.
         """
-        self._setting_bundle.world_definition.calendar = _clone_calendar(calendar)
-        self.calendar_history = apply_calendar_definition_history(
+        calendar_facade.apply_calendar_definition(
+            self,
             calendar=calendar,
-            current_year=self.year,
-            calendar_history=self.calendar_history,
+            clone_calendar=_clone_calendar,
             build_change_record=lambda year, month, day, changed_calendar: CalendarChangeRecord(
                 year=year,
                 month=month,
@@ -1254,12 +1142,12 @@ class World:
 
     def remaining_days_in_year(self, month: int, day: int) -> int:
         """Return how many in-world days remain including the current date."""
-        return remaining_days_in_year_for_calendar(self._base_calendar_ref(), month, day)
+        return calendar_facade.remaining_days_in_year(self, month, day)
 
     def advance_calendar_position(self, month: int, day: int, days: int = 1) -> Tuple[int, int, int]:
         """Advance a month/day position and return ``(month, day, year_delta)``."""
-        return advance_calendar_position_for_calendar(
-            self._base_calendar_ref(),
+        return calendar_facade.advance_calendar_position(
+            self,
             month,
             day,
             days=days,
@@ -1272,12 +1160,7 @@ class World:
 
     def latest_absolute_day_before_or_on(self, year: int, month: int) -> int:
         """Return the latest known absolute day on or before a given report period."""
-        matching_days = [
-            record.absolute_day
-            for record in self.event_records
-            if record.absolute_day > 0 and (record.year, record.month) <= (year, month)
-        ]
-        return max(matching_days, default=0)
+        return latest_event_absolute_day_before_or_on(self.event_records, year=year, month=month)
 
     MAX_EVENT_LOG = 2000
 
@@ -1299,12 +1182,9 @@ class World:
         When *month*/*day* are provided, the prefix includes intra-year date
         information so that the player-visible log reflects finer causality.
         """
-        self._display_event_log = append_display_event_log_entry(
-            self._display_event_log,
+        event_log_facade.append_event_log_entry(
+            self,
             event_text,
-            translate=tr,
-            year=self.year,
-            max_event_log=self.MAX_EVENT_LOG,
             month=month,
             day=day,
         )
@@ -1313,48 +1193,28 @@ class World:
 
     def rebuild_compatibility_event_log(self) -> None:
         """Drop stale display-only lines when canonical history exists."""
-        self._display_event_log = rebuild_display_event_log(
-            self._display_event_log,
-            self.event_records,
-            max_event_log=self.MAX_EVENT_LOG,
-        )
+        event_log_facade.rebuild_compatibility_event_log(self)
 
     def get_compatibility_event_log(self, last_n: Optional[int] = None) -> List[str]:
         """Return the legacy event-log adapter, projecting from records if needed."""
-        log = list(self.event_log)
-        if last_n is not None:
-            return log[-last_n:]
-        return list(log)
+        return event_log_facade.compatibility_event_log(self, last_n=last_n)
 
     def record_event(self, record: WorldEventRecord) -> WorldEventRecord:
         """Store a structured event record in the canonical world history.
 
         Returns the canonical stored record (may be a normalized copy).
         """
-        self._event_index.ensure_current(self.event_records)
-        actor_ids = [record.primary_actor_id] + list(record.secondary_actor_ids)
-        watched_tags: List[str] = []
-        for actor_id in actor_ids:
-            if not actor_id:
-                continue
-            actor = self.get_character_by_id(actor_id)
-            if actor is None:
-                continue
-            if actor.favorite or actor.spotlighted or actor.playable:
-                watched_tags.append(f"{self.WATCHED_ACTOR_TAG_PREFIX}{actor_id}")
-        if watched_tags:
-            record.tags = list(dict.fromkeys(list(record.tags) + watched_tags))
-
-        stored_record = append_canonical_event_record(
+        stored_record = record_world_event(
             record=record,
             event_records=self.event_records,
+            event_index=self._event_index,
             location_index=self._location_id_index,
             grid=self.grid,
             max_event_records=self.MAX_EVENT_RECORDS,
-            existing_record_ids=self._event_index.record_ids,
+            get_character_by_id=self.get_character_by_id,
+            watched_actor_tag_prefix=self.WATCHED_ACTOR_TAG_PREFIX,
         )
-        self._event_index.invalidate()
-        self._display_event_log = []
+        event_log_facade.clear_display_event_log(self)
         return stored_record
 
     def apply_event_impact(self, kind: str, location_id: Optional[str]) -> List[Dict[str, Any]]:
@@ -1381,7 +1241,7 @@ class World:
 
     def _decay_toward_baseline(self, months: int = 12) -> None:
         """Pull volatile state fields back toward their region-type defaults."""
-        decay_toward_baseline(
+        decay_world_state(
             locations=self.grid.values(),
             months=months,
             months_per_year=self.months_per_year,
@@ -1394,7 +1254,7 @@ class World:
         """Propagate location state using the configured propagation topology."""
         period_months = max(1, months)
         self._decay_toward_baseline(months=period_months)
-        propagate_state_changes(
+        propagate_world_state(
             locations=self.grid.values(),
             location_index=self._location_id_index,
             get_neighbors=self.get_propagation_neighboring_locations,
@@ -1406,23 +1266,23 @@ class World:
 
     def get_events_by_location(self, location_id: str) -> List[WorldEventRecord]:
         """Return all event records for a specific location."""
-        return self._event_index.by_location_id(self.event_records, location_id)
+        return events_by_location(self._event_index, self.event_records, location_id)
 
     def get_events_by_actor(self, char_id: str) -> List[WorldEventRecord]:
         """Return all event records involving a specific character."""
-        return self._event_index.by_actor_id(self.event_records, char_id)
+        return events_by_actor(self._event_index, self.event_records, char_id)
 
     def get_events_by_year(self, year: int) -> List[WorldEventRecord]:
         """Return all event records for a specific year."""
-        return self._event_index.by_year_value(self.event_records, year)
+        return events_by_year(self._event_index, self.event_records, year)
 
     def get_events_by_month(self, year: int, month: int) -> List[WorldEventRecord]:
         """Return all event records for a specific in-world month."""
-        return self._event_index.by_month_value(self.event_records, year, month)
+        return events_by_month(self._event_index, self.event_records, year, month)
 
     def get_events_by_kind(self, kind: str) -> List[WorldEventRecord]:
         """Return all event records for a specific canonical event kind."""
-        return self._event_index.by_kind_value(self.event_records, kind)
+        return events_by_kind(self._event_index, self.event_records, kind)
 
     def render_map(self, highlight_location: Optional[str] = None) -> str:
         """Return a stable ASCII grid of the world map.
@@ -1437,30 +1297,12 @@ class World:
         return render_map_ascii(info)
 
     def _grid_matches_bundle_seeds(self) -> bool:
-        bundle_locations = sorted(
-            (
-                seed.location_id,
-                seed.name,
-                seed.description,
-                seed.region_type,
-                int(seed.x),
-                int(seed.y),
-            )
-            for seed in self._setting_bundle.world_definition.site_seeds
-            if 0 <= seed.x < self.width and 0 <= seed.y < self.height
+        return grid_matches_site_seeds(
+            site_seeds=self._setting_bundle.world_definition.site_seeds,
+            grid_locations=self.grid.values(),
+            width=self.width,
+            height=self.height,
         )
-        current_locations = sorted(
-            (
-                loc.id,
-                loc.canonical_name,
-                loc.description,
-                loc.region_type,
-                int(loc.x),
-                int(loc.y),
-            )
-            for loc in self.grid.values()
-        )
-        return bundle_locations == current_locations
 
     def _overlay_serialized_route_state(self, serialized_routes: List[Dict[str, Any]]) -> None:
         """Overlay mutable route state onto the canonical route graph."""
@@ -1471,32 +1313,10 @@ class World:
 
     def _location_state_from_dict(self, data: Dict[str, Any]) -> LocationState:
         """Restore LocationState using the active bundle for missing defaults."""
-        canonical_name = data.get("canonical_name") or data.get("name", "")
-        loc_id = data.get("id")
-        loc_id = self.normalize_location_id(loc_id, location_name=canonical_name)
-        region_type = data["region_type"]
-        defaults = self.location_state_defaults(loc_id, region_type)
-        return LocationState(
-            id=loc_id,
-            canonical_name=canonical_name,
-            description=data["description"],
-            region_type=region_type,
-            x=data["x"],
-            y=data["y"],
-            prosperity=data.get("prosperity", defaults["prosperity"]),
-            safety=data.get("safety", defaults["safety"]),
-            mood=data.get("mood", defaults["mood"]),
-            danger=data.get("danger", defaults["danger"]),
-            traffic=data.get("traffic", defaults["traffic"]),
-            rumor_heat=data.get("rumor_heat", defaults["rumor_heat"]),
-            road_condition=data.get("road_condition", defaults["road_condition"]),
-            visited=data.get("visited", False),
-            controlling_faction_id=data.get("controlling_faction_id"),
-            recent_event_ids=_string_list_payload(data.get("recent_event_ids", []), field_name="recent_event_ids"),
-            aliases=_string_list_payload(data.get("aliases", []), field_name="aliases"),
-            generated_endonym=str(data.get("generated_endonym", "")),
-            memorial_ids=_string_list_payload(data.get("memorial_ids", []), field_name="memorial_ids"),
-            live_traces=_trace_list_payload(data.get("live_traces", []), field_name="live_traces"),
+        return LocationState.from_dict(
+            data,
+            normalize_location_id=lambda loc_id, name: self.normalize_location_id(loc_id, location_name=name),
+            defaults_for_location=self.location_state_defaults,
         )
 
     @classmethod

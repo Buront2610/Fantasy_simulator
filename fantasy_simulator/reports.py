@@ -11,76 +11,34 @@ Reports are generated on demand for display and never saved to disk.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Dict, List, Set
 
-from .i18n import tr
 from .narrative.constants import EVENT_KINDS_FATAL
+from .reports_formatting import format_monthly_report, format_yearly_report
+from .reports_models import (
+    CharacterReportEntry,
+    LocationReportEntry,
+    MonthlyReport,
+    RumorReportEntry,
+    YearlyReport,
+)
 from .rumor import RUMOR_MAX_AGE_MONTHS
 
 if TYPE_CHECKING:
     from .event_models import WorldEventRecord
     from .world import World
 
-
-# ------------------------------------------------------------------
-# Report data models
-# ------------------------------------------------------------------
-
-@dataclass
-class CharacterReportEntry:
-    """A single character's summary within a report."""
-
-    char_id: str
-    name: str
-    events: List[str] = field(default_factory=list)
-
-
-@dataclass
-class LocationReportEntry:
-    """A single location's summary within a report."""
-
-    location_id: str
-    name: str
-    event_count: int = 0
-    notable_events: List[str] = field(default_factory=list)
-
-
-@dataclass
-class RumorReportEntry:
-    """A single rumor entry within a report."""
-
-    rumor_id: str
-    description: str
-    reliability: str
-    category: str = "event"
-
-
-@dataclass
-class MonthlyReport:
-    """Data model for a monthly report."""
-
-    year: int
-    month: int
-    month_label: str = ""
-    season: str = "unknown"
-    character_entries: List[CharacterReportEntry] = field(default_factory=list)
-    notable_events: List[str] = field(default_factory=list)
-    location_entries: List[LocationReportEntry] = field(default_factory=list)
-    rumor_entries: List[RumorReportEntry] = field(default_factory=list)
-    total_events: int = 0
-
-
-@dataclass
-class YearlyReport:
-    """Data model for a yearly report."""
-
-    year: int
-    character_entries: List[CharacterReportEntry] = field(default_factory=list)
-    notable_events: List[str] = field(default_factory=list)
-    location_entries: List[LocationReportEntry] = field(default_factory=list)
-    total_events: int = 0
-    deaths_this_year: int = 0
+__all__ = [
+    "CharacterReportEntry",
+    "LocationReportEntry",
+    "RumorReportEntry",
+    "MonthlyReport",
+    "YearlyReport",
+    "generate_monthly_report",
+    "generate_yearly_report",
+    "format_monthly_report",
+    "format_yearly_report",
+]
 
 
 _SEVERITY_THRESHOLD_MONTHLY = 2
@@ -318,118 +276,3 @@ def generate_yearly_report(
         total_events=len(records),
         deaths_this_year=deaths_this_year,
     )
-
-
-# ------------------------------------------------------------------
-# Report formatting (i18n-aware text output)
-# ------------------------------------------------------------------
-
-def format_monthly_report(report: MonthlyReport) -> str:
-    """Format a MonthlyReport as displayable text."""
-    title = tr(
-        "report_monthly_title",
-        year=report.year,
-        month=report.month_label or report.month,
-        season=tr("season_" + report.season),
-    )
-    lines = [
-        "=" * 55,
-        f"  {title}",
-        "=" * 55,
-    ]
-
-    # Watched characters section — only those with events this month
-    if report.character_entries:
-        lines.append("")
-        lines.append(f"  {tr('report_section_watched')}")
-        for entry in report.character_entries:
-            lines.append(f"    {entry.name}")
-            for ev in entry.events:
-                lines.append(f"      - {ev}")
-
-    # Notable events
-    if report.notable_events:
-        lines.append("")
-        lines.append(f"  {tr('report_section_notable')}")
-        for ev in report.notable_events:
-            lines.append(f"    - {ev}")
-
-    # Location highlights. When no event crosses the notable threshold,
-    # still surface the location-level activity count so route/topology
-    # changes remain visible in the rendered report.
-    if report.location_entries:
-        lines.append("")
-        lines.append(f"  {tr('report_section_world')}")
-        for loc in report.location_entries:
-            if loc.notable_events:
-                for ev in loc.notable_events:
-                    lines.append(f"    {loc.name}: {ev}")
-            else:
-                lines.append(
-                    f"    {loc.name}: {tr('report_location_activity', count=loc.event_count)}"
-                )
-
-    # Rumors
-    if report.rumor_entries:
-        lines.append("")
-        lines.append(f"  {tr('report_section_rumors')}")
-        for entry in report.rumor_entries:
-            reliability_label = tr(f"rumor_reliability_{entry.reliability}")
-            lines.append(f"    - {entry.description} ({reliability_label})")
-
-    # Footer
-    lines.append("")
-    lines.append(f"  {tr('report_total_events', count=report.total_events)}")
-    lines.append("=" * 55)
-    return "\n".join(lines)
-
-
-def format_yearly_report(report: YearlyReport) -> str:
-    """Format a YearlyReport as displayable text."""
-    lines = [
-        "=" * 55,
-        f"  {tr('report_yearly_title', year=report.year)}",
-        "=" * 55,
-    ]
-
-    # World overview — derived from events only
-    lines.append("")
-    lines.append(f"  {tr('report_section_world_overview')}")
-    lines.append(f"    {tr('total_events')}: {report.total_events}")
-    if report.deaths_this_year:
-        lines.append(f"    {tr('report_deaths_this_year', count=report.deaths_this_year)}")
-
-    # Notable events
-    if report.notable_events:
-        lines.append("")
-        lines.append(f"  {tr('report_section_notable')}")
-        for ev in report.notable_events:
-            lines.append(f"    - {ev}")
-
-    # Location highlights
-    if report.location_entries:
-        lines.append("")
-        lines.append(f"  {tr('report_section_locations')}")
-        for loc in report.location_entries:
-            if loc.notable_events:
-                for ev in loc.notable_events:
-                    lines.append(f"    {loc.name}: {ev}")
-            else:
-                lines.append(
-                    f"    {loc.name}: {tr('report_location_activity', count=loc.event_count)}"
-                )
-
-    # Watched characters — only those with events this year
-    if report.character_entries:
-        lines.append("")
-        lines.append(f"  {tr('report_section_watched_year')}")
-        for entry in report.character_entries:
-            if entry.events:
-                summary = "; ".join(entry.events[:2])
-                lines.append(f"    {entry.name}: {summary}")
-            else:
-                lines.append(f"    {entry.name}")
-
-    # Footer
-    lines.append("=" * 55)
-    return "\n".join(lines)

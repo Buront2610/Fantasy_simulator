@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from fantasy_simulator.event_models import WorldEventRecord
+from fantasy_simulator.i18n import set_locale
+from fantasy_simulator import world_event_log_facade
 from fantasy_simulator.world_event_log import format_event_log_entry, project_compatibility_event_log
 
 
@@ -66,3 +68,42 @@ def test_project_compatibility_event_log_preserves_exact_legacy_event_log_entry(
 
     projected = project_compatibility_event_log(records, max_event_log=10, translate=_translate)
     assert projected == ["Year 1000: A legacy omen spread through the capital."]
+
+
+def test_event_log_facade_preserves_world_wrapper_semantics() -> None:
+    set_locale("en")
+
+    class _World:
+        MAX_EVENT_LOG = 2
+        year = 1042
+
+        def __init__(self) -> None:
+            self._display_event_log = []
+            self.event_records = []
+
+    world = _World()
+
+    world_event_log_facade.append_event_log_entry(world, "First")
+    world_event_log_facade.append_event_log_entry(world, "Second", month=3)
+    world_event_log_facade.append_event_log_entry(world, "Third", month=3, day=4)
+
+    assert list(world_event_log_facade.event_log_view(world)) == [
+        "[Year 1042, Month 3] Second",
+        "[Year 1042, Month 3, Day 4] Third",
+    ]
+    assert world_event_log_facade.compatibility_event_log(world, last_n=1) == [
+        "[Year 1042, Month 3, Day 4] Third",
+    ]
+
+    world_event_log_facade.set_event_log_entries(world, ["stale", "older", "newer"])
+    assert list(world_event_log_facade.event_log_view(world)) == ["older", "newer"]
+
+    world.event_records.append(
+        WorldEventRecord(kind="battle", year=1043, month=1, day=2, description="Canonical")
+    )
+    assert list(world_event_log_facade.event_log_view(world)) == [
+        "[Year 1043, Month 1, Day 2] Canonical",
+    ]
+
+    world_event_log_facade.rebuild_compatibility_event_log(world)
+    assert world._display_event_log == []

@@ -1,0 +1,69 @@
+"""Facade helpers for compatibility event-log methods exposed by ``World``."""
+
+from __future__ import annotations
+
+from typing import Any, Iterable, List, Optional
+
+from .i18n import tr
+from .world_event_log import (
+    append_display_event_log_entry,
+    compatibility_event_log_view,
+    rebuild_display_event_log,
+    trim_event_log_entries,
+)
+
+
+def event_log_view(world: Any) -> List[str]:
+    """Return the current read-only compatibility event-log view."""
+    return compatibility_event_log_view(
+        world._display_event_log,
+        world.event_records,
+        max_event_log=world.MAX_EVENT_LOG,
+        translate=tr,
+    )
+
+
+def set_event_log_entries(world: Any, value: Iterable[str]) -> None:
+    """Replace display-only event-log entries, preserving the trimming contract."""
+    world._display_event_log = trim_event_log_entries(value, max_event_log=world.MAX_EVENT_LOG)
+
+
+def append_event_log_entry(
+    world: Any,
+    event_text: str,
+    *,
+    month: Optional[int] = None,
+    day: Optional[int] = None,
+) -> None:
+    """Append one display-only compatibility event-log entry."""
+    world._display_event_log = append_display_event_log_entry(
+        world._display_event_log,
+        event_text,
+        translate=tr,
+        year=world.year,
+        max_event_log=world.MAX_EVENT_LOG,
+        month=month,
+        day=day,
+    )
+
+
+def rebuild_compatibility_event_log(world: Any) -> None:
+    """Drop stale display-only lines once canonical history exists."""
+    world._display_event_log = rebuild_display_event_log(
+        world._display_event_log,
+        world.event_records,
+        max_event_log=world.MAX_EVENT_LOG,
+    )
+
+
+def compatibility_event_log(world: Any, *, last_n: Optional[int] = None) -> List[str]:
+    """Return the legacy event-log adapter, projecting from records if needed."""
+    log = list(event_log_view(world))
+    if last_n is not None:
+        return log[-last_n:]
+    return list(log)
+
+
+def clear_display_event_log(world: Any) -> None:
+    """Clear display-only compatibility lines after canonical history changes."""
+    world._display_event_log = []

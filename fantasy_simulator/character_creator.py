@@ -9,6 +9,7 @@ import random
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from .character import Character, random_stats
+from .character_templates import TEMPLATES, supported_template_names
 from .content.setting_bundle import NamingRulesDefinition, SettingBundle, default_aethoria_bundle
 from .content.world_data import ALL_SKILLS
 from .i18n import tr, tr_term
@@ -18,78 +19,7 @@ if TYPE_CHECKING:
     from .ui.ui_context import UIContext
 
 
-# Compatibility fixtures for the default Aethoria bundle.
-_TEMPLATES: Dict[str, Dict] = {
-    "warrior": {
-        "race": "Human",
-        "job": "Warrior",
-        "base_stats": {
-            "strength": 70, "intelligence": 30, "dexterity": 55,
-            "wisdom": 35, "charisma": 40, "constitution": 70,
-        },
-        "skills": {"Swordsmanship": 3, "Shield Block": 2, "Battle Cry": 1, "Endurance": 2},
-    },
-    "mage": {
-        "race": "Elf",
-        "job": "Mage",
-        "base_stats": {
-            "strength": 25, "intelligence": 80, "dexterity": 55,
-            "wisdom": 65, "charisma": 45, "constitution": 30,
-        },
-        "skills": {"Fireball": 3, "Mana Control": 3, "Spellcraft": 2, "Arcane Shield": 1},
-    },
-    "rogue": {
-        "race": "Halfling",
-        "job": "Rogue",
-        "base_stats": {
-            "strength": 40, "intelligence": 55, "dexterity": 80,
-            "wisdom": 45, "charisma": 55, "constitution": 45,
-        },
-        "skills": {"Stealth": 4, "Backstab": 3, "Lockpicking": 2, "Evasion": 3},
-    },
-    "healer": {
-        "race": "Human",
-        "job": "Healer",
-        "base_stats": {
-            "strength": 30, "intelligence": 55, "dexterity": 45,
-            "wisdom": 75, "charisma": 60, "constitution": 55,
-        },
-        "skills": {"Holy Light": 3, "Regeneration": 2, "Purify": 2, "Blessing": 1},
-    },
-    "merchant": {
-        "race": "Halfling",
-        "job": "Merchant",
-        "base_stats": {
-            "strength": 30, "intelligence": 65, "dexterity": 50,
-            "wisdom": 55, "charisma": 80, "constitution": 40,
-        },
-        "skills": {"Appraisal": 3, "Bargaining": 4, "Trade Routes": 2, "Persuasion": 3},
-    },
-    "paladin": {
-        "race": "Dragonborn",
-        "job": "Paladin",
-        "base_stats": {
-            "strength": 65, "intelligence": 45, "dexterity": 45,
-            "wisdom": 65, "charisma": 55, "constitution": 65,
-        },
-        "skills": {"Holy Strike": 3, "Divine Shield": 2, "Lay on Hands": 2, "Aura of Courage": 1},
-    },
-    "druid": {
-        "race": "Elf",
-        "job": "Druid",
-        "base_stats": {
-            "strength": 40, "intelligence": 60, "dexterity": 55,
-            "wisdom": 70, "charisma": 50, "constitution": 50,
-        },
-        "skills": {"Nature's Wrath": 3, "Wild Shape": 2, "Commune": 3, "Entangle": 2},
-    },
-}
-
 _GENDERS = ["Male", "Female", "Non-binary"]
-_TEMPLATE_REQUIRED_IDENTITIES = {
-    (template["race"], template["job"])
-    for template in _TEMPLATES.values()
-}
 
 
 def _random_name(gender: str, naming_rules: NamingRulesDefinition, rng: Any = random) -> str:
@@ -235,21 +165,29 @@ class CharacterCreator:
         return race_entries, job_entries
 
     def _supports_aethoria_templates(self) -> bool:
-        if self.setting_bundle is None:
-            return True
-        if self.setting_bundle.world_definition.world_key != "aethoria":
-            return False
-        if not self.setting_bundle.world_definition.races and not self.setting_bundle.world_definition.jobs:
-            return True
         race_names = {race_name for race_name, _race_desc, _bonuses in self.race_entries}
         job_names = {job_name for job_name, _job_desc, _skills in self.job_entries}
-        return all(race in race_names and job in job_names for race, job in _TEMPLATE_REQUIRED_IDENTITIES)
+        world = self._effective_bundle().world_definition
+        return bool(supported_template_names(
+            world_key=world.world_key,
+            has_explicit_race_or_job_data=bool(world.races or world.jobs),
+            race_names=race_names,
+            job_names=job_names,
+            using_default_bundle=self.setting_bundle is None,
+        ))
 
     def list_templates(self) -> List[str]:
         """Return templates supported by the current creator context."""
-        if self._supports_aethoria_templates():
-            return list(_TEMPLATES.keys())
-        return []
+        race_names = {race_name for race_name, _race_desc, _bonuses in self.race_entries}
+        job_names = {job_name for job_name, _job_desc, _skills in self.job_entries}
+        world = self._effective_bundle().world_definition
+        return supported_template_names(
+            world_key=world.world_key,
+            has_explicit_race_or_job_data=bool(world.races or world.jobs),
+            race_names=race_names,
+            job_names=job_names,
+            using_default_bundle=self.setting_bundle is None,
+        )
 
     def _race_entries_for_context(
         self,
@@ -394,11 +332,11 @@ class CharacterCreator:
         key = template_name.lower().strip()
         if not self._supports_aethoria_templates():
             raise ValueError("Character templates are only available for Aethoria-compatible bundles")
-        if key not in _TEMPLATES:
-            available = ", ".join(_TEMPLATES.keys())
+        if key not in TEMPLATES:
+            available = ", ".join(TEMPLATES.keys())
             raise ValueError(f"Unknown template '{template_name}'. Available: {available}")
 
-        tmpl = _TEMPLATES[key]
+        tmpl = TEMPLATES[key]
         race = tmpl["race"]
         job = tmpl["job"]
         gender = rng.choice(_GENDERS)

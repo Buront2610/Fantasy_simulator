@@ -1,32 +1,12 @@
-"""LocationState model and helpers extracted from world.py."""
+"""Persistent location-state model for the world aggregate."""
 
 from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Protocol, Tuple
 
 from .i18n import tr
-
-
-def _clamp_state(value: int) -> int:
-    return max(0, min(100, int(value)))
-
-
-def _string_list_payload(payload: Any, *, field_name: str) -> List[str]:
-    if payload is None:
-        return []
-    if not isinstance(payload, list) or any(not isinstance(item, str) for item in payload):
-        raise ValueError(f"{field_name} must be a list of strings")
-    return list(payload)
-
-
-def _trace_list_payload(payload: Any, *, field_name: str) -> List[Dict[str, Any]]:
-    if payload is None:
-        return []
-    if not isinstance(payload, list) or any(not isinstance(item, dict) for item in payload):
-        raise ValueError(f"{field_name} must be a list of dicts")
-    return [deepcopy(item) for item in payload]
 
 
 PROSPERITY_LABELS = [
@@ -49,6 +29,75 @@ MOOD_LABELS = [
     (45, 75, "calm"),
     (75, 101, "festive"),
 ]
+
+
+def clamp_state(value: int) -> int:
+    return max(0, min(100, int(value)))
+
+
+def string_list_payload(payload: Any, *, field_name: str) -> List[str]:
+    if payload is None:
+        return []
+    if not isinstance(payload, list) or any(not isinstance(item, str) for item in payload):
+        raise ValueError(f"{field_name} must be a list of strings")
+    return list(payload)
+
+
+def trace_list_payload(payload: Any, *, field_name: str) -> List[Dict[str, Any]]:
+    if payload is None:
+        return []
+    if not isinstance(payload, list) or any(not isinstance(item, dict) for item in payload):
+        raise ValueError(f"{field_name} must be a list of dicts")
+    return [deepcopy(item) for item in payload]
+
+
+def fallback_location_id(name: str) -> str:
+    """Return a stable fallback id without depending on legacy world-data projections."""
+    slug = str(name).lower().replace(" ", "_").replace("-", "_").replace("'", "")
+    return f"loc_{slug}" if slug else "loc_unknown"
+
+
+def neutral_location_state_defaults(_location_id: str, _region_type: str) -> Dict[str, int]:
+    """Return conservative defaults for standalone LocationState deserialization."""
+    return {
+        "prosperity": 50,
+        "safety": 50,
+        "mood": 50,
+        "danger": 20,
+        "traffic": 30,
+        "rumor_heat": 0,
+        "road_condition": 70,
+    }
+
+
+FallbackLocationResolver = Callable[[str], str]
+LocationIdNormalizer = Callable[[Any, str], str]
+LocationDefaultsResolver = Callable[[str, str], Dict[str, int]]
+
+_fallback_location_resolver: FallbackLocationResolver = fallback_location_id
+_location_defaults_resolver: LocationDefaultsResolver = neutral_location_state_defaults
+
+
+class SupportsSiteSeed(Protocol):
+    location_id: str
+    name: str
+    description: str
+    region_type: str
+    x: int
+    y: int
+
+
+def configure_location_state_resolvers(
+    *,
+    fallback_resolver: FallbackLocationResolver | None = None,
+    defaults_resolver: LocationDefaultsResolver | None = None,
+) -> None:
+    """Configure legacy classmethod defaults without making this module bundle-aware."""
+    global _fallback_location_resolver, _location_defaults_resolver
+    if fallback_resolver is not None:
+        _fallback_location_resolver = fallback_resolver
+    if defaults_resolver is not None:
+        _location_defaults_resolver = defaults_resolver
 
 
 def _band_name(value: int, bands: List[Tuple[int, int, str]]) -> str:
@@ -86,7 +135,7 @@ class LocationState:
     rumor_heat: int
     road_condition: int
     visited: bool = False
-    controlling_faction_id: Optional[str] = None
+    controlling_faction_id: str | None = None
     recent_event_ids: List[str] = field(default_factory=list)
     aliases: List[str] = field(default_factory=list)
     generated_endonym: str = ""
@@ -103,7 +152,7 @@ class LocationState:
             "rumor_heat",
             "road_condition",
         ):
-            setattr(self, field_name, _clamp_state(getattr(self, field_name)))
+            setattr(self, field_name, clamp_state(getattr(self, field_name)))
 
     @property
     def name(self) -> str:
@@ -172,9 +221,10 @@ class LocationState:
         cls,
         entry: Tuple[str, str, str, str, int, int],
         *,
-        defaults_resolver: Callable[[str, str], Dict[str, int]],
+        defaults_for_location: LocationDefaultsResolver | None = None,
     ) -> "LocationState":
         loc_id, canonical_name, description, region_type, x, y = entry
+        defaults_resolver = defaults_for_location or _location_defaults_resolver
         defaults = defaults_resolver(loc_id, region_type)
         return cls(
             id=loc_id,
@@ -191,15 +241,19 @@ class LocationState:
         cls,
         data: Dict[str, Any],
         *,
-        fallback_resolver: Callable[[str], str],
-        defaults_resolver: Callable[[str, str], Dict[str, int]],
+        normalize_location_id: LocationIdNormalizer | None = None,
+        fallback_resolver: FallbackLocationResolver | None = None,
+        defaults_for_location: LocationDefaultsResolver | None = None,
     ) -> "LocationState":
-        loc_id = data.get("id")
-        if not loc_id:
-            name = data.get("canonical_name") or data.get("name", "")
-            loc_id = fallback_resolver(name)
         canonical_name = data.get("canonical_name") or data.get("name", "")
+        loc_id = data.get("id")
+        if normalize_location_id is not None:
+            loc_id = normalize_location_id(loc_id, canonical_name)
+        elif not loc_id:
+            resolved_fallback = fallback_resolver or _fallback_location_resolver
+            loc_id = resolved_fallback(canonical_name)
         region_type = data["region_type"]
+        defaults_resolver = defaults_for_location or _location_defaults_resolver
         defaults = defaults_resolver(loc_id, region_type)
         return cls(
             id=loc_id,
@@ -217,9 +271,31 @@ class LocationState:
             road_condition=data.get("road_condition", defaults["road_condition"]),
             visited=data.get("visited", False),
             controlling_faction_id=data.get("controlling_faction_id"),
-            recent_event_ids=_string_list_payload(data.get("recent_event_ids", []), field_name="recent_event_ids"),
-            aliases=_string_list_payload(data.get("aliases", []), field_name="aliases"),
+            recent_event_ids=string_list_payload(data.get("recent_event_ids", []), field_name="recent_event_ids"),
+            aliases=string_list_payload(data.get("aliases", []), field_name="aliases"),
             generated_endonym=str(data.get("generated_endonym", "")),
-            memorial_ids=_string_list_payload(data.get("memorial_ids", []), field_name="memorial_ids"),
-            live_traces=_trace_list_payload(data.get("live_traces", []), field_name="live_traces"),
+            memorial_ids=string_list_payload(data.get("memorial_ids", []), field_name="memorial_ids"),
+            live_traces=trace_list_payload(data.get("live_traces", []), field_name="live_traces"),
         )
+
+
+def location_state_from_site_seed(
+    seed: SupportsSiteSeed,
+    *,
+    defaults_for_location: LocationDefaultsResolver,
+    endonym_for_location: Callable[[str], str | None],
+) -> LocationState:
+    """Build a LocationState from an active setting-bundle site seed."""
+    location = LocationState(
+        id=seed.location_id,
+        canonical_name=seed.name,
+        description=seed.description,
+        region_type=seed.region_type,
+        x=seed.x,
+        y=seed.y,
+        **defaults_for_location(seed.location_id, seed.region_type),
+    )
+    endonym = endonym_for_location(seed.location_id)
+    if endonym and endonym != location.canonical_name:
+        location.generated_endonym = endonym
+    return location

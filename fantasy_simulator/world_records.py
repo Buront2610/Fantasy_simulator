@@ -1,4 +1,4 @@
-"""Record dataclasses used by world state and timeline transitions."""
+"""Small persistent records owned by the world aggregate."""
 
 from __future__ import annotations
 

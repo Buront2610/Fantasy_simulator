@@ -7,6 +7,7 @@ from fantasy_simulator.world_calendar import (
     apply_calendar_definition_history,
     calendar_definition_for_date_ref,
 )
+from fantasy_simulator import world_calendar_facade
 
 
 def test_calendar_definition_for_date_ref_uses_latest_history_before_target_date() -> None:
@@ -103,3 +104,68 @@ def test_advance_calendar_position_respects_variable_month_lengths_helper() -> N
 
     assert advance_calendar_position(calendar, 1, 10, days=1) == (2, 1, 0)
     assert advance_calendar_position(calendar, 2, 40, days=1) == (1, 1, 1)
+
+
+def test_calendar_facade_preserves_world_wrapper_semantics_without_world_construction() -> None:
+    baseline = CalendarDefinition(
+        calendar_key="baseline",
+        display_name="Baseline",
+        months=[CalendarMonthDefinition("first", "First", 30, season="winter")],
+    )
+    replacement = CalendarDefinition(
+        calendar_key="replacement",
+        display_name="Replacement",
+        months=[
+            CalendarMonthDefinition("wax", "Wax", 12, season="spring"),
+            CalendarMonthDefinition("wane", "Wane", 40, season="summer"),
+        ],
+    )
+
+    class _WorldDefinition:
+        calendar = baseline
+
+    class _SettingBundle:
+        world_definition = _WorldDefinition()
+
+    class _World:
+        _setting_bundle = _SettingBundle()
+        calendar_baseline = CalendarDefinition.from_dict(baseline.to_dict())
+        calendar_history = []
+        year = 1004
+
+        def _calendar_definition_for_date_ref(self, year, month=1, day=1, *, calendar_key=""):
+            return world_calendar_facade.calendar_definition_for_date_ref(
+                self,
+                year,
+                month,
+                day,
+                calendar_key=calendar_key,
+            )
+
+    world = _World()
+
+    world_calendar_facade.apply_calendar_definition(
+        world,
+        replacement,
+        clone_calendar=lambda calendar: CalendarDefinition.from_dict(calendar.to_dict()),
+        build_change_record=lambda year, month, day, calendar: CalendarChangeRecord(
+            year=year,
+            month=month,
+            day=day,
+            calendar=calendar,
+        ),
+        changed_month=8,
+        changed_day=99,
+    )
+    replacement.display_name = "Mutated Elsewhere"
+
+    assert world_calendar_facade.months_per_year(world) == 2
+    assert world_calendar_facade.days_in_month(world, 2) == 40
+    assert world_calendar_facade.month_display_name(world, 2) == "Wane"
+    assert world_calendar_facade.month_display_name_for_date(world, 1005, 2) == "Wane"
+    assert world_calendar_facade.season_for_date(world, 1005, 2) == "summer"
+    assert world_calendar_facade.remaining_days_in_year(world, 1, 12) == 41
+    assert world_calendar_facade.advance_calendar_position(world, 2, 40, days=1) == (1, 1, 1)
+    assert world.calendar_history[0].month == 2
+    assert world.calendar_history[0].day == 40
+    assert world._setting_bundle.world_definition.calendar.display_name == "Replacement"
