@@ -40,6 +40,16 @@ DEFAULT_EXCLUDES = [
     ".worktrees",
 ]
 
+WORLD_TYPECHECK_EXCLUSIONS = {
+    "fantasy_simulator/world_calendar.py": "generic calendar-change protocol still needs attribute-bound tightening",
+    "fantasy_simulator/world_event_log.py": "read-only list compatibility adapter needs list-subclass override cleanup",
+    "fantasy_simulator/world_load_normalizer.py": "legacy load normalization accepts nullable location references",
+    "fantasy_simulator/world_route_graph.py": (
+        "observable list compatibility adapter needs list-subclass override cleanup"
+    ),
+    "fantasy_simulator/world_topology_state.py": "topology payload validators still accept broad legacy dictionaries",
+}
+
 
 @dataclass(frozen=True)
 class CommandSpec:
@@ -100,20 +110,35 @@ TYPECHECK_TARGETS = [
     "fantasy_simulator/ui/view_models.py",
     "fantasy_simulator/world_actor_api.py",
     "fantasy_simulator/world_actor_index.py",
+    "fantasy_simulator/world_bundle_transition.py",
     "fantasy_simulator/world_calendar_api.py",
     "fantasy_simulator/world_calendar_facade.py",
+    "fantasy_simulator/world_dynamic_changes.py",
     "fantasy_simulator/world_event_api.py",
     "fantasy_simulator/world_event_history.py",
+    "fantasy_simulator/world_event_index.py",
     "fantasy_simulator/world_event_log_api.py",
     "fantasy_simulator/world_event_log_facade.py",
+    "fantasy_simulator/world_event_queries.py",
+    "fantasy_simulator/world_event_state.py",
     "fantasy_simulator/world_language_api.py",
     "fantasy_simulator/world_language_facade.py",
+    "fantasy_simulator/world_language.py",
+    "fantasy_simulator/world_location_references.py",
+    "fantasy_simulator/world_location_state.py",
     "fantasy_simulator/world_location_structure.py",
+    "fantasy_simulator/world_memory_api.py",
+    "fantasy_simulator/world_memory.py",
+    "fantasy_simulator/world_persistence.py",
     "fantasy_simulator/world_records.py",
     "fantasy_simulator/world_reference_repair.py",
+    "fantasy_simulator/world_state_propagation.py",
+    "fantasy_simulator/world_state_runtime.py",
     "fantasy_simulator/world_structure_api.py",
     "fantasy_simulator/world_topology_api.py",
     "fantasy_simulator/world_topology_queries.py",
+    "fantasy_simulator/world_topology_runtime.py",
+    "fantasy_simulator/world_topology.py",
     "fantasy_simulator/worldgen",
     "tools/worldgen_poc",
 ]

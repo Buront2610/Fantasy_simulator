@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import random
-from typing import Any, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from .world_actor_index import (
     location_ids as location_ids_for_locations,
@@ -24,12 +24,24 @@ from .world_memory import (
 )
 from .world_records import MemorialRecord
 
+if TYPE_CHECKING:
+    from .world_route_graph import ObservableRouteList
+
 
 class WorldMemoryMixin:
     #: Maximum live traces kept per location (rolling window)
     MAX_LIVE_TRACES = 10
     #: Maximum aliases allowed per location
     MAX_ALIASES = 3
+
+    if TYPE_CHECKING:
+        grid: Dict[Tuple[int, int], LocationState]
+        routes: ObservableRouteList
+        memorials: Dict[str, MemorialRecord]
+        _location_id_index: Dict[str, LocationState]
+        _location_name_index: Dict[str, LocationState]
+
+        def get_travel_neighboring_locations(self, location_id: str) -> List[LocationState]: ...
 
     def add_live_trace(
         self,

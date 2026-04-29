@@ -128,6 +128,10 @@ class WorldStructureMixin:
         if current is None:
             return
         self._copy_location_runtime_state(restored, current)
+        if restored.canonical_name != current.canonical_name:
+            self._location_name_index.pop(current.canonical_name, None)
+            current.canonical_name = restored.canonical_name
+            self._location_name_index[current.canonical_name] = current
 
     def _register_serialized_grid_locations(self, serialized_grid: List[Dict[str, Any]]) -> None:
         """Restore serialized locations as authoritative grid structure."""

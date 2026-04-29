@@ -1547,7 +1547,7 @@ class TestWorld:
         else:
             raise AssertionError("Expected malformed aliases payload to fail fast")
 
-    def test_location_state_from_dict_keeps_legacy_world_import_api(self):
+    def test_location_state_from_dict_uses_standalone_neutral_defaults(self):
         location = LocationState.from_dict({
             "canonical_name": "Aethoria Capital",
             "description": "Capital city",
@@ -1557,10 +1557,10 @@ class TestWorld:
         })
 
         assert location.id == "loc_aethoria_capital"
-        assert location.prosperity == 85
-        assert location.traffic == 90
+        assert location.prosperity == 50
+        assert location.traffic == 30
 
-    def test_location_state_from_default_entry_keeps_legacy_world_import_api(self):
+    def test_location_state_from_default_entry_uses_standalone_neutral_defaults(self):
         location = LocationState.from_default_entry((
             "loc_aethoria_capital",
             "Aethoria Capital",
@@ -1571,8 +1571,8 @@ class TestWorld:
         ))
 
         assert location.id == "loc_aethoria_capital"
-        assert location.prosperity == 85
-        assert location.safety == 80
+        assert location.prosperity == 50
+        assert location.safety == 50
 
     def test_from_dict_rejects_self_loop_route_in_serialized_topology(self):
         payload = World(width=1, height=1).to_dict()

@@ -2,10 +2,11 @@
 
 from pathlib import Path
 
-from scripts.quality_gate import TYPECHECK_TARGETS, build_profile_commands
+from scripts.quality_gate import TYPECHECK_TARGETS, WORLD_TYPECHECK_EXCLUSIONS, build_profile_commands
 
 
-PYPROJECT_TEXT = (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(encoding="utf-8")
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PYPROJECT_TEXT = (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
 
 def _pyproject_mypy_files() -> list[str]:
@@ -94,3 +95,16 @@ def test_pyproject_includes_type_gate_scaffolding():
 
 def test_quality_gate_typecheck_targets_match_pyproject_mypy_files():
     assert _pyproject_mypy_files() == TYPECHECK_TARGETS
+
+
+def test_world_typecheck_targets_are_complete_or_explicitly_excluded():
+    world_modules = {
+        path.as_posix().removeprefix(PROJECT_ROOT.as_posix() + "/")
+        for path in (PROJECT_ROOT / "fantasy_simulator").glob("world_*.py")
+    }
+    covered = {target for target in TYPECHECK_TARGETS if target.startswith("fantasy_simulator/world_")}
+    excluded = set(WORLD_TYPECHECK_EXCLUSIONS)
+
+    assert covered | excluded == world_modules
+    assert not covered & excluded
+    assert all(reason.strip() for reason in WORLD_TYPECHECK_EXCLUSIONS.values())

@@ -43,7 +43,6 @@ from .world_state_runtime import (
 from .world_location_state import (
     LocationState,
     clamp_state as _clamp_state,
-    configure_location_state_resolvers,
 )
 from .world_records import CalendarChangeRecord, MemorialRecord
 from .content.setting_bundle import (
@@ -66,12 +65,6 @@ if TYPE_CHECKING:
     from .adventure import AdventureRun
     from .character import Character
     from .rumor import Rumor
-
-
-configure_location_state_resolvers(
-    fallback_resolver=fallback_location_id,
-    defaults_resolver=get_location_state_defaults,
-)
 
 
 def _clone_calendar(calendar: CalendarDefinition) -> CalendarDefinition:

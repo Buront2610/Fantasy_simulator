@@ -482,3 +482,22 @@ def test_world_event_record_month_day_policy_is_lower_bound_normalization_only()
     record = WorldEventRecord(month=99, day=999)
     assert record.month == 99
     assert record.day == 999
+
+
+def test_world_event_record_constructor_rejects_invalid_canonical_fields() -> None:
+    invalid_payloads = [
+        {"record_id": None},
+        {"kind": 3},
+        {"year": "1000"},
+        {"primary_actor_id": 7},
+        {"secondary_actor_ids": ["char_a", 2]},
+        {"tags": "watched"},
+        {"impacts": ["not-a-dict"]},
+    ]
+
+    for payload in invalid_payloads:
+        try:
+            WorldEventRecord(**payload)
+        except ValueError:
+            continue
+        raise AssertionError(f"Expected constructor validation to reject {payload!r}")

@@ -96,4 +96,5 @@ form that tests can enforce.
   agent workflow docs, doc freshness, and harness scenarios. The `strict`
   profile layers lint, complexity, focused mypy targets, and full pytest over
   that suite; newly split `world_*` API/facade/helper modules belong in the
-  focused mypy target list when they become maintenance surfaces.
+  focused mypy target list when they become maintenance surfaces, unless
+  `scripts/quality_gate.py` records an explicit temporary exclusion reason.

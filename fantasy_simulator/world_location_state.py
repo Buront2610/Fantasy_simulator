@@ -72,10 +72,7 @@ def neutral_location_state_defaults(_location_id: str, _region_type: str) -> Dic
 
 FallbackLocationResolver = Callable[[str], str]
 LocationIdNormalizer = Callable[[Any, str], str]
-LocationDefaultsResolver = Callable[[str, str], Dict[str, int]]
-
-_fallback_location_resolver: FallbackLocationResolver = fallback_location_id
-_location_defaults_resolver: LocationDefaultsResolver = neutral_location_state_defaults
+LocationDefaultsResolver = Callable[..., Dict[str, int]]
 
 
 class SupportsSiteSeed(Protocol):
@@ -92,12 +89,11 @@ def configure_location_state_resolvers(
     fallback_resolver: FallbackLocationResolver | None = None,
     defaults_resolver: LocationDefaultsResolver | None = None,
 ) -> None:
-    """Configure legacy classmethod defaults without making this module bundle-aware."""
-    global _fallback_location_resolver, _location_defaults_resolver
-    if fallback_resolver is not None:
-        _fallback_location_resolver = fallback_resolver
-    if defaults_resolver is not None:
-        _location_defaults_resolver = defaults_resolver
+    """Compatibility no-op.
+
+    Standalone constructors intentionally use neutral defaults. Bundle-aware
+    callers must pass explicit fallback/default resolvers.
+    """
 
 
 def _band_name(value: int, bands: List[Tuple[int, int, str]]) -> str:
@@ -224,7 +220,7 @@ class LocationState:
         defaults_for_location: LocationDefaultsResolver | None = None,
     ) -> "LocationState":
         loc_id, canonical_name, description, region_type, x, y = entry
-        defaults_resolver = defaults_for_location or _location_defaults_resolver
+        defaults_resolver = defaults_for_location or neutral_location_state_defaults
         defaults = defaults_resolver(loc_id, region_type)
         return cls(
             id=loc_id,
@@ -233,7 +229,13 @@ class LocationState:
             region_type=region_type,
             x=x,
             y=y,
-            **defaults,
+            prosperity=defaults["prosperity"],
+            safety=defaults["safety"],
+            mood=defaults["mood"],
+            danger=defaults["danger"],
+            traffic=defaults["traffic"],
+            rumor_heat=defaults["rumor_heat"],
+            road_condition=defaults["road_condition"],
         )
 
     @classmethod
@@ -250,10 +252,10 @@ class LocationState:
         if normalize_location_id is not None:
             loc_id = normalize_location_id(loc_id, canonical_name)
         elif not loc_id:
-            resolved_fallback = fallback_resolver or _fallback_location_resolver
+            resolved_fallback = fallback_resolver or fallback_location_id
             loc_id = resolved_fallback(canonical_name)
         region_type = data["region_type"]
-        defaults_resolver = defaults_for_location or _location_defaults_resolver
+        defaults_resolver = defaults_for_location or neutral_location_state_defaults
         defaults = defaults_resolver(loc_id, region_type)
         return cls(
             id=loc_id,
@@ -286,6 +288,7 @@ def location_state_from_site_seed(
     endonym_for_location: Callable[[str], str | None],
 ) -> LocationState:
     """Build a LocationState from an active setting-bundle site seed."""
+    defaults = defaults_for_location(seed.location_id, seed.region_type)
     location = LocationState(
         id=seed.location_id,
         canonical_name=seed.name,
@@ -293,7 +296,13 @@ def location_state_from_site_seed(
         region_type=seed.region_type,
         x=seed.x,
         y=seed.y,
-        **defaults_for_location(seed.location_id, seed.region_type),
+        prosperity=defaults["prosperity"],
+        safety=defaults["safety"],
+        mood=defaults["mood"],
+        danger=defaults["danger"],
+        traffic=defaults["traffic"],
+        rumor_heat=defaults["rumor_heat"],
+        road_condition=defaults["road_condition"],
     )
     endonym = endonym_for_location(seed.location_id)
     if endonym and endonym != location.canonical_name:
