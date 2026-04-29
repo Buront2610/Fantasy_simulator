@@ -40,11 +40,7 @@ DEFAULT_EXCLUDES = [
     ".worktrees",
 ]
 
-WORLD_TYPECHECK_EXCLUSIONS = {
-    "fantasy_simulator/world_route_graph.py": (
-        "observable list compatibility adapter needs list-subclass override cleanup"
-    ),
-}
+WORLD_TYPECHECK_EXCLUSIONS: dict[str, str] = {}
 
 
 @dataclass(frozen=True)
@@ -118,6 +114,7 @@ TYPECHECK_TARGETS = [
     "fantasy_simulator/world_event_log_api.py",
     "fantasy_simulator/world_event_log_facade.py",
     "fantasy_simulator/world_event_queries.py",
+    "fantasy_simulator/world_event_record_updates.py",
     "fantasy_simulator/world_event_state.py",
     "fantasy_simulator/world_language_api.py",
     "fantasy_simulator/world_language_facade.py",
@@ -129,8 +126,10 @@ TYPECHECK_TARGETS = [
     "fantasy_simulator/world_memory_api.py",
     "fantasy_simulator/world_memory.py",
     "fantasy_simulator/world_persistence.py",
+    "fantasy_simulator/world_protocols.py",
     "fantasy_simulator/world_records.py",
     "fantasy_simulator/world_reference_repair.py",
+    "fantasy_simulator/world_route_graph.py",
     "fantasy_simulator/world_state_propagation.py",
     "fantasy_simulator/world_state_runtime.py",
     "fantasy_simulator/world_structure_api.py",

@@ -51,9 +51,15 @@ def apply_route_blocked_state(
     blocked: bool,
 ) -> bool:
     """Set a route blocked flag and return the previous value."""
+    route = route_by_id(routes, route_id=route_id)
+    old_blocked = bool(route.blocked)
+    route.blocked = bool(blocked)
+    return old_blocked
+
+
+def route_by_id(routes: Iterable[Any], *, route_id: str) -> Any:
+    """Return a route by ID or raise ``KeyError``."""
     for route in routes:
         if route.route_id == route_id:
-            old_blocked = bool(route.blocked)
-            route.blocked = bool(blocked)
-            return old_blocked
+            return route
     raise KeyError(route_id)

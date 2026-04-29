@@ -5,6 +5,8 @@ from __future__ import annotations
 import random
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
+from .event_models import WorldEventRecord
+from .i18n import tr
 from .world_actor_index import (
     location_ids as location_ids_for_locations,
     location_name as location_name_for_id,
@@ -14,6 +16,7 @@ from .world_dynamic_changes import (
     apply_controlling_faction,
     apply_location_rename,
     apply_route_blocked_state,
+    route_by_id,
 )
 from .world_location_state import LocationState
 from .world_memory import (
@@ -25,7 +28,7 @@ from .world_memory import (
 from .world_records import MemorialRecord
 
 if TYPE_CHECKING:
-    from .world_route_graph import ObservableRouteList
+    from .world_route_graph import RouteCollection
 
 
 class WorldMemoryMixin:
@@ -35,13 +38,52 @@ class WorldMemoryMixin:
     MAX_ALIASES = 3
 
     if TYPE_CHECKING:
+        year: int
         grid: Dict[Tuple[int, int], LocationState]
-        routes: ObservableRouteList
+        routes: RouteCollection
         memorials: Dict[str, MemorialRecord]
         _location_id_index: Dict[str, LocationState]
         _location_name_index: Dict[str, LocationState]
 
         def get_travel_neighboring_locations(self, location_id: str) -> List[LocationState]: ...
+        def record_event(self, record: WorldEventRecord) -> WorldEventRecord: ...
+
+    def _record_world_change(
+        self,
+        *,
+        kind: str,
+        location_id: Optional[str],
+        description: str,
+        summary_key: str,
+        render_params: Dict[str, Any],
+        impacts: List[Dict[str, Any]],
+        year: Optional[int] = None,
+        month: int = 1,
+        day: int = 1,
+        calendar_key: str = "",
+    ) -> WorldEventRecord:
+        record = WorldEventRecord(
+            kind=kind,
+            year=self.year if year is None else year,
+            month=month,
+            day=day,
+            location_id=location_id,
+            description=description,
+            severity=1,
+            visibility="public",
+            calendar_key=calendar_key,
+            summary_key=summary_key,
+            render_params=render_params,
+            tags=["world_change"],
+            impacts=impacts,
+        )
+        return self.record_event(record)
+
+    def _route_location_name(self, location_id: str) -> str:
+        location = self._location_id_index.get(location_id)
+        if location is None:
+            return location_id
+        return location.canonical_name
 
     def add_live_trace(
         self,
@@ -113,6 +155,46 @@ class WorldMemoryMixin:
             self._location_name_index[location.canonical_name] = location
         return old_name
 
+    def apply_location_rename_change(
+        self,
+        location_id: str,
+        new_name: str,
+        *,
+        year: Optional[int] = None,
+        month: int = 1,
+        day: int = 1,
+        calendar_key: str = "",
+    ) -> WorldEventRecord:
+        """Rename a location and record the canonical world-change event."""
+        old_name = self.rename_location(location_id, new_name)
+        location = self._location_id_index[location_id]
+        render_params = {
+            "location_id": location_id,
+            "old_name": old_name,
+            "new_name": location.canonical_name,
+        }
+        summary_key = "events.location_renamed.summary"
+        return self._record_world_change(
+            kind="location_renamed",
+            location_id=location_id,
+            description=tr(summary_key, **render_params),
+            summary_key=summary_key,
+            render_params=render_params,
+            impacts=[
+                {
+                    "target_type": "location",
+                    "target_id": location_id,
+                    "attribute": "canonical_name",
+                    "old_value": old_name,
+                    "new_value": location.canonical_name,
+                }
+            ],
+            year=year,
+            month=month,
+            day=day,
+            calendar_key=calendar_key,
+        )
+
     def set_location_controlling_faction(self, location_id: str, faction_id: Optional[str]) -> Optional[str]:
         """Set the controlling faction for a location and return the previous value."""
         return apply_controlling_faction(
@@ -121,9 +203,93 @@ class WorldMemoryMixin:
             faction_id=faction_id,
         )
 
+    def apply_controlling_faction_change(
+        self,
+        location_id: str,
+        faction_id: Optional[str],
+        *,
+        year: Optional[int] = None,
+        month: int = 1,
+        day: int = 1,
+        calendar_key: str = "",
+    ) -> WorldEventRecord:
+        """Set a location's controlling faction and record the canonical world-change event."""
+        old_faction_id = self.set_location_controlling_faction(location_id, faction_id)
+        location = self._location_id_index[location_id]
+        new_faction_id = location.controlling_faction_id
+        render_params = {
+            "location": location.canonical_name,
+            "location_id": location_id,
+            "old_faction": old_faction_id or tr("event_change_no_faction"),
+            "new_faction": new_faction_id or tr("event_change_no_faction"),
+        }
+        summary_key = "events.location_faction_changed.summary"
+        return self._record_world_change(
+            kind="location_faction_changed",
+            location_id=location_id,
+            description=tr(summary_key, **render_params),
+            summary_key=summary_key,
+            render_params=render_params,
+            impacts=[
+                {
+                    "target_type": "location",
+                    "target_id": location_id,
+                    "attribute": "controlling_faction_id",
+                    "old_value": old_faction_id,
+                    "new_value": new_faction_id,
+                }
+            ],
+            year=year,
+            month=month,
+            day=day,
+            calendar_key=calendar_key,
+        )
+
     def set_route_blocked(self, route_id: str, blocked: bool) -> bool:
         """Set route passability and return the previous blocked state."""
         return apply_route_blocked_state(self.routes, route_id=route_id, blocked=blocked)
+
+    def apply_route_blocked_change(
+        self,
+        route_id: str,
+        blocked: bool,
+        *,
+        year: Optional[int] = None,
+        month: int = 1,
+        day: int = 1,
+        calendar_key: str = "",
+    ) -> WorldEventRecord:
+        """Set route passability and record the canonical world-change event."""
+        route = route_by_id(self.routes, route_id=route_id)
+        old_blocked = self.set_route_blocked(route_id, blocked)
+        new_blocked = bool(route.blocked)
+        route_kind = "route_blocked" if new_blocked else "route_reopened"
+        summary_key = f"events.{route_kind}.summary"
+        render_params = {
+            "route_id": route_id,
+            "from_location": self._route_location_name(route.from_site_id),
+            "to_location": self._route_location_name(route.to_site_id),
+        }
+        return self._record_world_change(
+            kind=route_kind,
+            location_id=route.from_site_id,
+            description=tr(summary_key, **render_params),
+            summary_key=summary_key,
+            render_params=render_params,
+            impacts=[
+                {
+                    "target_type": "route",
+                    "target_id": route_id,
+                    "attribute": "blocked",
+                    "old_value": old_blocked,
+                    "new_value": new_blocked,
+                }
+            ],
+            year=year,
+            month=month,
+            day=day,
+            calendar_key=calendar_key,
+        )
 
     def get_memorials_for_location(self, location_id: str) -> List[MemorialRecord]:
         """Return all ``MemorialRecord`` objects associated with a location."""

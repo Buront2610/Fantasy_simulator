@@ -342,6 +342,16 @@ TEXT_JA: Dict[str, str] = {
     'event_type_adventure_returned': '冒険帰還',
     'event_type_adventure_retreated': '冒険撤退',
     'event_type_adventure_update': '冒険進行',
+    'events.generic.summary': '{description}',
+    'events.battle.summary': '{actor} は {location} で戦った。',
+    'events.meeting.summary': '{actor} は {location} で {other} と出会った。',
+    'events.location_renamed.summary': '{old_name} は {new_name} に改名された。',
+    'events.route_blocked.summary': '{from_location} から {to_location} への道が封鎖された。',
+    'events.route_reopened.summary': '{from_location} から {to_location} への道が再開された。',
+    'events.location_faction_changed.summary': (
+        '{location} の支配勢力が {old_faction} から {new_faction} に変わった。'
+    ),
+    'event_change_no_faction': 'なし',
     'times_suffix': '回',
     'report_monthly_title': 'Aethoria 月報 ─ {year}年 {season}の第{month}月',
     'report_yearly_title': 'Aethoria 年報 ─ {year}年',

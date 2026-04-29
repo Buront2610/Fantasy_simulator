@@ -10,15 +10,14 @@ resolver callback injected by the caller.
 
 from __future__ import annotations
 
-from typing import Callable, Iterable, Mapping, Protocol
+from typing import Callable, Iterable, Mapping, MutableSequence, Protocol
+
+from .event_models import WorldEventRecord
+from .world_event_record_updates import event_record_with_location_id
 
 
 class CharacterLocationReference(Protocol):
     location_id: str
-
-
-class OptionalLocationReference(Protocol):
-    location_id: str | None
 
 
 class RumorLocationReference(Protocol):
@@ -50,7 +49,7 @@ class LocationReferenceResolver(Protocol):
 def repair_world_location_references(
     *,
     characters: Iterable[CharacterLocationReference],
-    event_records: Iterable[OptionalLocationReference],
+    event_records: MutableSequence[WorldEventRecord],
     rumors: Iterable[RumorLocationReference],
     rumor_archive: Iterable[RumorLocationReference],
     active_adventures: Iterable[AdventureLocationReference],
@@ -70,8 +69,11 @@ def repair_world_location_references(
             or ""
         )
 
-    for record in event_records:
-        record.location_id = repair_location_reference(record.location_id)
+    for index, record in enumerate(event_records):
+        event_records[index] = event_record_with_location_id(
+            record,
+            repair_location_reference(record.location_id),
+        )
 
     for rumor in rumors:
         rumor.source_location_id = repair_location_reference(rumor.source_location_id)

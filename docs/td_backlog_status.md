@@ -11,6 +11,8 @@
 - 挙動維持
 - save/load 互換維持
 - canonical input は `World.event_records`
+- serialization conflict precedence は `docs/serialization_contract.md` を正とする
+- current risk summary は `docs/risk_register.md` で管理する
 
 ## TD-1 Canonical Event Store
 
@@ -80,6 +82,8 @@
 - map-visible golden harness として、seeded overview / region / detail の snapshot、
   memorial-heavy world memory snapshot を production の screen helper 経路で固定し、
   save-load-midyear 後の map-visible 同値性も `tests/test_map_visible_harness.py` で固定。
+- serialization contract と risk register を追加し、canonical source / derived
+  cache / legacy adapter の競合時 precedence を明文化。
 
 ### Current debt status
 

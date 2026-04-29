@@ -287,7 +287,7 @@ class TestGenerateMonthlyReport:
             record_id="r6c", kind="battle", year=1000, month=3,
             description="Canonical monthly event", severity=3,
         ))
-        world_with_chars.event_log = ["stale compatibility buffer"]
+        world_with_chars._restore_display_event_log_for_load(["stale compatibility buffer"])
 
         report = generate_monthly_report(world_with_chars, 1000, 3)
 
@@ -392,7 +392,7 @@ class TestGenerateYearlyReport:
             record_id="y1c", kind="death", year=1001, month=6,
             description="Canonical death", severity=5,
         ))
-        world_with_chars.event_log = ["stale compatibility buffer"]
+        world_with_chars._restore_display_event_log_for_load(["stale compatibility buffer"])
 
         report = generate_yearly_report(world_with_chars, 1001)
 

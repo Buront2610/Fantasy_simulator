@@ -342,6 +342,16 @@ TEXT_EN: Dict[str, str] = {
     'event_type_adventure_returned': 'Adventure return',
     'event_type_adventure_retreated': 'Adventure retreat',
     'event_type_adventure_update': 'Adventure update',
+    'events.generic.summary': '{description}',
+    'events.battle.summary': '{actor} fought at {location}.',
+    'events.meeting.summary': '{actor} met {other} at {location}.',
+    'events.location_renamed.summary': '{old_name} was renamed {new_name}.',
+    'events.route_blocked.summary': 'The route from {from_location} to {to_location} was blocked.',
+    'events.route_reopened.summary': 'The route from {from_location} to {to_location} reopened.',
+    'events.location_faction_changed.summary': (
+        '{location} changed controlling faction from {old_faction} to {new_faction}.'
+    ),
+    'event_change_no_faction': 'none',
     'times_suffix': 'times',
     'report_monthly_title': 'Aethoria Monthly Report - Year {year}, {season} Month {month}',
     'report_yearly_title': 'Aethoria Yearly Report - Year {year}',

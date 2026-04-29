@@ -3,15 +3,23 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import List, Optional
+from typing import TYPE_CHECKING, Iterable, List, Optional
 
 from . import world_event_log_facade as event_log_facade
+
+if TYPE_CHECKING:
+    from .event_models import WorldEventRecord
 
 
 class WorldEventLogMixin:
     """Compatibility API surface for display-only event log helpers."""
 
     MAX_EVENT_LOG = 2000
+
+    if TYPE_CHECKING:
+        year: int
+        _display_event_log: List[str]
+        event_records: Sequence[WorldEventRecord]
 
     @property
     def event_log(self) -> Sequence[str]:
@@ -27,6 +35,10 @@ class WorldEventLogMixin:
     @event_log.setter
     def event_log(self, value: List[str]) -> None:
         event_log_facade.set_event_log_entries(self, value)
+
+    def _restore_display_event_log_for_load(self, value: Iterable[str]) -> None:
+        """Restore legacy display-only event log entries during save hydration."""
+        event_log_facade.restore_display_event_log_for_load(self, value)
 
     def log_event(
         self,

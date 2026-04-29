@@ -1885,8 +1885,10 @@ class TestWorld:
                 description="Canonical clash",
             )
         )
-        world.event_log = ["stale cache entry"]
+        world._restore_display_event_log_for_load(["stale cache entry"])
 
+        with pytest.raises(RuntimeError, match="canonical event_records"):
+            world.event_log = ["stale cache entry"]
         assert world.get_compatibility_event_log() == ["[Year 1001, Month 2, Day 3] Canonical clash"]
 
     def test_event_log_property_projects_canonical_history_over_stale_cache(self):
@@ -1903,7 +1905,7 @@ class TestWorld:
                 description="Canonical clash",
             )
         )
-        world.event_log = ["stale cache entry"]
+        world._restore_display_event_log_for_load(["stale cache entry"])
 
         assert world.event_log == ["[Year 1001, Month 2, Day 3] Canonical clash"]
 

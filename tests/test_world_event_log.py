@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fantasy_simulator.event_models import WorldEventRecord
 from fantasy_simulator.i18n import set_locale
+from fantasy_simulator.world import World
 from fantasy_simulator import world_event_log_facade
 from fantasy_simulator.world_event_log import format_event_log_entry, project_compatibility_event_log
 
@@ -107,3 +108,24 @@ def test_event_log_facade_preserves_world_wrapper_semantics() -> None:
 
     world_event_log_facade.rebuild_compatibility_event_log(world)
     assert world._display_event_log == []
+
+
+def test_event_log_setter_rejects_stale_display_assignment_after_canonical_history() -> None:
+    world = World()
+    world.record_event(
+        WorldEventRecord(
+            record_id="r1",
+            kind="battle",
+            year=1001,
+            description="Canonical clash",
+        )
+    )
+
+    try:
+        world.event_log = ["stale cache entry"]
+    except RuntimeError as exc:
+        assert "canonical event_records" in str(exc)
+    else:
+        raise AssertionError("event_log assignment should fail after canonical history exists")
+
+    assert world.event_log == ["[Year 1001, Month 1, Day 1] Canonical clash"]

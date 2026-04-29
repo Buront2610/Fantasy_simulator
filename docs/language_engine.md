@@ -43,6 +43,8 @@ Persistence contract:
 - If history is absent, persisted runtime state is used as-is.
 - If neither exists, the bundle's static language definition is the complete
   source of truth.
+- Cross-area serialization precedence is summarized in
+  [`serialization_contract.md`](serialization_contract.md).
 
 ## Rule Order
 

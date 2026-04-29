@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 
 from fantasy_simulator.event_models import EventResult, WorldEventRecord, generate_record_id
+from fantasy_simulator.event_rendering import render_event_record
+from fantasy_simulator.i18n import get_locale, set_locale
 
 
 class _DeterministicRng:
@@ -59,17 +61,86 @@ def test_world_event_record_round_trip_and_defensive_copy() -> None:
         month=3,
         day=12,
         summary_key="events.battle.summary",
+        render_params={"actor": "Aldric", "location": "Thornwood"},
         impacts=[{"delta": {"danger": 1}}],
         tags=["combat"],
     )
 
     dumped = record.to_dict()
     dumped["impacts"][0]["delta"]["danger"] = 9
+    dumped["render_params"]["actor"] = "Changed"
 
     assert record.impacts[0]["delta"]["danger"] == 1
+    assert record.render_params["actor"] == "Aldric"
 
     restored = WorldEventRecord.from_dict(record.to_dict())
     assert restored.to_dict() == record.to_dict()
+
+
+def test_world_event_record_omits_empty_render_params_for_compatibility() -> None:
+    record = WorldEventRecord(record_id="r_empty_render_params")
+
+    assert "render_params" not in record.to_dict()
+
+
+def test_world_event_record_rejects_malformed_render_params_at_load_boundary() -> None:
+    malformed = {
+        "record_id": "r_render_params",
+        "kind": "battle",
+        "year": 1001,
+        "description": "Malformed render params",
+        "render_params": ["not-a-dict"],
+    }
+
+    try:
+        WorldEventRecord.from_dict(malformed)
+    except ValueError as exc:
+        assert "render_params" in str(exc)
+    else:
+        raise AssertionError("Expected malformed render_params to fail fast")
+
+
+def test_world_event_record_rejects_non_string_render_param_keys() -> None:
+    try:
+        WorldEventRecord(render_params={1: "Aldric"})
+    except ValueError as exc:
+        assert "render_params" in str(exc)
+    else:
+        raise AssertionError("Expected non-string render_params keys to fail fast")
+
+
+def test_render_event_record_uses_summary_key_render_params_and_locale() -> None:
+    previous = get_locale()
+    set_locale("en")
+    record = WorldEventRecord(
+        kind="battle",
+        description="A fallback battle happened.",
+        summary_key="events.battle.summary",
+        render_params={"actor": "Aldric", "location": "Thornwood"},
+    )
+
+    try:
+        assert render_event_record(record, locale="en") == "Aldric fought at Thornwood."
+        assert render_event_record(record, locale="ja") == "Aldric は Thornwood で戦った。"
+        assert get_locale() == "en"
+    finally:
+        set_locale(previous)
+
+
+def test_render_event_record_falls_back_to_description_for_missing_key_or_params() -> None:
+    missing_key = WorldEventRecord(
+        description="Known only by legacy text.",
+        summary_key="events.unknown.summary",
+        render_params={"actor": "Aldric"},
+    )
+    missing_params = WorldEventRecord(
+        description="A fallback battle happened.",
+        summary_key="events.battle.summary",
+        render_params={"actor": "Aldric"},
+    )
+
+    assert render_event_record(missing_key, locale="en") == "Known only by legacy text."
+    assert render_event_record(missing_params, locale="en") == "A fallback battle happened."
 
 
 def test_world_event_record_rejects_string_secondary_actor_ids_at_load_boundary() -> None:

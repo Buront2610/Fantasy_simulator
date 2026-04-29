@@ -850,6 +850,45 @@ class TestLoadSimulation:
         assert restored.history[0].stat_changes == {"char_1": {"strength": -2}}
         assert restored.history[0].metadata == {"source": "legacy"}
 
+    def test_current_schema_event_records_take_precedence_over_stale_event_log(self, tmp_path):
+        path = tmp_path / "current-schema-stale-event-log.json"
+        payload = {
+            "schema_version": CURRENT_VERSION,
+            "world": World().to_dict(),
+            "characters": [],
+            "history": [],
+        }
+        payload["world"]["event_records"] = [
+            {
+                "record_id": "canonical_001",
+                "kind": "meeting",
+                "year": 1000,
+                "month": 2,
+                "day": 3,
+                "absolute_day": 33,
+                "location_id": "loc_aethoria_capital",
+                "primary_actor_id": None,
+                "secondary_actor_ids": [],
+                "description": "A canonical meeting should be displayed.",
+                "severity": 2,
+                "visibility": "public",
+                "calendar_key": "",
+                "tags": [],
+                "impacts": [],
+            }
+        ]
+        payload["world"]["event_log"] = ["Year 999: A stale compatibility line should not survive."]
+        path.write_text(json.dumps(payload), encoding="utf-8")
+
+        restored = load_simulation(str(path))
+
+        assert restored is not None
+        assert [record.record_id for record in restored.world.event_records] == ["canonical_001"]
+        compatibility_log = list(restored.world.get_compatibility_event_log())
+        assert len(compatibility_log) == 1
+        assert "A canonical meeting should be displayed." in compatibility_log[0]
+        assert "stale compatibility line" not in compatibility_log[0]
+
     def test_load_current_schema_backfills_watched_tags_for_untagged_canonical_records(self, tmp_path):
         path = tmp_path / "current-schema-untagged-watch.json"
         hero = {
@@ -1253,6 +1292,39 @@ class TestLoadSimulation:
 
         assert restored is not None
         assert _language_semantics_snapshot(restored.world) == baseline
+
+    def test_language_evolution_history_takes_precedence_over_conflicting_runtime_state(self, tmp_path):
+        path = tmp_path / "language-conflicting-runtime-state.json"
+        world = World(name="Custom", year=1000)
+        world.setting_bundle = _bundle_with_language_evolution_contracts()
+        world.advance_time(2)
+        baseline = _language_semantics_snapshot(world)
+
+        assert save_simulation(Simulator(world, seed=0), str(path)) is True
+        with open(path, "r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+        payload["world"]["language_runtime_states"] = {
+            "custom_lang": {
+                "language_key": "custom_lang",
+                "applied_rules": [
+                    {
+                        "rule_key": "custom_lang.conflicting_runtime_cache",
+                        "source": "g",
+                        "target": "q",
+                    }
+                ],
+                "derived_name_stems": ["conflict"],
+                "derived_toponym_suffixes": ["cache"],
+            }
+        }
+        path.write_text(json.dumps(payload), encoding="utf-8")
+
+        restored = load_simulation(str(path))
+
+        assert restored is not None
+        assert _language_semantics_snapshot(restored.world) == baseline
+        status = restored.world.language_status()[0]
+        assert "conflicting_runtime_cache" not in status["sound_shifts"]
 
     def test_save_load_preserves_language_semantics_after_non_language_bundle_update(self, tmp_path):
         path = tmp_path / "language-after-non-language-bundle-update.json"
