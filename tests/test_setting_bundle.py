@@ -3,13 +3,19 @@
 from __future__ import annotations
 
 import json
+import importlib
 
 from fantasy_simulator.content.setting_bundle import (
     CalendarDefinition,
+    CalendarMonthDefinition,
     DEFAULT_AETHORIA_BUNDLE_PATH,
     GlossaryEntryDefinition,
+    JobDefinition,
     LanguageCommunityDefinition,
     LanguageDefinition,
+    NamingRulesDefinition,
+    RaceDefinition,
+    RouteSeedDefinition,
     SettingBundle,
     SettingEntryInspection,
     SiteSeedDefinition,
@@ -21,6 +27,156 @@ from fantasy_simulator.content.setting_bundle import (
 )
 from fantasy_simulator.language.schema import SoundChangeRuleDefinition
 from fantasy_simulator.world import World
+
+
+def test_setting_bundle_facade_supports_public_from_import_contract():
+    namespace = {}
+    expected_names = {
+        "CalendarDefinition",
+        "CalendarMonthDefinition",
+        "DEFAULT_AETHORIA_BUNDLE_PATH",
+        "GlossaryEntryDefinition",
+        "JobDefinition",
+        "LanguageCommunityDefinition",
+        "LanguageDefinition",
+        "NamingRulesDefinition",
+        "RaceDefinition",
+        "RouteSeedDefinition",
+        "SettingBundle",
+        "SettingBundleAuthoringSummary",
+        "SettingEntryInspection",
+        "SiteSeedDefinition",
+        "WorldDefinition",
+        "build_setting_bundle_authoring_summary",
+        "bundle_from_dict_validated",
+        "default_aethoria_bundle",
+        "default_calendar_definition",
+        "legacy_location_id_alias",
+        "load_setting_bundle",
+        "merge_event_impact_rule_overrides",
+        "merge_propagation_rule_overrides",
+    }
+
+    exec(
+        "from fantasy_simulator.content.setting_bundle import ("
+        "CalendarDefinition, CalendarMonthDefinition, DEFAULT_AETHORIA_BUNDLE_PATH, "
+        "GlossaryEntryDefinition, JobDefinition, LanguageCommunityDefinition, LanguageDefinition, "
+        "NamingRulesDefinition, RaceDefinition, RouteSeedDefinition, SettingBundle, "
+        "SettingBundleAuthoringSummary, SettingEntryInspection, SiteSeedDefinition, WorldDefinition, "
+        "build_setting_bundle_authoring_summary, bundle_from_dict_validated, default_aethoria_bundle, "
+        "default_calendar_definition, legacy_location_id_alias, load_setting_bundle, "
+        "merge_event_impact_rule_overrides, merge_propagation_rule_overrides"
+        ")",
+        namespace,
+    )
+
+    facade = importlib.import_module("fantasy_simulator.content.setting_bundle")
+    schema = importlib.import_module("fantasy_simulator.content.setting_bundle_schema")
+    calendar_schema = importlib.import_module("fantasy_simulator.content.setting_bundle_schema_calendar")
+    core_schema = importlib.import_module("fantasy_simulator.content.setting_bundle_schema_core")
+    language_schema = importlib.import_module("fantasy_simulator.content.setting_bundle_schema_language")
+    world_schema = importlib.import_module("fantasy_simulator.content.setting_bundle_schema_world")
+    inspection = importlib.import_module("fantasy_simulator.content.setting_bundle_inspection")
+    loader = importlib.import_module("fantasy_simulator.content.setting_bundle_loader")
+
+    assert namespace["CalendarDefinition"] is schema.CalendarDefinition
+    assert namespace["SettingBundle"] is schema.SettingBundle
+    assert namespace["WorldDefinition"] is schema.WorldDefinition
+    assert namespace["SettingEntryInspection"] is inspection.SettingEntryInspection
+    assert namespace["build_setting_bundle_authoring_summary"] is inspection.build_setting_bundle_authoring_summary
+    assert namespace["bundle_from_dict_validated"] is loader.bundle_from_dict_validated
+    assert namespace["DEFAULT_AETHORIA_BUNDLE_PATH"] == loader.DEFAULT_AETHORIA_BUNDLE_PATH
+    assert set(facade.__all__).issuperset(expected_names)
+    assert schema.CalendarDefinition is calendar_schema.CalendarDefinition
+    assert schema.RaceDefinition is core_schema.RaceDefinition
+    assert schema.LanguageDefinition is language_schema.LanguageDefinition
+    assert schema.WorldDefinition is world_schema.WorldDefinition
+
+
+def test_setting_bundle_public_json_round_trip_uses_facade_exports():
+    bundle = SettingBundle(
+        schema_version=2,
+        world_definition=WorldDefinition(
+            world_key="json_contract",
+            display_name="JSON Contract Realm",
+            lore_text="A compact realm for facade round-trip coverage.",
+            calendar=CalendarDefinition(
+                calendar_key="compact",
+                display_name="Compact Calendar",
+                months=[CalendarMonthDefinition("first", "First", 28, season="spring")],
+            ),
+            races=[RaceDefinition("Human", "Adaptable people.", {"charisma": 1})],
+            jobs=[JobDefinition("Scout", "Roadwise watcher.", ["Perception"])],
+            site_seeds=[
+                SiteSeedDefinition("loc_gate", "Gate", "A border gate.", "plains", 0, 0),
+                SiteSeedDefinition("loc_keep", "Keep", "A hill keep.", "hills", 1, 0),
+            ],
+            route_seeds=[
+                RouteSeedDefinition("route_gate_keep", "loc_gate", "loc_keep", distance=2),
+            ],
+            naming_rules=NamingRulesDefinition(
+                first_names_male=["Aren"],
+                first_names_female=["Mira"],
+                first_names_non_binary=["Ren"],
+                last_names=["Vale"],
+            ),
+        ),
+    )
+
+    payload = json.loads(json.dumps(bundle.to_dict()))
+    restored = bundle_from_dict_validated(payload, source="facade json round trip")
+
+    assert restored.to_dict() == bundle.to_dict()
+
+
+def test_race_definition_round_trips_lifespan_years():
+    race = RaceDefinition("Gnome", "Patient makers.", {"intelligence": 2}, lifespan_years=180)
+
+    restored = RaceDefinition.from_dict(race.to_dict())
+
+    assert restored.lifespan_years == 180
+    assert restored.to_dict()["lifespan_years"] == 180
+
+
+def test_default_aethoria_bundle_authors_legacy_race_lifespans():
+    lifespans = {
+        race.name: race.lifespan_years
+        for race in default_aethoria_bundle().world_definition.races
+    }
+
+    assert lifespans["Human"] == 80
+    assert lifespans["Elf"] == 600
+    assert lifespans["Dwarf"] == 250
+    assert lifespans["Orc"] == 60
+
+
+def test_race_definition_rejects_nonpositive_lifespan_from_payload():
+    try:
+        RaceDefinition.from_dict({"name": "Brief", "description": "", "lifespan_years": 0})
+    except ValueError as exc:
+        assert "lifespan_years" in str(exc)
+    else:
+        raise AssertionError("Expected nonpositive race lifespan payload to fail fast")
+
+
+def test_setting_bundle_validation_rejects_direct_nonpositive_race_lifespan():
+    bundle = SettingBundle(
+        schema_version=1,
+        world_definition=WorldDefinition(
+            world_key="invalid_lifespan",
+            display_name="Invalid Lifespan",
+            lore_text="Invalid race lifespan.",
+            races=[RaceDefinition("Brief", "", lifespan_years=0)],
+            naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+        ),
+    )
+
+    try:
+        World().setting_bundle = bundle
+    except ValueError as exc:
+        assert "lifespan_years" in str(exc)
+    else:
+        raise AssertionError("Expected direct nonpositive race lifespan to fail fast")
 
 
 def test_world_definition_round_trip():

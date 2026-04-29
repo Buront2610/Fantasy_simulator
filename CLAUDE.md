@@ -29,6 +29,9 @@ flake8 --max-line-length=120 --exclude=node_modules,__pycache__,.claude,.worktre
 
 # 検証（Lint + テスト一括）
 flake8 --max-line-length=120 --exclude=node_modules,__pycache__,.claude,.worktrees . && python -m pytest tests/ -v
+
+# 品質ゲート（lint / complexity / focused mypy / full pytest）
+python scripts/quality_gate.py strict
 ```
 
 ## Architecture

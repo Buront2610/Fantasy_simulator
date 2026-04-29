@@ -14,8 +14,17 @@ from .language.state import LanguageEvolutionRecord, LanguageRuntimeState
 
 
 def language_signature(world_definition: WorldDefinition) -> List[Dict[str, Any]]:
-    """Return a stable signature for bundle language definitions."""
-    return [language.to_dict() for language in world_definition.languages]
+    """Return a stable signature for language evolution semantics.
+
+    Display labels are intentionally excluded so authoring/UI text edits do not
+    reset long-running language history.
+    """
+    signatures = []
+    for language in world_definition.languages:
+        payload = language.to_dict()
+        payload.pop("display_name", None)
+        signatures.append(payload)
+    return signatures
 
 
 def prune_runtime_states(

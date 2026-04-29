@@ -603,5 +603,36 @@ class TestGetNumericChoiceUsesBackend(unittest.TestCase):
         self.assertTrue(len(warnings) >= 1)
 
 
+class TestReadBoundedIntUsesBackend(unittest.TestCase):
+    """_read_bounded_int centralizes bounded numeric prompts."""
+
+    def test_valid_value(self) -> None:
+        from fantasy_simulator.ui.screen_input import _read_bounded_int
+
+        inp = ScriptedInputBackend(answers=["7"])
+        ctx = UIContext(inp=inp, out=RecordingRenderBackend())
+
+        result = _read_bounded_int("Count: ", default=12, minimum=4, maximum=30, ctx=ctx)
+        self.assertEqual(result, 7)
+
+    def test_default_for_non_digit(self) -> None:
+        from fantasy_simulator.ui.screen_input import _read_bounded_int
+
+        inp = ScriptedInputBackend(answers=["many"])
+        ctx = UIContext(inp=inp, out=RecordingRenderBackend())
+
+        result = _read_bounded_int("Count: ", default=12, minimum=4, maximum=30, ctx=ctx)
+        self.assertEqual(result, 12)
+
+    def test_clamps_to_bounds(self) -> None:
+        from fantasy_simulator.ui.screen_input import _read_bounded_int
+
+        low_ctx = UIContext(inp=ScriptedInputBackend(answers=["1"]), out=RecordingRenderBackend())
+        high_ctx = UIContext(inp=ScriptedInputBackend(answers=["99"]), out=RecordingRenderBackend())
+
+        self.assertEqual(_read_bounded_int("Count: ", default=12, minimum=4, maximum=30, ctx=low_ctx), 4)
+        self.assertEqual(_read_bounded_int("Count: ", default=12, minimum=4, maximum=30, ctx=high_ctx), 30)
+
+
 if __name__ == "__main__":
     unittest.main()

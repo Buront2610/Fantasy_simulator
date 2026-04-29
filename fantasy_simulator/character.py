@@ -16,10 +16,11 @@ from .character_domain import (
     build_relationship_details,
     clamp_relationship_score,
     clamp_skill_level,
-    expand_relationship_details,
 )
+from .character_presentation import character_stat_block, random_stats as roll_random_stats
+from .character_serialization import deserialize_character, serialize_character
 from .content.world_data import NAME_TO_LOCATION_ID, fallback_location_id
-from .i18n import tr, tr_term
+from .i18n import tr
 
 
 class Character:
@@ -268,31 +269,7 @@ class Character:
         return lid.replace("_", " ").title()
 
     def to_dict(self) -> Dict[str, Any]:
-        abilities_payload = self.abilities.to_dict()
-        narrative_payload = self.narrative_state.to_dict()
-        relationship_payload = {
-            target_id: detail.to_dict()
-            for target_id, detail in self.relationship_details.items()
-        }
-        return {
-            "char_id": self.char_id,
-            "name": self.name,
-            "age": self.age,
-            "gender": self.gender,
-            "race": self.race,
-            "job": self.job,
-            **abilities_payload,
-            "abilities": abilities_payload,
-            "skills": dict(self.skills),
-            "relationships": dict(self.relationships),
-            "relationship_details": relationship_payload,
-            "alive": self.alive,
-            "location_id": self.location_id,
-            **narrative_payload,
-            "narrative_state": narrative_payload,
-            "relation_tags": {k: list(v) for k, v in self.relation_tags.items()},
-            "relation_tag_sources": {k: list(v) for k, v in self.relation_tag_sources.items()},
-        }
+        return serialize_character(self)
 
     @classmethod
     def from_dict(
@@ -301,67 +278,14 @@ class Character:
         *,
         location_resolver: Callable[[str], str] | None = None,
     ) -> "Character":
-        ability_payload = data.get("abilities", {})
-        narrative_payload = data.get("narrative_state", {})
-        skills = {
-            k: clamp_skill_level(v)
-            for k, v in data.get("skills", {}).items()
-        }
-        relationships = {
-            k: clamp_relationship_score(v)
-            for k, v in data.get("relationships", {}).items()
-        }
-        relation_tags = {
-            k: list(v) for k, v in data.get("relation_tags", {}).items()
-        }
-        relation_tag_sources = {
-            k: list(v) for k, v in data.get("relation_tag_sources", {}).items()
-        }
-        if data.get("relationship_details"):
-            relationships, relation_tags, relation_tag_sources = expand_relationship_details(
-                data["relationship_details"]
-            )
+        def legacy_location_resolver(old_name: str) -> str:
+            return NAME_TO_LOCATION_ID.get(old_name, fallback_location_id(old_name))
 
-        location_id = data.get("location_id")
-        if location_id is None:
-            old_name = data.get("location", "Aethoria Capital")
-            if location_resolver is not None:
-                location_id = location_resolver(old_name)
-            else:
-                location_id = NAME_TO_LOCATION_ID.get(old_name, fallback_location_id(old_name))
-
-        # Compatibility contract:
-        # - nested payloads (abilities/narrative_state) are authoritative when present
-        # - flat legacy keys are fallback-only for old snapshots
-        return cls(
-            name=data["name"],
-            age=data["age"],
-            gender=data["gender"],
-            race=data["race"],
-            job=data["job"],
-            strength=ability_payload.get("strength", data.get("strength", 10)),
-            intelligence=ability_payload.get("intelligence", data.get("intelligence", 10)),
-            dexterity=ability_payload.get("dexterity", data.get("dexterity", 10)),
-            wisdom=ability_payload.get("wisdom", data.get("wisdom", 10)),
-            charisma=ability_payload.get("charisma", data.get("charisma", 10)),
-            constitution=ability_payload.get("constitution", data.get("constitution", 10)),
-            skills=skills,
-            relationships=relationships,
-            alive=data.get("alive", True),
-            location_id=location_id,
-            favorite=narrative_payload.get("favorite", data.get("favorite", False)),
-            spotlighted=narrative_payload.get("spotlighted", data.get("spotlighted", False)),
-            playable=narrative_payload.get("playable", data.get("playable", False)),
-            history=narrative_payload.get("history", data.get("history", [])),
-            char_id=data.get("char_id"),
-            spouse_id=narrative_payload.get("spouse_id", data.get("spouse_id")),
-            injury_status=narrative_payload.get("injury_status", data.get("injury_status", "none")),
-            active_adventure_id=narrative_payload.get(
-                "active_adventure_id",
-                data.get("active_adventure_id"),
-            ),
-            relation_tags=relation_tags,
-            relation_tag_sources=relation_tag_sources,
+        return deserialize_character(
+            cls,
+            data,
+            location_resolver=location_resolver,
+            legacy_location_resolver=legacy_location_resolver,
         )
 
     def __repr__(self) -> str:  # pragma: no cover
@@ -376,43 +300,11 @@ class Character:
         char_name_lookup: Optional[Dict[str, str]] = None,
         location_resolver: Callable[[str], str] | None = None,
     ) -> str:
-        location_name = self.location_display_name
-        if location_resolver is not None and self.location_id:
-            location_name = location_resolver(self.location_id)
-        lines = [
-            f"  {tr('name_label'):<10}: {self.name}",
-            f"  {tr('race_job_label'):<10}: {tr_term(self.race)} {tr_term(self.job)}",
-            f"  {tr('age_gender_label'):<10}: {self.age}  |  {tr('gender_label')}: {tr_term(self.gender)}",
-            f"  {tr('location_label'):<10}: {location_name}",
-            f"  {tr('status_label'):<10}: {tr('status_alive') if self.alive else tr('status_dead')}",
-            f"  {tr('stats_label')}",
-            (
-                f"  {tr('stat_str')} {self.strength:>3}  |  "
-                f"{tr('stat_int')} {self.intelligence:>3}  |  "
-                f"{tr('stat_dex')} {self.dexterity:>3}"
-            ),
-            (
-                f"  {tr('stat_wis')} {self.wisdom:>3}  |  "
-                f"{tr('stat_cha')} {self.charisma:>3}  |  "
-                f"{tr('stat_con')} {self.constitution:>3}"
-            ),
-        ]
-        if self.skills:
-            top_skills = sorted(self.skills.items(), key=lambda x: -x[1])[:5]
-            skill_str = "  |  ".join(f"{tr_term(k)}(Lv{v})" for k, v in top_skills)
-            lines.append(f"  {tr('top_skills_label')}")
-            lines.append(f"  {skill_str}")
-        if self.injury_status != "none":
-            lines.append(f"  {tr('injury_label'):<10}: {tr(f'injury_status_{self.injury_status}')}")
-        if self.relation_tags:
-            lines.append(f"  {tr('relations_label')}")
-            for other_id, tags in list(self.relation_tags.items())[:5]:
-                tag_str = ", ".join(tr(f"relation_tag_{t}") for t in tags)
-                display_name = other_id[:8]
-                if char_name_lookup is not None:
-                    display_name = char_name_lookup.get(other_id, display_name)
-                lines.append(f"    {display_name}: {tag_str}")
-        return "\n".join(lines)
+        return character_stat_block(
+            self,
+            char_name_lookup=char_name_lookup,
+            location_resolver=location_resolver,
+        )
 
 
 def random_stats(
@@ -421,9 +313,4 @@ def random_stats(
     race_bonuses: Optional[Dict[str, int]] = None,
     rng: Any = random,
 ) -> Dict[str, int]:
-    bonuses = race_bonuses or {}
-    result: Dict[str, int] = {}
-    for stat in ("strength", "intelligence", "dexterity", "wisdom", "charisma", "constitution"):
-        raw = rng.randint(base, base + spread) + bonuses.get(stat, 0)
-        result[stat] = max(1, min(100, raw))
-    return result
+    return roll_random_stats(base=base, spread=spread, race_bonuses=race_bonuses, rng=rng)

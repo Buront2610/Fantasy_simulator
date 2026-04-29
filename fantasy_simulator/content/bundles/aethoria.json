@@ -142,6 +142,7 @@
       {
         "name": "Human",
         "description": "Adaptable and ambitious. Humans are found everywhere and excel at nothing — except perseverance.",
+        "lifespan_years": 80,
         "stat_bonuses": {
           "strength": 0,
           "intelligence": 0,
@@ -154,6 +155,7 @@
       {
         "name": "Elf",
         "description": "Long-lived and graceful. Elves carry centuries of wisdom in their eyes and a quiet sadness in their hearts.",
+        "lifespan_years": 600,
         "stat_bonuses": {
           "strength": -2,
           "intelligence": 8,
@@ -166,6 +168,7 @@
       {
         "name": "Dwarf",
         "description": "Stout and stubborn. Dwarves are master craftsmen who remember every grudge ever dealt to their kin.",
+        "lifespan_years": 250,
         "stat_bonuses": {
           "strength": 6,
           "intelligence": 0,
@@ -178,6 +181,7 @@
       {
         "name": "Halfling",
         "description": "Small but surprisingly resilient. Halflings have an almost supernatural talent for finding comfort in chaos.",
+        "lifespan_years": 130,
         "stat_bonuses": {
           "strength": -5,
           "intelligence": 2,
@@ -190,6 +194,7 @@
       {
         "name": "Orc",
         "description": "Fierce warriors shaped by harsh lands. Orcs value strength and loyalty above all else.",
+        "lifespan_years": 60,
         "stat_bonuses": {
           "strength": 12,
           "intelligence": -4,
@@ -202,6 +207,7 @@
       {
         "name": "Tiefling",
         "description": "Touched by infernal blood. Tieflings carry a stigma they did not choose and often forge their own path despite it.",
+        "lifespan_years": 100,
         "stat_bonuses": {
           "strength": 0,
           "intelligence": 5,
@@ -214,6 +220,7 @@
       {
         "name": "Dragonborn",
         "description": "Descendants of dragons. Proud and powerful, they carry a primal fire within.",
+        "lifespan_years": 80,
         "stat_bonuses": {
           "strength": 8,
           "intelligence": 2,

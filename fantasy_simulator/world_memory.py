@@ -6,7 +6,7 @@ aliases from the core aggregate orchestration.
 
 from __future__ import annotations
 
-from typing import Iterable, List, Mapping, MutableMapping, Protocol, Sequence
+from typing import Iterable, List, Mapping, MutableMapping, Protocol, Sequence, TypeVar
 
 
 class SupportsLiveTraces(Protocol):
@@ -24,6 +24,9 @@ class SupportsMemorialIds(Protocol):
 class SupportsMemorialRecord(Protocol):
     memorial_id: str
     location_id: str
+
+
+MemorialT = TypeVar("MemorialT", bound=SupportsMemorialRecord)
 
 
 def add_live_trace(
@@ -46,9 +49,9 @@ def add_live_trace(
 
 def link_memorial_record(
     *,
-    memorials: MutableMapping[str, SupportsMemorialRecord],
+    memorials: MutableMapping[str, MemorialT],
     location_index: Mapping[str, SupportsMemorialIds],
-    record: SupportsMemorialRecord,
+    record: MemorialT,
 ) -> None:
     """Store a memorial record and link it to the live location when present."""
     memorials[record.memorial_id] = record
@@ -75,9 +78,9 @@ def add_alias(
 def memorials_for_location(
     *,
     location_index: Mapping[str, SupportsMemorialIds],
-    memorials: Mapping[str, SupportsMemorialRecord],
+    memorials: Mapping[str, MemorialT],
     location_id: str,
-) -> List[SupportsMemorialRecord]:
+) -> List[MemorialT]:
     """Return linked memorial records for a location, skipping stale IDs."""
     location = location_index.get(location_id)
     if location is None:
@@ -92,9 +95,9 @@ def rebuild_location_memorial_ids(
     memorials: Sequence[SupportsMemorialRecord] | Iterable[SupportsMemorialRecord],
 ) -> None:
     """Rebuild per-location memorial indices from canonical memorial records."""
-    for location in locations:
-        location.memorial_ids = []
+    for live_location in locations:
+        live_location.memorial_ids = []
     for memorial in memorials:
-        location = location_index.get(memorial.location_id)
-        if location is not None and memorial.memorial_id not in location.memorial_ids:
-            location.memorial_ids.append(memorial.memorial_id)
+        linked_location = location_index.get(memorial.location_id)
+        if linked_location is not None and memorial.memorial_id not in linked_location.memorial_ids:
+            linked_location.memorial_ids.append(memorial.memorial_id)

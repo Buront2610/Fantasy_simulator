@@ -97,11 +97,27 @@ class WorldEventRecord:
 
     def __post_init__(self) -> None:
         # Contract checks / normalization for persistence compatibility.
-        self.severity = max(1, min(5, int(self.severity)))
-        self.month = max(1, int(self.month))
-        self.day = max(1, int(self.day))
-        self.absolute_day = max(0, int(self.absolute_day))
-        self._validate_summary_key(self.summary_key)
+        self.record_id = self._validate_string_payload(self.record_id, "record_id")
+        self.kind = self._validate_string_payload(self.kind, "kind")
+        self.year = self._validate_int_payload(self.year, "year")
+        self.month = max(1, self._validate_int_payload(self.month, "month"))
+        self.day = max(1, self._validate_int_payload(self.day, "day"))
+        self.absolute_day = max(0, self._validate_int_payload(self.absolute_day, "absolute_day"))
+        self.location_id = self._validate_optional_string_payload(self.location_id, "location_id")
+        self.primary_actor_id = self._validate_optional_string_payload(self.primary_actor_id, "primary_actor_id")
+        self.secondary_actor_ids = self._validate_string_list_payload(
+            self.secondary_actor_ids,
+            "secondary_actor_ids",
+        )
+        self.description = self._validate_string_payload(self.description, "description")
+        self.severity = max(1, min(5, self._validate_int_payload(self.severity, "severity")))
+        self.visibility = self._validate_string_payload(self.visibility, "visibility")
+        self.calendar_key = self._validate_string_payload(self.calendar_key, "calendar_key")
+        self.summary_key = self._validate_summary_key(self.summary_key)
+        self.tags = self._validate_string_list_payload(self.tags, "tags")
+        self.impacts = self._validate_impacts_payload(self.impacts)
+        self.legacy_event_result = self._validate_legacy_event_result_payload(self.legacy_event_result)
+        self.legacy_event_log_entry = self._validate_legacy_event_log_entry_payload(self.legacy_event_log_entry)
 
     def to_dict(self) -> Dict[str, Any]:
         payload = {

@@ -1,30 +1,34 @@
-"""Core Simulator class — orchestrates the world simulation loop.
+"""Core Simulator class — assembles the world simulation loop.
 
 The Simulator is composed from several mixins that separate concerns:
 
+- :class:`~.engine_progression.EngineProgressionMixin`: calendar advancement
+- :class:`~.engine_pause.EnginePauseMixin`: conditional auto-pause handling
+- :class:`~.engine_persistence.EnginePersistenceMixin`: serialization
 - :class:`~.event_recorder.EventRecorderMixin`: event recording
 - :class:`~.timeline.TimelineMixin`: monthly processing
 - :class:`~.notifications.NotificationMixin`: notification evaluation
 - :class:`~.adventure_coordinator.AdventureMixin`: adventure management
 - :class:`~.queries.QueryMixin`: summary / report / story access
 
-This module contains the core orchestration: initialisation, the main
-advance loops, pause-condition checking, and serialization.
+This module contains only Simulator assembly, initialisation, and the legacy
+``history`` adapter.
 """
 
 from __future__ import annotations
 
-import ast
 import random
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 from ..adventure import AdventureRun
 from ..event_models import EventResult, WorldEventRecord
 from ..events import EventSystem
-from ..i18n import get_locale, set_locale
 from ..narrative.template_history import TemplateHistory
 
 from .adventure_coordinator import AdventureMixin
+from .engine_pause import EnginePauseMixin
+from .engine_persistence import EnginePersistenceMixin
+from .engine_progression import EngineProgressionMixin
 from .event_recorder import EventRecorderMixin
 from .notifications import NotificationMixin
 from .queries import QueryMixin
@@ -35,6 +39,9 @@ if TYPE_CHECKING:
 
 
 class Simulator(
+    EngineProgressionMixin,
+    EnginePauseMixin,
+    EnginePersistenceMixin,
     EventRecorderMixin,
     TimelineMixin,
     NotificationMixin,
@@ -52,17 +59,6 @@ class Simulator(
     seed : Optional[int]
         If provided, seeds the random number generator for reproducibility.
     """
-
-    # Conditional auto-advance pause priorities (design §4.5)
-    AUTO_PAUSE_PRIORITIES: Dict[str, int] = {
-        "dying_spotlighted": 100,
-        "pending_decision": 90,
-        "dying_favorite": 80,
-        "party_returned": 70,
-        "dying_any": 60,
-        "condition_worsened_favorite": 50,
-        "years_elapsed": 10,
-    }
 
     def __init__(
         self,
@@ -101,45 +97,6 @@ class Simulator(
         self.memorial_template_history = TemplateHistory(cooldown_size=4)
         self.alias_template_history = TemplateHistory(cooldown_size=4)
 
-    # ------------------------------------------------------------------
-    # Static helpers
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def _id_seed_from_seed(seed: Optional[int]) -> int:
-        base_seed = 0 if seed is None else seed
-        return base_seed ^ 0x5EED5EED
-
-    @staticmethod
-    def _legacy_id_seed(data: Dict[str, Any]) -> int:
-        world_data = data.get("world", {})
-        seed = world_data.get("year", 0)
-        for count in (
-            len(data.get("history", [])),
-            len(world_data.get("event_records", [])),
-            len(world_data.get("active_adventures", [])),
-            len(world_data.get("completed_adventures", [])),
-        ):
-            seed = (seed * 1_000_003 + count) & ((1 << 64) - 1)
-        return seed ^ 0x5EED5EED
-
-    @staticmethod
-    def _restore_rng_state(rng: random.Random, state_repr: Optional[str]) -> bool:
-        if state_repr is None:
-            return False
-        try:
-            parsed = ast.literal_eval(state_repr)
-            if (
-                isinstance(parsed, tuple)
-                and len(parsed) == 3
-                and isinstance(parsed[0], int)
-                and isinstance(parsed[1], tuple)
-            ):
-                rng.setstate(parsed)
-                return True
-        except (ValueError, SyntaxError, TypeError):
-            return False
-
     @property
     def history(self) -> List[EventResult]:
         """Project the legacy EventResult adapter from canonical world records.
@@ -150,274 +107,3 @@ class Simulator(
         `world.event_records` instead of this adapter.
         """
         return [record.to_event_result() for record in self.world.event_records]
-
-    # ------------------------------------------------------------------
-    # Main simulation loop
-    # ------------------------------------------------------------------
-
-    def run(self, years: int = 10) -> None:
-        """Simulate *years* years of in-world history.
-
-        Each year:
-        1. Check for natural deaths.
-        2. Generate *events_per_year* random events.
-        3. Advance the world clock.
-        """
-        self.advance_years(years)
-
-    def advance_years(self, years: int = 1) -> None:
-        """Advance the simulation by exactly *years × 360* in-world days."""
-        self.advance_days(years * self.world.days_per_year)
-
-    def advance_months(self, months: int = 1) -> None:
-        """Advance the simulation by *months* in-world months."""
-        total_days = 0
-        month_cursor = self.current_month
-        day_cursor = self.current_day
-        for _ in range(months):
-            total_days += self.world.days_in_month(month_cursor) - day_cursor + 1
-            month_cursor += 1
-            if month_cursor > self.world.months_per_year:
-                month_cursor = 1
-            day_cursor = 1
-        self.advance_days(total_days)
-
-    def advance_days(self, days: int = 1) -> None:
-        """Advance the simulation by *days* in-world days.
-
-        This is the canonical progression path. Month and year helpers
-        delegate here so that partial-month state is preserved naturally.
-        """
-        self.pending_notifications.clear()
-        for _ in range(days):
-            if self.current_month == 1 and self.current_day == 1:
-                # Reset per-year tracking at the start of each new year
-                self._recently_completed_adventures.clear()
-                self._favorites_worsened_this_year.clear()
-            self._run_day(self.current_month, self.current_day)
-            self.current_month, self.current_day, year_delta = self.world.advance_calendar_position(
-                self.current_month,
-                self.current_day,
-                days=1,
-            )
-            self.elapsed_days += 1
-            if year_delta:
-                self.world.advance_time(year_delta)
-
-    def advance_until_pause(self, max_years: int = 12) -> Dict[str, Any]:
-        """Advance the simulation day-by-day until a pause condition triggers.
-
-        Returns a dict with 'days_advanced', 'months_advanced', 'years_advanced',
-        'pause_reason', and 'pause_priority'. The daily granularity allows pause
-        conditions to fire without waiting for a month or year boundary.
-
-        This implements the conditional auto-advance system (design §4.4).
-        """
-        self.pending_notifications.clear()
-        self._favorites_worsened_this_year.clear()
-        self._recently_completed_adventures.clear()
-        preexisting_reason = self._check_pause_conditions()
-        if preexisting_reason is not None:
-            all_reasons = self._collect_pause_conditions()
-            return {
-                "days_advanced": 0,
-                "months_advanced": 0,
-                "years_advanced": 0,
-                "pause_reason": preexisting_reason,
-                "pause_priority": self.AUTO_PAUSE_PRIORITIES.get(preexisting_reason, 0),
-                "supplemental_reasons": [r for r in all_reasons if r != preexisting_reason],
-                "pause_context": self._pause_context_for_reason(preexisting_reason),
-            }
-        max_days = max_years * self.world.days_per_year
-        days_advanced = 0
-        months_advanced = 0
-        years_advanced = 0
-        for _ in range(max_days):
-            if self.current_month == 1 and self.current_day == 1:
-                self._recently_completed_adventures.clear()
-                self._favorites_worsened_this_year.clear()
-            previous_month = self.current_month
-            self._run_day(self.current_month, self.current_day)
-            self.current_month, self.current_day, year_delta = self.world.advance_calendar_position(
-                self.current_month,
-                self.current_day,
-                days=1,
-            )
-            self.elapsed_days += 1
-            if year_delta:
-                self.world.advance_time(year_delta)
-                years_advanced += year_delta
-            if self.current_day == 1 and self.current_month != previous_month:
-                months_advanced += 1
-            days_advanced += 1
-            reason = self._check_pause_conditions()
-            if reason is not None:
-                all_reasons = self._collect_pause_conditions()
-                return {
-                    "days_advanced": days_advanced,
-                    "months_advanced": months_advanced,
-                    "years_advanced": years_advanced,
-                    "pause_reason": reason,
-                    "pause_priority": self.AUTO_PAUSE_PRIORITIES.get(reason, 0),
-                    "supplemental_reasons": [r for r in all_reasons if r != reason],
-                    "pause_context": self._pause_context_for_reason(reason),
-                }
-        return {
-            "days_advanced": days_advanced,
-            "months_advanced": months_advanced,
-            "years_advanced": years_advanced,
-            "pause_reason": "years_elapsed",
-            "pause_priority": self.AUTO_PAUSE_PRIORITIES["years_elapsed"],
-            "supplemental_reasons": [],
-            "pause_context": {},
-        }
-
-    def _check_pause_conditions(self) -> Optional[str]:
-        """Check if any auto-pause condition is met. Returns highest-priority reason."""
-        reasons = self._collect_pause_conditions()
-        if not reasons:
-            return None
-        return reasons[0]
-
-    def _collect_pause_conditions(self) -> List[str]:
-        """Return pause reasons sorted by priority (highest first)."""
-        reasons: List[tuple] = []
-
-        for char in self.world.characters:
-            if not char.alive:
-                continue
-            if char.is_dying:
-                if char.spotlighted:
-                    reasons.append(("dying_spotlighted",
-                                    self.AUTO_PAUSE_PRIORITIES["dying_spotlighted"]))
-                elif char.favorite:
-                    reasons.append(("dying_favorite",
-                                    self.AUTO_PAUSE_PRIORITIES["dying_favorite"]))
-                else:
-                    reasons.append(("dying_any",
-                                    self.AUTO_PAUSE_PRIORITIES["dying_any"]))
-            if char.favorite and char.char_id in self._favorites_worsened_this_year:
-                reasons.append(("condition_worsened_favorite",
-                                self.AUTO_PAUSE_PRIORITIES["condition_worsened_favorite"]))
-
-        # Pending adventure choices
-        for run in self.world.active_adventures:
-            if run.pending_choice is not None:
-                reasons.append(("pending_decision",
-                                self.AUTO_PAUSE_PRIORITIES["pending_decision"]))
-                break
-
-        # Party returned (design §4.4: check recently completed adventures)
-        if self._recently_completed_adventures:
-            for run in self._recently_completed_adventures:
-                char = self._watched_party_member(run)
-                if char is not None:
-                    reasons.append(("party_returned",
-                                    self.AUTO_PAUSE_PRIORITIES["party_returned"]))
-                    break
-
-        reasons.sort(key=lambda x: -x[1])
-        return [reason for reason, _ in reasons]
-
-    def _pause_context_for_reason(self, reason: str) -> Dict[str, str]:
-        """Return lightweight context (character/location) for a pause reason."""
-        if reason.startswith("dying"):
-            for char in self.world.characters:
-                if char.alive and char.is_dying:
-                    return {"character": char.name, "location": self.world.location_name(char.location_id)}
-        if reason == "pending_decision":
-            for run in self.world.active_adventures:
-                if run.pending_choice is not None:
-                    return {"character": run.character_name, "location": self.world.location_name(run.destination)}
-        if reason == "party_returned" and self._recently_completed_adventures:
-            for run in reversed(self._recently_completed_adventures):
-                watched = self._watched_party_member(run)
-                if watched is not None:
-                    return {"character": watched.name, "location": self.world.location_name(run.origin)}
-            run = self._recently_completed_adventures[-1]
-            return {"character": run.character_name, "location": self.world.location_name(run.origin)}
-        return {}
-
-    def _watched_party_member(self, run: AdventureRun):
-        """Return a watched member of the run, if one exists."""
-        member_ids = list(run.member_ids) or [run.character_id]
-        for member_id in member_ids:
-            char = self.world.get_character_by_id(member_id)
-            if char is not None and (char.favorite or char.spotlighted or char.playable):
-                return char
-        return None
-
-    # ------------------------------------------------------------------
-    # Serialization
-    # ------------------------------------------------------------------
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Serialise simulator state.
-
-        ``event_records`` is the canonical event store by policy.
-        Compatibility adapters (``history``/``event_log``) are projected at
-        runtime and are no longer serialized as first-class save payload fields.
-        Loader paths keep backward compatibility with older snapshots that still
-        contain the legacy fields.
-        """
-        return {
-            "world": self.world.to_dict(),
-            "characters": [char.to_dict() for char in self.world.characters],
-            "events_per_year": self.events_per_year,
-            "adventure_steps_per_year": self.adventure_steps_per_year,
-            "current_month": self.current_month,
-            "current_day": self.current_day,
-            "elapsed_days": self.elapsed_days,
-            "start_year": self.start_year,
-            "locale": get_locale(),
-            "rng_state": repr(self.rng.getstate()),
-            "id_rng_state": repr(self.id_rng.getstate()),
-            "memorial_template_history": self.memorial_template_history.to_dict(),
-            "alias_template_history": self.alias_template_history.to_dict(),
-        }
-
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Simulator":
-        """Rebuild a simulator from a serialised snapshot."""
-        from ..character import Character
-        from ..world import World
-
-        world = World.from_dict(data["world"])
-        characters = []
-        for char_data in data.get("characters", []):
-            character = Character.from_dict(
-                char_data,
-                location_resolver=world.resolve_location_id_from_name,
-            )
-            character.location_id = (
-                world.normalize_location_id(
-                    character.location_id,
-                    location_name=char_data.get("location"),
-                )
-                or character.location_id
-            )
-            characters.append(character)
-        world.characters = characters
-        world.normalize_after_load()
-        sim = cls(
-            world,
-            events_per_year=data.get("events_per_year", 8),
-            adventure_steps_per_year=data.get("adventure_steps_per_year", 3),
-        )
-        set_locale(data.get("locale", get_locale()))
-        sim._restore_rng_state(sim.rng, data.get("rng_state"))
-        if not sim._restore_rng_state(sim.id_rng, data.get("id_rng_state")):
-            sim.id_rng.seed(sim._legacy_id_seed(data))
-        sim.current_month, sim.current_day = sim.world.clamp_calendar_position(
-            data.get("current_month", 1),
-            data.get("current_day", 1),
-        )
-        sim.elapsed_days = max(0, int(data.get("elapsed_days", 0)))
-        sim.start_year = data.get("start_year", sim.world.year)
-        sim.memorial_template_history = TemplateHistory.from_dict(
-            data.get("memorial_template_history", {})
-        )
-        sim.alias_template_history = TemplateHistory.from_dict(
-            data.get("alias_template_history", {})
-        )
-        return sim

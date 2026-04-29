@@ -6,7 +6,7 @@ TD-3 responsibility split: isolate event-driven world state mutations from
 
 from __future__ import annotations
 
-from typing import Callable, Dict, List, Mapping, MutableMapping, Optional, Protocol, Set
+from typing import Callable, Dict, List, Mapping, Optional, Protocol, Set
 
 from .event_models import WorldEventRecord
 from .rule_override_resolution import (
@@ -32,7 +32,7 @@ def apply_event_impact_to_location(
     *,
     kind: str,
     location_id: Optional[str],
-    location_index: MutableMapping[str, SupportsEventIndex],
+    location_index: Mapping[str, SupportsEventIndex],
     clamp_state: Callable[[int], int],
     impact_rules: Optional[Mapping[str, Mapping[str, int]]] = None,
 ) -> List[Dict[str, int | str]]:
@@ -67,8 +67,8 @@ def append_canonical_event_record(
     *,
     record: WorldEventRecord,
     event_records: List[WorldEventRecord],
-    location_index: MutableMapping[str, SupportsEventIndex],
-    grid: MutableMapping[object, SupportsEventIndex],
+    location_index: Mapping[str, SupportsEventIndex],
+    grid: Mapping[object, SupportsEventIndex],
     max_event_records: int,
     existing_record_ids: Optional[Set[str]] = None,
 ) -> WorldEventRecord:

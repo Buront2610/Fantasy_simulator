@@ -1,37 +1,30 @@
 """Adventure lifecycle management for the Simulator.
 
-Handles adventure creation, step-by-step progression, dead-character
-resolution, and player-facing query methods.
-
-PR-E: Extended with party adventure formation (design §9.1–§9.4).
+This module keeps the active adventure progression loop and composes helper
+mixins for launch, memory, and query responsibilities.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Optional
 
-from ..adventure import (
-    AdventureRun,
-    SUPPLY_FULL,
-    create_adventure_run,
-    default_retreat_rule_for_policy,
-    generate_adventure_id,
-    select_party_policy,
-)
-from ..narrative.context import alias_for_event, build_narrative_context, derive_relation_hint, epitaph_for_character
+from ..adventure import AdventureRun, select_party_policy
 from ..i18n import tr
+from .adventure_memory import AdventureMemoryMixin
+from .adventure_partying import AdventureStartMixin
+from .adventure_queries import AdventureQueryMixin
 
 if TYPE_CHECKING:
     from ..character import Character
 
-
-# Maximum party size for auto-formed parties
-_MAX_PARTY_SIZE = 3
-# Probability that a new adventure attempt forms a party (vs solo)
-_PARTY_FORMATION_CHANCE = 0.30
+__all__ = ["AdventureMixin", "select_party_policy"]
 
 
-class AdventureMixin:
+class AdventureMixin(
+    AdventureStartMixin,
+    AdventureMemoryMixin,
+    AdventureQueryMixin,
+):
     """Mixin providing adventure management methods for the Simulator.
 
     Expected attributes on *self* (provided by ``engine.Simulator``):
@@ -42,133 +35,6 @@ class AdventureMixin:
     - ``rng``, ``id_rng``: RNG instances
     - ``_recently_completed_adventures``: list of recently completed runs
     """
-
-    def _maybe_start_adventure(self, year_fraction: float = 1.0) -> None:
-        """Start at most one new adventure during the current simulation step."""
-        candidates = [
-            c for c in self.world.characters
-            if c.alive and c.active_adventure_id is None
-            and c.injury_status not in ("injured", "serious", "dying")
-        ]
-        if not candidates:
-            return
-        start_chance = 0.25 if year_fraction >= 1.0 else 1.0 - ((1.0 - 0.25) ** year_fraction)
-        if self.rng.random() >= start_chance:
-            return
-
-        # 30% chance to form a party adventure when enough candidates exist
-        if len(candidates) >= 2 and self.rng.random() < _PARTY_FORMATION_CHANCE:
-            self._start_party_adventure(candidates)
-        else:
-            self._start_solo_adventure(candidates)
-
-    def _start_solo_adventure(self, candidates: List["Character"]) -> None:
-        """Pick one candidate and start a solo adventure."""
-        char = self.rng.choice(candidates)
-        try:
-            run = create_adventure_run(char, self.world, rng=self.rng, id_rng=self.id_rng)
-        except ValueError:
-            return
-        char.active_adventure_id = run.adventure_id
-        char.add_history(
-            tr(
-                "set_out_for_adventure",
-                year=self.world.year,
-                origin=self.world.location_name(run.origin),
-                destination=self.world.location_name(run.destination),
-            )
-        )
-        self.world.add_adventure(run)
-        self._record_world_event(
-            run.summary_log[-1],
-            kind="adventure_started",
-            location_id=run.origin,
-            primary_actor_id=char.char_id,
-            severity=2,
-        )
-
-    def _start_party_adventure(self, candidates: List["Character"]) -> None:
-        """Form a small party from candidates and start a shared adventure.
-
-        Party size: 2–_MAX_PARTY_SIZE members.
-        Leader is the first selected character.
-        Policy is AI-selected unless spotlighted/playable leader is present
-        (player UI hook reserved for future enhancement).
-        Design §9.3: policy selection by character status.
-        """
-        # Prefer locally co-located parties for world consistency.
-        # Future extension hook: if co-located candidates are insufficient,
-        # allow "gather for one month" travel-to-rally behavior instead of
-        # instant cross-map assembly.
-        leader = self.rng.choice(candidates)
-        same_location = [c for c in candidates if c.location_id == leader.location_id and c.char_id != leader.char_id]
-        size = self.rng.choice(range(2, _MAX_PARTY_SIZE + 1))
-        size = min(size, len(candidates))
-        needed_companions = max(0, size - 1)
-        selected_companions = self.rng.sample(same_location, min(needed_companions, len(same_location)))
-        members = [leader] + selected_companions
-        leader = members[0]
-
-        # Build adventure on leader
-        try:
-            run = create_adventure_run(leader, self.world, rng=self.rng, id_rng=self.id_rng)
-        except ValueError:
-            return
-
-        # Apply party data
-        run.party_id = generate_adventure_id(self.id_rng)
-        selected_policy = select_party_policy(members, self.rng)
-        run.set_party_configuration(
-            member_ids=[m.char_id for m in members],
-            policy=selected_policy,
-            retreat_rule=default_retreat_rule_for_policy(selected_policy),
-        )
-        run.supply_state = SUPPLY_FULL
-        # danger_level already set in create_adventure_run from destination.danger
-
-        # Override the initial summary with party text if multi-member
-        if len(members) > 1:
-            party_names = self._format_party_names(members)
-            origin_name = self.world.location_name(run.origin)
-            dest_name = self.world.location_name(run.destination)
-            run.summary_log = [
-                tr("summary_party_set_out", party=party_names,
-                   origin=origin_name, destination=dest_name)
-            ]
-            run.detail_log = [
-                tr("detail_party_set_out", party=party_names,
-                   origin=origin_name, destination=dest_name)
-            ]
-
-        # Mark all members as on this adventure
-        for member in members:
-            member.active_adventure_id = run.adventure_id
-            member.add_history(
-                tr(
-                    "set_out_for_adventure",
-                    year=self.world.year,
-                    origin=self.world.location_name(run.origin),
-                    destination=self.world.location_name(run.destination),
-                )
-            )
-
-        self.world.add_adventure(run)
-        self._record_world_event(
-            run.summary_log[-1],
-            kind="adventure_started",
-            location_id=run.origin,
-            primary_actor_id=leader.char_id,
-            severity=2,
-        )
-
-    @staticmethod
-    def _format_party_names(members: List["Character"], max_shown: int = 3) -> str:
-        """Return a display string for party members  (e.g. 'Aldric & Lysara')."""
-        names = [m.name for m in members[:max_shown]]
-        result = " & ".join(names)
-        if len(members) > max_shown:
-            result += f" +{len(members) - max_shown}"
-        return result
 
     def _advance_adventures(self, steps: Optional[int] = None) -> None:
         """Advance active adventures by a configurable number of internal steps."""
@@ -203,15 +69,19 @@ class AdventureMixin:
                 if not char.alive:
                     self.event_system.handle_death_side_effects(char, self.world)
                 if run.is_resolved:
-                    if run.outcome == "death":
-                        deceased = self.world.get_character_by_id(run.death_member_id or run.character_id)
-                        if deceased is not None and not deceased.alive:
-                            self.event_system.handle_death_side_effects(deceased, self.world)
-                    self._apply_world_memory(run)
-                    self._recently_completed_adventures.append(run)
-                    self.world.complete_adventure(run.adventure_id)
+                    self._complete_resolved_adventure(run)
                 elif not had_pending_choice and run.pending_choice is not None:
                     paused_until_next_year.add(run.adventure_id)
+
+    def _complete_resolved_adventure(self, run: AdventureRun) -> None:
+        """Apply side effects and move a resolved adventure into completed storage."""
+        if run.outcome == "death":
+            deceased = self.world.get_character_by_id(run.death_member_id or run.character_id)
+            if deceased is not None and not deceased.alive:
+                self.event_system.handle_death_side_effects(deceased, self.world)
+        self._apply_world_memory(run)
+        self._recently_completed_adventures.append(run)
+        self.world.complete_adventure(run.adventure_id)
 
     def _resolve_dead_character_adventure(self, run: AdventureRun, char: "Character") -> None:
         run.pending_choice = None
@@ -219,7 +89,6 @@ class AdventureMixin:
         run.outcome = "death"
         run.resolution_year = self.world.year
         char.active_adventure_id = None
-        # Clear all other party members
         for mid in run.member_ids:
             if mid != run.character_id:
                 member = self.world.get_character_by_id(mid)
@@ -239,194 +108,3 @@ class AdventureMixin:
         self._apply_world_memory(run)
         self._recently_completed_adventures.append(run)
         self.world.complete_adventure(run.adventure_id)
-
-    def _apply_world_memory(self, run: AdventureRun) -> None:
-        """Record live traces, memorials, and aliases from a resolved adventure.
-
-        PR-F (design §E-2): Called for every resolved adventure to leave
-        footprints at the destination.  Deaths additionally create a
-        permanent memorial and may generate a location alias.
-
-        Does NOT consume RNG — all IDs are generated via ``self.id_rng``.
-        """
-        dest = run.destination
-        dest_name = self.world.location_name(dest)
-
-        # -- Live trace (all outcomes) -----------------------------------
-        if run.is_party:
-            members = [self.world.get_character_by_id(mid) for mid in run.member_ids]
-            names = [m.name for m in members if m is not None]
-            if not names:
-                names = [run.character_name]
-            party_str = self._format_party_names_from_list(names)
-            if run.outcome == "retreat":
-                trace_key = "live_trace_party_retreat"
-            elif run.outcome == "injury":
-                trace_key = "live_trace_party_injury"
-            else:
-                trace_key = "live_trace_party_safe"
-            trace_text = tr(trace_key, party=party_str, destination=dest_name, year=self.world.year)
-        else:
-            if run.outcome == "retreat":
-                trace_key = "live_trace_solo_retreat"
-            elif run.outcome == "injury":
-                trace_key = "live_trace_solo_injury"
-            else:
-                trace_key = "live_trace_solo_safe"
-            trace_text = tr(trace_key, name=run.character_name, destination=dest_name, year=self.world.year)
-        self.world.add_live_trace(dest, self.world.year, run.character_name, trace_text)
-
-        # -- Memorial + alias (death only) --------------------------------
-        if run.outcome == "death":
-            memorial_template_history = getattr(self, "memorial_template_history", None)
-            alias_template_history = getattr(self, "alias_template_history", None)
-            deceased_id = run.death_member_id or run.character_id
-            char = self.world.get_character_by_id(deceased_id)
-            char_name = char.name if char is not None else run.character_name
-            observers = self._surviving_observers_for_deceased(run, deceased_id)
-            context = build_narrative_context(
-                self.world,
-                dest,
-                self.world.year,
-                observer=observers,
-                subject_id=deceased_id,
-            )
-            relation_hint = derive_relation_hint(observers, deceased_id)
-            epitaph = epitaph_for_character(
-                char_name,
-                self.world.year,
-                dest_name,
-                "adventure_death",
-                char=char,
-                template_history=memorial_template_history,
-                relation_hint=relation_hint,
-                context=context,
-            )
-            memorial_id = generate_adventure_id(self.id_rng)
-            self.world.add_memorial(
-                memorial_id,
-                deceased_id,
-                char_name,
-                dest,
-                self.world.year,
-                "adventure_death",
-                epitaph,
-            )
-            # Generate a location alias (capped by World.MAX_ALIASES)
-            dest_loc = self.world.get_location_by_id(dest)
-            if dest_loc is not None:
-                alias = alias_for_event(
-                    "adventure_death",
-                    char_name,
-                    dest_name,
-                    template_history=alias_template_history,
-                    relation_hint=relation_hint,
-                    context=context,
-                )
-                self.world.add_alias(dest, alias)
-
-    def _surviving_observers_for_deceased(
-        self,
-        run: AdventureRun,
-        deceased_id: str,
-    ) -> List["Character"]:
-        """Return living party observers for directional relation lookup."""
-        if not getattr(run, "is_party", False):
-            return []
-        observers: List["Character"] = []
-        for member_id in getattr(run, "member_ids", []):
-            if member_id == deceased_id:
-                continue
-            observer = self.world.get_character_by_id(member_id)
-            if observer is not None and observer.alive:
-                observers.append(observer)
-        return observers
-
-    def get_adventure_summaries(self, include_active: bool = True) -> List[str]:
-        """Return summary lines for known adventures."""
-        runs = list(self.world.completed_adventures)
-        if include_active:
-            runs.extend(self.world.active_adventures)
-        summaries: List[str] = []
-        for run in runs:
-            status_key = f"outcome_{run.outcome}" if run.outcome else f"state_{run.state}"
-            status = tr(status_key)
-            origin_name = self.world.location_name(run.origin)
-            dest_name = self.world.location_name(run.destination)
-            # Show all party members for party adventures
-            if run.is_party:
-                party_names = self._build_party_display_names(run)
-                summaries.append(
-                    f"{party_names}: {origin_name} -> {dest_name} [{status}]"
-                )
-            else:
-                summaries.append(
-                    f"{run.character_name}: {origin_name} -> {dest_name} [{status}]"
-                )
-        return summaries
-
-    def _build_party_display_names(self, run: AdventureRun) -> str:
-        """Return display names for party members, falling back to leader name."""
-        names = []
-        for mid in run.member_ids:
-            c = self.world.get_character_by_id(mid)
-            if c is not None:
-                names.append(c.name)
-        if not names:
-            names = [run.character_name]
-        return self._format_party_names_from_list(names)
-
-    @staticmethod
-    def _format_party_names_from_list(names: List[str], max_shown: int = 3) -> str:
-        shown = names[:max_shown]
-        result = " & ".join(shown)
-        if len(names) > max_shown:
-            result += f" +{len(names) - max_shown}"
-        return result
-
-    def get_adventure_details(self, adventure_id: str) -> List[str]:
-        """Return detailed log entries for a specific adventure."""
-        run = self.world.get_adventure_by_id(adventure_id)
-        if run is None:
-            return []
-        return list(run.detail_log)
-
-    def get_pending_adventure_choices(self) -> List[Dict[str, Any]]:
-        """Return all unresolved adventure choices."""
-        pending: List[Dict[str, Any]] = []
-        for run in self.world.active_adventures:
-            if run.pending_choice is not None:
-                pending.append(
-                    {
-                        "adventure_id": run.adventure_id,
-                        "character_id": run.character_id,
-                        "character_name": run.character_name,
-                        "prompt": run.pending_choice.prompt,
-                        "options": list(run.pending_choice.options),
-                        "default_option": run.pending_choice.default_option,
-                    }
-                )
-        return pending
-
-    def resolve_adventure_choice(
-        self,
-        adventure_id: str,
-        option: Optional[str] = None,
-    ) -> bool:
-        """Resolve a pending choice on a specific adventure."""
-        run = self.world.get_adventure_by_id(adventure_id)
-        if run is None or run.pending_choice is None:
-            return False
-        char = self.world.get_character_by_id(run.character_id)
-        if char is None:
-            return False
-        summaries = run.resolve_choice(self.world, char, option=option)
-        for entry in summaries:
-            self._record_world_event(
-                entry,
-                kind="adventure_choice",
-                month=self.current_month,
-                location_id=run.destination,
-                primary_actor_id=run.character_id,
-            )
-        return True

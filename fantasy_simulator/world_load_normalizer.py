@@ -36,10 +36,11 @@ def rebuild_recent_event_ids(
         location.recent_event_ids = []
 
     for record in event_records:
-        if record.location_id not in location_index:
+        location_id = record.location_id
+        if location_id is None or location_id not in location_index:
             record.location_id = None
             continue
-        location_index[record.location_id].recent_event_ids.append(record.record_id)
+        location_index[location_id].recent_event_ids.append(record.record_id)
 
     for location in locations:
         location.recent_event_ids = location.recent_event_ids[-max_recent_event_ids:]

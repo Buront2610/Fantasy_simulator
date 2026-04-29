@@ -6,40 +6,71 @@ stateful world orchestration and compatibility rendering are separated.
 
 from __future__ import annotations
 
-from typing import Any, Callable, Iterable, List, Optional
+from collections.abc import Sequence
+from typing import Any, Callable, Iterable, Iterator, List, Optional, overload
 
 from .event_models import WorldEventRecord
 
 Translator = Callable[..., str]
 
 
-class ReadOnlyEventLog(list[str]):
+class ReadOnlyEventLog(Sequence[str]):
     """List-like read-only view for compatibility event-log access."""
+
+    def __init__(self, entries: Iterable[str]) -> None:
+        self._entries = tuple(entries)
+
+    @overload
+    def __getitem__(self, index: int) -> str: ...
+
+    @overload
+    def __getitem__(self, index: slice) -> tuple[str, ...]: ...
+
+    def __getitem__(self, index: int | slice) -> str | tuple[str, ...]:
+        return self._entries[index]
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._entries)
+
+    def __len__(self) -> int:
+        return len(self._entries)
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, ReadOnlyEventLog):
+            return self._entries == other._entries
+        if isinstance(other, (list, tuple)):
+            return list(self._entries) == list(other)
+        return NotImplemented
+
+    def __repr__(self) -> str:
+        return repr(list(self._entries))
 
     def _readonly(self, *_args: Any, **_kwargs: Any) -> None:
         raise TypeError("event_log is a read-only view; use log_event() or record_event()")
 
-    append = _readonly
-    clear = _readonly
-    extend = _readonly
-    insert = _readonly
-    pop = _readonly
-    remove = _readonly
-    reverse = _readonly
-    sort = _readonly
-
-    def __delitem__(self, _index: Any) -> None:
+    def append(self, _value: str) -> None:
         self._readonly()
 
-    def __iadd__(self, _other: Any) -> "ReadOnlyEventLog":
+    def clear(self) -> None:
         self._readonly()
-        return self
 
-    def __imul__(self, _other: Any) -> "ReadOnlyEventLog":
+    def extend(self, _values: Iterable[str]) -> None:
         self._readonly()
-        return self
 
-    def __setitem__(self, _index: Any, _value: Any) -> None:
+    def insert(self, _index: int, _value: str) -> None:
+        self._readonly()
+
+    def pop(self, _index: int = -1) -> str:
+        self._readonly()
+        raise AssertionError("unreachable")
+
+    def remove(self, _value: str) -> None:
+        self._readonly()
+
+    def reverse(self) -> None:
+        self._readonly()
+
+    def sort(self, *_args: Any, **_kwargs: Any) -> None:
         self._readonly()
 
 
