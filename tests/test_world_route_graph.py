@@ -170,6 +170,36 @@ def test_route_collection_rejects_repetition() -> None:
         raise AssertionError("Expected RouteCollection repetition to fail fast")
 
 
+def test_route_collection_rejects_route_owned_by_another_active_collection() -> None:
+    first_notifications = 0
+    second_notifications = 0
+
+    def _notify_first() -> None:
+        nonlocal first_notifications
+        first_notifications += 1
+
+    def _notify_second() -> None:
+        nonlocal second_notifications
+        second_notifications += 1
+
+    route = RouteEdge("route_1", "loc_one", "loc_two", "road")
+    first = RouteCollection([route], on_change=_notify_first)
+    second = RouteCollection(on_change=_notify_second)
+
+    try:
+        second.append(route)
+    except ValueError as exc:
+        assert "shared" in str(exc)
+    else:
+        raise AssertionError("Expected active RouteEdge sharing to fail fast")
+
+    route.blocked = True
+    assert first == [route]
+    assert second == []
+    assert first_notifications == 1
+    assert second_notifications == 0
+
+
 def test_route_collection_sort_and_reverse_mark_dirty() -> None:
     notifications = 0
 

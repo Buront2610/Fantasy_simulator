@@ -115,6 +115,19 @@ def test_apply_location_rename_change_updates_map_and_records_canonical_event():
     assert render_event_record(record, locale="ja") == "Aethoria Capital は Aethoria March に改名された。"
 
 
+def test_apply_location_rename_change_noops_when_name_is_unchanged():
+    world = World()
+    location = world.get_location_by_id("loc_aethoria_capital")
+    assert location is not None
+
+    record = world.apply_location_rename_change("loc_aethoria_capital", "Aethoria Capital")
+
+    assert record is None
+    assert location.canonical_name == "Aethoria Capital"
+    assert location.aliases == []
+    assert world.event_records == []
+
+
 def test_apply_route_blocked_change_records_block_and_reopen_events():
     previous_locale = get_locale()
     set_locale("en")
@@ -154,6 +167,17 @@ def test_apply_route_blocked_change_records_block_and_reopen_events():
     assert world.event_records[-2:] == [blocked_record, reopened_record]
 
 
+def test_apply_route_blocked_change_noops_when_blocked_state_is_unchanged():
+    world = World()
+    route = world.routes[0]
+
+    record = world.apply_route_blocked_change(route.route_id, False)
+
+    assert record is None
+    assert route.blocked is False
+    assert world.event_records == []
+
+
 def test_apply_controlling_faction_change_updates_location_and_records_event():
     previous_locale = get_locale()
     set_locale("en")
@@ -188,6 +212,38 @@ def test_apply_controlling_faction_change_updates_location_and_records_event():
     assert render_event_record(second, locale="en") == (
         "Aethoria Capital changed controlling faction from wardens to dawn_court."
     )
+
+
+def test_apply_controlling_faction_change_noops_when_faction_is_unchanged():
+    world = World()
+    location = world.get_location_by_id("loc_aethoria_capital")
+    assert location is not None
+    location.controlling_faction_id = "wardens"
+
+    record = world.apply_controlling_faction_change("loc_aethoria_capital", "wardens")
+
+    assert record is None
+    assert location.controlling_faction_id == "wardens"
+    assert world.event_records == []
+
+
+def test_world_change_description_uses_non_empty_fallback_when_rendering_fails(monkeypatch):
+    world = World()
+
+    monkeypatch.setattr(
+        "fantasy_simulator.world_memory_api.render_event_record",
+        lambda _record: "",
+    )
+
+    try:
+        world.apply_location_rename_change("loc_aethoria_capital", "Aethoria March")
+    except ValueError as exc:
+        assert "description" in str(exc)
+    else:
+        raise AssertionError("Expected empty rendered world-change description to fail fast")
+
+    assert world.get_location_by_id("loc_aethoria_capital").canonical_name == "Aethoria Capital"
+    assert world.event_records == []
 
 
 def test_world_change_record_created_in_en_renders_event_log_and_report_in_ja():

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fantasy_simulator.event_models import WorldEventRecord
-from fantasy_simulator.i18n import set_locale
+from fantasy_simulator.i18n import get_locale, set_locale
 from fantasy_simulator.world import World
 from fantasy_simulator import world_event_log_facade
 from fantasy_simulator.world_event_log import format_event_log_entry, project_compatibility_event_log
@@ -69,6 +69,28 @@ def test_project_compatibility_event_log_preserves_exact_legacy_event_log_entry(
 
     projected = project_compatibility_event_log(records, max_event_log=10, translate=_translate)
     assert projected == ["Year 1000: A legacy omen spread through the capital."]
+
+
+def test_legacy_event_log_entry_is_not_retranslated_after_locale_switch() -> None:
+    previous_locale = get_locale()
+    set_locale(previous_locale)
+    world = World()
+    world.record_event(
+        WorldEventRecord(
+            kind="legacy_event_log",
+            year=1000,
+            month=1,
+            day=1,
+            description="A legacy omen spread through the capital.",
+            legacy_event_log_entry="Year 1000: A legacy omen spread through the capital.",
+        )
+    )
+
+    set_locale("ja")
+    try:
+        assert list(world.event_log) == ["Year 1000: A legacy omen spread through the capital."]
+    finally:
+        set_locale(previous_locale)
 
 
 def test_event_log_facade_preserves_world_wrapper_semantics() -> None:

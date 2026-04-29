@@ -22,6 +22,11 @@ work and its serialization guardrails.
   Evidence: `event_log` and reports render canonical records through
   `summary_key`/`render_params`; `render_params` rejects non-JSON values and
   keeps faction absence as semantic `null` until display time.
+- World-change event quality.
+  Status: completed in the current branch worktree.
+  Evidence: world-change APIs no-op without appending records when the state is
+  unchanged, fail fast rather than storing empty fallback descriptions, and
+  roll back state when canonical recording fails.
 
 ## Remaining Risks
 

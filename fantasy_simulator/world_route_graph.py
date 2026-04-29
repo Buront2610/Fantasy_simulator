@@ -33,6 +33,9 @@ class RouteCollection(MutableSequence[RouteEdge]):
             self._on_change()
 
     def _attach(self, route: RouteEdge) -> None:
+        current_callback = route._on_change
+        if current_callback is not None and current_callback is not self._on_change:
+            raise ValueError("RouteEdge instances cannot be shared across active RouteCollection owners")
         route._on_change = self._on_change
 
     @staticmethod

@@ -85,6 +85,25 @@ class WorldMemoryMixin:
             return location_id
         return location.canonical_name
 
+    def _world_change_description(
+        self,
+        *,
+        summary_key: str,
+        render_params: Dict[str, Any],
+        fallback_description: str,
+    ) -> str:
+        """Render a world-change description with a non-empty compatibility fallback."""
+        description = render_event_record(
+            WorldEventRecord(
+                description=fallback_description,
+                summary_key=summary_key,
+                render_params=render_params,
+            )
+        )
+        if not description:
+            raise ValueError("world-change event description must not be empty")
+        return description
+
     def _restore_location_rename_state(
         self,
         location_id: str,
@@ -177,12 +196,14 @@ class WorldMemoryMixin:
         month: int = 1,
         day: int = 1,
         calendar_key: str = "",
-    ) -> WorldEventRecord:
+    ) -> WorldEventRecord | None:
         """Rename a location and record the canonical world-change event."""
         location = self._location_id_index[location_id]
         rollback_name = location.canonical_name
         rollback_aliases = list(location.aliases)
         old_name = self.rename_location(location_id, new_name)
+        if old_name == location.canonical_name:
+            return None
         render_params = {
             "location_id": location_id,
             "old_name": old_name,
@@ -193,8 +214,10 @@ class WorldMemoryMixin:
             return self._record_world_change(
                 kind="location_renamed",
                 location_id=location_id,
-                description=render_event_record(
-                    WorldEventRecord(summary_key=summary_key, render_params=render_params)
+                description=self._world_change_description(
+                    summary_key=summary_key,
+                    render_params=render_params,
+                    fallback_description=f"{old_name} was renamed {location.canonical_name}.",
                 ),
                 summary_key=summary_key,
                 render_params=render_params,
@@ -237,24 +260,33 @@ class WorldMemoryMixin:
         month: int = 1,
         day: int = 1,
         calendar_key: str = "",
-    ) -> WorldEventRecord:
+    ) -> WorldEventRecord | None:
         """Set a location's controlling faction and record the canonical world-change event."""
         old_faction_id = self.set_location_controlling_faction(location_id, faction_id)
         location = self._location_id_index[location_id]
         new_faction_id = location.controlling_faction_id
+        if old_faction_id == new_faction_id:
+            return None
         render_params = {
             "location": location.canonical_name,
             "location_id": location_id,
             "old_faction_id": old_faction_id,
             "new_faction_id": new_faction_id,
         }
+        old_faction_fallback = old_faction_id or "none"
+        new_faction_fallback = new_faction_id or "none"
         summary_key = "events.location_faction_changed.summary"
         try:
             return self._record_world_change(
                 kind="location_faction_changed",
                 location_id=location_id,
-                description=render_event_record(
-                    WorldEventRecord(summary_key=summary_key, render_params=render_params)
+                description=self._world_change_description(
+                    summary_key=summary_key,
+                    render_params=render_params,
+                    fallback_description=(
+                        f"{location.canonical_name} changed controlling faction from "
+                        f"{old_faction_fallback} to {new_faction_fallback}."
+                    ),
                 ),
                 summary_key=summary_key,
                 render_params=render_params,
@@ -289,11 +321,13 @@ class WorldMemoryMixin:
         month: int = 1,
         day: int = 1,
         calendar_key: str = "",
-    ) -> WorldEventRecord:
+    ) -> WorldEventRecord | None:
         """Set route passability and record the canonical world-change event."""
         route = route_by_id(self.routes, route_id=route_id)
         old_blocked = self.set_route_blocked(route_id, blocked)
         new_blocked = bool(route.blocked)
+        if old_blocked == new_blocked:
+            return None
         route_kind = "route_blocked" if new_blocked else "route_reopened"
         summary_key = f"events.{route_kind}.summary"
         render_params = {
@@ -301,12 +335,18 @@ class WorldMemoryMixin:
             "from_location": self._route_location_name(route.from_site_id),
             "to_location": self._route_location_name(route.to_site_id),
         }
+        route_verb = "blocked" if new_blocked else "reopened"
         try:
             return self._record_world_change(
                 kind=route_kind,
                 location_id=route.from_site_id,
-                description=render_event_record(
-                    WorldEventRecord(summary_key=summary_key, render_params=render_params)
+                description=self._world_change_description(
+                    summary_key=summary_key,
+                    render_params=render_params,
+                    fallback_description=(
+                        f"The route from {render_params['from_location']} to "
+                        f"{render_params['to_location']} was {route_verb}."
+                    ),
                 ),
                 summary_key=summary_key,
                 render_params=render_params,

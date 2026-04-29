@@ -24,6 +24,8 @@ this precedence:
 - Event rendering: `WorldEventRecord.summary_key` plus JSON-compatible
   `render_params` is the locale-aware display source when present.
   `description` remains the compatibility fallback text.
+- Legacy event log entries: `legacy_event_log_entry` is exact preserved text
+  from older saves. It is intentionally not retranslated after locale changes.
 - Language evolution: `world.language_evolution_history` beats
   `world.language_runtime_states`.
 - Bundle-backed world structure: embedded `world.setting_bundle` site/route
@@ -40,6 +42,8 @@ this precedence:
 - Current-schema saves with `world.event_records` ignore stale serialized
   `world.event_log` lines. The event log is a read-only compatibility view
   projected from canonical records.
+- New world-change APIs are idempotent: if the requested state already matches
+  the current state, they do not append a canonical `world_change` record.
 - `render_params` values must be JSON-compatible scalars, lists, or dicts with
   string keys. Store semantic values such as IDs or `null`, not translated
   surface strings, so records can render cleanly in another locale.
