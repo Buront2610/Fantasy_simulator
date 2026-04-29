@@ -115,14 +115,14 @@ def overlay_serialized_route_state(
             raise ValueError(f"Serialized route overlay contains duplicate route id: {route_id!r}")
         serialized_by_id[route_id] = payload
     for route in routes:
-        payload = serialized_by_id.get(route.route_id)
-        if payload is None:
+        route_payload = serialized_by_id.get(route.route_id)
+        if route_payload is None:
             continue
-        if payload["from_site_id"] != route.from_site_id or payload["to_site_id"] != route.to_site_id:
+        if route_payload["from_site_id"] != route.from_site_id or route_payload["to_site_id"] != route.to_site_id:
             raise ValueError(f"Serialized route overlay disagrees with canonical endpoints: {route.route_id!r}")
-        route.route_type = payload["route_type"]
-        route.distance = payload["distance"]
-        route.blocked = payload["blocked"]
+        route.route_type = route_payload["route_type"]
+        route.distance = route_payload["distance"]
+        route.blocked = route_payload["blocked"]
 
 
 def validate_topology_integrity(
@@ -155,7 +155,8 @@ def validate_topology_integrity(
             raise ValueError(f"Serialized route forms a self-loop: {route.route_id!r}")
         if route.from_site_id not in site_index or route.to_site_id not in site_index:
             raise ValueError(f"Serialized route references unknown site: {route.route_id!r}")
-        pair = tuple(sorted((route.from_site_id, route.to_site_id)))
+        first_site_id, second_site_id = sorted((route.from_site_id, route.to_site_id))
+        pair = (first_site_id, second_site_id)
         if pair in seen_route_pairs:
             raise ValueError(f"Serialized topology contains duplicate route pair: {pair[0]}->{pair[1]}")
         seen_route_pairs.add(pair)

@@ -6,6 +6,7 @@ import random
 
 import pytest
 from fantasy_simulator.character import Character
+from fantasy_simulator.content.setting_bundle import RaceDefinition, SettingBundle, SiteSeedDefinition, WorldDefinition
 from fantasy_simulator.events import EventResult, EventSystem
 from fantasy_simulator.i18n import get_locale, set_locale
 from fantasy_simulator.world import World
@@ -530,6 +531,41 @@ class TestNaturalDeath:
         world.add_character(dead)
         result = es.check_natural_death(dead, world)
         assert result is None
+
+    def test_custom_bundle_race_lifespan_drives_natural_decline(self, es, world):
+        """World-authored race lifespan overrides Character.max_age for lifecycle checks."""
+
+        class FixedRng:
+            def random(self):
+                return 0.0
+
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="short_lived",
+                display_name="Short Lived",
+                lore_text="A world with brief human lives.",
+                races=[RaceDefinition("Human", "Brief lives.", lifespan_years=40)],
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="loc_aethoria_capital",
+                        name="Capital",
+                        description="Capital.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                        tags=["default_resident"],
+                    )
+                ],
+            ),
+        )
+        character = _make_char("Elder", age=40, constitution=100)
+        world.add_character(character)
+
+        result = es.check_natural_death(character, world, rng=FixedRng())
+
+        assert result is not None
+        assert result.event_type == "condition_worsened"
 
 
 # ---------------------------------------------------------------------------

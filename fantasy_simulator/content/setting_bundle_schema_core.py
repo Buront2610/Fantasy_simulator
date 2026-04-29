@@ -68,16 +68,24 @@ class RaceDefinition:
     name: str
     description: str
     stat_bonuses: Dict[str, int] = field(default_factory=dict)
+    lifespan_years: int | None = None
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        payload: Dict[str, Any] = {
             "name": self.name,
             "description": self.description,
             "stat_bonuses": {key: int(value) for key, value in self.stat_bonuses.items()},
         }
+        if self.lifespan_years is not None:
+            payload["lifespan_years"] = int(self.lifespan_years)
+        return payload
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "RaceDefinition":
+        raw_lifespan = data.get("lifespan_years")
+        lifespan_years = None if raw_lifespan is None else int(raw_lifespan)
+        if lifespan_years is not None and lifespan_years <= 0:
+            raise ValueError("lifespan_years must be positive")
         return cls(
             name=data["name"],
             description=data.get("description", ""),
@@ -85,6 +93,7 @@ class RaceDefinition:
                 key: int(value)
                 for key, value in dict(data.get("stat_bonuses", {})).items()
             },
+            lifespan_years=lifespan_years,
         )
 
 

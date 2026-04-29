@@ -11,14 +11,14 @@ from typing import Callable, Iterable, List, Optional, Protocol, Tuple, TypeVar
 from .content.setting_bundle import CalendarDefinition
 
 
-TCalendarChange = TypeVar("TCalendarChange")
-
-
 class SupportsCalendarChange(Protocol):
     year: int
     month: int
     day: int
     calendar: CalendarDefinition
+
+
+TCalendarChange = TypeVar("TCalendarChange", bound=SupportsCalendarChange)
 
 
 def clone_calendar(calendar: CalendarDefinition) -> CalendarDefinition:

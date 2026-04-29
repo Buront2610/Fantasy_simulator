@@ -14,6 +14,26 @@ def test_rename_location_updates_name_index_and_keeps_old_name_as_alias():
     assert world.get_location_by_name("Aethoria March") is location
 
 
+def test_rename_location_rejects_existing_canonical_name_without_mutating_indexes():
+    world = World()
+    capital = world.get_location_by_id("loc_aethoria_capital")
+    silverbrook = world.get_location_by_id("loc_silverbrook")
+    assert capital is not None
+    assert silverbrook is not None
+
+    try:
+        world.rename_location("loc_aethoria_capital", "Silverbrook")
+    except ValueError as exc:
+        assert "location name already exists" in str(exc)
+    else:
+        raise AssertionError("Expected duplicate canonical location name to fail fast")
+
+    assert capital.canonical_name == "Aethoria Capital"
+    assert silverbrook.canonical_name == "Silverbrook"
+    assert world.get_location_by_name("Aethoria Capital") is capital
+    assert world.get_location_by_name("Silverbrook") is silverbrook
+
+
 def test_rename_location_survives_reports_and_save_load_views():
     world = World()
 

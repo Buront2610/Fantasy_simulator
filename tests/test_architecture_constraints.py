@@ -11,6 +11,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = PROJECT_ROOT / "fantasy_simulator"
 REPORTS_MODULE = "fantasy_simulator.reports"
 WORLD_DATA_MODULE = "fantasy_simulator.content.world_data"
+ADVENTURE_FACADE_MODULE = "fantasy_simulator.adventure"
+ADVENTURE_DOMAIN_MODULE = "fantasy_simulator.adventure_domain"
+ADVENTURE_EXPORTS_MODULE = "fantasy_simulator.adventure_exports"
 
 
 def _module_name(path: Path) -> str:
@@ -52,6 +55,14 @@ def _iter_import_targets(path: Path) -> list[str]:
     return imports
 
 
+def _imports_module(path: Path, module_name: str) -> list[str]:
+    return [
+        target
+        for target in _iter_import_targets(path)
+        if target == module_name or target.startswith(f"{module_name}.")
+    ]
+
+
 def test_resolve_import_expands_relative_package_aliases() -> None:
     node = ast.parse("from .. import persistence").body[0]
 
@@ -85,6 +96,61 @@ def _iter_history_attribute_accesses(path: Path) -> list[tuple[str, int]]:
 
 def _production_files() -> list[Path]:
     return sorted(path for path in PACKAGE_ROOT.rglob("*.py") if "__pycache__" not in path.parts)
+
+
+def _adventure_helper_files() -> list[Path]:
+    allowed_domain_facade = PACKAGE_ROOT / "adventure_domain.py"
+    return sorted(
+        path
+        for path in PACKAGE_ROOT.glob("adventure_*.py")
+        if path != allowed_domain_facade
+    )
+
+
+def test_adventure_helper_modules_do_not_import_adventure_facades() -> None:
+    forbidden_modules = (ADVENTURE_FACADE_MODULE, ADVENTURE_DOMAIN_MODULE)
+
+    for path in _adventure_helper_files():
+        forbidden = [
+            target
+            for module_name in forbidden_modules
+            for target in _imports_module(path, module_name)
+        ]
+        assert forbidden == [], f"{path} imports adventure facade modules: {forbidden}"
+
+
+def test_adventure_domain_facade_imports_only_adventure_exports_facade() -> None:
+    path = PACKAGE_ROOT / "adventure_domain.py"
+    imports = _iter_import_targets(path)
+    forbidden = [
+        target
+        for target in imports
+        if target.startswith("fantasy_simulator.adventure")
+        and not (target == ADVENTURE_EXPORTS_MODULE or target.startswith(f"{ADVENTURE_EXPORTS_MODULE}."))
+    ]
+
+    assert forbidden == [], f"{path} imports adventure modules other than adventure_exports: {forbidden}"
+    assert _imports_module(path, ADVENTURE_EXPORTS_MODULE), (
+        "adventure_domain.py should re-export adventure_exports"
+    )
+
+
+def test_only_adventure_entrypoint_imports_adventure_domain_facade() -> None:
+    allowed = {PACKAGE_ROOT / "adventure.py"}
+
+    for path in _production_files():
+        if path in allowed or path.name == "adventure_domain.py":
+            continue
+        forbidden = _imports_module(path, ADVENTURE_DOMAIN_MODULE)
+        assert forbidden == [], f"{path} imports adventure_domain facade: {forbidden}"
+
+
+def test_adventure_domain_all_matches_adventure_exports_all() -> None:
+    from fantasy_simulator import adventure_domain, adventure_exports
+
+    assert adventure_domain.__all__ == adventure_exports.__all__
+    for name in adventure_exports.__all__:
+        assert getattr(adventure_domain, name) is getattr(adventure_exports, name)
 
 
 def test_simulation_layer_does_not_import_ui_or_persistence() -> None:

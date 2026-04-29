@@ -65,6 +65,9 @@ def validate_bundle_unique_names(world: WorldDefinition, *, source: str) -> None
         raise ValueError(
             f"Setting bundle {source} contains duplicate race names: {', '.join(duplicate_races)}"
         )
+    for race in world.races:
+        if race.lifespan_years is not None and race.lifespan_years <= 0:
+            raise ValueError(f"Setting bundle {source} has nonpositive lifespan_years for race: {race.name}")
 
     job_names = [job.name for job in world.jobs]
     duplicate_jobs = duplicate_values(job_names)

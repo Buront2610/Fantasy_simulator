@@ -97,13 +97,17 @@ class WorldMemoryMixin:
 
     def rename_location(self, location_id: str, new_name: str) -> str:
         """Rename a location and keep the previous name as an alias."""
+        location = self._location_id_index[location_id]
+        normalized_name = new_name.strip()
+        existing = self._location_name_index.get(normalized_name)
+        if existing is not None and existing is not location:
+            raise ValueError(f"location name already exists: {normalized_name}")
         old_name = apply_location_rename(
             self._location_id_index,
             location_id=location_id,
             new_name=new_name,
             max_aliases=self.MAX_ALIASES,
         )
-        location = self._location_id_index[location_id]
         if old_name != location.canonical_name:
             self._location_name_index.pop(old_name, None)
             self._location_name_index[location.canonical_name] = location

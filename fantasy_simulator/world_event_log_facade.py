@@ -6,6 +6,7 @@ from typing import Any, Iterable, List, Optional
 
 from .i18n import tr
 from .world_event_log import (
+    ReadOnlyEventLog,
     append_display_event_log_entry,
     compatibility_event_log_view,
     rebuild_display_event_log,
@@ -13,7 +14,7 @@ from .world_event_log import (
 )
 
 
-def event_log_view(world: Any) -> List[str]:
+def event_log_view(world: Any) -> ReadOnlyEventLog:
     """Return the current read-only compatibility event-log view."""
     return compatibility_event_log_view(
         world._display_event_log,
@@ -36,6 +37,8 @@ def append_event_log_entry(
     day: Optional[int] = None,
 ) -> None:
     """Append one display-only compatibility event-log entry."""
+    if world.event_records:
+        raise RuntimeError("log_event() cannot append display-only lines after canonical event_records exist")
     world._display_event_log = append_display_event_log_entry(
         world._display_event_log,
         event_text,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import List, Optional
 
 from . import world_event_log_facade as event_log_facade
@@ -13,7 +14,7 @@ class WorldEventLogMixin:
     MAX_EVENT_LOG = 2000
 
     @property
-    def event_log(self) -> List[str]:
+    def event_log(self) -> Sequence[str]:
         """Compatibility event log view.
 
         Once canonical ``event_records`` exist, the compatibility log is

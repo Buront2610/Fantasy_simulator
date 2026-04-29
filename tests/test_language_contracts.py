@@ -228,3 +228,31 @@ def test_non_language_bundle_change_preserves_language_runtime_state() -> None:
     assert world.language_origin_year == before_origin_year
     assert world.language_evolution_history == before_history
     assert world.language_status() == before_status
+
+
+def test_language_display_name_change_preserves_evolution_history() -> None:
+    world = _language_world()
+    world.advance_time(1)
+    before_origin_year = world.language_origin_year
+    before_history = list(world.language_evolution_history)
+
+    updated_bundle = SettingBundle.from_dict(world.setting_bundle.to_dict())
+    updated_bundle.world_definition.languages[1].display_name = "Child Lang Display Only"
+    world.setting_bundle = updated_bundle
+
+    assert world.language_origin_year == before_origin_year
+    assert world.language_evolution_history == before_history
+    status = next(item for item in world.language_status() if item["language_key"] == "child_lang")
+    assert status["display_name"] == "Child Lang Display Only"
+
+
+def test_language_semantic_change_resets_evolution_history() -> None:
+    world = _language_world()
+    world.advance_time(1)
+
+    updated_bundle = SettingBundle.from_dict(world.setting_bundle.to_dict())
+    updated_bundle.world_definition.languages[1].seed_syllables.append("mor")
+    world.setting_bundle = updated_bundle
+
+    assert world.language_origin_year == world.year
+    assert world.language_evolution_history == []

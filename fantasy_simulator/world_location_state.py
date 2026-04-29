@@ -71,7 +71,7 @@ def neutral_location_state_defaults(_location_id: str, _region_type: str) -> Dic
 
 
 FallbackLocationResolver = Callable[[str], str]
-LocationIdNormalizer = Callable[[Any, str], str]
+LocationIdNormalizer = Callable[[Any, str], str | None]
 LocationDefaultsResolver = Callable[..., Dict[str, int]]
 
 
@@ -251,6 +251,8 @@ class LocationState:
         loc_id = data.get("id")
         if normalize_location_id is not None:
             loc_id = normalize_location_id(loc_id, canonical_name)
+            if not loc_id:
+                raise ValueError("location id could not be resolved")
         elif not loc_id:
             resolved_fallback = fallback_resolver or fallback_location_id
             loc_id = resolved_fallback(canonical_name)

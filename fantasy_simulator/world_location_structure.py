@@ -15,11 +15,20 @@ def register_location(
 ) -> None:
     """Register one location into coordinate, name, and ID indexes."""
     existing_at_coord = grid.get((location.x, location.y))
+    existing_by_id = location_id_index.get(location.id)
+    existing_by_name = location_name_index.get(location.canonical_name)
+    if (
+        existing_by_name is not None
+        and existing_by_name is not location
+        and existing_by_name is not existing_at_coord
+        and existing_by_name is not existing_by_id
+    ):
+        raise ValueError(f"duplicate location canonical name: {location.canonical_name}")
+
     if existing_at_coord is not None and existing_at_coord is not location:
         location_name_index.pop(existing_at_coord.canonical_name, None)
         location_id_index.pop(existing_at_coord.id, None)
 
-    existing_by_id = location_id_index.get(location.id)
     if existing_by_id is not None and existing_by_id is not location:
         grid.pop((existing_by_id.x, existing_by_id.y), None)
         location_name_index.pop(existing_by_id.canonical_name, None)

@@ -59,6 +59,13 @@ class WorldDefinition:
         """Return the site seed for a given location id, if present."""
         return self.site_seed_index().get(location_id)
 
+    def race_lifespan_years(self, race_name: str) -> int | None:
+        """Return the authored lifespan for a race, if the bundle defines one."""
+        for race in self.races:
+            if race.name == race_name:
+                return race.lifespan_years
+        return None
+
     def resident_site_ids(self) -> List[str]:
         """Return site ids tagged as reasonable resident defaults."""
         return [

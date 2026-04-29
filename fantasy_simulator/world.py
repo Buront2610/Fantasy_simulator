@@ -197,6 +197,10 @@ class World(
     def setting_bundle(self, value: SettingBundle) -> None:
         self.apply_setting_bundle(value)
 
+    def race_lifespan_years(self, race_name: str) -> int | None:
+        """Return bundle-authored lifespan for a race, if available."""
+        return self._setting_bundle.world_definition.race_lifespan_years(race_name)
+
     def _set_setting_bundle_metadata(self, bundle: SettingBundle) -> None:
         set_setting_bundle_metadata(
             self,

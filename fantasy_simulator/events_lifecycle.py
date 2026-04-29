@@ -18,9 +18,18 @@ if TYPE_CHECKING:
 DeathEventCallback = Callable[["Character", "World", Any], EventResult]
 
 
+def character_lifespan_years(char: "Character", world: "World") -> int:
+    """Return bundle-authored race lifespan with Character.max_age as compatibility fallback."""
+    world_lifespan = world.race_lifespan_years(char.race)
+    if world_lifespan is not None:
+        return world_lifespan
+    return char.max_age
+
+
 def resolve_aging_event(char: "Character", world: "World", rng: Any = random) -> EventResult:
     """Resolve one annual aging tick for a character."""
     char.age += 1
+    max_age = character_lifespan_years(char, world)
     if char.age < 30:
         stat_changes = {
             "strength": rng.randint(0, 2),
@@ -36,7 +45,7 @@ def resolve_aging_event(char: "Character", world: "World", rng: Any = random) ->
             "strength": rng.randint(-1, 1),
         }
         desc = tr("aging_prime", name=char.name, age=char.age)
-    elif char.age < char.max_age * 0.75:
+    elif char.age < max_age * 0.75:
         stat_changes = {
             "wisdom": rng.randint(1, 3),
             "charisma": rng.randint(0, 1),
@@ -76,7 +85,8 @@ def resolve_death_event(char: "Character", world: "World", rng: Any = random) ->
         tr("death_cause_dungeon"),
         tr("death_cause_road"),
     ]
-    cause = cause_options[0] if char.age >= char.max_age * 0.9 else rng.choice(cause_options[1:])
+    max_age = character_lifespan_years(char, world)
+    cause = cause_options[0] if char.age >= max_age * 0.9 else rng.choice(cause_options[1:])
     desc = tr("death_narrative", name=char.name, race=char.race, job=char.job, age=char.age, cause=cause)
     char.add_history(tr("history_passed_away", year=world.year, cause=cause))
     return EventResult(
@@ -98,7 +108,7 @@ def check_natural_death(
     """Resolve natural decline, possibly worsening injury or causing death."""
     if not char.alive:
         return None
-    age_ratio = char.age / max(char.max_age, 1)
+    age_ratio = char.age / max(character_lifespan_years(char, world), 1)
     con_factor = (100 - char.constitution) / 100 * 0.5 + 0.5
     annual_death_chance = max(0.0, (age_ratio - 0.6) / 0.4) ** 2 * con_factor
     death_chance = annual_probability_to_fraction(annual_death_chance, year_fraction)

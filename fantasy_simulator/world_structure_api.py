@@ -129,6 +129,9 @@ class WorldStructureMixin:
             return
         self._copy_location_runtime_state(restored, current)
         if restored.canonical_name != current.canonical_name:
+            existing = self._location_name_index.get(restored.canonical_name)
+            if existing is not None and existing is not current:
+                raise ValueError(f"duplicate location canonical name: {restored.canonical_name}")
             self._location_name_index.pop(current.canonical_name, None)
             current.canonical_name = restored.canonical_name
             self._location_name_index[current.canonical_name] = current

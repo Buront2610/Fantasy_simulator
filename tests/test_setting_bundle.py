@@ -129,6 +129,56 @@ def test_setting_bundle_public_json_round_trip_uses_facade_exports():
     assert restored.to_dict() == bundle.to_dict()
 
 
+def test_race_definition_round_trips_lifespan_years():
+    race = RaceDefinition("Gnome", "Patient makers.", {"intelligence": 2}, lifespan_years=180)
+
+    restored = RaceDefinition.from_dict(race.to_dict())
+
+    assert restored.lifespan_years == 180
+    assert restored.to_dict()["lifespan_years"] == 180
+
+
+def test_default_aethoria_bundle_authors_legacy_race_lifespans():
+    lifespans = {
+        race.name: race.lifespan_years
+        for race in default_aethoria_bundle().world_definition.races
+    }
+
+    assert lifespans["Human"] == 80
+    assert lifespans["Elf"] == 600
+    assert lifespans["Dwarf"] == 250
+    assert lifespans["Orc"] == 60
+
+
+def test_race_definition_rejects_nonpositive_lifespan_from_payload():
+    try:
+        RaceDefinition.from_dict({"name": "Brief", "description": "", "lifespan_years": 0})
+    except ValueError as exc:
+        assert "lifespan_years" in str(exc)
+    else:
+        raise AssertionError("Expected nonpositive race lifespan payload to fail fast")
+
+
+def test_setting_bundle_validation_rejects_direct_nonpositive_race_lifespan():
+    bundle = SettingBundle(
+        schema_version=1,
+        world_definition=WorldDefinition(
+            world_key="invalid_lifespan",
+            display_name="Invalid Lifespan",
+            lore_text="Invalid race lifespan.",
+            races=[RaceDefinition("Brief", "", lifespan_years=0)],
+            naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+        ),
+    )
+
+    try:
+        World().setting_bundle = bundle
+    except ValueError as exc:
+        assert "lifespan_years" in str(exc)
+    else:
+        raise AssertionError("Expected direct nonpositive race lifespan to fail fast")
+
+
 def test_world_definition_round_trip():
     world_def = WorldDefinition(
         world_key="custom",

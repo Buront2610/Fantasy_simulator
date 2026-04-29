@@ -321,6 +321,16 @@ class TestWorld:
         assert location is not None
         assert restored.get_location_by_id("stale_id") is None
 
+    def test_from_dict_rejects_bundle_overlay_rename_to_existing_canonical_name(self):
+        world = World()
+        payload = world.to_dict()
+        capital = next(loc for loc in payload["grid"] if loc["id"] == "loc_aethoria_capital")
+        capital["canonical_name"] = "Thornwood"
+        capital["name"] = "Thornwood"
+
+        with pytest.raises(ValueError, match="duplicate location canonical name: Thornwood"):
+            World.from_dict(payload)
+
     def test_normalize_location_id_keeps_recognized_current_id_even_if_name_differs(self):
         world = World(name="Custom")
         world.setting_bundle = SettingBundle(
@@ -1560,6 +1570,20 @@ class TestWorld:
         assert location.prosperity == 50
         assert location.traffic == 30
 
+    def test_location_state_from_dict_rejects_unresolved_normalized_id(self):
+        with pytest.raises(ValueError, match="location id could not be resolved"):
+            LocationState.from_dict(
+                {
+                    "id": "stale",
+                    "canonical_name": "Unknown Place",
+                    "description": "Lost site",
+                    "region_type": "city",
+                    "x": 0,
+                    "y": 0,
+                },
+                normalize_location_id=lambda _loc_id, _name: None,
+            )
+
     def test_location_state_from_default_entry_uses_standalone_neutral_defaults(self):
         location = LocationState.from_default_entry((
             "loc_aethoria_capital",
@@ -1922,6 +1946,24 @@ class TestWorld:
         )
 
         assert all("display-only line" not in line for line in world.get_compatibility_event_log())
+
+    def test_log_event_rejects_display_only_write_after_canonical_history_exists(self):
+        from fantasy_simulator.events import WorldEventRecord
+
+        world = World()
+        world.record_event(
+            WorldEventRecord(
+                record_id="r1",
+                kind="battle",
+                year=1001,
+                description="Canonical clash",
+            )
+        )
+
+        with pytest.raises(RuntimeError, match="canonical event_records"):
+            world.log_event("display-only line")
+
+        assert world.event_log == ["[Year 1001, Month 1, Day 1] Canonical clash"]
 
     def test_trimming_event_records_removes_dangling_recent_event_ids(self):
         from fantasy_simulator.events import WorldEventRecord
