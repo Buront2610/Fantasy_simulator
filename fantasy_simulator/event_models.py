@@ -15,6 +15,7 @@ from __future__ import annotations
 import uuid
 from copy import deepcopy
 from dataclasses import dataclass, field
+from math import isfinite
 from typing import Any, Dict, List, Optional, Protocol
 
 
@@ -250,9 +251,36 @@ class WorldEventRecord:
             raise ValueError("render_params must be a dict when provided")
         if not isinstance(payload, dict):
             raise ValueError("render_params must be a dict")
-        if any(not isinstance(key, str) for key in payload):
-            raise ValueError("render_params keys must be strings")
+        WorldEventRecord._validate_json_object_payload(payload, "render_params")
         return deepcopy(payload)
+
+    @staticmethod
+    def _validate_json_object_payload(payload: Any, field_name: str) -> None:
+        if not isinstance(payload, dict):
+            raise ValueError(f"{field_name} must be a dict")
+        for key, value in payload.items():
+            if not isinstance(key, str):
+                raise ValueError(f"{field_name} keys must be strings")
+            WorldEventRecord._validate_json_value_payload(value, f"{field_name}.{key}")
+
+    @staticmethod
+    def _validate_json_value_payload(value: Any, field_name: str) -> None:
+        if value is None or isinstance(value, str) or isinstance(value, bool):
+            return
+        if isinstance(value, int):
+            return
+        if isinstance(value, float):
+            if not isfinite(value):
+                raise ValueError(f"{field_name} must be JSON-compatible")
+            return
+        if isinstance(value, list):
+            for index, item in enumerate(value):
+                WorldEventRecord._validate_json_value_payload(item, f"{field_name}[{index}]")
+            return
+        if isinstance(value, dict):
+            WorldEventRecord._validate_json_object_payload(value, field_name)
+            return
+        raise ValueError(f"{field_name} must be JSON-compatible")
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "WorldEventRecord":

@@ -13,7 +13,7 @@ from __future__ import annotations
 from typing import Callable, Iterable, Mapping, MutableSequence, Protocol
 
 from .event_models import WorldEventRecord
-from .world_event_record_updates import event_record_with_location_id
+from .world_event_record_updates import event_record_with_added_tags, event_record_with_location_id
 
 
 class CharacterLocationReference(Protocol):
@@ -27,12 +27,6 @@ class RumorLocationReference(Protocol):
 class AdventureLocationReference(Protocol):
     origin: str
     destination: str
-
-
-class WatchedActorRecord(Protocol):
-    tags: list[str]
-    primary_actor_id: str | None
-    secondary_actor_ids: list[str]
 
 
 class LocationReferenceResolver(Protocol):
@@ -152,7 +146,7 @@ def normalize_world_references_after_structure_change(
 
 def backfill_watched_actor_tags(
     *,
-    event_records: Iterable[WatchedActorRecord],
+    event_records: MutableSequence[WorldEventRecord],
     watched_actor_ids: set[str],
     watched_actor_tag_prefix: str,
     inferred_tag: str,
@@ -161,7 +155,7 @@ def backfill_watched_actor_tags(
     if not watched_actor_ids:
         return
 
-    for record in event_records:
+    for index, record in enumerate(event_records):
         if any(tag.startswith(watched_actor_tag_prefix) for tag in record.tags):
             continue
         actor_ids = [record.primary_actor_id] + list(record.secondary_actor_ids)
@@ -171,6 +165,4 @@ def backfill_watched_actor_tags(
             if actor_id and actor_id in watched_actor_ids
         ]
         if watched_tags:
-            record.tags = list(
-                dict.fromkeys(list(record.tags) + watched_tags + [inferred_tag])
-            )
+            event_records[index] = event_record_with_added_tags(record, [*watched_tags, inferred_tag])

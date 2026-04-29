@@ -25,3 +25,11 @@ def normalize_event_record_locations(
         event_record_with_location_id(record, normalize_location_id(record.location_id))
         for record in records
     ]
+
+
+def event_record_with_added_tags(
+    record: WorldEventRecord,
+    tags: Iterable[str],
+) -> WorldEventRecord:
+    """Return a copy of *record* with unique appended tags."""
+    return replace(record, tags=list(dict.fromkeys([*record.tags, *tags])))

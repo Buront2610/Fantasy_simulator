@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from math import inf
 
 from fantasy_simulator.event_models import EventResult, WorldEventRecord, generate_record_id
 from fantasy_simulator.event_rendering import render_event_record
@@ -107,6 +108,42 @@ def test_world_event_record_rejects_non_string_render_param_keys() -> None:
         assert "render_params" in str(exc)
     else:
         raise AssertionError("Expected non-string render_params keys to fail fast")
+
+
+def test_world_event_record_rejects_non_json_render_param_values() -> None:
+    invalid_values = [
+        {"bad": object()},
+        {"bad": {"nested": object()}},
+        {"bad": [object()]},
+        {"bad": inf},
+    ]
+
+    for render_params in invalid_values:
+        try:
+            WorldEventRecord(render_params=render_params)
+        except ValueError as exc:
+            assert "render_params" in str(exc)
+            continue
+        raise AssertionError(f"Expected non-JSON render_params to fail fast: {render_params!r}")
+
+
+def test_render_event_record_localizes_none_faction_params_at_display_time() -> None:
+    record = WorldEventRecord(
+        summary_key="events.location_faction_changed.summary",
+        render_params={
+            "location": "Aethoria Capital",
+            "location_id": "loc_aethoria_capital",
+            "old_faction_id": None,
+            "new_faction_id": "wardens",
+        },
+    )
+
+    assert render_event_record(record, locale="en") == (
+        "Aethoria Capital changed controlling faction from none to wardens."
+    )
+    assert render_event_record(record, locale="ja") == (
+        "Aethoria Capital の支配勢力が なし から wardens に変わった。"
+    )
 
 
 def test_render_event_record_uses_summary_key_render_params_and_locale() -> None:

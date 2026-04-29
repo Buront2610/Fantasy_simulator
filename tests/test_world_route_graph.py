@@ -102,6 +102,74 @@ def test_route_collection_slice_delete_detaches_removed_routes() -> None:
     assert notifications == 1
 
 
+def test_route_collection_pop_and_clear_detach_removed_routes() -> None:
+    notifications = 0
+
+    def _notify() -> None:
+        nonlocal notifications
+        notifications += 1
+
+    first = RouteEdge("route_1", "loc_one", "loc_two", "road")
+    second = RouteEdge("route_2", "loc_two", "loc_three", "road")
+    routes = RouteCollection([first, second], on_change=_notify)
+
+    popped = routes.pop()
+    popped.blocked = True
+    routes.clear()
+    first.blocked = True
+
+    assert popped is second
+    assert routes == []
+    assert notifications == 2
+
+
+def test_route_collection_slice_assignment_detaches_removed_routes() -> None:
+    notifications = 0
+
+    def _notify() -> None:
+        nonlocal notifications
+        notifications += 1
+
+    old_route = RouteEdge("route_old", "loc_one", "loc_two", "road")
+    new_route = RouteEdge("route_new", "loc_one", "loc_three", "road")
+    routes = RouteCollection([old_route], on_change=_notify)
+
+    routes[:] = [new_route]
+    old_route.blocked = True
+    new_route.blocked = True
+
+    assert notifications == 2
+
+
+def test_route_collection_rejects_non_route_edges() -> None:
+    routes = RouteCollection()
+
+    for action in (
+        lambda: routes.append("bad"),  # type: ignore[arg-type]
+        lambda: routes.extend([RouteEdge("route_ok", "a", "b"), "bad"]),  # type: ignore[list-item]
+        lambda: routes.insert(0, "bad"),  # type: ignore[arg-type]
+        lambda: routes.__iadd__(["bad"]),  # type: ignore[list-item]
+        lambda: routes.__setitem__(slice(None), ["bad"]),  # type: ignore[list-item]
+    ):
+        try:
+            action()
+        except TypeError as exc:
+            assert "RouteEdge" in str(exc)
+            continue
+        raise AssertionError("Expected RouteCollection to reject non-RouteEdge values")
+
+
+def test_route_collection_rejects_repetition() -> None:
+    routes = RouteCollection([RouteEdge("route_1", "loc_one", "loc_two", "road")])
+
+    try:
+        routes *= 2
+    except TypeError as exc:
+        assert "repetition" in str(exc)
+    else:
+        raise AssertionError("Expected RouteCollection repetition to fail fast")
+
+
 def test_route_collection_sort_and_reverse_mark_dirty() -> None:
     notifications = 0
 

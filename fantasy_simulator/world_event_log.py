@@ -10,6 +10,7 @@ from collections.abc import Sequence
 from typing import Any, Callable, Iterable, Iterator, List, Optional, overload
 
 from .event_models import WorldEventRecord
+from .event_rendering import render_event_record
 
 Translator = Callable[..., str]
 
@@ -109,7 +110,7 @@ def project_compatibility_event_log(
         record.legacy_event_log_entry
         if record.legacy_event_log_entry is not None
         else format_event_log_entry(
-            record.description,
+            render_event_record(record),
             translate=translate,
             year=record.year,
             month=record.month,

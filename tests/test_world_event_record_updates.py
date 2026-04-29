@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 
 from fantasy_simulator.event_models import WorldEventRecord
 from fantasy_simulator.world_event_record_updates import (
+    event_record_with_added_tags,
     event_record_with_location_id,
     normalize_event_record_locations,
 )
@@ -46,6 +47,16 @@ def test_normalize_event_record_locations_returns_copied_records() -> None:
     assert [record.location_id for record in records] == ["legacy_capital", None]
     assert [record.location_id for record in normalized] == ["loc_aethoria_capital", None]
     assert all(updated is not original for updated, original in zip(normalized, records))
+
+
+def test_event_record_with_added_tags_returns_copy_with_unique_tags() -> None:
+    record = WorldEventRecord(record_id="evt_1", tags=["existing"])
+
+    updated = event_record_with_added_tags(record, ["watched:char_1", "existing"])
+
+    assert updated is not record
+    assert record.tags == ["existing"]
+    assert updated.tags == ["existing", "watched:char_1"]
 
 
 def test_rebuild_recent_event_ids_clears_invalid_locations_by_replacing_records() -> None:

@@ -35,6 +35,12 @@ class RouteCollection(MutableSequence[RouteEdge]):
     def _attach(self, route: RouteEdge) -> None:
         route._on_change = self._on_change
 
+    @staticmethod
+    def _validate_route(route: object) -> RouteEdge:
+        if not isinstance(route, RouteEdge):
+            raise TypeError("route collection entries must be RouteEdge instances")
+        return route
+
     def _contains_identity(self, route: RouteEdge) -> bool:
         return any(item is route for item in self._items)
 
@@ -66,7 +72,7 @@ class RouteCollection(MutableSequence[RouteEdge]):
             if isinstance(value, RouteEdge) or not isinstance(value, IterableABC):
                 raise TypeError("slice assignment requires an iterable of RouteEdge")
             old_routes = self._items[index]
-            new_routes = list(value)
+            new_routes = [self._validate_route(route) for route in value]
             for route in new_routes:
                 self._attach(route)
             self._items[index] = new_routes
@@ -74,8 +80,7 @@ class RouteCollection(MutableSequence[RouteEdge]):
                 self._detach_if_removed(route)
             self._notify()
             return
-        if not isinstance(value, RouteEdge):
-            raise TypeError("route assignment requires a RouteEdge")
+        value = self._validate_route(value)
         old_route = self._items[index]
         self._attach(value)
         self._items[index] = value
@@ -110,20 +115,16 @@ class RouteCollection(MutableSequence[RouteEdge]):
         return self
 
     def __imul__(self, value: int) -> "RouteCollection":
-        if value <= 0:
-            self.clear()
-            return self
-        self._items *= value
-        self._notify()
-        return self
+        raise TypeError("route graph collections do not support repetition")
 
     def append(self, value: RouteEdge) -> None:
+        value = self._validate_route(value)
         self._attach(value)
         self._items.append(value)
         self._notify()
 
     def extend(self, iterable: Iterable[RouteEdge]) -> None:
-        new_routes = list(iterable)
+        new_routes = [self._validate_route(route) for route in iterable]
         if not new_routes:
             return
         for route in new_routes:
@@ -132,6 +133,7 @@ class RouteCollection(MutableSequence[RouteEdge]):
         self._notify()
 
     def insert(self, index: int, value: RouteEdge) -> None:
+        value = self._validate_route(value)
         self._attach(value)
         self._items.insert(index, value)
         self._notify()

@@ -17,13 +17,19 @@ work and its serialization guardrails.
   Evidence: `docs/serialization_contract.md`, `tests/test_doc_freshness.py`,
   and focused save/load conflict tests cover event adapter precedence and
   language history/cache precedence.
+- Locale-aware event rendering contract.
+  Status: completed in the current branch worktree.
+  Evidence: `event_log` and reports render canonical records through
+  `summary_key`/`render_params`; `render_params` rejects non-JSON values and
+  keeps faction absence as semantic `null` until display time.
 
 ## Remaining Risks
 
 - Canonical event records drift from legacy adapters.
   Impact: reports, summaries, and UI event logs disagree after load.
   Guardrail: `world.event_records` remains canonical; current-schema conflict
-  tests reject stale `event_log` precedence.
+  tests reject stale `event_log` precedence; display adapters render canonical
+  records through the shared event renderer.
 - Language runtime cache diverges from durable history.
   Impact: generated names and endonyms change depending on save shape.
   Guardrail: `language_evolution_history` wins over

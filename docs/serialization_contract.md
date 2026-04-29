@@ -21,6 +21,9 @@ this precedence:
   `world.event_log`.
 - Display event log: project from `world.event_records`; use `world.event_log`
   only when no records exist.
+- Event rendering: `WorldEventRecord.summary_key` plus JSON-compatible
+  `render_params` is the locale-aware display source when present.
+  `description` remains the compatibility fallback text.
 - Language evolution: `world.language_evolution_history` beats
   `world.language_runtime_states`.
 - Bundle-backed world structure: embedded `world.setting_bundle` site/route
@@ -37,6 +40,9 @@ this precedence:
 - Current-schema saves with `world.event_records` ignore stale serialized
   `world.event_log` lines. The event log is a read-only compatibility view
   projected from canonical records.
+- `render_params` values must be JSON-compatible scalars, lists, or dicts with
+  string keys. Store semantic values such as IDs or `null`, not translated
+  surface strings, so records can render cleanly in another locale.
 - Migrating pre-current saves may lift legacy `history` and `world.event_log`
   entries into `world.event_records`. Already-migrated legacy records are
   skipped by payload identity so repeated migrations do not duplicate them.

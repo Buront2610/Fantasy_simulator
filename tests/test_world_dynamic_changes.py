@@ -1,5 +1,6 @@
 from fantasy_simulator.event_rendering import render_event_record
 from fantasy_simulator.i18n import get_locale, set_locale
+from fantasy_simulator.reports import generate_monthly_report
 from fantasy_simulator.world import World
 
 
@@ -172,8 +173,8 @@ def test_apply_controlling_faction_change_updates_location_and_records_event():
     assert second.render_params == {
         "location": "Aethoria Capital",
         "location_id": "loc_aethoria_capital",
-        "old_faction": "wardens",
-        "new_faction": "dawn_court",
+        "old_faction_id": "wardens",
+        "new_faction_id": "dawn_court",
     }
     assert second.impacts == [
         {
@@ -187,6 +188,96 @@ def test_apply_controlling_faction_change_updates_location_and_records_event():
     assert render_event_record(second, locale="en") == (
         "Aethoria Capital changed controlling faction from wardens to dawn_court."
     )
+
+
+def test_world_change_record_created_in_en_renders_event_log_and_report_in_ja():
+    previous_locale = get_locale()
+    world = World()
+    set_locale("en")
+    try:
+        record = world.apply_controlling_faction_change(
+            "loc_aethoria_capital",
+            "wardens",
+            month=2,
+        )
+    finally:
+        set_locale(previous_locale)
+
+    set_locale("ja")
+    try:
+        expected = "Aethoria Capital の支配勢力が なし から wardens に変わった。"
+        report = generate_monthly_report(world, record.year, record.month)
+
+        assert render_event_record(record) == expected
+        assert any(expected in line for line in world.event_log)
+        assert expected in report.notable_events
+    finally:
+        set_locale(previous_locale)
+
+
+def test_apply_location_rename_change_rolls_back_when_recording_fails(monkeypatch):
+    world = World()
+    location = world.get_location_by_id("loc_aethoria_capital")
+    assert location is not None
+
+    def _fail_record_event(_record):
+        raise ValueError("duplicate record")
+
+    monkeypatch.setattr(world, "record_event", _fail_record_event)
+
+    try:
+        world.apply_location_rename_change("loc_aethoria_capital", "Aethoria March")
+    except ValueError as exc:
+        assert "duplicate record" in str(exc)
+    else:
+        raise AssertionError("Expected record failure to roll back rename")
+
+    assert location.canonical_name == "Aethoria Capital"
+    assert location.aliases == []
+    assert world.get_location_by_name("Aethoria Capital") is location
+    assert world.get_location_by_name("Aethoria March") is None
+    assert world.event_records == []
+
+
+def test_apply_route_blocked_change_rolls_back_when_recording_fails(monkeypatch):
+    world = World()
+    route = world.routes[0]
+
+    def _fail_record_event(_record):
+        raise ValueError("duplicate record")
+
+    monkeypatch.setattr(world, "record_event", _fail_record_event)
+
+    try:
+        world.apply_route_blocked_change(route.route_id, True)
+    except ValueError as exc:
+        assert "duplicate record" in str(exc)
+    else:
+        raise AssertionError("Expected record failure to roll back route change")
+
+    assert route.blocked is False
+    assert world.event_records == []
+
+
+def test_apply_controlling_faction_change_rolls_back_when_recording_fails(monkeypatch):
+    world = World()
+    location = world.get_location_by_id("loc_aethoria_capital")
+    assert location is not None
+
+    def _fail_record_event(_record):
+        raise ValueError("duplicate record")
+
+    monkeypatch.setattr(world, "record_event", _fail_record_event)
+
+    try:
+        world.apply_controlling_faction_change("loc_aethoria_capital", "wardens")
+    except ValueError as exc:
+        assert "duplicate record" in str(exc)
+    else:
+        raise AssertionError("Expected record failure to roll back faction change")
+
+    assert location.controlling_faction_id is None
+    assert world.event_records == []
 
 
 def test_world_change_event_records_survive_world_round_trip():
