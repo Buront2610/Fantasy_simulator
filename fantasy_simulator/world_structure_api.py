@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 
 from .world_location_state import LocationState, location_state_from_site_seed
 from .world_location_structure import (
@@ -21,22 +21,53 @@ from .world_reference_repair import (
     repair_world_location_references,
 )
 
-_FALLBACK_LOCATION_ID: Callable[[str], str] = lambda name: name
-_LOCATION_STATE_DEFAULTS: Callable[..., Dict[str, int]] = lambda *_args, **_kwargs: {}
-
-
-def configure_world_structure_resolvers(
-    *,
-    fallback_resolver: Callable[[str], str],
-    defaults_resolver: Callable[..., Dict[str, int]],
-) -> None:
-    """Inject legacy compatibility resolvers from the allowed world facade."""
-    global _FALLBACK_LOCATION_ID, _LOCATION_STATE_DEFAULTS
-    _FALLBACK_LOCATION_ID = fallback_resolver
-    _LOCATION_STATE_DEFAULTS = defaults_resolver
+if TYPE_CHECKING:
+    from .adventure import AdventureRun
+    from .character import Character
+    from .content.setting_bundle import SettingBundle
+    from .event_models import WorldEventRecord
+    from .rumor import Rumor
+    from .world_location_references import LocationReferenceResolver
+    from .world_records import MemorialRecord
 
 
 class WorldStructureMixin:
+    if TYPE_CHECKING:
+        _fallback_location_id_resolver: Callable[[str], str]
+        _location_state_defaults_resolver: Callable[..., Dict[str, int]]
+        _setting_bundle: SettingBundle
+        _location_reference_resolver: LocationReferenceResolver
+        width: int
+        height: int
+        grid: Dict[Tuple[int, int], LocationState]
+        _location_name_index: Dict[str, LocationState]
+        _location_id_index: Dict[str, LocationState]
+        characters: List[Character]
+        event_records: List[WorldEventRecord]
+        rumors: List[Rumor]
+        rumor_archive: List[Rumor]
+        active_adventures: List[AdventureRun]
+        completed_adventures: List[AdventureRun]
+        memorials: Dict[str, MemorialRecord]
+
+        def _build_terrain_from_grid(self, *, explicit_route_graph: Optional[bool] = None) -> None: ...
+        def _location_state_from_dict(self, data: Dict[str, Any]) -> LocationState: ...
+        def location_endonym(self, location_id: str, fallback: str = "") -> str: ...
+        def _default_resident_location_id(self) -> str: ...
+        def rebuild_char_index(self) -> None: ...
+        def ensure_valid_character_locations(self) -> None: ...
+        def rebuild_adventure_index(self) -> None: ...
+        def rebuild_recent_event_ids(self) -> None: ...
+        def rebuild_compatibility_event_log(self) -> None: ...
+
+    def _fallback_location_id(self, name: str) -> str:
+        """Resolve legacy fallback location IDs through this world instance."""
+        return self._fallback_location_id_resolver(name)
+
+    def _location_state_defaults(self, location_id: str, region_type: str, **kwargs: Any) -> Dict[str, int]:
+        """Resolve location-state defaults through this world instance."""
+        return self._location_state_defaults_resolver(location_id, region_type, **kwargs)
+
     def _refresh_locations_from_site_seeds(self) -> None:
         """Refresh static location metadata when bundle lore changes but topology does not."""
         for seed in self._setting_bundle.world_definition.site_seeds:
@@ -128,7 +159,7 @@ class WorldStructureMixin:
         """Resolve a location name through the active bundle with slug fallback."""
         return self._location_reference_resolver.resolve_location_id_from_name(
             name,
-            fallback_resolver=_FALLBACK_LOCATION_ID,
+            fallback_resolver=self._fallback_location_id,
         )
 
     def _legacy_location_id_aliases(self) -> Dict[str, str]:
@@ -145,7 +176,7 @@ class WorldStructureMixin:
         return self._location_reference_resolver.normalize_location_id(
             location_id,
             location_name=location_name,
-            fallback_resolver=_FALLBACK_LOCATION_ID,
+            fallback_resolver=self._fallback_location_id,
         )
 
     def _repair_location_reference(
@@ -166,7 +197,7 @@ class WorldStructureMixin:
             location_name=location_name,
             required=required,
             fallback_location_id=resolved_fallback,
-            fallback_resolver=_FALLBACK_LOCATION_ID,
+            fallback_resolver=self._fallback_location_id,
         )
 
     def _repair_location_references(self) -> None:
@@ -209,7 +240,7 @@ class WorldStructureMixin:
 
     def location_state_defaults(self, location_id: str, region_type: str) -> Dict[str, int]:
         """Return location defaults using the active bundle's site tags."""
-        return _LOCATION_STATE_DEFAULTS(
+        return self._location_state_defaults(
             location_id,
             region_type,
             site_tags=self._site_seed_tags(location_id),

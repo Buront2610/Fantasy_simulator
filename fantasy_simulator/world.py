@@ -19,7 +19,7 @@ from .world_event_log_api import WorldEventLogMixin
 from .world_language_api import WorldLanguageMixin
 from .world_actor_api import WorldActorMixin
 from .world_memory_api import WorldMemoryMixin
-from .world_structure_api import WorldStructureMixin, configure_world_structure_resolvers
+from .world_structure_api import WorldStructureMixin
 from .world_topology_api import WorldTopologyMixin
 from .world_bundle_transition import (
     apply_setting_bundle as apply_world_setting_bundle,
@@ -72,10 +72,6 @@ configure_location_state_resolvers(
     fallback_resolver=fallback_location_id,
     defaults_resolver=get_location_state_defaults,
 )
-configure_world_structure_resolvers(
-    fallback_resolver=fallback_location_id,
-    defaults_resolver=get_location_state_defaults,
-)
 
 
 def _clone_calendar(calendar: CalendarDefinition) -> CalendarDefinition:
@@ -119,6 +115,8 @@ class World(
         self._location_reference_resolver = LocationReferenceResolver.from_site_seeds(
             self._setting_bundle.world_definition.site_seeds
         )
+        self._fallback_location_id_resolver = fallback_location_id
+        self._location_state_defaults_resolver = get_location_state_defaults
         self._language_engine: LanguageEngine | None = None
         self.calendar_baseline: CalendarDefinition = _clone_calendar(
             self._setting_bundle.world_definition.calendar

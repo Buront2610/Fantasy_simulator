@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Sequence, Tuple
+from dataclasses import replace
+from typing import Any, Callable, List, Mapping, Sequence
 
 from .event_models import WorldEventRecord
 from .world_event_index import EventHistoryIndex
-from .world_event_state import append_canonical_event_record
+from .world_event_state import SupportsEventIndex, append_canonical_event_record
 
 
 def latest_absolute_day_before_or_on(
@@ -49,8 +50,8 @@ def record_world_event(
     record: WorldEventRecord,
     event_records: List[WorldEventRecord],
     event_index: EventHistoryIndex,
-    location_index: Dict[str, Any],
-    grid: Dict[Tuple[int, int], Any],
+    location_index: Mapping[str, SupportsEventIndex],
+    grid: Mapping[Any, SupportsEventIndex],
     max_event_records: int,
     get_character_by_id: Callable[[str], Any],
     watched_actor_tag_prefix: str,
@@ -62,11 +63,12 @@ def record_world_event(
         get_character_by_id=get_character_by_id,
         watched_actor_tag_prefix=watched_actor_tag_prefix,
     )
+    normalized_record = record
     if watched_tags:
-        record.tags = list(dict.fromkeys(list(record.tags) + watched_tags))
+        normalized_record = replace(record, tags=list(dict.fromkeys(list(record.tags) + watched_tags)))
 
     stored_record = append_canonical_event_record(
-        record=record,
+        record=normalized_record,
         event_records=event_records,
         location_index=location_index,
         grid=grid,

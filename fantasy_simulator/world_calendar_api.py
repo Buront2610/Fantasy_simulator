@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Callable, Optional, Tuple
+from typing import TYPE_CHECKING, Callable, List, Optional, Tuple
 
 from . import world_calendar_facade as calendar_facade
 from .content.setting_bundle import CalendarDefinition
 from .world_records import CalendarChangeRecord
+
+if TYPE_CHECKING:
+    from .content.setting_bundle import SettingBundle
 
 
 CloneCalendar = Callable[[CalendarDefinition], CalendarDefinition]
@@ -18,6 +21,14 @@ def clone_calendar(calendar: CalendarDefinition) -> CalendarDefinition:
 
 class WorldCalendarMixin:
     """Compatibility API surface for world calendar helpers."""
+
+    if TYPE_CHECKING:
+        _setting_bundle: SettingBundle
+        calendar_baseline: CalendarDefinition
+        calendar_history: List[CalendarChangeRecord]
+        year: int
+
+        def _maybe_evolve_languages_for_year(self, year: int) -> None: ...
 
     def months_elapsed_between(
         self,

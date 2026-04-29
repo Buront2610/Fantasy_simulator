@@ -2,10 +2,25 @@
 
 from pathlib import Path
 
-from scripts.quality_gate import build_profile_commands
+from scripts.quality_gate import TYPECHECK_TARGETS, build_profile_commands
 
 
 PYPROJECT_TEXT = (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(encoding="utf-8")
+
+
+def _pyproject_mypy_files() -> list[str]:
+    files: list[str] = []
+    in_mypy_files = False
+    for line in PYPROJECT_TEXT.splitlines():
+        stripped = line.strip()
+        if stripped == "files = [":
+            in_mypy_files = True
+            continue
+        if in_mypy_files and stripped == "]":
+            return files
+        if in_mypy_files:
+            files.append(stripped.rstrip(",").strip('"'))
+    raise AssertionError("tool.mypy files list not found")
 
 
 def test_minimal_profile_defaults_to_smoke_target():
@@ -63,14 +78,19 @@ def test_strict_profile_includes_targeted_lint_and_full_pytest():
     assert "." in commands[1].argv
     assert "--max-complexity=25" in commands[2].argv
     assert "." in commands[2].argv
-    assert "fantasy_simulator/worldgen" in commands[3].argv
-    assert "tools/worldgen_poc" in commands[3].argv
+    assert commands[3].argv[-len(TYPECHECK_TARGETS):] == TYPECHECK_TARGETS
     assert len(commands[4].argv) == 4
 
 
 def test_pyproject_includes_type_gate_scaffolding():
     assert "[tool.mypy]" in PYPROJECT_TEXT
     assert 'follow_imports = "silent"' in PYPROJECT_TEXT
+    assert '"fantasy_simulator/world_actor_api.py"' in PYPROJECT_TEXT
+    assert '"fantasy_simulator/world_topology_queries.py"' in PYPROJECT_TEXT
     assert '"fantasy_simulator/worldgen"' in PYPROJECT_TEXT
     assert '"tools/worldgen_poc"' in PYPROJECT_TEXT
     assert "check_untyped_defs = true" in PYPROJECT_TEXT
+
+
+def test_quality_gate_typecheck_targets_match_pyproject_mypy_files():
+    assert _pyproject_mypy_files() == TYPECHECK_TARGETS

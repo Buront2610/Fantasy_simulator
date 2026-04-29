@@ -33,10 +33,27 @@ jobs:
           fantasy_simulator/character.py
           fantasy_simulator/character_domain.py
           fantasy_simulator/event_models.py
+          fantasy_simulator/location_observation.py
           fantasy_simulator/ui/presenters.py
           fantasy_simulator/ui/view_models.py
+          fantasy_simulator/world_actor_api.py
+          fantasy_simulator/world_actor_index.py
+          fantasy_simulator/world_calendar_api.py
+          fantasy_simulator/world_calendar_facade.py
+          fantasy_simulator/world_event_api.py
+          fantasy_simulator/world_event_history.py
+          fantasy_simulator/world_event_log_api.py
+          fantasy_simulator/world_event_log_facade.py
+          fantasy_simulator/world_language_api.py
+          fantasy_simulator/world_language_facade.py
+          fantasy_simulator/world_location_structure.py
+          fantasy_simulator/world_records.py
           fantasy_simulator/world_reference_repair.py
+          fantasy_simulator/world_structure_api.py
+          fantasy_simulator/world_topology_api.py
+          fantasy_simulator/world_topology_queries.py
           fantasy_simulator/worldgen
+          tools/worldgen_poc
       - name: Run tests
         run: python -m pytest tests/ -v
 

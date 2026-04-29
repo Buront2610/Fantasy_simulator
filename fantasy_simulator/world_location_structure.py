@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Tuple
 
 
@@ -60,7 +61,7 @@ def copy_location_runtime_state(source: Any, target: Any) -> None:
     target.aliases = list(dict.fromkeys(structural_aliases + list(source.aliases)))
     target.generated_endonym = structural_endonym
     target.memorial_ids = list(source.memorial_ids)
-    target.live_traces = [dict(trace) for trace in source.live_traces]
+    target.live_traces = deepcopy(source.live_traces)
 
 
 def preserved_locations_by_normalized_id(

@@ -160,6 +160,8 @@ def add_adventure(
     run: AdventureT,
 ) -> None:
     """Add an active adventure and update the ID index."""
+    if run.adventure_id in adventure_index:
+        raise ValueError(f"Duplicate adventure ID: {run.adventure_id!r}")
     active_adventures.append(run)
     adventure_index[run.adventure_id] = run
 

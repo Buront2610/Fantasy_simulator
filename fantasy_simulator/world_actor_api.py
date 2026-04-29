@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import random
-from typing import TYPE_CHECKING, Any, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from .world_actor_index import (
     add_adventure as add_adventure_to_index,
@@ -27,9 +27,31 @@ from .world_reference_repair import backfill_watched_actor_tags
 if TYPE_CHECKING:
     from .adventure import AdventureRun
     from .character import Character
+    from .content.setting_bundle import SettingBundle
+    from .event_models import WorldEventRecord
+    from .world_event_index import EventHistoryIndex
+    from .world_location_state import LocationState
 
 
 class WorldActorMixin:
+    if TYPE_CHECKING:
+        WATCHED_ACTOR_TAG_PREFIX: str
+        WATCHED_ACTOR_INFERRED_TAG: str
+        _setting_bundle: SettingBundle
+        grid: Dict[Tuple[int, int], LocationState]
+        characters: List[Character]
+        active_adventures: List[AdventureRun]
+        completed_adventures: List[AdventureRun]
+        event_records: List[WorldEventRecord]
+        _char_index: Dict[str, Character]
+        _adventure_index: Dict[str, AdventureRun]
+        _event_index: EventHistoryIndex
+        _location_id_index: Dict[str, LocationState]
+
+        def _repair_location_references(self) -> None: ...
+        def _rebuild_location_memorial_ids(self) -> None: ...
+        def rebuild_compatibility_event_log(self) -> None: ...
+
     def _location_ids_for_site_tag(self, tag: str) -> List[str]:
         """Return in-bounds location_ids for bundle site seeds carrying *tag*."""
         return [

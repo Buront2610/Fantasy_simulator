@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from . import world_event_log_facade as event_log_facade
 from .event_models import WorldEventRecord
@@ -20,11 +20,26 @@ from .world_event_queries import (
 from .world_event_state import apply_event_impact_to_location
 from .world_location_state import clamp_state as _clamp_state
 
+if TYPE_CHECKING:
+    from .character import Character
+    from .world_event_index import EventHistoryIndex
+    from .world_location_state import LocationState
+
 
 class WorldEventMixin:
     """Compatibility API surface for structured world events."""
 
     MAX_EVENT_RECORDS = 5000
+    WATCHED_ACTOR_TAG_PREFIX: str
+
+    if TYPE_CHECKING:
+        event_records: List[WorldEventRecord]
+        _event_index: EventHistoryIndex
+        _location_id_index: Dict[str, LocationState]
+        grid: Dict[Tuple[int, int], LocationState]
+        event_impact_rules: Dict[str, Dict[str, int]]
+
+        def get_character_by_id(self, char_id: str) -> Optional[Character]: ...
 
     def latest_absolute_day_before_or_on(self, year: int, month: int) -> int:
         """Return the latest known absolute day on or before a given report period."""

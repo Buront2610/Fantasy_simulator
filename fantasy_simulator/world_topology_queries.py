@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import deque
-from typing import Callable, List, Mapping, Protocol, Tuple
+from typing import Callable, List, Mapping, Protocol, Sequence, Tuple
 
 from .world_topology import (
     PROPAGATION_TOPOLOGY_GRID,
@@ -27,7 +27,7 @@ class SupportsRouteEdge(Protocol):
 
 LocationIndex = Mapping[str, SupportsTopologyLocation]
 GridIndex = Mapping[Tuple[int, int], SupportsTopologyLocation]
-RouteLookup = Callable[[str], List[SupportsRouteEdge]]
+RouteLookup = Callable[[str], Sequence[SupportsRouteEdge]]
 
 
 def locations_for_ids(
@@ -68,7 +68,7 @@ def travel_neighboring_locations(
     *,
     location_index: LocationIndex,
     grid: GridIndex,
-    routes: List[SupportsRouteEdge],
+    routes: Sequence[SupportsRouteEdge],
     route_graph_explicit: bool,
     get_routes_for_site: RouteLookup,
 ) -> List[SupportsTopologyLocation]:
@@ -87,7 +87,7 @@ def propagation_neighboring_locations(
     *,
     location_index: LocationIndex,
     grid: GridIndex,
-    routes: List[SupportsRouteEdge],
+    routes: Sequence[SupportsRouteEdge],
     route_graph_explicit: bool,
     get_routes_for_site: RouteLookup,
     topology_mode: str = PROPAGATION_TOPOLOGY_TRAVEL,

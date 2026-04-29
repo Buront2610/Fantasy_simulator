@@ -138,3 +138,20 @@ def test_implementation_plan_mentions_current_observation_and_type_gate_debt_pay
     assert "inspectable" in PLAN_TEXT
     assert "bundle authoring / swap review" in PLAN_TEXT
     assert "type-gate scaffolding" in PLAN_TEXT
+
+
+def test_architecture_doc_tracks_strict_quality_gate_scope() -> None:
+    assert "focused mypy targets" in ARCHITECTURE_TEXT
+    assert "newly split `world_*` API/facade/helper modules" in ARCHITECTURE_TEXT
+
+
+def test_user_docs_mention_strict_quality_gate() -> None:
+    for doc_text in (README_TEXT, AGENTS_TEXT, CLAUDE_TEXT):
+        assert "python scripts/quality_gate.py strict" in doc_text
+        assert "focused mypy" in doc_text
+        assert "full pytest" in doc_text
+
+
+def test_readme_keeps_ci_type_target_wording_non_prescriptive() -> None:
+    assert "workflow\ncoverage should be reviewed against the same list" in README_TEXT
+    assert "CI should\nkeep the same focused target coverage" not in README_TEXT

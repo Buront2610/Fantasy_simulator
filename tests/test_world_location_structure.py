@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from fantasy_simulator.world import World
 from fantasy_simulator.world_location_structure import (
     copy_location_runtime_state,
     default_location_entries,
@@ -79,7 +80,7 @@ def test_copy_location_runtime_state_preserves_structural_name_and_endonym() -> 
         generated_endonym="Old Endonym",
         recent_event_ids=["evt_1"],
         memorial_ids=["mem_1"],
-        live_traces=[{"text": "seen"}],
+        live_traces=[{"text": "seen", "nested": {"depth": 1}}],
     )
     target = _Location(
         "loc_a",
@@ -100,8 +101,13 @@ def test_copy_location_runtime_state_preserves_structural_name_and_endonym() -> 
     assert target.aliases == ["Shared", "Structural Alias", "Old Alias"]
     assert target.recent_event_ids == ["evt_1"]
     assert target.memorial_ids == ["mem_1"]
-    assert target.live_traces == [{"text": "seen"}]
+    assert target.live_traces == [{"text": "seen", "nested": {"depth": 1}}]
     assert target.live_traces is not source.live_traces
+    assert target.live_traces[0]["nested"] is not source.live_traces[0]["nested"]
+
+    source.live_traces[0]["nested"]["depth"] = 99
+
+    assert target.live_traces == [{"text": "seen", "nested": {"depth": 1}}]
 
 
 def test_bundle_grid_compatibility_helpers_use_in_bounds_site_seed_shape() -> None:
@@ -123,3 +129,17 @@ def test_bundle_grid_compatibility_helpers_use_in_bounds_site_seed_shape() -> No
         site_seeds=seeds,
         normalize_location_id=lambda loc_id, _name: loc_id,
     )
+
+
+def test_world_structure_resolvers_are_instance_scoped() -> None:
+    world_a = World(_skip_defaults=True)
+    world_b = World(_skip_defaults=True)
+    world_a._fallback_location_id_resolver = lambda name: f"a:{name}"
+    world_b._fallback_location_id_resolver = lambda name: f"b:{name}"
+    world_a._location_state_defaults_resolver = lambda *_args, **_kwargs: {"danger": 11}
+    world_b._location_state_defaults_resolver = lambda *_args, **_kwargs: {"danger": 22}
+
+    assert world_a.resolve_location_id_from_name("Unmapped Place") == "a:Unmapped Place"
+    assert world_b.resolve_location_id_from_name("Unmapped Place") == "b:Unmapped Place"
+    assert world_a.location_state_defaults("loc_unknown", "wilds") == {"danger": 11}
+    assert world_b.location_state_defaults("loc_unknown", "wilds") == {"danger": 22}

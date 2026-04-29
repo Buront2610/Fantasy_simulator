@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from .terrain import AtlasLayout, RouteEdge, Site
 from .world_route_graph import routes_for_site
@@ -23,8 +23,31 @@ from .world_topology_state import (
     validate_topology_integrity,
 )
 
+if TYPE_CHECKING:
+    from .content.setting_bundle import SettingBundle
+    from .world_location_state import LocationState
+    from .world_route_graph import ObservableRouteList
+
 
 class WorldTopologyMixin:
+    if TYPE_CHECKING:
+        _setting_bundle: SettingBundle
+        width: int
+        height: int
+        grid: Dict[Tuple[int, int], LocationState]
+        _location_id_index: Dict[str, LocationState]
+        terrain_map: Any
+        sites: List[Site]
+        routes: ObservableRouteList
+        _site_index: Dict[str, Site]
+        _routes_by_site: Dict[str, List[RouteEdge]]
+        _routes_dirty: bool
+        _route_graph_explicit: bool
+        atlas_layout: AtlasLayout | None
+        propagation_rules: Dict[str, Dict[str, Any]]
+
+        def _grid_matches_bundle_seeds(self) -> bool: ...
+
     def _build_terrain_from_grid(self, *, explicit_route_graph: Optional[bool] = None) -> None:
         """Generate terrain, sites, and routes from the current grid."""
         use_explicit_route_graph = (

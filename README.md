@@ -152,6 +152,11 @@ for the changed area you want to verify.
 architecture constraints, the quality-gate self-test, the agent workflow docs
 checks, doc freshness, and the harness scenario suite.
 
+`strict` adds lint, complexity, focused mypy over the `[tool.mypy]` file list,
+and the full pytest suite. The focused type-check target list is mirrored by
+`scripts/quality_gate.py` and guarded by `tests/test_quality_gate.py`; workflow
+coverage should be reviewed against the same list when CI changes are in scope.
+
 ## Project Structure
 
 ```
