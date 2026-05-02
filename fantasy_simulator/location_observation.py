@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, TYPE_CHECKING
 
+from .event_rendering import render_event_record
 from .i18n import tr, tr_term
 
 if TYPE_CHECKING:
@@ -109,7 +110,7 @@ def build_location_observation_view(
 
     record_lookup = {record.record_id: record for record in getattr(world, "event_records", [])}
     recent_events = [
-        tr("location_recent_event_entry", year=record.year, description=record.description)
+        tr("location_recent_event_entry", year=record.year, description=render_event_record(record, world=world))
         for record_id in reversed(location.recent_event_ids[-event_limit:])
         for record in [record_lookup.get(record_id)]
         if record is not None

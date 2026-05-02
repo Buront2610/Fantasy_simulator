@@ -294,6 +294,30 @@ def test_route_collection_extended_slice_assignment_failure_does_not_attach_obse
     assert notifications == 0
 
 
+def test_stale_route_collection_alias_cannot_detach_active_collection_observers() -> None:
+    old_notifications = 0
+    active_notifications = 0
+
+    def _notify_old() -> None:
+        nonlocal old_notifications
+        old_notifications += 1
+
+    def _notify_active() -> None:
+        nonlocal active_notifications
+        active_notifications += 1
+
+    route = RouteEdge("route_1", "loc_one", "loc_two", "road")
+    old_routes = RouteCollection([route], on_change=_notify_old)
+    active_routes = replace_routes(old_routes, list(old_routes), on_change=_notify_active)
+
+    old_routes.clear()
+    route.blocked = True
+
+    assert active_routes == [route]
+    assert old_notifications == 1
+    assert active_notifications == 1
+
+
 def test_route_collection_rejects_non_route_edges() -> None:
     routes = RouteCollection()
 

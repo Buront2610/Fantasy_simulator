@@ -98,6 +98,18 @@ def test_monthly_report_card_renders_completed_adventure_summary_records():
     assert card.completed_adventures == ["Aldric fought at Aethoria Capital."]
 
 
+def test_monthly_report_card_highlights_both_route_event_endpoints():
+    set_locale("en")
+    world = World()
+    route = world.routes[0]
+    world.apply_route_blocked_change(route.route_id, True, month=3)
+
+    card = build_monthly_report_card_view(world, world.year, 3)
+
+    assert world.location_name(route.from_site_id) in card.highlighted_locations
+    assert world.location_name(route.to_site_id) in card.highlighted_locations
+
+
 def test_monthly_report_card_uses_historical_calendar_label_after_calendar_change():
     set_locale("en")
     world = World()

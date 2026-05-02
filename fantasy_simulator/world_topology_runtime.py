@@ -20,12 +20,14 @@ def route_index_by_site(
     sites: Iterable[Site],
     routes: Iterable[RouteEdge],
     on_change: RouteIndexChangeHandler,
+    owner_token: object | None = None,
 ) -> Dict[str, List[RouteEdge]]:
     """Build route adjacency lists keyed by endpoint location id."""
     return rebuild_route_index(
         sites=sites,
         routes=routes,
         on_change=on_change,
+        owner_token=owner_token,
     )
 
 

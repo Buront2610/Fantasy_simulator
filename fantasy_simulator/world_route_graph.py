@@ -33,14 +33,19 @@ class RouteCollection(MutableSequence[RouteEdge]):
         routes: Iterable[RouteEdge] = (),
         *,
         on_change: Callable[[], None] | None = None,
+        owner_token: object | None = None,
+        takeover_owner_token: object | None = None,
     ) -> None:
         self._items: list[RouteEdge] = []
         self._on_change = on_change
+        self._owner_token = owner_token if owner_token is not None else object()
+        self._takeover_owner_token = takeover_owner_token
         new_routes = [self._validate_route(route) for route in routes]
         self._ensure_attachable(new_routes)
         for route in new_routes:
             self._attach(route)
         self._items = new_routes
+        self._takeover_owner_token = None
 
     def _notify(self) -> None:
         if self._on_change is not None:
@@ -50,10 +55,17 @@ class RouteCollection(MutableSequence[RouteEdge]):
         if not self._can_attach(route):
             raise ValueError("RouteEdge instances cannot be shared across active RouteCollection owners")
         route._on_change = self._on_change
+        route._route_owner_token = self._owner_token
 
     def _can_attach(self, route: RouteEdge) -> bool:
         current_callback = route._on_change
-        return current_callback is None or _same_observer(current_callback, self._on_change)
+        current_owner = getattr(route, "_route_owner_token", None)
+        return (
+            current_callback is None
+            or current_owner is self._owner_token
+            or current_owner is self._takeover_owner_token
+            or (current_owner is None and _same_observer(current_callback, self._on_change))
+        )
 
     def _ensure_attachable(self, routes: Iterable[RouteEdge]) -> None:
         if any(not self._can_attach(route) for route in routes):
@@ -69,8 +81,9 @@ class RouteCollection(MutableSequence[RouteEdge]):
         return any(item is route for item in self._items)
 
     def _detach_if_removed(self, route: RouteEdge) -> None:
-        if not self._contains_identity(route):
+        if not self._contains_identity(route) and getattr(route, "_route_owner_token", None) is self._owner_token:
             route._on_change = None
+            route._route_owner_token = None
 
     @overload
     def __getitem__(self, index: int) -> RouteEdge:
@@ -184,7 +197,9 @@ class RouteCollection(MutableSequence[RouteEdge]):
         old_routes = list(self._items)
         self._items.clear()
         for route in old_routes:
-            route._on_change = None
+            if getattr(route, "_route_owner_token", None) is self._owner_token:
+                route._on_change = None
+                route._route_owner_token = None
         self._notify()
 
     def reverse(self) -> None:
@@ -204,26 +219,46 @@ def replace_routes(
     new_routes: Iterable[RouteEdge],
     *,
     on_change: Callable[[], None],
+    owner_token: object | None = None,
 ) -> RouteCollection:
     """Replace the active route collection and detach stale observers."""
     old_routes = list(current_routes)
-    new_collection = RouteCollection(new_routes, on_change=on_change)
+    current_owner = getattr(current_routes, "_owner_token", None)
+    resolved_owner_token = owner_token if owner_token is not None else object()
+    new_collection = RouteCollection(
+        new_routes,
+        on_change=on_change,
+        owner_token=resolved_owner_token,
+        takeover_owner_token=current_owner,
+    )
     new_route_ids = {id(route) for route in new_collection}
     for route in old_routes:
-        if id(route) not in new_route_ids:
+        if id(route) not in new_route_ids and getattr(route, "_route_owner_token", None) is current_owner:
             route._on_change = None
+            route._route_owner_token = None
     return new_collection
 
 
-def attach_route_observers(routes: Iterable[RouteEdge], *, on_change: Callable[[], None]) -> None:
+def attach_route_observers(
+    routes: Iterable[RouteEdge],
+    *,
+    on_change: Callable[[], None],
+    owner_token: object | None = None,
+) -> None:
     """Attach mutation hooks to each route in the active collection."""
+    route_owner = getattr(routes, "_owner_token", owner_token)
     for route in routes:
         current_callback = route._on_change
         if current_callback is None:
             route._on_change = on_change
+            route._route_owner_token = route_owner
             continue
-        if not _same_observer(current_callback, on_change):
+        current_owner = getattr(route, "_route_owner_token", None)
+        if current_owner is not route_owner and not (
+            current_owner is None and _same_observer(current_callback, on_change)
+        ):
             raise ValueError("RouteEdge instances cannot be shared across active RouteCollection owners")
+        route._route_owner_token = route_owner
 
 
 def rebuild_route_index(
@@ -231,11 +266,13 @@ def rebuild_route_index(
     sites: Iterable[Site],
     routes: Iterable[RouteEdge],
     on_change: Callable[[], None],
+    owner_token: object | None = None,
 ) -> Dict[str, List[RouteEdge]]:
     """Build route adjacency lists keyed by endpoint location ID."""
     site_list = list(sites)
     route_list = list(routes)
-    attach_route_observers(route_list, on_change=on_change)
+    route_owner = getattr(routes, "_owner_token", owner_token)
+    attach_route_observers(route_list, on_change=on_change, owner_token=route_owner)
     route_index: Dict[str, List[RouteEdge]] = {site.location_id: [] for site in site_list}
     for route in route_list:
         route_index.setdefault(route.from_site_id, []).append(route)

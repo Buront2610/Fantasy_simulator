@@ -11,6 +11,7 @@ from typing import Dict, List, TYPE_CHECKING
 
 from ..event_rendering import render_event_record
 from ..i18n import tr
+from ..world_event_index import location_ids_for_record
 from ..location_observation import (
     LocationObservationView,
     RumorSummaryView,
@@ -116,8 +117,8 @@ def build_monthly_report_card_view(world: "World", year: int, month: int) -> Mon
     for r in records:
         if r.primary_actor_id:
             chars[r.primary_actor_id] = chars.get(r.primary_actor_id, 0) + 1
-        if r.location_id:
-            locs[r.location_id] = locs.get(r.location_id, 0) + 1
+        for location_id in location_ids_for_record(r):
+            locs[location_id] = locs.get(location_id, 0) + 1
         if r.kind in (
             "adventure_returned",
             "adventure_returned_injured",

@@ -1,10 +1,10 @@
 """
 reports.py - Monthly and yearly report generation from WorldEventRecord.
 
-Reports are non-persistent view models derived exclusively from the
-canonical WorldEventRecord store.  Character status and location are
-derived from the event records of the period rather than from current
-world state, so that past reports remain stable over time.
+Reports are non-persistent view models derived from the canonical
+WorldEventRecord store.  Period membership and event grouping come from the
+record payload, while display names are resolved through the current world
+context so renamed locations and authored faction names use current labels.
 
 Reports are generated on demand for display and never saved to disk.
 """

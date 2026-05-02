@@ -103,6 +103,7 @@ class WorldTopologyMixin:
             sites=self.sites,
             routes=self.routes,
             on_change=self._mark_routes_dirty,
+            owner_token=getattr(self.routes, "_owner_token", None),
         )
         self._routes_dirty = False
 

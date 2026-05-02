@@ -13,7 +13,7 @@ from __future__ import annotations
 from typing import Callable, Iterable, Mapping, MutableSequence, Protocol
 
 from .event_models import WorldEventRecord
-from .world_event_record_updates import event_record_with_added_tags, event_record_with_location_id
+from .world_event_record_updates import event_record_with_added_tags, event_record_with_normalized_location_references
 
 
 class CharacterLocationReference(Protocol):
@@ -64,9 +64,9 @@ def repair_world_location_references(
         )
 
     for index, record in enumerate(event_records):
-        event_records[index] = event_record_with_location_id(
+        event_records[index] = event_record_with_normalized_location_references(
             record,
-            repair_location_reference(record.location_id),
+            repair_location_reference,
         )
 
     for rumor in rumors:

@@ -8,6 +8,7 @@ from fantasy_simulator.event_models import WorldEventRecord
 from fantasy_simulator.world_event_record_updates import (
     event_record_with_added_tags,
     event_record_with_location_id,
+    event_record_with_normalized_location_references,
     normalize_event_record_locations,
 )
 from fantasy_simulator.world_load_normalizer import rebuild_recent_event_ids
@@ -47,6 +48,42 @@ def test_normalize_event_record_locations_returns_copied_records() -> None:
     assert [record.location_id for record in records] == ["legacy_capital", None]
     assert [record.location_id for record in normalized] == ["loc_aethoria_capital", None]
     assert all(updated is not original for updated, original in zip(normalized, records))
+
+
+def test_event_record_location_reference_normalization_updates_metadata() -> None:
+    record = WorldEventRecord(
+        record_id="evt_route",
+        location_id="old_origin",
+        render_params={
+            "location_id": "old_origin",
+            "from_location_id": "old_origin",
+            "to_location_id": "old_destination",
+            "endpoint_location_ids": ["old_origin", "old_destination", "missing"],
+        },
+        tags=["world_change", "location:old_origin", "location:old_destination", "location:missing"],
+        impacts=[
+            {"target_type": "location", "target_id": "old_origin", "attribute": "safety"},
+            {"target_type": "route", "target_id": "route_1", "attribute": "blocked"},
+        ],
+    )
+
+    normalized = event_record_with_normalized_location_references(
+        record,
+        lambda location_id: {
+            "old_origin": "loc_origin",
+            "old_destination": "loc_destination",
+        }.get(location_id or ""),
+    )
+
+    assert normalized is not record
+    assert normalized.location_id == "loc_origin"
+    assert normalized.render_params["location_id"] == "loc_origin"
+    assert normalized.render_params["from_location_id"] == "loc_origin"
+    assert normalized.render_params["to_location_id"] == "loc_destination"
+    assert normalized.render_params["endpoint_location_ids"] == ["loc_origin", "loc_destination"]
+    assert normalized.tags == ["world_change", "location:loc_origin", "location:loc_destination"]
+    assert normalized.impacts[0]["target_id"] == "loc_origin"
+    assert normalized.impacts[1]["target_id"] == "route_1"
 
 
 def test_event_record_with_added_tags_returns_copy_with_unique_tags() -> None:
