@@ -24,6 +24,7 @@ from .reports_models import (
     YearlyReport,
 )
 from .rumor import RUMOR_MAX_AGE_MONTHS
+from .world_event_index import location_ids_for_record
 
 if TYPE_CHECKING:
     from .event_models import WorldEventRecord
@@ -147,8 +148,8 @@ def generate_monthly_report(
     # Location summaries
     loc_event_map: Dict[str, List[WorldEventRecord]] = {}
     for r in records:
-        if r.location_id:
-            loc_event_map.setdefault(r.location_id, []).append(r)
+        for loc_id in location_ids_for_record(r):
+            loc_event_map.setdefault(loc_id, []).append(r)
 
     loc_entries: List[LocationReportEntry] = []
     for loc_id, loc_records in sorted(loc_event_map.items()):
@@ -268,8 +269,8 @@ def generate_yearly_report(
     # Location summaries
     loc_event_map: Dict[str, List[WorldEventRecord]] = {}
     for r in records:
-        if r.location_id:
-            loc_event_map.setdefault(r.location_id, []).append(r)
+        for loc_id in location_ids_for_record(r):
+            loc_event_map.setdefault(loc_id, []).append(r)
 
     loc_entries: List[LocationReportEntry] = []
     for loc_id, loc_records in sorted(loc_event_map.items()):

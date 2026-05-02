@@ -1,6 +1,7 @@
 from fantasy_simulator.event_rendering import render_event_record
 from fantasy_simulator.i18n import get_locale, set_locale
-from fantasy_simulator.reports import generate_monthly_report
+from fantasy_simulator.location_observation import build_location_observation_view
+from fantasy_simulator.reports import generate_monthly_report, generate_yearly_report
 from fantasy_simulator.world import World
 
 
@@ -150,9 +151,17 @@ def test_apply_route_blocked_change_records_block_and_reopen_events():
     assert reopened_record.summary_key == "events.route_reopened.summary"
     assert blocked_record.render_params == {
         "route_id": route_id,
+        "from_location_id": route.from_site_id,
+        "to_location_id": route.to_site_id,
+        "endpoint_location_ids": [route.from_site_id, route.to_site_id],
         "from_location": from_location,
         "to_location": to_location,
     }
+    assert blocked_record.tags == [
+        "world_change",
+        f"location:{route.from_site_id}",
+        f"location:{route.to_site_id}",
+    ]
     assert blocked_record.impacts == [
         {
             "target_type": "route",
@@ -165,6 +174,36 @@ def test_apply_route_blocked_change_records_block_and_reopen_events():
     assert reopened_record.impacts[0]["old_value"] is True
     assert reopened_record.impacts[0]["new_value"] is False
     assert world.event_records[-2:] == [blocked_record, reopened_record]
+
+
+def test_apply_route_blocked_change_reports_activity_at_both_endpoints():
+    previous_locale = get_locale()
+    set_locale("en")
+    world = World()
+    route = world.routes[0]
+
+    try:
+        record = world.apply_route_blocked_change(route.route_id, True, month=4)
+        monthly_report = generate_monthly_report(world, record.year, record.month)
+        yearly_report = generate_yearly_report(world, record.year)
+    finally:
+        set_locale(previous_locale)
+
+    monthly_location_ids = [entry.location_id for entry in monthly_report.location_entries]
+    yearly_location_ids = [entry.location_id for entry in yearly_report.location_entries]
+    assert route.from_site_id in monthly_location_ids
+    assert route.to_site_id in monthly_location_ids
+    assert route.from_site_id in yearly_location_ids
+    assert route.to_site_id in yearly_location_ids
+    for location_id in (route.from_site_id, route.to_site_id):
+        location = world.get_location_by_id(location_id)
+        assert location is not None
+        assert record.record_id in location.recent_event_ids
+        observation = build_location_observation_view(world, location_id)
+        entry = next(item for item in monthly_report.location_entries if item.location_id == location_id)
+        assert entry.event_count == 1
+        assert render_event_record(record, locale="en") in entry.notable_events
+        assert any(record.description in event for event in observation.recent_events)
 
 
 def test_apply_route_blocked_change_noops_when_blocked_state_is_unchanged():

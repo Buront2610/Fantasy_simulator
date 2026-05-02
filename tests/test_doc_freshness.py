@@ -145,6 +145,9 @@ def test_serialization_contract_documents_conflict_precedence() -> None:
     assert "language_evolution_history" in SERIALIZATION_CONTRACT_TEXT
     assert "language_runtime_states" in SERIALIZATION_CONTRACT_TEXT
     assert "history wins" in SERIALIZATION_CONTRACT_TEXT
+    assert "endpoint_location_ids" in SERIALIZATION_CONTRACT_TEXT
+    assert "location:*" in SERIALIZATION_CONTRACT_TEXT
+    assert "EventResult" in SERIALIZATION_CONTRACT_TEXT
     assert "language_engine.md" in SERIALIZATION_CONTRACT_TEXT
     assert "serialization_contract.md" in LANGUAGE_ENGINE_TEXT
 
@@ -152,8 +155,12 @@ def test_serialization_contract_documents_conflict_precedence() -> None:
 def test_risk_register_tracks_serialization_conflict_risks() -> None:
     assert "Canonical event records" in RISK_REGISTER_TEXT
     assert "Language runtime cache" in RISK_REGISTER_TEXT
+    assert "Hydration precedence changes" in RISK_REGISTER_TEXT
     assert "world.event_records" in RISK_REGISTER_TEXT
     assert "language_evolution_history" in RISK_REGISTER_TEXT
+    assert "Route visibility adapter coverage" in RISK_REGISTER_TEXT
+    assert "endpoint IDs" in RISK_REGISTER_TEXT
+    assert "CURRENT_VERSION` stays unchanged" in RISK_REGISTER_TEXT
     assert "Core serialization logic was not changed" in RISK_REGISTER_TEXT
 
 
@@ -161,6 +168,8 @@ def test_implementation_plan_mentions_current_observation_and_type_gate_debt_pay
     assert "inspectable" in PLAN_TEXT
     assert "bundle authoring / swap review" in PLAN_TEXT
     assert "type-gate scaffolding" in PLAN_TEXT
+    assert "world-change event adapter" in PLAN_TEXT
+    assert "endpoint IDs" in PLAN_TEXT
 
 
 def test_architecture_doc_tracks_strict_quality_gate_scope() -> None:

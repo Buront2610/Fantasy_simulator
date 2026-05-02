@@ -24,6 +24,10 @@ this precedence:
 - Event rendering: `WorldEventRecord.summary_key` plus JSON-compatible
   `render_params` is the locale-aware display source when present.
   `description` remains the compatibility fallback text.
+- Event visibility/querying: location queries are derived from canonical record
+  metadata, including `location_id`, `location:*` tags, `render_params`
+  location IDs (`location_id`, `from_location_id`, `to_location_id`,
+  `endpoint_location_ids`), and location-targeted impacts.
 - Legacy event log entries: `legacy_event_log_entry` is exact preserved text
   from older saves. It is intentionally not retranslated after locale changes.
 - Language evolution: `world.language_evolution_history` beats
@@ -46,7 +50,16 @@ this precedence:
   the current state, they do not append a canonical `world_change` record.
 - `render_params` values must be JSON-compatible scalars, lists, or dicts with
   string keys. Store semantic values such as IDs or `null`, not translated
-  surface strings, so records can render cleanly in another locale.
+  surface strings, so records can render cleanly in another locale. If a record
+  also stores compatibility display labels, it must keep the semantic IDs
+  alongside them.
+- Route visibility must cover both endpoints. Route block/reopen records store
+  `from_location_id`, `to_location_id`, `endpoint_location_ids`, and matching
+  `location:*` tags so reports and location queries can see the event from
+  either connected site.
+- Compatibility `EventResult` projections may expose `render_params` in
+  metadata for legacy readers. That metadata is adapter output, not an
+  additional durable source of truth.
 - Migrating pre-current saves may lift legacy `history` and `world.event_log`
   entries into `world.event_records`. Already-migrated legacy records are
   skipped by payload identity so repeated migrations do not duplicate them.

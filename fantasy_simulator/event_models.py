@@ -19,6 +19,9 @@ from math import isfinite
 from typing import Any, Dict, List, Optional, Protocol
 
 
+LOCATION_TAG_PREFIX = "location:"
+
+
 class SupportsGetRandBits(Protocol):
     def getrandbits(self, k: int) -> int: ...
 
@@ -359,6 +362,9 @@ class WorldEventRecord:
         if self.primary_actor_id is not None:
             affected_characters.append(self.primary_actor_id)
         affected_characters.extend(self.secondary_actor_ids)
+        adapter_metadata: Dict[str, Any] = {}
+        if self.render_params:
+            adapter_metadata["render_params"] = deepcopy(self.render_params)
         if self.legacy_event_result is not None:
             projected = EventResult.from_dict(self.legacy_event_result)
             projected.description = self.description
@@ -366,6 +372,8 @@ class WorldEventRecord:
             projected.event_type = self.kind
             projected.summary_key = self.summary_key
             projected.year = self.year
+            if adapter_metadata:
+                projected.metadata.update(adapter_metadata)
             return projected
         return EventResult(
             description=self.description,
@@ -373,4 +381,5 @@ class WorldEventRecord:
             event_type=self.kind,
             summary_key=self.summary_key,
             year=self.year,
+            metadata=adapter_metadata,
         )

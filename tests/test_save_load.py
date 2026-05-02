@@ -113,6 +113,67 @@ def _language_semantics_snapshot(world: World) -> dict:
     }
 
 
+def _simulator_payload(
+    *,
+    world: World | None = None,
+    schema_version: int = CURRENT_VERSION,
+    characters: list[dict] | None = None,
+    history: list[dict] | None = None,
+    events_per_year: int = 8,
+    adventure_steps_per_year: int = 3,
+) -> dict:
+    return {
+        "schema_version": schema_version,
+        "world": (world or World()).to_dict(),
+        "characters": list(characters or []),
+        "events_per_year": events_per_year,
+        "adventure_steps_per_year": adventure_steps_per_year,
+        "history": list(history or []),
+    }
+
+
+def _event_record_payload(
+    *,
+    record_id: str,
+    kind: str = "meeting",
+    description: str,
+    year: int = 1000,
+    month: int = 1,
+    day: int = 1,
+    absolute_day: int = 0,
+    location_id: str | None = "loc_aethoria_capital",
+    primary_actor_id: str | None = None,
+    secondary_actor_ids: list[str] | None = None,
+    severity: int = 2,
+    tags: list[str] | None = None,
+    impacts: list[dict] | None = None,
+    **extra: object,
+) -> dict:
+    payload = {
+        "record_id": record_id,
+        "kind": kind,
+        "year": year,
+        "month": month,
+        "day": day,
+        "absolute_day": absolute_day,
+        "location_id": location_id,
+        "primary_actor_id": primary_actor_id,
+        "secondary_actor_ids": list(secondary_actor_ids or []),
+        "description": description,
+        "severity": severity,
+        "visibility": "public",
+        "calendar_key": "",
+        "tags": list(tags or []),
+        "impacts": list(impacts or []),
+    }
+    payload.update(extra)
+    return payload
+
+
+def _write_payload(path, payload: dict) -> None:
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+
 class TestSaveSimulation:
     def test_save_creates_file(self, tmp_path):
         path = tmp_path / "test_save.json"
@@ -351,50 +412,24 @@ class TestLoadSimulation:
         path = tmp_path / "duplicate_event_ids.json"
         world_payload = World().to_dict()
         world_payload["event_records"] = [
-            {
-                "record_id": "dup_event",
-                "kind": "battle",
-                "year": 1000,
-                "month": 1,
-                "day": 1,
-                "absolute_day": 0,
-                "location_id": "loc_thornwood",
-                "primary_actor_id": None,
-                "secondary_actor_ids": [],
-                "description": "First",
-                "severity": 2,
-                "visibility": "public",
-                "calendar_key": "",
-                "tags": [],
-                "impacts": [],
-            },
-            {
-                "record_id": "dup_event",
-                "kind": "journey",
-                "year": 1000,
-                "month": 1,
-                "day": 2,
-                "absolute_day": 0,
-                "location_id": "loc_thornwood",
-                "primary_actor_id": None,
-                "secondary_actor_ids": [],
-                "description": "Second",
-                "severity": 1,
-                "visibility": "public",
-                "calendar_key": "",
-                "tags": [],
-                "impacts": [],
-            },
+            _event_record_payload(
+                record_id="dup_event",
+                kind="battle",
+                description="First",
+                location_id="loc_thornwood",
+            ),
+            _event_record_payload(
+                record_id="dup_event",
+                kind="journey",
+                description="Second",
+                day=2,
+                location_id="loc_thornwood",
+                severity=1,
+            ),
         ]
-        duplicate_save = {
-            "schema_version": CURRENT_VERSION,
-            "world": world_payload,
-            "characters": [],
-            "events_per_year": 8,
-            "adventure_steps_per_year": 3,
-            "history": [],
-        }
-        path.write_text(json.dumps(duplicate_save), encoding="utf-8")
+        duplicate_save = _simulator_payload(world=World())
+        duplicate_save["world"] = world_payload
+        _write_payload(path, duplicate_save)
 
         restored = load_simulation(str(path))
 
@@ -852,33 +887,18 @@ class TestLoadSimulation:
 
     def test_current_schema_event_records_take_precedence_over_stale_event_log(self, tmp_path):
         path = tmp_path / "current-schema-stale-event-log.json"
-        payload = {
-            "schema_version": CURRENT_VERSION,
-            "world": World().to_dict(),
-            "characters": [],
-            "history": [],
-        }
+        payload = _simulator_payload()
         payload["world"]["event_records"] = [
-            {
-                "record_id": "canonical_001",
-                "kind": "meeting",
-                "year": 1000,
-                "month": 2,
-                "day": 3,
-                "absolute_day": 33,
-                "location_id": "loc_aethoria_capital",
-                "primary_actor_id": None,
-                "secondary_actor_ids": [],
-                "description": "A canonical meeting should be displayed.",
-                "severity": 2,
-                "visibility": "public",
-                "calendar_key": "",
-                "tags": [],
-                "impacts": [],
-            }
+            _event_record_payload(
+                record_id="canonical_001",
+                month=2,
+                day=3,
+                absolute_day=33,
+                description="A canonical meeting should be displayed.",
+            )
         ]
         payload["world"]["event_log"] = ["Year 999: A stale compatibility line should not survive."]
-        path.write_text(json.dumps(payload), encoding="utf-8")
+        _write_payload(path, payload)
 
         restored = load_simulation(str(path))
 
@@ -901,32 +921,16 @@ class TestLoadSimulation:
             "location_id": "loc_aethoria_capital",
             "favorite": True,
         }
-        payload = {
-            "schema_version": CURRENT_VERSION,
-            "world": World().to_dict(),
-            "characters": [hero],
-            "history": [],
-        }
+        payload = _simulator_payload(characters=[hero])
         payload["world"]["event_records"] = [
-            {
-                "record_id": "untagged_watch_001",
-                "kind": "meeting",
-                "year": 1000,
-                "month": 3,
-                "day": 1,
-                "absolute_day": 0,
-                "location_id": "loc_aethoria_capital",
-                "primary_actor_id": "char_hero",
-                "secondary_actor_ids": [],
-                "description": "Old canonical record without watched tags.",
-                "severity": 2,
-                "visibility": "public",
-                "calendar_key": "",
-                "tags": [],
-                "impacts": [],
-            }
+            _event_record_payload(
+                record_id="untagged_watch_001",
+                month=3,
+                primary_actor_id="char_hero",
+                description="Old canonical record without watched tags.",
+            )
         ]
-        path.write_text(json.dumps(payload), encoding="utf-8")
+        _write_payload(path, payload)
 
         restored = load_simulation(str(path))
 
@@ -939,12 +943,9 @@ class TestLoadSimulation:
 
     def test_migration_lifts_mixed_legacy_history_and_event_log_into_canonical_event_records(self, tmp_path):
         path = tmp_path / "legacy-mixed-event-adapters.json"
-        world = World()
-        payload = {
-            "schema_version": CURRENT_VERSION - 1,
-            "world": world.to_dict(),
-            "characters": [],
-            "history": [
+        payload = _simulator_payload(
+            schema_version=CURRENT_VERSION - 1,
+            history=[
                 {
                     "description": "A legacy battle occurred.",
                     "affected_characters": ["char_1"],
@@ -954,10 +955,10 @@ class TestLoadSimulation:
                     "metadata": {"source": "legacy"},
                 }
             ],
-        }
+        )
         payload["world"]["event_records"] = []
         payload["world"]["event_log"] = ["Year 1000: A legacy omen spread through the capital."]
-        path.write_text(json.dumps(payload), encoding="utf-8")
+        _write_payload(path, payload)
 
         restored = load_simulation(str(path))
 
@@ -975,12 +976,9 @@ class TestLoadSimulation:
 
     def test_migration_merges_existing_canonical_records_with_legacy_adapters(self, tmp_path):
         path = tmp_path / "legacy-mixed-with-canonical.json"
-        world = World()
-        payload = {
-            "schema_version": CURRENT_VERSION - 1,
-            "world": world.to_dict(),
-            "characters": [],
-            "history": [
+        payload = _simulator_payload(
+            schema_version=CURRENT_VERSION - 1,
+            history=[
                 {
                     "description": "A legacy battle occurred.",
                     "affected_characters": ["char_1"],
@@ -990,28 +988,18 @@ class TestLoadSimulation:
                     "metadata": {"source": "legacy"},
                 }
             ],
-        }
+        )
         payload["world"]["event_records"] = [
-            {
-                "record_id": "existing_001",
-                "kind": "meeting",
-                "year": 1000,
-                "month": 4,
-                "day": 2,
-                "absolute_day": 0,
-                "location_id": "loc_aethoria_capital",
-                "primary_actor_id": "char_existing",
-                "secondary_actor_ids": [],
-                "description": "A canonical meeting already exists.",
-                "severity": 2,
-                "visibility": "public",
-                "calendar_key": "",
-                "tags": [],
-                "impacts": [],
-            }
+            _event_record_payload(
+                record_id="existing_001",
+                month=4,
+                day=2,
+                primary_actor_id="char_existing",
+                description="A canonical meeting already exists.",
+            )
         ]
         payload["world"]["event_log"] = ["Year 1000: A legacy omen spread through the capital."]
-        path.write_text(json.dumps(payload), encoding="utf-8")
+        _write_payload(path, payload)
 
         restored = load_simulation(str(path))
 
@@ -1038,49 +1026,30 @@ class TestLoadSimulation:
             "metadata": {"source": "legacy"},
         }
         repeated_log_entry = "Year 1000: A repeated legacy omen spread through the capital."
-        payload = {
-            "schema_version": CURRENT_VERSION - 1,
-            "world": world.to_dict(),
-            "characters": [],
-            "history": [dict(repeated_history_item), dict(repeated_history_item)],
-        }
+        payload = _simulator_payload(
+            world=world,
+            schema_version=CURRENT_VERSION - 1,
+            history=[dict(repeated_history_item), dict(repeated_history_item)],
+        )
         payload["world"]["event_records"] = [
-            {
-                "record_id": "legacy_history_000001",
-                "kind": "battle",
-                "year": 1000,
-                "month": 1,
-                "day": 1,
-                "absolute_day": 0,
-                "location_id": None,
-                "primary_actor_id": "char_1",
-                "secondary_actor_ids": [],
-                "description": repeated_history_item["description"],
-                "severity": 1,
-                "visibility": "public",
-                "calendar_key": "",
-                "tags": [],
-                "impacts": [],
-                "legacy_event_result": dict(repeated_history_item),
-                "legacy_event_log_entry": None,
-            },
-            {
-                "record_id": "legacy_event_log_000001",
-                "kind": "legacy_event_log",
-                "year": 1000,
-                "month": 1,
-                "day": 1,
-                "absolute_day": 0,
-                "location_id": None,
-                "primary_actor_id": None,
-                "secondary_actor_ids": [],
-                "description": repeated_log_entry,
-                "severity": 1,
-                "visibility": "public",
-                "calendar_key": "",
-                "tags": ["legacy_event_log"],
-                "impacts": [],
-                "legacy_event_result": {
+            _event_record_payload(
+                record_id="legacy_history_000001",
+                kind="battle",
+                description=repeated_history_item["description"],
+                location_id=None,
+                primary_actor_id="char_1",
+                severity=1,
+                legacy_event_result=dict(repeated_history_item),
+                legacy_event_log_entry=None,
+            ),
+            _event_record_payload(
+                record_id="legacy_event_log_000001",
+                kind="legacy_event_log",
+                description=repeated_log_entry,
+                location_id=None,
+                severity=1,
+                tags=["legacy_event_log"],
+                legacy_event_result={
                     "description": repeated_log_entry,
                     "affected_characters": [],
                     "stat_changes": {},
@@ -1088,11 +1057,11 @@ class TestLoadSimulation:
                     "year": 1000,
                     "metadata": {"legacy_event_log_entry": True},
                 },
-                "legacy_event_log_entry": repeated_log_entry,
-            },
+                legacy_event_log_entry=repeated_log_entry,
+            ),
         ]
         payload["world"]["event_log"] = [repeated_log_entry, repeated_log_entry]
-        path.write_text(json.dumps(payload), encoding="utf-8")
+        _write_payload(path, payload)
 
         restored = load_simulation(str(path))
 

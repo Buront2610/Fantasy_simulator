@@ -77,3 +77,30 @@ def test_rebuild_recent_event_ids_clears_invalid_locations_by_replacing_records(
     assert stale_record.location_id == "loc_missing"
     assert event_records[1] is not stale_record
     assert event_records[1].location_id is None
+
+
+def test_rebuild_recent_event_ids_includes_route_endpoint_metadata() -> None:
+    origin = _Location()
+    destination = _Location()
+    event_records = [
+        WorldEventRecord(
+            record_id="evt_route_blocked",
+            kind="route_blocked",
+            location_id="loc_origin",
+            render_params={
+                "from_location_id": "loc_origin",
+                "to_location_id": "loc_destination",
+                "endpoint_location_ids": ["loc_origin", "loc_destination"],
+            },
+            tags=["location:loc_origin", "location:loc_destination"],
+        )
+    ]
+
+    rebuild_recent_event_ids(
+        locations=[origin, destination],
+        location_index={"loc_origin": origin, "loc_destination": destination},
+        event_records=event_records,
+    )
+
+    assert origin.recent_event_ids == ["evt_route_blocked"]
+    assert destination.recent_event_ids == ["evt_route_blocked"]

@@ -13,6 +13,18 @@ from typing import Callable, Dict, Iterable, List, Mapping, overload
 from .terrain import RouteEdge, Site
 
 
+def _same_observer(left: Callable[[], None] | None, right: Callable[[], None] | None) -> bool:
+    if left is right:
+        return True
+    if left is None or right is None:
+        return False
+    left_self = getattr(left, "__self__", None)
+    right_self = getattr(right, "__self__", None)
+    left_func = getattr(left, "__func__", None)
+    right_func = getattr(right, "__func__", None)
+    return left_self is right_self and left_func is right_func and left_func is not None
+
+
 class RouteCollection(MutableSequence[RouteEdge]):
     """Route collection that invalidates cached adjacency on mutation."""
 
@@ -34,7 +46,7 @@ class RouteCollection(MutableSequence[RouteEdge]):
 
     def _attach(self, route: RouteEdge) -> None:
         current_callback = route._on_change
-        if current_callback is not None and current_callback is not self._on_change:
+        if current_callback is not None and not _same_observer(current_callback, self._on_change):
             raise ValueError("RouteEdge instances cannot be shared across active RouteCollection owners")
         route._on_change = self._on_change
 
@@ -183,7 +195,12 @@ def replace_routes(
 def attach_route_observers(routes: Iterable[RouteEdge], *, on_change: Callable[[], None]) -> None:
     """Attach mutation hooks to each route in the active collection."""
     for route in routes:
-        route._on_change = on_change
+        current_callback = route._on_change
+        if current_callback is None:
+            route._on_change = on_change
+            continue
+        if not _same_observer(current_callback, on_change):
+            raise ValueError("RouteEdge instances cannot be shared across active RouteCollection owners")
 
 
 def rebuild_route_index(

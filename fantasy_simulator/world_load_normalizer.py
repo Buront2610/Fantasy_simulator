@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Callable, Iterable, List, Mapping, MutableSequence, Protocol, Sequence
 
 from .event_models import WorldEventRecord
+from .world_event_index import location_ids_for_record
 from .world_event_record_updates import event_record_with_location_id
 
 
@@ -38,10 +39,14 @@ def rebuild_recent_event_ids(
 
     for index, record in enumerate(event_records):
         location_id = record.location_id
-        if location_id is None or location_id not in location_index:
-            event_records[index] = event_record_with_location_id(record, None)
-            continue
-        location_index[location_id].recent_event_ids.append(record.record_id)
+        if location_id is not None and location_id not in location_index:
+            record = event_record_with_location_id(record, None)
+            event_records[index] = record
+        for attached_location_id in location_ids_for_record(record):
+            attached_location = location_index.get(attached_location_id)
+            if attached_location is None:
+                continue
+            attached_location.recent_event_ids.append(record.record_id)
 
     for location in locations:
         location.recent_event_ids = location.recent_event_ids[-max_recent_event_ids:]

@@ -27,6 +27,10 @@ work and its serialization guardrails.
   Evidence: world-change APIs no-op without appending records when the state is
   unchanged, fail fast rather than storing empty fallback descriptions, and
   roll back state when canonical recording fails.
+- Route visibility adapter coverage.
+  Status: completed in the current branch worktree.
+  Evidence: route block/reopen records carry endpoint IDs and `location:*` tags
+  so reports and location queries include both connected sites.
 
 ## Remaining Risks
 
@@ -34,7 +38,8 @@ work and its serialization guardrails.
   Impact: reports, summaries, and UI event logs disagree after load.
   Guardrail: `world.event_records` remains canonical; current-schema conflict
   tests reject stale `event_log` precedence; display adapters render canonical
-  records through the shared event renderer.
+  records through the shared event renderer; route visibility uses endpoint IDs
+  and `location:*` tags rather than display text.
 - Language runtime cache diverges from durable history.
   Impact: generated names and endonyms change depending on save shape.
   Guardrail: `language_evolution_history` wins over
@@ -44,10 +49,12 @@ work and its serialization guardrails.
   unclear.
   Guardrail: `tests/test_doc_freshness.py` checks this contract and risk
   register for key precedence terms.
-- Save schema changes without migration tests.
-  Impact: old snapshots fail or hydrate with partial defaults.
-  Guardrail: `CURRENT_VERSION` bumps require migration tests and
-  README/agent doc freshness updates.
+- Hydration precedence changes without regression tests.
+  Impact: unchanged save schemas still load differently because canonical
+  records, legacy adapters, or derived caches are reconciled in a new order.
+  Guardrail: behavior-only hydration changes require focused save/load
+  conflict tests even when `CURRENT_VERSION` stays unchanged; schema-version
+  bumps still require migration tests and README/agent doc freshness updates.
 
 ## Current Status
 

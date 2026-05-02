@@ -5,7 +5,44 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Set, Tuple
 
-from .event_models import WorldEventRecord
+from .event_models import LOCATION_TAG_PREFIX, WorldEventRecord
+
+
+def _freeze_payload(value: Any) -> Any:
+    """Return a hashable representation of JSON-like record metadata."""
+    if isinstance(value, dict):
+        return tuple((key, _freeze_payload(item)) for key, item in sorted(value.items(), key=lambda pair: str(pair[0])))
+    if isinstance(value, list):
+        return tuple(_freeze_payload(item) for item in value)
+    return value
+
+
+def location_ids_for_record(record: WorldEventRecord) -> List[str]:
+    """Return all location ids directly attached to a record."""
+    location_ids: List[str] = []
+
+    def add_location_id(value: Any) -> None:
+        if isinstance(value, str) and value and value not in location_ids:
+            location_ids.append(value)
+
+    add_location_id(record.location_id)
+    for tag in record.tags:
+        if tag.startswith(LOCATION_TAG_PREFIX):
+            add_location_id(tag[len(LOCATION_TAG_PREFIX):])
+
+    for key in ("location_id", "from_location_id", "to_location_id"):
+        add_location_id(record.render_params.get(key))
+
+    endpoint_location_ids = record.render_params.get("endpoint_location_ids")
+    if isinstance(endpoint_location_ids, list):
+        for location_id in endpoint_location_ids:
+            add_location_id(location_id)
+
+    for impact in record.impacts:
+        if impact.get("target_type") == "location":
+            add_location_id(impact.get("target_id"))
+
+    return location_ids
 
 
 def _event_signature(records: List[WorldEventRecord]) -> Tuple[Any, ...]:
@@ -19,6 +56,9 @@ def _event_signature(records: List[WorldEventRecord]) -> Tuple[Any, ...]:
             record.location_id or "",
             record.primary_actor_id or "",
             tuple(record.secondary_actor_ids),
+            tuple(record.tags),
+            _freeze_payload(record.render_params),
+            _freeze_payload(record.impacts),
         )
         for record in records
     )
@@ -53,8 +93,8 @@ class EventHistoryIndex:
 
         for record in records:
             record_ids.add(record.record_id)
-            if record.location_id:
-                by_location.setdefault(record.location_id, []).append(record)
+            for location_id in location_ids_for_record(record):
+                by_location.setdefault(location_id, []).append(record)
             indexed_actor_ids: Set[str] = set()
             if record.primary_actor_id:
                 by_actor.setdefault(record.primary_actor_id, []).append(record)

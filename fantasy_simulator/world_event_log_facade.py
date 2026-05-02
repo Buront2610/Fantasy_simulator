@@ -22,6 +22,7 @@ def event_log_view(world: MutableEventLogWorld) -> ReadOnlyEventLog:
         world.event_records,
         max_event_log=world.MAX_EVENT_LOG,
         translate=tr,
+        world=world,
     )
 
 

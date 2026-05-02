@@ -33,13 +33,28 @@ def get_locale() -> str:
     return _LOCALE
 
 
-def tr(key: str, **kwargs: object) -> str:
-    table = _TEXT.get(_LOCALE, _TEXT["en"])
+def normalize_locale(locale: str | None) -> str:
+    if locale is None:
+        return _LOCALE
+    return locale if locale in _TEXT else "en"
+
+
+def tr_for_locale(locale: str | None, key: str, **kwargs: object) -> str:
+    resolved_locale = normalize_locale(locale)
+    table = _TEXT.get(resolved_locale, _TEXT["en"])
     fallback = _TEXT["en"]
     template = table.get(key, fallback.get(key, key))
     return template.format(**kwargs)
 
 
-def tr_term(term: str) -> str:
-    table = _TERMS.get(_LOCALE, {})
+def tr_term_for_locale(locale: str | None, term: str) -> str:
+    table = _TERMS.get(normalize_locale(locale), {})
     return table.get(term, term)
+
+
+def tr(key: str, **kwargs: object) -> str:
+    return tr_for_locale(_LOCALE, key, **kwargs)
+
+
+def tr_term(term: str) -> str:
+    return tr_term_for_locale(_LOCALE, term)

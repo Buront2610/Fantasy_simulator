@@ -103,6 +103,7 @@ def project_compatibility_event_log(
     *,
     max_event_log: int,
     translate: Translator,
+    world: object = None,
 ) -> List[str]:
     """Project compatibility log lines from canonical records."""
     recent = list(records)[-max_event_log:]
@@ -110,7 +111,7 @@ def project_compatibility_event_log(
         record.legacy_event_log_entry
         if record.legacy_event_log_entry is not None
         else format_event_log_entry(
-            render_event_record(record),
+            render_event_record(record, world=world, translate=translate),
             translate=translate,
             year=record.year,
             month=record.month,
@@ -167,6 +168,7 @@ def compatibility_event_log_view(
     *,
     max_event_log: int,
     translate: Translator,
+    world: object = None,
 ) -> ReadOnlyEventLog:
     """Return the current read-only compatibility log view."""
     canonical_records = list(records)
@@ -176,6 +178,7 @@ def compatibility_event_log_view(
                 canonical_records,
                 max_event_log=max_event_log,
                 translate=translate,
+                world=world,
             )
         )
     return ReadOnlyEventLog(trim_event_log_entries(display_entries, max_event_log=max_event_log))

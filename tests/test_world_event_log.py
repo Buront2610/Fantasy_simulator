@@ -7,13 +7,20 @@ from fantasy_simulator import world_event_log_facade
 from fantasy_simulator.world_event_log import format_event_log_entry, project_compatibility_event_log
 
 
-def _translate(key: str, **kwargs: int) -> str:
+def _translate(key: str, **kwargs: object) -> str:
     if key == "event_log_prefix":
         return f"[Y{kwargs['year']}]"
     if key == "event_log_prefix_month":
         return f"[Y{kwargs['year']} M{kwargs['month']}]"
     if key == "event_log_prefix_day":
         return f"[Y{kwargs['year']} M{kwargs['month']} D{kwargs['day']}]"
+    if key == "event_change_no_faction":
+        return "none"
+    if key == "events.location_faction_changed.summary":
+        return (
+            f"{kwargs['location']} changed controlling faction from "
+            f"{kwargs['old_faction']} to {kwargs['new_faction']}."
+        )
     raise AssertionError(key)
 
 
@@ -53,6 +60,59 @@ def test_project_compatibility_event_log_uses_formatting_when_no_legacy_entry() 
 
     projected = project_compatibility_event_log(records, max_event_log=10, translate=_translate)
     assert projected == ["[Y1001 M6 D4] battle"]
+
+
+def test_project_compatibility_event_log_keeps_legacy_default_without_world_context() -> None:
+    records = [
+        WorldEventRecord(
+            kind="location_faction_changed",
+            year=1001,
+            month=6,
+            day=4,
+            description="Aethoria Capital changed controlling faction from none to stormwatch_wardens.",
+            summary_key="events.location_faction_changed.summary",
+            render_params={
+                "location": "Aethoria Capital",
+                "old_faction_id": None,
+                "new_faction_id": "stormwatch_wardens",
+            },
+        ),
+    ]
+
+    projected = project_compatibility_event_log(records, max_event_log=10, translate=_translate)
+
+    assert projected == [
+        "[Y1001 M6 D4] Aethoria Capital changed controlling faction from none to stormwatch_wardens."
+    ]
+
+
+def test_world_event_log_view_uses_world_context_for_authored_faction_names() -> None:
+    previous_locale = get_locale()
+    set_locale("en")
+    world = World()
+    world.record_event(
+        WorldEventRecord(
+            kind="location_faction_changed",
+            year=1001,
+            month=6,
+            day=4,
+            description="Aethoria Capital changed controlling faction from none to stormwatch_wardens.",
+            summary_key="events.location_faction_changed.summary",
+            render_params={
+                "location": "Aethoria Capital",
+                "old_faction_id": None,
+                "new_faction_id": "stormwatch_wardens",
+            },
+        )
+    )
+
+    try:
+        assert list(world.event_log) == [
+            "[Year 1001, Month 6, Day 4] "
+            "Aethoria Capital changed controlling faction from none to Stormwatch Wardens."
+        ]
+    finally:
+        set_locale(previous_locale)
 
 
 def test_project_compatibility_event_log_preserves_exact_legacy_event_log_entry() -> None:

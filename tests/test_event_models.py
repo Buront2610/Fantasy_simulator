@@ -3,9 +3,11 @@ from __future__ import annotations
 import re
 from math import inf
 
+import fantasy_simulator.event_rendering as event_rendering
 from fantasy_simulator.event_models import EventResult, WorldEventRecord, generate_record_id
 from fantasy_simulator.event_rendering import render_event_record
 from fantasy_simulator.i18n import get_locale, set_locale
+from fantasy_simulator.world import World
 
 
 class _DeterministicRng:
@@ -143,6 +145,59 @@ def test_render_event_record_localizes_none_faction_params_at_display_time() -> 
     )
     assert render_event_record(record, locale="ja") == (
         "Aethoria Capital の支配勢力が なし から wardens に変わった。"
+    )
+
+
+def test_render_event_record_explicit_locale_does_not_call_global_locale_mutator(monkeypatch) -> None:
+    previous = get_locale()
+    set_locale("en")
+    record = WorldEventRecord(
+        kind="battle",
+        description="A fallback battle happened.",
+        summary_key="events.battle.summary",
+        render_params={"actor": "Aldric", "location": "Thornwood"},
+    )
+
+    def _fail_set_locale(_locale: str) -> str:
+        raise AssertionError("render_event_record should not mutate global locale")
+
+    if hasattr(event_rendering, "set_locale"):
+        monkeypatch.setattr(event_rendering, "set_locale", _fail_set_locale)
+
+    try:
+        assert render_event_record(record, locale="ja") == "Aldric は Thornwood で戦った。"
+        assert get_locale() == "en"
+    finally:
+        set_locale(previous)
+
+
+def test_render_event_record_uses_world_context_for_missing_location_name() -> None:
+    world = World()
+    record = WorldEventRecord(
+        kind="battle",
+        location_id="loc_aethoria_capital",
+        description="A fallback battle happened.",
+        summary_key="events.battle.summary",
+        render_params={"actor": "Aldric"},
+    )
+
+    assert render_event_record(record, locale="en", world=world) == "Aldric fought at Aethoria Capital."
+
+
+def test_render_event_record_uses_world_context_for_authored_faction_names() -> None:
+    world = World()
+    record = WorldEventRecord(
+        summary_key="events.location_faction_changed.summary",
+        render_params={
+            "location": "Aethoria Capital",
+            "location_id": "loc_aethoria_capital",
+            "old_faction_id": None,
+            "new_faction_id": "stormwatch_wardens",
+        },
+    )
+
+    assert render_event_record(record, locale="en", world=world) == (
+        "Aethoria Capital changed controlling faction from none to Stormwatch Wardens."
     )
 
 
@@ -322,6 +377,54 @@ def test_world_event_record_from_event_result_to_event_result_round_trip() -> No
     assert projected.affected_characters == source.affected_characters
     assert projected.stat_changes == source.stat_changes
     assert projected.metadata == source.metadata
+
+
+def test_world_event_record_to_event_result_exposes_render_params_metadata() -> None:
+    record = WorldEventRecord(
+        record_id="route_blocked_1",
+        kind="route_blocked",
+        year=1000,
+        summary_key="events.route_blocked.summary",
+        render_params={
+            "route_id": "route_a_b",
+            "from_location_id": "loc_a",
+            "to_location_id": "loc_b",
+            "from_location": "Alpha",
+            "to_location": "Bravo",
+        },
+    )
+
+    projected = record.to_event_result()
+    projected.metadata["render_params"]["from_location"] = "Changed"
+
+    assert projected.metadata["render_params"]["route_id"] == "route_a_b"
+    assert record.render_params["from_location"] == "Alpha"
+
+
+def test_world_event_record_to_event_result_merges_render_params_into_legacy_metadata() -> None:
+    record = WorldEventRecord(
+        record_id="legacy_route_blocked_1",
+        kind="route_blocked",
+        year=1000,
+        description="The route was blocked.",
+        summary_key="events.route_blocked.summary",
+        render_params={"from_location": "Alpha", "to_location": "Bravo"},
+        legacy_event_result={
+            "description": "Legacy route text.",
+            "affected_characters": [],
+            "stat_changes": {},
+            "event_type": "generic",
+            "year": 999,
+            "metadata": {"source": "legacy"},
+        },
+    )
+
+    projected = record.to_event_result()
+
+    assert projected.metadata == {
+        "source": "legacy",
+        "render_params": {"from_location": "Alpha", "to_location": "Bravo"},
+    }
 
 
 def test_world_event_record_from_event_result_uses_metadata_summary_key_fallback() -> None:

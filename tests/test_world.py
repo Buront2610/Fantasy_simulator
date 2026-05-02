@@ -138,6 +138,18 @@ class TestWorld:
         assert routes
         assert rebuild_calls == 0
 
+    def test_route_collection_keeps_world_observer_ownership_after_index_rebuild(self):
+        world = World()
+        route = world.routes[0]
+
+        world._rebuild_route_index()
+        world.routes[0] = route
+        world._routes_dirty = False
+
+        route.blocked = not route.blocked
+
+        assert world._routes_dirty is True
+
     def test_route_block_toggle_invalidates_cache_without_signature_scan(self, monkeypatch):
         world = World()
         route = next(

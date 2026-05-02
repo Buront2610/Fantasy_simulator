@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Callable, Dict, List, Mapping, Optional, Protocol, Set
 
 from .event_models import WorldEventRecord
+from .world_event_index import location_ids_for_record
 from .rule_override_resolution import (
     DEFAULT_EVENT_IMPACT_RULES,
     clone_default_event_impact_rules as _clone_default_event_impact_rules,
@@ -97,8 +98,10 @@ def append_canonical_event_record(
     if existing_record_ids is not None:
         existing_record_ids.add(stored_record.record_id)
 
-    if stored_record.location_id is not None:
-        location = location_index[stored_record.location_id]
+    for location_id in location_ids_for_record(stored_record):
+        location = location_index.get(location_id)
+        if location is None:
+            continue
         location.recent_event_ids.append(stored_record.record_id)
         location.recent_event_ids = location.recent_event_ids[-12:]
 

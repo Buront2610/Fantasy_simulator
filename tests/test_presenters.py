@@ -2,7 +2,7 @@
 
 from fantasy_simulator.i18n import set_locale
 from fantasy_simulator.ui.presenters import ReportPresenter
-from fantasy_simulator.ui.view_models import build_monthly_report_card_view
+from fantasy_simulator.ui.view_models import build_monthly_report_card_view, build_notification_views
 from fantasy_simulator.rumor import Rumor
 from fantasy_simulator.world import CalendarChangeRecord, World
 from fantasy_simulator.events import WorldEventRecord
@@ -55,6 +55,47 @@ def test_monthly_report_card_excludes_pending_adventure_choices_from_completed_a
     card = build_monthly_report_card_view(world, world.year, 3)
 
     assert card.completed_adventures == []
+
+
+def test_notification_views_render_canonical_summary_records_with_world_context():
+    set_locale("en")
+    world = World()
+    record = WorldEventRecord(
+        year=world.year,
+        month=3,
+        kind="location_faction_changed",
+        description="Aethoria Capital changed controlling faction from none to stormwatch_wardens.",
+        summary_key="events.location_faction_changed.summary",
+        render_params={
+            "location": "Aethoria Capital",
+            "old_faction_id": None,
+            "new_faction_id": "stormwatch_wardens",
+        },
+    )
+
+    views = build_notification_views([record], world=world)
+
+    assert views[0].text == "Aethoria Capital changed controlling faction from none to Stormwatch Wardens."
+
+
+def test_monthly_report_card_renders_completed_adventure_summary_records():
+    set_locale("en")
+    world = World()
+    world.record_event(
+        WorldEventRecord(
+            year=world.year,
+            month=3,
+            kind="adventure_returned",
+            description="Legacy adventure text.",
+            location_id="loc_aethoria_capital",
+            summary_key="events.battle.summary",
+            render_params={"actor": "Aldric"},
+        )
+    )
+
+    card = build_monthly_report_card_view(world, world.year, 3)
+
+    assert card.completed_adventures == ["Aldric fought at Aethoria Capital."]
 
 
 def test_monthly_report_card_uses_historical_calendar_label_after_calendar_change():

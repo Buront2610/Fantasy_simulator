@@ -5,7 +5,7 @@ from __future__ import annotations
 import random
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
-from .event_models import WorldEventRecord
+from .event_models import LOCATION_TAG_PREFIX, WorldEventRecord
 from .event_rendering import render_event_record
 from .world_actor_index import (
     location_ids as location_ids_for_locations,
@@ -57,6 +57,7 @@ class WorldMemoryMixin:
         summary_key: str,
         render_params: Dict[str, Any],
         impacts: List[Dict[str, Any]],
+        tags: Optional[List[str]] = None,
         year: Optional[int] = None,
         month: int = 1,
         day: int = 1,
@@ -74,7 +75,7 @@ class WorldMemoryMixin:
             calendar_key=calendar_key,
             summary_key=summary_key,
             render_params=render_params,
-            tags=["world_change"],
+            tags=list(dict.fromkeys(["world_change", *(tags or [])])),
             impacts=impacts,
         )
         return self.record_event(record)
@@ -332,6 +333,9 @@ class WorldMemoryMixin:
         summary_key = f"events.{route_kind}.summary"
         render_params = {
             "route_id": route_id,
+            "from_location_id": route.from_site_id,
+            "to_location_id": route.to_site_id,
+            "endpoint_location_ids": [route.from_site_id, route.to_site_id],
             "from_location": self._route_location_name(route.from_site_id),
             "to_location": self._route_location_name(route.to_site_id),
         }
@@ -350,6 +354,10 @@ class WorldMemoryMixin:
                 ),
                 summary_key=summary_key,
                 render_params=render_params,
+                tags=[
+                    f"{LOCATION_TAG_PREFIX}{route.from_site_id}",
+                    f"{LOCATION_TAG_PREFIX}{route.to_site_id}",
+                ],
                 impacts=[
                     {
                         "target_type": "route",
