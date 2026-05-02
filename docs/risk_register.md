@@ -59,7 +59,8 @@ work and its serialization guardrails.
 ## Current Status
 
 - No open blocker for Step 6/9 documentation and conflict-precedence coverage.
-- Core serialization logic was not changed for this step.
+- Save schema format was not changed for this step; hydration guardrails and
+  derived-cache rebuild behavior were tightened.
 - RR-001 route graph is no longer tracked as an open serialization risk.
 - Remaining future risk is additive: new PR-K dynamic world state fields must
   declare their canonical source and conflict behavior before persistence lands.

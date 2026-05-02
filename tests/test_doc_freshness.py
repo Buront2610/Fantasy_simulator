@@ -161,7 +161,9 @@ def test_risk_register_tracks_serialization_conflict_risks() -> None:
     assert "Route visibility adapter coverage" in RISK_REGISTER_TEXT
     assert "endpoint IDs" in RISK_REGISTER_TEXT
     assert "CURRENT_VERSION` stays unchanged" in RISK_REGISTER_TEXT
-    assert "Core serialization logic was not changed" in RISK_REGISTER_TEXT
+    assert "Save schema format was not changed" in RISK_REGISTER_TEXT
+    assert "hydration guardrails" in RISK_REGISTER_TEXT
+    assert "Core serialization logic was not changed" not in RISK_REGISTER_TEXT
 
 
 def test_implementation_plan_mentions_current_observation_and_type_gate_debt_payoff() -> None:
