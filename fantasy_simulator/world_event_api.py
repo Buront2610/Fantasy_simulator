@@ -53,6 +53,7 @@ class WorldEventMixin:
 
         Returns the canonical stored record (may be a normalized copy).
         """
+        record = WorldEventRecord.from_dict(record.to_dict())
         stored_record = record_world_event(
             record=record,
             event_records=self.event_records,

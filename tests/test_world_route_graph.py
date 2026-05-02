@@ -154,6 +154,36 @@ def test_route_collection_rejects_duplicate_route_ids_during_construction_and_ex
     assert notifications == 0
 
 
+def test_route_collection_rejects_self_loop_routes_on_mutation_paths() -> None:
+    baseline = RouteEdge("route_1", "loc_one", "loc_two", "road")
+
+    try:
+        RouteCollection([RouteEdge("route_self", "loc_one", "loc_one", "road")])
+    except ValueError as exc:
+        assert "self-loop" in str(exc)
+    else:
+        raise AssertionError("Expected self-loop route construction to fail")
+
+    for action in (
+        lambda routes: routes.append(RouteEdge("route_append", "loc_one", "loc_one", "road")),
+        lambda routes: routes.extend([RouteEdge("route_extend", "loc_one", "loc_one", "road")]),
+        lambda routes: routes.insert(0, RouteEdge("route_insert", "loc_one", "loc_one", "road")),
+        lambda routes: routes.__setitem__(0, RouteEdge("route_setitem", "loc_one", "loc_one", "road")),
+        lambda routes: routes.__setitem__(
+            slice(None),
+            [RouteEdge("route_slice", "loc_one", "loc_one", "road")],
+        ),
+    ):
+        routes = RouteCollection([baseline])
+        try:
+            action(routes)
+        except ValueError as exc:
+            assert "self-loop" in str(exc)
+            assert routes == [baseline]
+            continue
+        raise AssertionError("Expected self-loop route mutation to fail")
+
+
 def test_route_collection_rejects_duplicate_undirected_endpoint_pairs_on_append_insert_and_iadd() -> None:
     first = RouteEdge("route_1", "loc_one", "loc_two", "road")
     routes = RouteCollection([first])

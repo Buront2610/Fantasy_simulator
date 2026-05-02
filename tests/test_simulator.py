@@ -175,6 +175,69 @@ class TestSimulatorConstruction:
 
         assert sim.rng.getstate() == before
 
+    def test_record_event_invalid_metadata_does_not_apply_location_impact(self, small_world):
+        sim = Simulator(small_world, events_per_year=0, seed=123)
+        location = small_world.get_location_by_id("loc_aethoria_capital")
+        before_state = (location.safety, location.mood, location.danger, location.rumor_heat)
+        result = EventResult(
+            description="Broken battle.",
+            event_type="battle",
+            year=small_world.year,
+            metadata={"render_params": ["not", "a", "dict"]},
+        )
+
+        with pytest.raises(ValueError, match="render_params must be a dict"):
+            sim._record_event(result, location_id=location.id)
+
+        assert small_world.event_records == []
+        assert (location.safety, location.mood, location.danger, location.rumor_heat) == before_state
+
+    def test_record_event_duplicate_id_does_not_apply_second_location_impact(self, small_world):
+        sim = Simulator(small_world, events_per_year=0, seed=123)
+        location = small_world.get_location_by_id("loc_aethoria_capital")
+        result = EventResult(
+            description="A battle.",
+            event_type="battle",
+            year=small_world.year,
+            metadata={"record_id": "same_record"},
+        )
+        sim._record_event(result, location_id=location.id)
+        before_state = (location.safety, location.mood, location.danger, location.rumor_heat)
+
+        with pytest.raises(ValueError, match="Duplicate event record ID"):
+            sim._record_event(result, location_id=location.id)
+
+        assert len(small_world.event_records) == 1
+        assert (location.safety, location.mood, location.danger, location.rumor_heat) == before_state
+
+    def test_record_world_event_invalid_description_does_not_apply_location_impact(self, small_world):
+        sim = Simulator(small_world, events_per_year=0, seed=123)
+        location = small_world.get_location_by_id("loc_aethoria_capital")
+        before_state = (location.safety, location.mood, location.danger, location.rumor_heat)
+
+        with pytest.raises(ValueError, match="description must be a string"):
+            sim._record_world_event(123, kind="battle", location_id=location.id)
+
+        assert small_world.event_records == []
+        assert (location.safety, location.mood, location.danger, location.rumor_heat) == before_state
+
+    def test_record_world_event_duplicate_id_does_not_apply_second_location_impact(self, small_world):
+        class FixedIdRng:
+            def getrandbits(self, _bits):
+                return 7
+
+        sim = Simulator(small_world, events_per_year=0, seed=123)
+        sim.id_rng = FixedIdRng()
+        location = small_world.get_location_by_id("loc_aethoria_capital")
+        sim._record_world_event("A battle.", kind="battle", location_id=location.id)
+        before_state = (location.safety, location.mood, location.danger, location.rumor_heat)
+
+        with pytest.raises(ValueError, match="Duplicate event record ID"):
+            sim._record_world_event("Another battle.", kind="battle", location_id=location.id)
+
+        assert len(small_world.event_records) == 1
+        assert (location.safety, location.mood, location.danger, location.rumor_heat) == before_state
+
 
 # ---------------------------------------------------------------------------
 # run()

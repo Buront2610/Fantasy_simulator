@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, List
+from typing import Dict, Iterable, List
 
 from ..event_models import WorldEventRecord
-from ..event_rendering import render_event_record
+from ..event_rendering import EventRenderContext, render_event_record
 from ..i18n import tr, tr_term
 from ..narrative.constants import EVENT_KINDS_FATAL
 
@@ -19,7 +19,7 @@ def render_simulation_summary(
     deceased_count: int,
     type_counts: Dict[str, int],
     records: Iterable[WorldEventRecord],
-    world: Any = None,
+    world: EventRenderContext | None = None,
 ) -> str:
     """Render the public simulation summary text."""
     lines = [

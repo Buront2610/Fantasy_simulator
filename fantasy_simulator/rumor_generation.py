@@ -150,6 +150,7 @@ def _months_elapsed_for_rumor(
     current_absolute_day: int,
     world: Optional["World"],
 ) -> tuple[int, Any]:
+    period_calendar: Any
     if current_absolute_day > 0 and record.absolute_day > 0 and world is not None:
         period_calendar = world.calendar_definition_for_date(current_year, current_month)
         months_elapsed = world.months_elapsed_between(

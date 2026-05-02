@@ -82,6 +82,8 @@ class RouteCollection(MutableSequence[RouteEdge]):
         seen_route_ids: set[str] = set()
         seen_route_pairs: set[tuple[str, str]] = set()
         for route in routes:
+            if route.from_site_id == route.to_site_id:
+                raise ValueError(f"route collection contains self-loop: {route.route_id!r}")
             if route.route_id in seen_route_ids:
                 raise ValueError(f"route collection contains duplicate route id: {route.route_id!r}")
             seen_route_ids.add(route.route_id)
@@ -96,6 +98,8 @@ class RouteCollection(MutableSequence[RouteEdge]):
     def _validate_route(route: object) -> RouteEdge:
         if not isinstance(route, RouteEdge):
             raise TypeError("route collection entries must be RouteEdge instances")
+        if route.from_site_id == route.to_site_id:
+            raise ValueError(f"route collection cannot contain self-loop route: {route.route_id!r}")
         return route
 
     def _contains_identity(self, route: RouteEdge) -> bool:
