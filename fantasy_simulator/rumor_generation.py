@@ -6,6 +6,7 @@ import random
 import uuid
 from typing import TYPE_CHECKING, Any, List, Optional
 
+from .event_rendering import render_event_record
 from .i18n import tr
 from .narrative.constants import EVENT_KINDS_FATAL
 from .rumor_constants import DISCLOSURE, MIN_SEVERITY_FOR_RUMOR, RUMOR_BASE_CHANCE
@@ -106,10 +107,11 @@ def _build_rumor_description(
     hidden information instead of contradicting itself.
     """
     disclosure = DISCLOSURE[reliability]
+    rendered_description = render_event_record(record, world=world)
 
     if reliability == "false":
         if rng.random() < disclosure["what"]:
-            return record.description
+            return rendered_description
         return _generate_misinformation(record, rng=rng)
 
     who_known = rng.random() < disclosure["who"]
@@ -118,7 +120,7 @@ def _build_rumor_description(
     when_known = rng.random() < disclosure["when"]
 
     if who_known and what_known and where_known and when_known:
-        return record.description
+        return rendered_description
 
     if not what_known:
         return tr("rumor_vague_event")
@@ -211,7 +213,7 @@ def generate_rumor_from_event(
     if world is not None:
         description = _build_rumor_description(record, reliability, world, rng=rng)
     else:
-        description = record.description
+        description = render_event_record(record)
 
     if hasattr(rng, "getrandbits"):
         rumor_id = f"rum_{rng.getrandbits(48):012x}"

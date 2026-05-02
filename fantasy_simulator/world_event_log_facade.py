@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, cast
 
 from .i18n import tr
 from .world_protocols import MutableEventLogWorld
 from .world_event_log import (
+    EventRenderContext,
     ReadOnlyEventLog,
     append_display_event_log_entry,
     compatibility_event_log_view,
@@ -22,7 +23,7 @@ def event_log_view(world: MutableEventLogWorld) -> ReadOnlyEventLog:
         world.event_records,
         max_event_log=world.MAX_EVENT_LOG,
         translate=tr,
-        world=world,
+        world=cast(EventRenderContext, world),
     )
 
 

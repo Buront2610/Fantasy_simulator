@@ -344,7 +344,33 @@ TEXT_EN: Dict[str, str] = {
     'event_type_adventure_update': 'Adventure update',
     'events.generic.summary': '{description}',
     'events.battle.summary': '{actor} fought at {location}.',
+    'events.battle_result.summary': '{winner} defeated {loser}.{injury}',
+    'events.battle_fatal.summary': '{winner} defeated {loser}, who did not survive the encounter.',
     'events.meeting.summary': '{actor} met {other} at {location}.',
+    'events.meeting_positive.summary': (
+        '{name1} and {name2} met in {location} and hit it off splendidly. '
+        '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        'Avg: {relationship_avg:+d})'
+    ),
+    'events.meeting_pleasant.summary': (
+        '{name1} and {name2} met in {location} and had a pleasant exchange. '
+        '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        'Avg: {relationship_avg:+d})'
+    ),
+    'events.meeting_neutral.summary': (
+        '{name1} and {name2} met in {location} and exchanged a polite nod. '
+        '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        'Avg: {relationship_avg:+d})'
+    ),
+    'events.meeting_negative.summary': (
+        '{name1} and {name2} met in {location} and had a tense, uncomfortable encounter. '
+        '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        'Avg: {relationship_avg:+d})'
+    ),
+    'events.marriage.summary': (
+        '{name1} ({race1} {job1}) and {name2} ({race2} {job2}) were married in {location} '
+        'amid great celebration!'
+    ),
     'events.location_renamed.summary': '{old_name} was renamed {new_name}.',
     'events.route_blocked.summary': 'The route from {from_location} to {to_location} was blocked.',
     'events.route_reopened.summary': 'The route from {from_location} to {to_location} reopened.',

@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Dict, Iterable, List
+from typing import Any, Dict, Iterable, List
 
 from ..event_models import WorldEventRecord
+from ..event_rendering import render_event_record
 from ..i18n import tr, tr_term
 from ..narrative.constants import EVENT_KINDS_FATAL
 
@@ -18,6 +19,7 @@ def render_simulation_summary(
     deceased_count: int,
     type_counts: Dict[str, int],
     records: Iterable[WorldEventRecord],
+    world: Any = None,
 ) -> str:
     """Render the public simulation summary text."""
     lines = [
@@ -46,7 +48,7 @@ def render_simulation_summary(
     ]
     shown = dramatic[:5] if len(dramatic) >= 5 else dramatic
     for record in shown:
-        lines.append(f"    • {record.description}")
+        lines.append(f"    • {render_event_record(record, world=world)}")
 
     lines.append("=" * 60)
     return "\n".join(lines)

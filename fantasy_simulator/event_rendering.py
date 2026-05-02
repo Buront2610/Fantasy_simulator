@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Protocol
 
 from .content.setting_bundle_inspection import setting_entry_key
 from .event_models import WorldEventRecord
@@ -13,13 +13,21 @@ from .i18n import get_locale, tr_for_locale
 Translator = Callable[..., str]
 
 
+class EventRenderContext(Protocol):
+    """World-facing API used to resolve event-render display labels."""
+
+    def get_location_by_id(self, location_id: str) -> Any: ...
+
+    def location_name(self, location_id: str) -> str: ...
+
+
 def _translator_for_locale(locale: Optional[str]) -> Translator:
     if locale is None:
         return lambda key, **kwargs: tr_for_locale(get_locale(), key, **kwargs)
     return lambda key, **kwargs: tr_for_locale(locale, key, **kwargs)
 
 
-def _location_display_name(location_id: Any, world: object = None) -> Optional[str]:
+def _location_display_name(location_id: Any, world: EventRenderContext | None = None) -> Optional[str]:
     if not isinstance(location_id, str) or not location_id:
         return None
     if world is None:
@@ -43,7 +51,7 @@ def _location_display_name(location_id: Any, world: object = None) -> Optional[s
     return None
 
 
-def _faction_display_name(faction_id: str, world: object = None) -> Optional[str]:
+def _faction_display_name(faction_id: str, world: EventRenderContext | None = None) -> Optional[str]:
     if world is None:
         return None
     bundle = getattr(world, "_setting_bundle", None)
@@ -62,14 +70,19 @@ def _faction_display_name(faction_id: str, world: object = None) -> Optional[str
     return None
 
 
-def _display_faction(value: Any, *, world: object = None, translate: Translator) -> str:
+def _display_faction(value: Any, *, world: EventRenderContext | None = None, translate: Translator) -> str:
     if value is None or value == "":
         return translate("event_change_no_faction")
     faction_id = str(value)
     return _faction_display_name(faction_id, world) or faction_id
 
 
-def _render_params(record: WorldEventRecord, *, world: object = None, translate: Translator) -> dict[str, Any]:
+def _render_params(
+    record: WorldEventRecord,
+    *,
+    world: EventRenderContext | None = None,
+    translate: Translator,
+) -> dict[str, Any]:
     params = deepcopy(record.render_params)
 
     if "location" not in params:
@@ -99,13 +112,20 @@ def _render_params(record: WorldEventRecord, *, world: object = None, translate:
                 world=world,
                 translate=translate,
             )
+    if record.summary_key == "events.battle_result.summary" and "injury" not in params:
+        injury_status = params.get("loser_injury_status")
+        loser = params.get("loser")
+        if isinstance(injury_status, str) and injury_status != "none" and isinstance(loser, str):
+            params["injury"] = " " + translate(f"battle_injury_{injury_status}", name=loser)
+        else:
+            params["injury"] = ""
     return params
 
 
 def render_event_record(
     record: WorldEventRecord,
     locale: Optional[str] = None,
-    world: object = None,
+    world: EventRenderContext | None = None,
     translate: Optional[Translator] = None,
     strict: bool = False,
 ) -> str:

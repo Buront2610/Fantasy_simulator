@@ -263,6 +263,33 @@ class TestGetSummary:
         summary = sim_small.get_summary()
         assert isinstance(summary, str)
 
+    def test_notable_moments_render_with_current_locale(self):
+        world = World()
+        hero = Character("Hero", 25, "Male", "Human", "Warrior", location_id="loc_aethoria_capital")
+        rival = Character("Rival", 25, "Male", "Human", "Warrior", location_id="loc_aethoria_capital")
+        world.add_character(hero)
+        world.add_character(rival)
+        sim = Simulator(world, events_per_year=0, seed=1)
+        sim._record_event(
+            EventResult(
+                description="Hero defeated Rival, who did not survive the encounter.",
+                affected_characters=[hero.char_id, rival.char_id],
+                event_type="battle_fatal",
+                year=world.year,
+                metadata={
+                    "summary_key": "events.battle_fatal.summary",
+                    "render_params": {"winner": "Hero", "loser": "Rival"},
+                },
+            ),
+            location_id=hero.location_id,
+        )
+
+        set_locale("ja")
+        summary = sim.get_summary()
+
+        assert "Hero は Rival に勝利したが、Rival はその戦いを生き延びられなかった。" in summary
+        assert "Hero defeated Rival, who did not survive the encounter." not in summary
+
 
 # ---------------------------------------------------------------------------
 # get_character_story()
@@ -365,6 +392,34 @@ class TestGetCharacterStory:
         assert "Canonical story event" in story
         assert "Born beneath a comet." in story
         assert story.index("Canonical story event") < story.index("Born beneath a comet.")
+
+    def test_story_renders_canonical_records_with_current_locale(self):
+        world = World()
+        hero = Character("Hero", 25, "Male", "Human", "Warrior", location_id="loc_aethoria_capital")
+        rival = Character("Rival", 25, "Male", "Human", "Warrior", location_id="loc_aethoria_capital")
+        world.add_character(hero)
+        world.add_character(rival)
+        hero.history.append("Hero defeated Rival.")
+        sim = Simulator(world, events_per_year=0, seed=1)
+        sim._record_event(
+            EventResult(
+                description="Hero defeated Rival.",
+                affected_characters=[hero.char_id, rival.char_id],
+                event_type="battle",
+                year=world.year,
+                metadata={
+                    "summary_key": "events.battle_result.summary",
+                    "render_params": {"winner": "Hero", "loser": "Rival", "loser_injury_status": "none"},
+                },
+            ),
+            location_id=hero.location_id,
+        )
+
+        set_locale("ja")
+        story = sim.get_character_story(hero.char_id)
+
+        assert "Hero は Rival に勝利した。" in story
+        assert story.count("Hero defeated Rival.") == 0
 
     def test_story_orders_legacy_undated_records_by_nominal_date(self):
         world = World()

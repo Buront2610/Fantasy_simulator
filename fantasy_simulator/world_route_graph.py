@@ -41,6 +41,7 @@ class RouteCollection(MutableSequence[RouteEdge]):
         self._owner_token = owner_token if owner_token is not None else object()
         self._takeover_owner_token = takeover_owner_token
         new_routes = [self._validate_route(route) for route in routes]
+        self._ensure_unique_topology(new_routes)
         self._ensure_attachable(new_routes)
         for route in new_routes:
             self._attach(route)
@@ -70,6 +71,26 @@ class RouteCollection(MutableSequence[RouteEdge]):
     def _ensure_attachable(self, routes: Iterable[RouteEdge]) -> None:
         if any(not self._can_attach(route) for route in routes):
             raise ValueError("RouteEdge instances cannot be shared across active RouteCollection owners")
+
+    @staticmethod
+    def _route_pair(route: RouteEdge) -> tuple[str, str]:
+        first_site_id, second_site_id = sorted((route.from_site_id, route.to_site_id))
+        return first_site_id, second_site_id
+
+    @classmethod
+    def _ensure_unique_topology(cls, routes: Iterable[RouteEdge]) -> None:
+        seen_route_ids: set[str] = set()
+        seen_route_pairs: set[tuple[str, str]] = set()
+        for route in routes:
+            if route.route_id in seen_route_ids:
+                raise ValueError(f"route collection contains duplicate route id: {route.route_id!r}")
+            seen_route_ids.add(route.route_id)
+            route_pair = cls._route_pair(route)
+            if route_pair in seen_route_pairs:
+                raise ValueError(
+                    f"route collection contains duplicate route pair: {route_pair[0]}->{route_pair[1]}"
+                )
+            seen_route_pairs.add(route_pair)
 
     @staticmethod
     def _validate_route(route: object) -> RouteEdge:
@@ -115,9 +136,10 @@ class RouteCollection(MutableSequence[RouteEdge]):
                     f"attempt to assign sequence of size {len(new_routes)} "
                     f"to extended slice of size {len(old_routes)}"
                 )
-            self._ensure_attachable(new_routes)
             new_items = list(self._items)
             new_items[index] = new_routes
+            self._ensure_unique_topology(new_items)
+            self._ensure_attachable(new_routes)
             for route in new_routes:
                 self._attach(route)
             self._items = new_items
@@ -127,9 +149,12 @@ class RouteCollection(MutableSequence[RouteEdge]):
             return
         value = self._validate_route(value)
         old_route = self._items[index]
+        new_items = list(self._items)
+        new_items[index] = value
+        self._ensure_unique_topology(new_items)
         self._ensure_attachable([value])
         self._attach(value)
-        self._items[index] = value
+        self._items = new_items
         self._detach_if_removed(old_route)
         self._notify()
 
@@ -165,24 +190,35 @@ class RouteCollection(MutableSequence[RouteEdge]):
 
     def append(self, value: RouteEdge) -> None:
         value = self._validate_route(value)
+        new_items = list(self._items)
+        new_items.append(value)
+        self._ensure_unique_topology(new_items)
+        self._ensure_attachable([value])
         self._attach(value)
-        self._items.append(value)
+        self._items = new_items
         self._notify()
 
     def extend(self, iterable: Iterable[RouteEdge]) -> None:
         new_routes = [self._validate_route(route) for route in iterable]
         if not new_routes:
             return
+        new_items = list(self._items)
+        new_items.extend(new_routes)
+        self._ensure_unique_topology(new_items)
         self._ensure_attachable(new_routes)
         for route in new_routes:
             self._attach(route)
-        self._items.extend(new_routes)
+        self._items = new_items
         self._notify()
 
     def insert(self, index: int, value: RouteEdge) -> None:
         value = self._validate_route(value)
+        new_items = list(self._items)
+        new_items.insert(index, value)
+        self._ensure_unique_topology(new_items)
+        self._ensure_attachable([value])
         self._attach(value)
-        self._items.insert(index, value)
+        self._items = new_items
         self._notify()
 
     def pop(self, index: int = -1) -> RouteEdge:

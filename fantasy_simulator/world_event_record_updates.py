@@ -64,7 +64,10 @@ def _normalize_location_impacts(
         if normalized_impact.get("target_type") == "location":
             target_id = normalized_impact.get("target_id")
             if isinstance(target_id, str):
-                normalized_impact["target_id"] = normalize_location_id(target_id)
+                normalized_target_id = normalize_location_id(target_id)
+                if normalized_target_id is None:
+                    continue
+                normalized_impact["target_id"] = normalized_target_id
         normalized_impacts.append(normalized_impact)
     return normalized_impacts
 

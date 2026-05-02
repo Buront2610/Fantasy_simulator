@@ -5,6 +5,8 @@ Reports are non-persistent view models derived from the canonical
 WorldEventRecord store.  Period membership and event grouping come from the
 record payload, while display names are resolved through the current world
 context so renamed locations and authored faction names use current labels.
+That means report membership is stable for a saved event history, while
+rendered labels may intentionally follow the active world context.
 
 Reports are generated on demand for display and never saved to disk.
 """
@@ -111,8 +113,9 @@ def generate_monthly_report(
 
     Character entries are built only for watched characters that actually
     appear in that month's event records.  No current-world character
-    state (location, alive, injury) is mixed in, so past-month reports
-    remain stable.
+    state (location, alive, injury) is mixed in, so past-month event
+    membership remains record-derived.  Rendered names may reflect the
+    current world context.
     """
     records = world.get_events_by_month(year, month)
     record_calendar_key = next((r.calendar_key for r in records if r.calendar_key), "")
@@ -167,8 +170,8 @@ def generate_monthly_report(
         ))
 
     # Rumor entries — evaluate expiration and freshness relative to the
-    # report's own year/month so that historical reports stay stable even
-    # after the simulation advances and ages/removes rumors.
+    # report's own year/month so that historical rumor membership stays
+    # stable even after the simulation advances and ages/removes rumors.
     # Read from both active rumors and the archive so that past reports
     # remain reproducible after rumors expire or are trimmed.
     period_calendar = world.calendar_definition_for_date(year, month, calendar_key=record_calendar_key)
@@ -232,7 +235,8 @@ def generate_yearly_report(
 
     Character entries are built only for watched characters that actually
     appear in that year's event records.  Death counts are derived from
-    fatal event records, not from current world state.
+    fatal event records, not from current world state.  Rendered names may
+    reflect the current world context.
     """
     records = world.get_events_by_year(year)
 

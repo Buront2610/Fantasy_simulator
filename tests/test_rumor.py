@@ -17,6 +17,7 @@ from fantasy_simulator.rumor import (
     _content_tags_from_event,
 )
 from fantasy_simulator.events import WorldEventRecord
+from fantasy_simulator.i18n import get_locale, set_locale
 from fantasy_simulator.world import World
 from fantasy_simulator.character import Character
 from fantasy_simulator.simulator import Simulator
@@ -740,3 +741,64 @@ def test_partial_disclosure_does_not_contradict_description():
     # masked variants across 200 seeds
     assert found_masked_who, "Never saw a who-masked rumor in 200 seeds"
     assert found_masked_where, "Never saw a where-masked rumor in 200 seeds"
+
+
+def test_fully_disclosed_rumor_renders_current_locale_description():
+    from fantasy_simulator.rumor import _build_rumor_description
+
+    previous = get_locale()
+    world = World()
+    char = Character("Hero", 25, "Male", "Human", "Warrior", location_id="loc_aethoria_capital")
+    world.add_character(char)
+    record = WorldEventRecord(
+        record_id="evt_locale_rumor",
+        kind="battle",
+        year=1000,
+        month=6,
+        location_id="loc_aethoria_capital",
+        primary_actor_id=char.char_id,
+        description="Hero fought at Aethoria Capital.",
+        summary_key="events.battle.summary",
+        render_params={"actor": "Hero", "location_id": "loc_aethoria_capital"},
+        severity=4,
+    )
+
+    try:
+        set_locale("ja")
+        description = _build_rumor_description(record, "certain", world, rng=random.Random(0))
+    finally:
+        set_locale(previous)
+
+    assert description == "Hero は Aethoria Capital で戦った。"
+
+
+def test_rumor_generation_without_world_uses_renderable_fallback_description():
+    previous = get_locale()
+    record = WorldEventRecord(
+        record_id="evt_locale_rumor_without_world",
+        kind="battle",
+        year=1000,
+        month=6,
+        location_id="loc_aethoria_capital",
+        primary_actor_id="char_hero",
+        description="Hero fought at Aethoria Capital.",
+        summary_key="events.battle.summary",
+        render_params={"actor": "Hero", "location": "Aethoria Capital"},
+        severity=4,
+    )
+
+    try:
+        set_locale("ja")
+        rumor = generate_rumor_from_event(
+            record,
+            listener_location_id=None,
+            current_year=1000,
+            current_month=6,
+            world=None,
+            rng=random.Random(1),
+        )
+    finally:
+        set_locale(previous)
+
+    assert rumor is not None
+    assert rumor.description == "Hero は Aethoria Capital で戦った。"

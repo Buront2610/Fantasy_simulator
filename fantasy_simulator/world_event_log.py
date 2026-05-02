@@ -10,7 +10,7 @@ from collections.abc import Sequence
 from typing import Any, Callable, Iterable, Iterator, List, Optional, overload
 
 from .event_models import WorldEventRecord
-from .event_rendering import render_event_record
+from .event_rendering import EventRenderContext, render_event_record
 
 Translator = Callable[..., str]
 
@@ -103,7 +103,7 @@ def project_compatibility_event_log(
     *,
     max_event_log: int,
     translate: Translator,
-    world: object = None,
+    world: EventRenderContext | None = None,
 ) -> List[str]:
     """Project compatibility log lines from canonical records."""
     recent = list(records)[-max_event_log:]
@@ -168,7 +168,7 @@ def compatibility_event_log_view(
     *,
     max_event_log: int,
     translate: Translator,
-    world: object = None,
+    world: EventRenderContext | None = None,
 ) -> ReadOnlyEventLog:
     """Return the current read-only compatibility log view."""
     canonical_records = list(records)

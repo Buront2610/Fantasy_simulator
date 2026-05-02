@@ -86,6 +86,21 @@ def test_event_record_location_reference_normalization_updates_metadata() -> Non
     assert normalized.impacts[1]["target_id"] == "route_1"
 
 
+def test_location_impact_is_removed_when_target_normalizes_to_none() -> None:
+    record = WorldEventRecord(
+        record_id="evt_missing_impact",
+        impacts=[
+            {"target_type": "location", "target_id": "missing", "attribute": "danger"},
+            {"target_type": "route", "target_id": "route_1", "attribute": "blocked"},
+        ],
+    )
+
+    normalized = event_record_with_normalized_location_references(record, lambda _location_id: None)
+
+    assert normalized.impacts == [{"target_type": "route", "target_id": "route_1", "attribute": "blocked"}]
+    assert record.impacts[0]["target_id"] == "missing"
+
+
 def test_event_record_with_added_tags_returns_copy_with_unique_tags() -> None:
     record = WorldEventRecord(record_id="evt_1", tags=["existing"])
 
@@ -141,3 +156,40 @@ def test_rebuild_recent_event_ids_includes_route_endpoint_metadata() -> None:
 
     assert origin.recent_event_ids == ["evt_route_blocked"]
     assert destination.recent_event_ids == ["evt_route_blocked"]
+
+
+def test_rebuild_recent_event_ids_normalizes_all_location_references() -> None:
+    known = _Location()
+    event_records = [
+        WorldEventRecord(
+            record_id="evt_mixed_locations",
+            location_id="loc_known",
+            render_params={
+                "location_id": "loc_missing",
+                "from_location_id": "loc_known",
+                "to_location_id": "loc_missing",
+                "endpoint_location_ids": ["loc_known", "loc_missing"],
+            },
+            tags=["location:loc_known", "location:loc_missing"],
+            impacts=[
+                {"target_type": "location", "target_id": "loc_missing", "attribute": "danger"},
+                {"target_type": "route", "target_id": "route_1", "attribute": "blocked"},
+            ],
+        )
+    ]
+
+    rebuild_recent_event_ids(
+        locations=[known],
+        location_index={"loc_known": known},
+        event_records=event_records,
+    )
+
+    normalized = event_records[0]
+    assert known.recent_event_ids == ["evt_mixed_locations"]
+    assert normalized.location_id == "loc_known"
+    assert normalized.render_params["location_id"] is None
+    assert normalized.render_params["from_location_id"] == "loc_known"
+    assert normalized.render_params["to_location_id"] is None
+    assert normalized.render_params["endpoint_location_ids"] == ["loc_known"]
+    assert normalized.tags == ["location:loc_known"]
+    assert normalized.impacts == [{"target_type": "route", "target_id": "route_1", "attribute": "blocked"}]

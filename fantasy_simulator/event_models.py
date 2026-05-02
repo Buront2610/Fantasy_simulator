@@ -336,6 +336,9 @@ class WorldEventRecord:
         metadata_summary_key = result.metadata.get("summary_key", "")
         if not isinstance(metadata_summary_key, str):
             raise ValueError("summary_key must be a string when provided in metadata")
+        metadata_render_params = result.metadata.get("render_params", {})
+        if not isinstance(metadata_render_params, dict):
+            raise ValueError("render_params must be a dict when provided in metadata")
         resolved_summary_key = summary_key or result.summary_key or metadata_summary_key
         cls._validate_summary_key(resolved_summary_key)
         return cls(
@@ -352,7 +355,7 @@ class WorldEventRecord:
             severity=severity,
             calendar_key=calendar_key,
             summary_key=resolved_summary_key,
-            render_params=render_params or {},
+            render_params=render_params if render_params is not None else metadata_render_params,
             legacy_event_result=legacy_event_result,
         )
 

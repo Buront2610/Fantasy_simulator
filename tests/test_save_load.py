@@ -10,6 +10,7 @@ from fantasy_simulator.character_creator import CharacterCreator
 from fantasy_simulator.content.setting_bundle import (
     LanguageDefinition,
     NamingRulesDefinition,
+    RouteSeedDefinition,
     SettingBundle,
     SiteSeedDefinition,
     WorldDefinition,
@@ -22,6 +23,7 @@ from fantasy_simulator.simulator import Simulator
 from fantasy_simulator.events import WorldEventRecord
 from fantasy_simulator.world import World
 from fantasy_simulator.reports import generate_monthly_report
+from fantasy_simulator.ui.view_models import build_monthly_report_card_view
 
 
 def _make_world(n_chars: int = 3) -> World:
@@ -91,6 +93,44 @@ def _bundle_with_language_evolution_contracts() -> SettingBundle:
                     evolution_interval_years=1,
                     inspiration_tags=["germanic_like"],
                 )
+            ],
+            naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+        ),
+    )
+
+
+def _bundle_with_non_slug_route_locations() -> SettingBundle:
+    return SettingBundle(
+        schema_version=1,
+        world_definition=WorldDefinition(
+            world_key="custom",
+            display_name="Custom Realm",
+            lore_text="Custom lore",
+            site_seeds=[
+                SiteSeedDefinition(
+                    location_id="hub_primary",
+                    name="Clockwork Hub",
+                    description="Primary site.",
+                    region_type="city",
+                    x=0,
+                    y=0,
+                ),
+                SiteSeedDefinition(
+                    location_id="hub_secondary",
+                    name="Second Hub",
+                    description="Secondary site.",
+                    region_type="city",
+                    x=1,
+                    y=0,
+                ),
+            ],
+            route_seeds=[
+                RouteSeedDefinition(
+                    route_id="route_hubs",
+                    from_site_id="hub_primary",
+                    to_site_id="hub_secondary",
+                    route_type="road",
+                ),
             ],
             naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
         ),
@@ -292,6 +332,101 @@ class TestLoadSimulation:
         assert restored_route.blocked is True
         assert "legacy_thornwood_id" not in {restored_route.from_site_id, restored_route.to_site_id}
         assert "loc_thornwood" in {restored_route.from_site_id, restored_route.to_site_id}
+
+    def test_load_repairs_route_event_location_metadata_from_current_schema_payload(self, tmp_path):
+        path = tmp_path / "stale-route-event-location-metadata.json"
+        world = World(name="Custom")
+        world.setting_bundle = _bundle_with_non_slug_route_locations()
+        sim = Simulator(world, seed=0)
+        save_simulation(sim, str(path))
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        assert data["schema_version"] == CURRENT_VERSION
+
+        stale_origin = "loc_clockwork_hub"
+        stale_destination = "loc_second_hub"
+        data["world"]["event_records"] = [
+            _event_record_payload(
+                record_id="route_event_stale_locations",
+                kind="route_blocked",
+                description="The road between the hubs was blocked.",
+                year=world.year,
+                month=3,
+                location_id=stale_origin,
+                severity=3,
+                tags=[
+                    "world_change",
+                    f"location:{stale_origin}",
+                    f"location:{stale_destination}",
+                ],
+                impacts=[
+                    {
+                        "target_type": "location",
+                        "target_id": stale_origin,
+                        "attribute": "traffic",
+                        "old_value": 40,
+                        "new_value": 20,
+                        "delta": -20,
+                    },
+                    {
+                        "target_type": "location",
+                        "target_id": stale_destination,
+                        "attribute": "safety",
+                        "old_value": 65,
+                        "new_value": 55,
+                        "delta": -10,
+                    },
+                    {
+                        "target_type": "location",
+                        "target_id": "loc_unknown_outpost",
+                        "attribute": "danger",
+                        "old_value": 10,
+                        "new_value": 20,
+                        "delta": 10,
+                    },
+                ],
+                render_params={
+                    "route_id": "route_hubs",
+                    "location_id": stale_origin,
+                    "from_location_id": stale_origin,
+                    "to_location_id": stale_destination,
+                    "endpoint_location_ids": [stale_origin, stale_destination],
+                },
+            )
+        ]
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+
+        restored = load_simulation(str(path))
+
+        assert restored is not None
+        record = restored.world.event_records[0]
+        assert record.location_id == "hub_primary"
+        assert record.render_params["location_id"] == "hub_primary"
+        assert record.render_params["from_location_id"] == "hub_primary"
+        assert record.render_params["to_location_id"] == "hub_secondary"
+        assert record.render_params["endpoint_location_ids"] == ["hub_primary", "hub_secondary"]
+        assert "location:hub_primary" in record.tags
+        assert "location:hub_secondary" in record.tags
+        assert f"location:{stale_origin}" not in record.tags
+        assert f"location:{stale_destination}" not in record.tags
+        assert [impact["target_id"] for impact in record.impacts] == ["hub_primary", "hub_secondary"]
+        assert all(impact["target_id"] != "loc_unknown_outpost" for impact in record.impacts)
+        assert restored.world.get_events_by_location("hub_primary") == [record]
+        assert restored.world.get_events_by_location("hub_secondary") == [record]
+        assert restored.world.get_events_by_location(stale_origin) == []
+        assert restored.world.get_events_by_location(stale_destination) == []
+
+        monthly_report = generate_monthly_report(restored.world, world.year, 3)
+        assert {entry.location_id for entry in monthly_report.location_entries} == {
+            "hub_primary",
+            "hub_secondary",
+        }
+        assert all(entry.event_count == 1 for entry in monthly_report.location_entries)
+
+        card = build_monthly_report_card_view(restored.world, world.year, 3)
+        assert "Clockwork Hub" in card.highlighted_locations
+        assert "Second Hub" in card.highlighted_locations
 
     def test_load_returns_none_for_invalid_bundle_backed_blocked_route_state(self, tmp_path):
         path = tmp_path / "invalid-blocked-route.json"

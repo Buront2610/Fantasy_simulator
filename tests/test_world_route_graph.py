@@ -118,6 +118,105 @@ def test_route_collection_extend_notifies_once_and_attaches_observers() -> None:
     assert notifications == 2
 
 
+def test_route_collection_rejects_duplicate_route_ids_during_construction_and_extend() -> None:
+    notifications = 0
+
+    def _notify() -> None:
+        nonlocal notifications
+        notifications += 1
+
+    first = RouteEdge("route_1", "loc_one", "loc_two", "road")
+    duplicate = RouteEdge("route_1", "loc_two", "loc_three", "road")
+
+    try:
+        RouteCollection([first, duplicate], on_change=_notify)
+    except ValueError as exc:
+        assert "duplicate route id" in str(exc)
+    else:
+        raise AssertionError("Expected duplicate route ids to fail during construction")
+
+    first.blocked = True
+    duplicate.blocked = True
+
+    assert notifications == 0
+
+    routes = RouteCollection([first], on_change=_notify)
+    try:
+        routes.extend([duplicate])
+    except ValueError as exc:
+        assert "duplicate route id" in str(exc)
+    else:
+        raise AssertionError("Expected duplicate route ids to fail during extend")
+
+    duplicate.blocked = False
+
+    assert routes == [first]
+    assert notifications == 0
+
+
+def test_route_collection_rejects_duplicate_undirected_endpoint_pairs_on_append_insert_and_iadd() -> None:
+    first = RouteEdge("route_1", "loc_one", "loc_two", "road")
+    routes = RouteCollection([first])
+
+    for action in (
+        lambda: routes.append(RouteEdge("route_append", "loc_two", "loc_one", "road")),
+        lambda: routes.insert(0, RouteEdge("route_insert", "loc_one", "loc_two", "trail")),
+        lambda: routes.__iadd__([RouteEdge("route_iadd", "loc_two", "loc_one", "sea_lane")]),
+    ):
+        try:
+            action()
+        except ValueError as exc:
+            assert "duplicate route pair" in str(exc)
+            continue
+        raise AssertionError("Expected duplicate endpoint pair to fail")
+
+    assert routes == [first]
+
+
+def test_route_collection_rejects_duplicates_from_item_and_slice_assignment() -> None:
+    first = RouteEdge("route_1", "loc_one", "loc_two", "road")
+    second = RouteEdge("route_2", "loc_three", "loc_four", "road")
+    routes = RouteCollection([first, second])
+
+    try:
+        routes[0] = RouteEdge("route_2", "loc_five", "loc_six", "road")
+    except ValueError as exc:
+        assert "duplicate route id" in str(exc)
+    else:
+        raise AssertionError("Expected duplicate route id assignment to fail")
+
+    try:
+        routes[:] = [
+            RouteEdge("route_3", "loc_one", "loc_two", "road"),
+            RouteEdge("route_4", "loc_two", "loc_one", "trail"),
+        ]
+    except ValueError as exc:
+        assert "duplicate route pair" in str(exc)
+    else:
+        raise AssertionError("Expected duplicate route pair slice assignment to fail")
+
+    assert routes == [first, second]
+
+
+def test_route_collection_allows_replacing_slot_with_same_route_identity_fields() -> None:
+    notifications = 0
+
+    def _notify() -> None:
+        nonlocal notifications
+        notifications += 1
+
+    old_route = RouteEdge("route_1", "loc_one", "loc_two", "road")
+    equivalent_route = RouteEdge("route_1", "loc_two", "loc_one", "trail")
+    routes = RouteCollection([old_route], on_change=_notify)
+
+    routes[0] = equivalent_route
+    old_route.blocked = True
+    equivalent_route.blocked = True
+
+    assert routes == [equivalent_route]
+    assert notifications == 2
+
+
 def test_route_collection_init_failure_does_not_attach_partial_observers() -> None:
     notifications = 0
 

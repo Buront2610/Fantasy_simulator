@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import Dict, List, Optional
 
 from ..event_models import EventResult, WorldEventRecord
+from ..event_rendering import render_event_record
 from ..i18n import tr
 from ..reports import (
     format_monthly_report,
@@ -57,6 +58,7 @@ class QueryMixin:
             deceased_count=dead,
             type_counts=type_counts,
             records=records,
+            world=self.world,
         )
 
     def get_monthly_report(self, year: int, month: int) -> str:
@@ -143,7 +145,9 @@ class QueryMixin:
         story_entries: List[str] = []
         if event_history:
             for record in event_history:
-                story_entries.append(record.description)
+                rendered = render_event_record(record, world=self.world)
+                story_entries.append(rendered)
+                seen_entries.add(rendered)
                 seen_entries.add(record.description)
             for entry in char.history:
                 if entry in seen_entries:
