@@ -77,6 +77,15 @@ def _render_params(record: WorldEventRecord, *, world: object = None, translate:
         if location_name is not None:
             params["location"] = location_name
 
+    if "from_location" not in params:
+        from_location_name = _location_display_name(params.get("from_location_id"), world)
+        if from_location_name is not None:
+            params["from_location"] = from_location_name
+    if "to_location" not in params:
+        to_location_name = _location_display_name(params.get("to_location_id"), world)
+        if to_location_name is not None:
+            params["to_location"] = to_location_name
+
     if record.summary_key == "events.location_faction_changed.summary":
         if "old_faction_id" in params:
             params["old_faction"] = _display_faction(
@@ -98,6 +107,7 @@ def render_event_record(
     locale: Optional[str] = None,
     world: object = None,
     translate: Optional[Translator] = None,
+    strict: bool = False,
 ) -> str:
     """Render a world event record summary for display.
 
@@ -116,8 +126,12 @@ def render_event_record(
             translate=resolved_translate,
         ))
     except (KeyError, IndexError, TypeError, ValueError):
+        if strict:
+            raise
         return record.description
 
     if rendered == record.summary_key:
+        if strict:
+            raise KeyError(record.summary_key)
         return record.description
     return rendered

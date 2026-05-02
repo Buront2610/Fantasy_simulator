@@ -51,9 +51,11 @@ def apply_route_blocked_state(
     blocked: bool,
 ) -> bool:
     """Set a route blocked flag and return the previous value."""
+    if not isinstance(blocked, bool):
+        raise TypeError("blocked must be a bool")
     route = route_by_id(routes, route_id=route_id)
     old_blocked = bool(route.blocked)
-    route.blocked = bool(blocked)
+    route.blocked = blocked
     return old_blocked
 
 

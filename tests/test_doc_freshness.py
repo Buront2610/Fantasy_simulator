@@ -148,6 +148,7 @@ def test_serialization_contract_documents_conflict_precedence() -> None:
     assert "endpoint_location_ids" in SERIALIZATION_CONTRACT_TEXT
     assert "location:*" in SERIALIZATION_CONTRACT_TEXT
     assert "EventResult" in SERIALIZATION_CONTRACT_TEXT
+    assert "strict rendering" in SERIALIZATION_CONTRACT_TEXT
     assert "language_engine.md" in SERIALIZATION_CONTRACT_TEXT
     assert "serialization_contract.md" in LANGUAGE_ENGINE_TEXT
 
@@ -160,6 +161,8 @@ def test_risk_register_tracks_serialization_conflict_risks() -> None:
     assert "language_evolution_history" in RISK_REGISTER_TEXT
     assert "Route visibility adapter coverage" in RISK_REGISTER_TEXT
     assert "endpoint IDs" in RISK_REGISTER_TEXT
+    assert "Locale-aware rendering coverage remains partial" in RISK_REGISTER_TEXT
+    assert "strict event rendering" in RISK_REGISTER_TEXT
     assert "CURRENT_VERSION` stays unchanged" in RISK_REGISTER_TEXT
     assert "Save schema format was not changed" in RISK_REGISTER_TEXT
     assert "hydration guardrails" in RISK_REGISTER_TEXT

@@ -36,19 +36,28 @@ class RouteCollection(MutableSequence[RouteEdge]):
     ) -> None:
         self._items: list[RouteEdge] = []
         self._on_change = on_change
-        for route in routes:
+        new_routes = [self._validate_route(route) for route in routes]
+        self._ensure_attachable(new_routes)
+        for route in new_routes:
             self._attach(route)
-            self._items.append(route)
+        self._items = new_routes
 
     def _notify(self) -> None:
         if self._on_change is not None:
             self._on_change()
 
     def _attach(self, route: RouteEdge) -> None:
-        current_callback = route._on_change
-        if current_callback is not None and not _same_observer(current_callback, self._on_change):
+        if not self._can_attach(route):
             raise ValueError("RouteEdge instances cannot be shared across active RouteCollection owners")
         route._on_change = self._on_change
+
+    def _can_attach(self, route: RouteEdge) -> bool:
+        current_callback = route._on_change
+        return current_callback is None or _same_observer(current_callback, self._on_change)
+
+    def _ensure_attachable(self, routes: Iterable[RouteEdge]) -> None:
+        if any(not self._can_attach(route) for route in routes):
+            raise ValueError("RouteEdge instances cannot be shared across active RouteCollection owners")
 
     @staticmethod
     def _validate_route(route: object) -> RouteEdge:
@@ -88,15 +97,24 @@ class RouteCollection(MutableSequence[RouteEdge]):
                 raise TypeError("slice assignment requires an iterable of RouteEdge")
             old_routes = self._items[index]
             new_routes = [self._validate_route(route) for route in value]
+            if index.step not in (None, 1) and len(old_routes) != len(new_routes):
+                raise ValueError(
+                    f"attempt to assign sequence of size {len(new_routes)} "
+                    f"to extended slice of size {len(old_routes)}"
+                )
+            self._ensure_attachable(new_routes)
+            new_items = list(self._items)
+            new_items[index] = new_routes
             for route in new_routes:
                 self._attach(route)
-            self._items[index] = new_routes
+            self._items = new_items
             for route in old_routes:
                 self._detach_if_removed(route)
             self._notify()
             return
         value = self._validate_route(value)
         old_route = self._items[index]
+        self._ensure_attachable([value])
         self._attach(value)
         self._items[index] = value
         self._detach_if_removed(old_route)
@@ -142,6 +160,7 @@ class RouteCollection(MutableSequence[RouteEdge]):
         new_routes = [self._validate_route(route) for route in iterable]
         if not new_routes:
             return
+        self._ensure_attachable(new_routes)
         for route in new_routes:
             self._attach(route)
         self._items.extend(new_routes)
@@ -187,9 +206,13 @@ def replace_routes(
     on_change: Callable[[], None],
 ) -> RouteCollection:
     """Replace the active route collection and detach stale observers."""
-    for route in current_routes:
-        route._on_change = None
-    return RouteCollection(new_routes, on_change=on_change)
+    old_routes = list(current_routes)
+    new_collection = RouteCollection(new_routes, on_change=on_change)
+    new_route_ids = {id(route) for route in new_collection}
+    for route in old_routes:
+        if id(route) not in new_route_ids:
+            route._on_change = None
+    return new_collection
 
 
 def attach_route_observers(routes: Iterable[RouteEdge], *, on_change: Callable[[], None]) -> None:

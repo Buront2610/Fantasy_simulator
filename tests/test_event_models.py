@@ -235,6 +235,26 @@ def test_render_event_record_falls_back_to_description_for_missing_key_or_params
     assert render_event_record(missing_params, locale="en") == "A fallback battle happened."
 
 
+def test_render_event_record_strict_mode_raises_for_missing_key_or_params() -> None:
+    missing_key = WorldEventRecord(
+        description="Known only by legacy text.",
+        summary_key="events.unknown.summary",
+        render_params={"actor": "Aldric"},
+    )
+    missing_params = WorldEventRecord(
+        description="A fallback battle happened.",
+        summary_key="events.battle.summary",
+        render_params={"actor": "Aldric"},
+    )
+
+    for record in (missing_key, missing_params):
+        try:
+            render_event_record(record, locale="en", strict=True)
+        except (KeyError, ValueError):
+            continue
+        raise AssertionError("Expected strict event rendering to reject broken summary data")
+
+
 def test_world_event_record_rejects_string_secondary_actor_ids_at_load_boundary() -> None:
     malformed = {
         "record_id": "r2",

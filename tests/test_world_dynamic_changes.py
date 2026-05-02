@@ -71,6 +71,20 @@ def test_set_route_blocked_uses_existing_route_collection_observers():
     assert next(route for route in world.routes if route.route_id == route_id).blocked is True
 
 
+def test_set_route_blocked_rejects_non_bool_state():
+    world = World()
+    route = world.routes[0]
+
+    try:
+        world.set_route_blocked(route.route_id, "false")  # type: ignore[arg-type]
+    except TypeError as exc:
+        assert "blocked must be a bool" in str(exc)
+    else:
+        raise AssertionError("Expected non-bool blocked state to fail fast")
+
+    assert route.blocked is False
+
+
 def test_apply_location_rename_change_updates_map_and_records_canonical_event():
     previous_locale = get_locale()
     set_locale("en")
@@ -135,9 +149,6 @@ def test_apply_route_blocked_change_records_block_and_reopen_events():
     world = World()
     route = world.routes[0]
     route_id = route.route_id
-    from_location = world.location_name(route.from_site_id)
-    to_location = world.location_name(route.to_site_id)
-
     try:
         blocked_record = world.apply_route_blocked_change(route_id, True)
         reopened_record = world.apply_route_blocked_change(route_id, False)
@@ -154,9 +165,14 @@ def test_apply_route_blocked_change_records_block_and_reopen_events():
         "from_location_id": route.from_site_id,
         "to_location_id": route.to_site_id,
         "endpoint_location_ids": [route.from_site_id, route.to_site_id],
-        "from_location": from_location,
-        "to_location": to_location,
     }
+    assert "from_location" not in blocked_record.render_params
+    assert "to_location" not in blocked_record.render_params
+    assert render_event_record(blocked_record, locale="en", world=world) == blocked_record.description
+    world.rename_location(route.from_site_id, "Renamed Endpoint")
+    assert render_event_record(blocked_record, locale="en", world=world).startswith(
+        "The route from Renamed Endpoint to "
+    )
     assert blocked_record.tags == [
         "world_change",
         f"location:{route.from_site_id}",

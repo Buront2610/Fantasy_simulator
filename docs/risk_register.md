@@ -40,6 +40,12 @@ work and its serialization guardrails.
   tests reject stale `event_log` precedence; display adapters render canonical
   records through the shared event renderer; route visibility uses endpoint IDs
   and `location:*` tags rather than display text.
+- Locale-aware rendering coverage remains partial for legacy simulation events.
+  Impact: world-change events can be re-rendered from `summary_key` and
+  `render_params`, while older battle/meeting-style records may continue to
+  display their stored compatibility description.
+  Guardrail: strict event rendering detects broken summary metadata; future
+  migrations should add semantic params to ordinary event families explicitly.
 - Language runtime cache diverges from durable history.
   Impact: generated names and endonyms change depending on save shape.
   Guardrail: `language_evolution_history` wins over

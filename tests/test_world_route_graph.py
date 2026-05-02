@@ -48,6 +48,59 @@ def test_replace_routes_detaches_old_observers_and_wraps_new_collection() -> Non
     assert notifications == 1
 
 
+def test_replace_routes_preserves_old_observers_when_new_routes_are_invalid() -> None:
+    notifications = 0
+
+    def _notify() -> None:
+        nonlocal notifications
+        notifications += 1
+
+    old_route = RouteEdge("route_old", "loc_one", "loc_two", "road")
+    old_route._on_change = _notify
+
+    try:
+        replace_routes([old_route], ["bad"], on_change=_notify)  # type: ignore[list-item]
+    except TypeError as exc:
+        assert "RouteEdge" in str(exc)
+    else:
+        raise AssertionError("Expected invalid replacement route to fail")
+
+    old_route.blocked = True
+
+    assert notifications == 1
+
+
+def test_replace_routes_preserves_old_observers_when_new_route_has_foreign_owner() -> None:
+    old_notifications = 0
+    foreign_notifications = 0
+
+    def _notify_old() -> None:
+        nonlocal old_notifications
+        old_notifications += 1
+
+    def _notify_foreign() -> None:
+        nonlocal foreign_notifications
+        foreign_notifications += 1
+
+    old_route = RouteEdge("route_old", "loc_one", "loc_two", "road")
+    old_route._on_change = _notify_old
+    foreign_route = RouteEdge("route_foreign", "loc_two", "loc_three", "road")
+    RouteCollection([foreign_route], on_change=_notify_foreign)
+
+    try:
+        replace_routes([old_route], [foreign_route], on_change=_notify_old)
+    except ValueError as exc:
+        assert "shared" in str(exc)
+    else:
+        raise AssertionError("Expected foreign-owned replacement route to fail")
+
+    old_route.blocked = True
+    foreign_route.blocked = True
+
+    assert old_notifications == 1
+    assert foreign_notifications == 1
+
+
 def test_route_collection_extend_notifies_once_and_attaches_observers() -> None:
     notifications = 0
 
@@ -63,6 +116,59 @@ def test_route_collection_extend_notifies_once_and_attaches_observers() -> None:
     first.blocked = True
 
     assert notifications == 2
+
+
+def test_route_collection_init_failure_does_not_attach_partial_observers() -> None:
+    notifications = 0
+
+    def _notify() -> None:
+        nonlocal notifications
+        notifications += 1
+
+    valid_route = RouteEdge("route_valid", "loc_one", "loc_two", "road")
+
+    try:
+        RouteCollection([valid_route, "bad"], on_change=_notify)  # type: ignore[list-item]
+    except TypeError as exc:
+        assert "RouteEdge" in str(exc)
+    else:
+        raise AssertionError("Expected invalid route collection construction to fail")
+
+    valid_route.blocked = True
+
+    assert notifications == 0
+
+
+def test_route_collection_extend_failure_does_not_attach_partial_observers() -> None:
+    first_notifications = 0
+    second_notifications = 0
+
+    def _notify_first() -> None:
+        nonlocal first_notifications
+        first_notifications += 1
+
+    def _notify_second() -> None:
+        nonlocal second_notifications
+        second_notifications += 1
+
+    valid_route = RouteEdge("route_valid", "loc_one", "loc_two", "road")
+    foreign_route = RouteEdge("route_foreign", "loc_two", "loc_three", "road")
+    RouteCollection([foreign_route], on_change=_notify_second)
+    routes = RouteCollection(on_change=_notify_first)
+
+    try:
+        routes.extend([valid_route, foreign_route])
+    except ValueError as exc:
+        assert "shared" in str(exc)
+    else:
+        raise AssertionError("Expected mixed ownership extend to fail")
+
+    valid_route.blocked = True
+    foreign_route.blocked = True
+
+    assert routes == []
+    assert first_notifications == 0
+    assert second_notifications == 1
 
 
 def test_route_collection_setitem_detaches_replaced_route() -> None:
@@ -81,6 +187,28 @@ def test_route_collection_setitem_detaches_replaced_route() -> None:
     new_route.blocked = True
 
     assert notifications == 2
+
+
+def test_route_collection_setitem_out_of_range_does_not_attach_observer() -> None:
+    notifications = 0
+
+    def _notify() -> None:
+        nonlocal notifications
+        notifications += 1
+
+    new_route = RouteEdge("route_new", "loc_one", "loc_three", "road")
+    routes = RouteCollection(on_change=_notify)
+
+    try:
+        routes[1] = new_route
+    except IndexError:
+        pass
+    else:
+        raise AssertionError("Expected out-of-range route assignment to fail")
+
+    new_route.blocked = True
+
+    assert notifications == 0
 
 
 def test_route_collection_slice_delete_detaches_removed_routes() -> None:
@@ -139,6 +267,31 @@ def test_route_collection_slice_assignment_detaches_removed_routes() -> None:
     new_route.blocked = True
 
     assert notifications == 2
+
+
+def test_route_collection_extended_slice_assignment_failure_does_not_attach_observers() -> None:
+    notifications = 0
+
+    def _notify() -> None:
+        nonlocal notifications
+        notifications += 1
+
+    first = RouteEdge("route_1", "loc_one", "loc_two", "road")
+    second = RouteEdge("route_2", "loc_two", "loc_three", "road")
+    new_route = RouteEdge("route_new", "loc_one", "loc_three", "road")
+    routes = RouteCollection([first, second], on_change=_notify)
+
+    try:
+        routes[::2] = [new_route, RouteEdge("route_extra", "loc_three", "loc_four", "road")]
+    except ValueError as exc:
+        assert "extended slice" in str(exc)
+    else:
+        raise AssertionError("Expected extended slice size mismatch to fail")
+
+    new_route.blocked = True
+
+    assert routes == [first, second]
+    assert notifications == 0
 
 
 def test_route_collection_rejects_non_route_edges() -> None:

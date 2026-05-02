@@ -24,6 +24,8 @@ this precedence:
 - Event rendering: `WorldEventRecord.summary_key` plus JSON-compatible
   `render_params` is the locale-aware display source when present.
   `description` remains the compatibility fallback text.
+  Production display may fall back to `description`; strict rendering paths
+  should raise on missing translation keys or params when validating contracts.
 - Event visibility/querying: location queries are derived from canonical record
   metadata, including `location_id`, `location:*` tags, `render_params`
   location IDs (`location_id`, `from_location_id`, `to_location_id`,

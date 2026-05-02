@@ -336,10 +336,10 @@ class WorldMemoryMixin:
             "from_location_id": route.from_site_id,
             "to_location_id": route.to_site_id,
             "endpoint_location_ids": [route.from_site_id, route.to_site_id],
-            "from_location": self._route_location_name(route.from_site_id),
-            "to_location": self._route_location_name(route.to_site_id),
         }
         route_verb = "blocked" if new_blocked else "reopened"
+        from_location = self._route_location_name(route.from_site_id)
+        to_location = self._route_location_name(route.to_site_id)
         try:
             return self._record_world_change(
                 kind=route_kind,
@@ -348,8 +348,7 @@ class WorldMemoryMixin:
                     summary_key=summary_key,
                     render_params=render_params,
                     fallback_description=(
-                        f"The route from {render_params['from_location']} to "
-                        f"{render_params['to_location']} was {route_verb}."
+                        f"The route from {from_location} to {to_location} was {route_verb}."
                     ),
                 ),
                 summary_key=summary_key,
