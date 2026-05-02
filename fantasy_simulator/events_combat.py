@@ -47,6 +47,17 @@ def resolve_battle_event(
     old_status = loser.injury_status
     loser.worsen_injury()
     loser_died = loser.injury_status == "dying" and loser.constitution <= 5 and rng.random() < 0.4
+
+    def _render_metadata(summary_key: str) -> Dict[str, Any]:
+        return {
+            "summary_key": summary_key,
+            "render_params": {
+                "winner": winner.name,
+                "loser": loser.name,
+                "loser_injury_status": loser.injury_status,
+            },
+        }
+
     if loser_died:
         event_death(loser, world, rng=rng)
         desc = tr("battle_fatal", winner=winner.name, loser=loser.name)
@@ -60,7 +71,11 @@ def resolve_battle_event(
             stat_changes={winner.char_id: winner_gains, loser.char_id: loser_losses},
             event_type="battle_fatal",
             year=world.year,
-            metadata={"relation_tag_updates": relation_tag_updates, "record_id": event_source_id},
+            metadata={
+                "relation_tag_updates": relation_tag_updates,
+                "record_id": event_source_id,
+                **_render_metadata("events.battle_fatal.summary"),
+            },
         )
 
     injury_key = f"battle_injury_{loser.injury_status}"
@@ -81,5 +96,9 @@ def resolve_battle_event(
         stat_changes={winner.char_id: winner_gains, loser.char_id: loser_losses},
         event_type="battle",
         year=world.year,
-        metadata={"relation_tag_updates": relation_tag_updates, "record_id": event_source_id},
+        metadata={
+            "relation_tag_updates": relation_tag_updates,
+            "record_id": event_source_id,
+            **_render_metadata("events.battle_result.summary"),
+        },
     )

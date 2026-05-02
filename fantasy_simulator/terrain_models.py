@@ -148,6 +148,7 @@ class RouteEdge:
     distance: int = 1
     blocked: bool = False
     _on_change: Optional[Callable[[], None]] = field(default=None, repr=False, compare=False)
+    _route_owner_token: object | None = field(default=None, repr=False, compare=False)
 
     def __setattr__(self, name: str, value: Any) -> None:
         callback = None

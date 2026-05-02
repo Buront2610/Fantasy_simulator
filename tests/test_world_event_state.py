@@ -38,6 +38,43 @@ def test_apply_event_impact_to_location_updates_all_battle_fields() -> None:
     assert loc.rumor_heat == before["rumor_heat"] + 5
 
 
+def test_world_record_event_revalidates_mutated_record_payload_without_side_effects() -> None:
+    world = World()
+    loc = world.get_location_by_id("loc_thornwood")
+    record = WorldEventRecord(record_id="bad_payload", kind="battle", year=1000, location_id=loc.id)
+    record.tags.append(123)
+
+    with pytest.raises(ValueError, match="tags must be a list of strings"):
+        world.record_event(record)
+
+    assert world.event_records == []
+    assert loc.recent_event_ids == []
+
+
+def test_world_record_event_stores_canonical_copy_of_mutable_payloads() -> None:
+    world = World()
+    record = WorldEventRecord(
+        record_id="mutable_payload",
+        kind="battle",
+        year=1000,
+        location_id="loc_thornwood",
+        secondary_actor_ids=["char_1"],
+        tags=["tag_1"],
+        impacts=[{"target_type": "route", "target_id": "route_1"}],
+    )
+
+    stored = world.record_event(record)
+    record.secondary_actor_ids.append("char_2")
+    record.tags.append("tag_2")
+    record.impacts[0]["target_id"] = "mutated"
+
+    assert stored is world.event_records[-1]
+    assert stored is not record
+    assert stored.secondary_actor_ids == ["char_1"]
+    assert stored.tags == ["tag_1"]
+    assert stored.impacts == [{"target_type": "route", "target_id": "route_1"}]
+
+
 def test_apply_event_impact_to_location_ignores_unknown_location() -> None:
     world = World()
 

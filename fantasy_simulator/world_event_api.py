@@ -29,11 +29,14 @@ if TYPE_CHECKING:
 class WorldEventMixin:
     """Compatibility API surface for structured world events."""
 
+    MAX_EVENT_LOG = 2000
     MAX_EVENT_RECORDS = 5000
     WATCHED_ACTOR_TAG_PREFIX: str
 
     if TYPE_CHECKING:
         event_records: List[WorldEventRecord]
+        year: int
+        _display_event_log: List[str]
         _event_index: EventHistoryIndex
         _location_id_index: Dict[str, LocationState]
         grid: Dict[Tuple[int, int], LocationState]
@@ -50,6 +53,7 @@ class WorldEventMixin:
 
         Returns the canonical stored record (may be a normalized copy).
         """
+        record = WorldEventRecord.from_dict(record.to_dict())
         stored_record = record_world_event(
             record=record,
             event_records=self.event_records,

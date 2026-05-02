@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, List
+from typing import Dict, Iterable, List
 
 from .terrain import RouteEdge, Site
 from .world_route_graph import rebuild_route_index
 from .world_topology_state import WorldTopologyState
+from .world_protocols import RouteIndexChangeHandler, TopologyRuntimeWorld
 
 
 def site_index_by_location(sites: Iterable[Site]) -> Dict[str, Site]:
@@ -16,19 +17,21 @@ def site_index_by_location(sites: Iterable[Site]) -> Dict[str, Site]:
 
 def route_index_by_site(
     *,
-    sites: List[Site],
-    routes: List[RouteEdge],
-    on_change: Any,
+    sites: Iterable[Site],
+    routes: Iterable[RouteEdge],
+    on_change: RouteIndexChangeHandler,
+    owner_token: object | None = None,
 ) -> Dict[str, List[RouteEdge]]:
     """Build route adjacency lists keyed by endpoint location id."""
     return rebuild_route_index(
         sites=sites,
         routes=routes,
         on_change=on_change,
+        owner_token=owner_token,
     )
 
 
-def apply_topology_state(world: Any, topology_state: WorldTopologyState) -> None:
+def apply_topology_state(world: TopologyRuntimeWorld, topology_state: WorldTopologyState) -> None:
     """Apply a reconstructed topology snapshot to a live world object."""
     world.terrain_map = topology_state.terrain_map
     world.sites = topology_state.sites

@@ -1,10 +1,12 @@
 """
 reports.py - Monthly and yearly report generation from WorldEventRecord.
 
-Reports are non-persistent view models derived exclusively from the
-canonical WorldEventRecord store.  Character status and location are
-derived from the event records of the period rather than from current
-world state, so that past reports remain stable over time.
+Reports are non-persistent view models derived from the canonical
+WorldEventRecord store.  Period membership and event grouping come from the
+record payload, while display names are resolved through the current world
+context so renamed locations and authored faction names use current labels.
+That means report membership is stable for a saved event history, while
+rendered labels may intentionally follow the active world context.
 
 Reports are generated on demand for display and never saved to disk.
 """
@@ -13,6 +15,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Dict, List, Set
 
+from .event_rendering import render_event_record
 from .narrative.constants import EVENT_KINDS_FATAL
 from .reports_formatting import format_monthly_report, format_yearly_report
 from .reports_models import (
@@ -23,6 +26,7 @@ from .reports_models import (
     YearlyReport,
 )
 from .rumor import RUMOR_MAX_AGE_MONTHS
+from .world_event_index import location_ids_for_record
 
 if TYPE_CHECKING:
     from .event_models import WorldEventRecord
@@ -91,6 +95,11 @@ def _actors_in_record(record: WorldEventRecord) -> List[str]:
     return ids
 
 
+def _render_report_event(world: World, record: WorldEventRecord) -> str:
+    """Render one canonical event for report display using the active locale."""
+    return render_event_record(record, world=world)
+
+
 # ------------------------------------------------------------------
 # Report generation
 # ------------------------------------------------------------------
@@ -104,8 +113,9 @@ def generate_monthly_report(
 
     Character entries are built only for watched characters that actually
     appear in that month's event records.  No current-world character
-    state (location, alive, injury) is mixed in, so past-month reports
-    remain stable.
+    state (location, alive, injury) is mixed in, so past-month event
+    membership remains record-derived.  Rendered names may reflect the
+    current world context.
     """
     records = world.get_events_by_month(year, month)
     record_calendar_key = next((r.calendar_key for r in records if r.calendar_key), "")
@@ -124,7 +134,7 @@ def generate_monthly_report(
     for r in records:
         for cid in _actors_in_record(r):
             if cid in watched:
-                char_event_map.setdefault(cid, []).append(r.description)
+                char_event_map.setdefault(cid, []).append(_render_report_event(world, r))
 
     char_entries = [
         CharacterReportEntry(
@@ -136,18 +146,22 @@ def generate_monthly_report(
     ]
 
     # Notable events (severity >= threshold)
-    notable = [r.description for r in records if r.severity >= _SEVERITY_THRESHOLD_MONTHLY]
+    notable = [_render_report_event(world, r) for r in records if r.severity >= _SEVERITY_THRESHOLD_MONTHLY]
 
     # Location summaries
     loc_event_map: Dict[str, List[WorldEventRecord]] = {}
     for r in records:
-        if r.location_id:
-            loc_event_map.setdefault(r.location_id, []).append(r)
+        for loc_id in location_ids_for_record(r):
+            loc_event_map.setdefault(loc_id, []).append(r)
 
     loc_entries: List[LocationReportEntry] = []
     for loc_id, loc_records in sorted(loc_event_map.items()):
         loc_name = world.location_name(loc_id)
-        notable_loc = [r.description for r in loc_records if r.severity >= _SEVERITY_THRESHOLD_MONTHLY]
+        notable_loc = [
+            _render_report_event(world, r)
+            for r in loc_records
+            if r.severity >= _SEVERITY_THRESHOLD_MONTHLY
+        ]
         loc_entries.append(LocationReportEntry(
             location_id=loc_id,
             name=loc_name,
@@ -156,8 +170,8 @@ def generate_monthly_report(
         ))
 
     # Rumor entries — evaluate expiration and freshness relative to the
-    # report's own year/month so that historical reports stay stable even
-    # after the simulation advances and ages/removes rumors.
+    # report's own year/month so that historical rumor membership stays
+    # stable even after the simulation advances and ages/removes rumors.
     # Read from both active rumors and the archive so that past reports
     # remain reproducible after rumors expire or are trimmed.
     period_calendar = world.calendar_definition_for_date(year, month, calendar_key=record_calendar_key)
@@ -168,36 +182,36 @@ def generate_monthly_report(
     )
     all_rumors = list(world.rumors) + list(world.rumor_archive)
     rumor_entries = []
-    for r in all_rumors:
-        if (r.year_created, r.month_created) > (year, month):
+    for rumor in all_rumors:
+        if (rumor.year_created, rumor.month_created) > (year, month):
             continue
-        if report_absolute_day > 0 and r.created_absolute_day > 0:
+        if report_absolute_day > 0 and rumor.created_absolute_day > 0:
             age_at_report = world.months_elapsed_between(
-                r.year_created,
-                r.month_created,
+                rumor.year_created,
+                rumor.month_created,
                 year,
                 month,
                 start_day=1,
                 end_day=period_calendar.days_in_month(month),
-                start_calendar_key=r.created_calendar_key,
+                start_calendar_key=rumor.created_calendar_key,
             )
         else:
             age_at_report = world.months_elapsed_between(
-                r.year_created,
-                r.month_created,
+                rumor.year_created,
+                rumor.month_created,
                 year,
                 month,
-                start_calendar_key=r.created_calendar_key,
+                start_calendar_key=rumor.created_calendar_key,
             )
         if age_at_report >= RUMOR_MAX_AGE_MONTHS:
             continue
         if age_at_report > _RUMOR_FRESHNESS_MONTHS:
             continue
         rumor_entries.append(RumorReportEntry(
-            rumor_id=r.id,
-            description=r.description,
-            reliability=r.reliability,
-            category=r.category,
+            rumor_id=rumor.id,
+            description=rumor.description,
+            reliability=rumor.reliability,
+            category=rumor.category,
         ))
 
     return MonthlyReport(
@@ -221,7 +235,8 @@ def generate_yearly_report(
 
     Character entries are built only for watched characters that actually
     appear in that year's event records.  Death counts are derived from
-    fatal event records, not from current world state.
+    fatal event records, not from current world state.  Rendered names may
+    reflect the current world context.
     """
     records = world.get_events_by_year(year)
 
@@ -239,9 +254,13 @@ def generate_yearly_report(
 
     char_entries: List[CharacterReportEntry] = []
     for cid, char_records in sorted(char_event_map.items()):
-        events = [r.description for r in char_records if r.severity >= _SEVERITY_THRESHOLD_YEARLY]
+        events = [
+            _render_report_event(world, r)
+            for r in char_records
+            if r.severity >= _SEVERITY_THRESHOLD_YEARLY
+        ]
         if not events:
-            events = [r.description for r in char_records[:3]]
+            events = [_render_report_event(world, r) for r in char_records[:3]]
         char_entries.append(CharacterReportEntry(
             char_id=cid,
             name=names.get(cid, cid),
@@ -249,18 +268,22 @@ def generate_yearly_report(
         ))
 
     # Notable events for the year (severity >= threshold)
-    notable = [r.description for r in records if r.severity >= _SEVERITY_THRESHOLD_YEARLY]
+    notable = [_render_report_event(world, r) for r in records if r.severity >= _SEVERITY_THRESHOLD_YEARLY]
 
     # Location summaries
     loc_event_map: Dict[str, List[WorldEventRecord]] = {}
     for r in records:
-        if r.location_id:
-            loc_event_map.setdefault(r.location_id, []).append(r)
+        for loc_id in location_ids_for_record(r):
+            loc_event_map.setdefault(loc_id, []).append(r)
 
     loc_entries: List[LocationReportEntry] = []
     for loc_id, loc_records in sorted(loc_event_map.items()):
         loc_name = world.location_name(loc_id)
-        notable_loc = [r.description for r in loc_records if r.severity >= _SEVERITY_THRESHOLD_YEARLY]
+        notable_loc = [
+            _render_report_event(world, r)
+            for r in loc_records
+            if r.severity >= _SEVERITY_THRESHOLD_YEARLY
+        ]
         loc_entries.append(LocationReportEntry(
             location_id=loc_id,
             name=loc_name,

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Iterable, List, MutableMapping, Protocol
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Protocol
 
 from .world_state_propagation import decay_toward_baseline, propagate_state_changes
 
@@ -42,7 +42,7 @@ def decay_world_state(
 def propagate_world_state(
     *,
     locations: Iterable[SupportsRuntimeStateLocation],
-    location_index: MutableMapping[str, SupportsRuntimeStateLocation],
+    location_index: Mapping[str, SupportsRuntimeStateLocation],
     get_neighbors: Callable[[str], List[SupportsRuntimeStateLocation]],
     months: int,
     months_per_year: int,

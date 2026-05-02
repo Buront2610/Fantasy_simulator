@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, cast
 
 from .terrain import AtlasLayout, RouteEdge, Site
 from .world_route_graph import routes_for_site
@@ -26,7 +26,7 @@ from .world_topology_state import (
 if TYPE_CHECKING:
     from .content.setting_bundle import SettingBundle
     from .world_location_state import LocationState
-    from .world_route_graph import ObservableRouteList
+    from .world_route_graph import RouteCollection
 
 
 class WorldTopologyMixin:
@@ -38,7 +38,7 @@ class WorldTopologyMixin:
         _location_id_index: Dict[str, LocationState]
         terrain_map: Any
         sites: List[Site]
-        routes: ObservableRouteList
+        routes: RouteCollection
         _site_index: Dict[str, Site]
         _routes_by_site: Dict[str, List[RouteEdge]]
         _routes_dirty: bool
@@ -75,7 +75,9 @@ class WorldTopologyMixin:
 
     def _apply_topology_state(self, topology_state: WorldTopologyState) -> None:
         """Apply a reconstructed topology snapshot to the live world state."""
-        apply_topology_state(self, topology_state)
+        from .world_protocols import TopologyRuntimeWorld
+
+        apply_topology_state(cast(TopologyRuntimeWorld, self), topology_state)
 
     def _build_atlas_layout_from_current_state(self) -> AtlasLayout:
         """Generate the persistent atlas layout from current terrain/site data."""
@@ -101,6 +103,7 @@ class WorldTopologyMixin:
             sites=self.sites,
             routes=self.routes,
             on_change=self._mark_routes_dirty,
+            owner_token=getattr(self.routes, "_owner_token", None),
         )
         self._routes_dirty = False
 

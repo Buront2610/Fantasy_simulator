@@ -7,6 +7,7 @@ from typing import Any, Callable, Dict, Mapping, Type
 from .content.setting_bundle import CalendarDefinition, bundle_from_dict_validated
 from .language.state import LanguageEvolutionRecord, LanguageRuntimeState
 from .terrain import AtlasLayout
+from .world_event_record_updates import normalize_event_record_locations
 from .world_topology_state import restore_serialized_topology
 
 
@@ -116,12 +117,14 @@ def hydrate_world_state(
     else:
         world._register_serialized_grid_locations(serialized_grid)
 
-    world.event_log = list(data.get("event_log", []))
+    world._restore_display_event_log_for_load(list(data.get("event_log", [])))
     world.event_records = [
         world_event_record_cls.from_dict(r) for r in data.get("event_records", [])
     ]
-    for record in world.event_records:
-        record.location_id = world.normalize_location_id(record.location_id)
+    world.event_records = normalize_event_record_locations(
+        world.event_records,
+        world.normalize_location_id,
+    )
 
     world.rumors = [
         Rumor.from_dict(r) for r in data.get("rumors", [])

@@ -6,9 +6,11 @@ the core world aggregate.
 
 from __future__ import annotations
 
-from typing import Callable, Iterable, List, Mapping, Protocol, Sequence
+from typing import Callable, Iterable, List, Mapping, MutableSequence, Protocol, Sequence
 
 from .event_models import WorldEventRecord
+from .world_event_index import location_ids_for_record
+from .world_event_record_updates import event_record_with_normalized_location_references
 
 
 class SupportsRecentEvents(Protocol):
@@ -28,19 +30,33 @@ def rebuild_recent_event_ids(
     *,
     locations: Iterable[SupportsRecentEvents],
     location_index: Mapping[str, SupportsRecentEvents],
-    event_records: Sequence[WorldEventRecord],
+    event_records: MutableSequence[WorldEventRecord],
     max_recent_event_ids: int = 12,
 ) -> None:
-    """Rebuild derived per-location recent event IDs from canonical records."""
+    """Rebuild derived per-location recent event IDs from canonical records.
+
+    Unknown location references are normalized out of stored records before
+    indexing so recent-event IDs are derived from the same repaired references
+    that reports and event-history queries use.
+    """
     for location in locations:
         location.recent_event_ids = []
 
-    for record in event_records:
-        location_id = record.location_id
+    def normalize_indexed_location_id(location_id: str | None) -> str | None:
         if location_id is None or location_id not in location_index:
-            record.location_id = None
-            continue
-        location_index[location_id].recent_event_ids.append(record.record_id)
+            return None
+        return location_id
+
+    for index, record in enumerate(event_records):
+        original_record = record
+        record = event_record_with_normalized_location_references(record, normalize_indexed_location_id)
+        if record != original_record:
+            event_records[index] = record
+        for attached_location_id in location_ids_for_record(record):
+            attached_location = location_index.get(attached_location_id)
+            if attached_location is None:
+                continue
+            attached_location.recent_event_ids.append(record.record_id)
 
     for location in locations:
         location.recent_event_ids = location.recent_event_ids[-max_recent_event_ids:]

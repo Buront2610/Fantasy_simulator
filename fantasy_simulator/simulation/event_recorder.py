@@ -11,10 +11,15 @@ canonical records only.
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 from ..adventure import AdventureRun
 from ..event_models import EventResult, WorldEventRecord, generate_record_id
+
+if TYPE_CHECKING:
+    from random import Random
+
+    from ..world import World
 
 
 class EventRecorderMixin:
@@ -37,6 +42,21 @@ class EventRecorderMixin:
         "romance": 2, "anniversary": 2,
         "condition_worsened": 3, "dying_rescued": 4,
     }
+
+    if TYPE_CHECKING:
+        world: World
+        current_month: int
+        current_day: int
+        elapsed_days: int
+        id_rng: Random
+        pending_notifications: List[WorldEventRecord]
+
+        def should_notify(self, record: WorldEventRecord) -> bool: ...
+
+    def _ensure_event_record_id_available(self, record_id: str) -> None:
+        self.world._event_index.ensure_current(self.world.event_records)
+        if record_id in self.world._event_index.record_ids:
+            raise ValueError(f"Duplicate event record ID: {record_id!r}")
 
     def _record_world_event(
         self,
@@ -66,7 +86,6 @@ class EventRecorderMixin:
             if location_id is not None
             else None
         )
-        impacts = self.world.apply_event_impact(kind, canonical_location_id)
         record = WorldEventRecord(
             record_id=generate_record_id(self.id_rng),
             kind=kind,
@@ -81,8 +100,11 @@ class EventRecorderMixin:
             severity=severity,
             visibility=visibility,
             calendar_key=self.world.calendar_definition.calendar_key,
-            impacts=[] if not impacts else list(impacts),
         )
+        self._ensure_event_record_id_available(record.record_id)
+        impacts = self.world.apply_event_impact(kind, canonical_location_id)
+        if impacts:
+            record.impacts = list(impacts)
         record = self.world.record_event(record)
         # Surface notable events to the UI layer via notification thresholds
         if self.should_notify(record):
@@ -134,7 +156,6 @@ class EventRecorderMixin:
             if location_id is not None
             else None
         )
-        impacts = self.world.apply_event_impact(result.event_type, canonical_location_id)
         record = WorldEventRecord.from_event_result(
             result,
             location_id=canonical_location_id,
@@ -146,6 +167,8 @@ class EventRecorderMixin:
             absolute_day=self.elapsed_days + 1,
             calendar_key=self.world.calendar_definition.calendar_key,
         )
+        self._ensure_event_record_id_available(record.record_id)
+        impacts = self.world.apply_event_impact(result.event_type, canonical_location_id)
         if impacts:
             record.impacts = list(impacts)
         record = self.world.record_event(record)

@@ -10,9 +10,11 @@ legacy fields remain load-compatible.
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 from ..event_models import EventResult, WorldEventRecord
+from ..event_rendering import render_event_record
 from ..i18n import tr
 from ..reports import (
     format_monthly_report,
@@ -28,6 +30,9 @@ from ..location_observation import (
 )
 from .query_presenters import render_character_story, render_simulation_summary
 
+if TYPE_CHECKING:
+    from ..world import World
+
 
 class QueryMixin:
     """Mixin providing query / reporting methods for the Simulator.
@@ -38,12 +43,17 @@ class QueryMixin:
     - ``history``: legacy EventResult list (compatibility adapter)
     """
 
+    if TYPE_CHECKING:
+        world: World
+        start_year: int
+        history: Sequence[EventResult]
+
     def get_summary(self) -> str:
         """Return a human-readable summary using WorldEventRecord as canonical source."""
         records = self.world.event_records
         total = len(records)
-        alive = sum(1 for c in self.world.characters if c.alive)
-        dead = sum(1 for c in self.world.characters if not c.alive)
+        alive = len([c for c in self.world.characters if c.alive])
+        dead = len([c for c in self.world.characters if not c.alive])
 
         type_counts: Dict[str, int] = {}
         for rec in records:
@@ -57,6 +67,7 @@ class QueryMixin:
             deceased_count=dead,
             type_counts=type_counts,
             records=records,
+            world=self.world,
         )
 
     def get_monthly_report(self, year: int, month: int) -> str:
@@ -143,7 +154,9 @@ class QueryMixin:
         story_entries: List[str] = []
         if event_history:
             for record in event_history:
-                story_entries.append(record.description)
+                rendered = render_event_record(record, world=self.world)
+                story_entries.append(rendered)
+                seen_entries.add(rendered)
                 seen_entries.add(record.description)
             for entry in char.history:
                 if entry in seen_entries:

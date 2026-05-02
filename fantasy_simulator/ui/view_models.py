@@ -9,7 +9,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, TYPE_CHECKING
 
+from ..event_rendering import render_event_record
 from ..i18n import tr
+from ..world_event_index import location_ids_for_record
 from ..location_observation import (
     LocationObservationView,
     RumorSummaryView,
@@ -78,12 +80,19 @@ class NotificationItemView:
     location_id: str | None
 
 
-def build_notification_views(records: List["WorldEventRecord"]) -> List[NotificationItemView]:
+def _render_view_event(record: "WorldEventRecord", world: "World" | None = None) -> str:
+    return render_event_record(record, world=world)
+
+
+def build_notification_views(
+    records: List["WorldEventRecord"],
+    world: "World" | None = None,
+) -> List[NotificationItemView]:
     return [
         NotificationItemView(
             year=r.year,
             month=r.month,
-            text=r.description,
+            text=_render_view_event(r, world),
             kind=r.kind,
             location_id=r.location_id,
         )
@@ -108,17 +117,17 @@ def build_monthly_report_card_view(world: "World", year: int, month: int) -> Mon
     for r in records:
         if r.primary_actor_id:
             chars[r.primary_actor_id] = chars.get(r.primary_actor_id, 0) + 1
-        if r.location_id:
-            locs[r.location_id] = locs.get(r.location_id, 0) + 1
+        for location_id in location_ids_for_record(r):
+            locs[location_id] = locs.get(location_id, 0) + 1
         if r.kind in (
             "adventure_returned",
             "adventure_returned_injured",
             "adventure_retreated",
             "adventure_death",
         ):
-            completed_adventures.append(r.description)
+            completed_adventures.append(_render_view_event(r, world))
         if r.kind in ("death", "adventure_death", "adventure_discovery"):
-            new_memory.append(r.description)
+            new_memory.append(_render_view_event(r, world))
 
     char_lookup = {c.char_id: c.name for c in getattr(world, "characters", [])}
     highlights = [char_lookup.get(cid, cid) for cid, _ in sorted(chars.items(), key=lambda x: -x[1])[:3]]

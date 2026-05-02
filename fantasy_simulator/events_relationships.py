@@ -108,7 +108,20 @@ def resolve_marriage_event(
         stat_changes=stat_changes,
         event_type="marriage",
         year=world.year,
-        metadata={"relation_tag_updates": relation_tag_updates, "record_id": marriage_source_id},
+        metadata={
+            "relation_tag_updates": relation_tag_updates,
+            "record_id": marriage_source_id,
+            "summary_key": "events.marriage.summary",
+            "render_params": {
+                "name1": char1.name,
+                "race1": char1.race,
+                "job1": char1.job,
+                "name2": char2.name,
+                "race2": char2.race,
+                "job2": char2.job,
+                "location_id": char1.location_id,
+            },
+        },
     )
 
 
@@ -179,6 +192,15 @@ def resolve_meeting_event(
         year=world.year,
         metadata={
             "relation_tag_updates": relation_tag_updates,
+            "summary_key": f"events.{description_key}.summary",
+            "render_params": {
+                "name1": char1.name,
+                "name2": char2.name,
+                "location_id": char1.location_id,
+                "relationship_a": rel1_after,
+                "relationship_b": rel2_after,
+                "relationship_avg": avg_after,
+            },
             **({"record_id": meeting_source_id} if meeting_source_id is not None else {}),
         },
     )

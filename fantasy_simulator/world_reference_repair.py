@@ -10,15 +10,14 @@ resolver callback injected by the caller.
 
 from __future__ import annotations
 
-from typing import Callable, Iterable, Mapping, Protocol
+from typing import Callable, Iterable, Mapping, MutableSequence, Protocol
+
+from .event_models import WorldEventRecord
+from .world_event_record_updates import event_record_with_added_tags, event_record_with_normalized_location_references
 
 
 class CharacterLocationReference(Protocol):
     location_id: str
-
-
-class OptionalLocationReference(Protocol):
-    location_id: str | None
 
 
 class RumorLocationReference(Protocol):
@@ -28,12 +27,6 @@ class RumorLocationReference(Protocol):
 class AdventureLocationReference(Protocol):
     origin: str
     destination: str
-
-
-class WatchedActorRecord(Protocol):
-    tags: list[str]
-    primary_actor_id: str | None
-    secondary_actor_ids: list[str]
 
 
 class LocationReferenceResolver(Protocol):
@@ -50,7 +43,7 @@ class LocationReferenceResolver(Protocol):
 def repair_world_location_references(
     *,
     characters: Iterable[CharacterLocationReference],
-    event_records: Iterable[OptionalLocationReference],
+    event_records: MutableSequence[WorldEventRecord],
     rumors: Iterable[RumorLocationReference],
     rumor_archive: Iterable[RumorLocationReference],
     active_adventures: Iterable[AdventureLocationReference],
@@ -70,8 +63,11 @@ def repair_world_location_references(
             or ""
         )
 
-    for record in event_records:
-        record.location_id = repair_location_reference(record.location_id)
+    for index, record in enumerate(event_records):
+        event_records[index] = event_record_with_normalized_location_references(
+            record,
+            repair_location_reference,
+        )
 
     for rumor in rumors:
         rumor.source_location_id = repair_location_reference(rumor.source_location_id)
@@ -150,7 +146,7 @@ def normalize_world_references_after_structure_change(
 
 def backfill_watched_actor_tags(
     *,
-    event_records: Iterable[WatchedActorRecord],
+    event_records: MutableSequence[WorldEventRecord],
     watched_actor_ids: set[str],
     watched_actor_tag_prefix: str,
     inferred_tag: str,
@@ -159,7 +155,7 @@ def backfill_watched_actor_tags(
     if not watched_actor_ids:
         return
 
-    for record in event_records:
+    for index, record in enumerate(event_records):
         if any(tag.startswith(watched_actor_tag_prefix) for tag in record.tags):
             continue
         actor_ids = [record.primary_actor_id] + list(record.secondary_actor_ids)
@@ -169,6 +165,4 @@ def backfill_watched_actor_tags(
             if actor_id and actor_id in watched_actor_ids
         ]
         if watched_tags:
-            record.tags = list(
-                dict.fromkeys(list(record.tags) + watched_tags + [inferred_tag])
-            )
+            event_records[index] = event_record_with_added_tags(record, [*watched_tags, inferred_tag])

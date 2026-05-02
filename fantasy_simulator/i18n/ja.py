@@ -342,6 +342,41 @@ TEXT_JA: Dict[str, str] = {
     'event_type_adventure_returned': '冒険帰還',
     'event_type_adventure_retreated': '冒険撤退',
     'event_type_adventure_update': '冒険進行',
+    'events.generic.summary': '{description}',
+    'events.battle.summary': '{actor} は {location} で戦った。',
+    'events.battle_result.summary': '{winner} は {loser} に勝利した。{injury}',
+    'events.battle_fatal.summary': '{winner} は {loser} に勝利したが、{loser} はその戦いを生き延びられなかった。',
+    'events.meeting.summary': '{actor} は {location} で {other} と出会った。',
+    'events.meeting_positive.summary': (
+        '{name1} と {name2} は {location} で出会い、素晴らしい相性を見せた。'
+        '（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        '平均: {relationship_avg:+d}）'
+    ),
+    'events.meeting_pleasant.summary': (
+        '{name1} と {name2} は {location} で気持ちの良い交流をした。'
+        '（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        '平均: {relationship_avg:+d}）'
+    ),
+    'events.meeting_neutral.summary': (
+        '{name1} と {name2} は {location} で軽く会釈を交わした。'
+        '（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        '平均: {relationship_avg:+d}）'
+    ),
+    'events.meeting_negative.summary': (
+        '{name1} と {name2} は {location} でぎこちない出会いをした。'
+        '（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        '平均: {relationship_avg:+d}）'
+    ),
+    'events.marriage.summary': (
+        '{name1}（{race1} {job1}）と {name2}（{race2} {job2}）は {location} で盛大に結婚した。'
+    ),
+    'events.location_renamed.summary': '{old_name} は {new_name} に改名された。',
+    'events.route_blocked.summary': '{from_location} から {to_location} への道が封鎖された。',
+    'events.route_reopened.summary': '{from_location} から {to_location} への道が再開された。',
+    'events.location_faction_changed.summary': (
+        '{location} の支配勢力が {old_faction} から {new_faction} に変わった。'
+    ),
+    'event_change_no_faction': 'なし',
     'times_suffix': '回',
     'report_monthly_title': 'Aethoria 月報 ─ {year}年 {season}の第{month}月',
     'report_yearly_title': 'Aethoria 年報 ─ {year}年',

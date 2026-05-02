@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fantasy_simulator.event_models import WorldEventRecord
+from fantasy_simulator.i18n import get_locale, set_locale
 from fantasy_simulator.rumor import Rumor
 from fantasy_simulator.simulator import Simulator
 from fantasy_simulator.world import World
@@ -87,3 +88,20 @@ def test_get_location_observation_surfaces_recent_events_and_rumors():
     assert "Delegates gathered at the capital." in observation
     assert "Rumors & Intelligence" in observation
     assert "People whisper about the delegates." in observation
+
+
+def test_location_observation_uses_canonical_event_rendering_for_recent_events():
+    previous_locale = get_locale()
+    set_locale("en")
+    world = World()
+    try:
+        record = world.apply_location_rename_change("loc_aethoria_capital", "Aethoria March", month=3)
+        assert record is not None
+        set_locale("ja")
+        sim = Simulator(world, events_per_year=0, adventure_steps_per_year=0, seed=7)
+
+        observation = sim.get_location_observation("loc_aethoria_capital")
+    finally:
+        set_locale(previous_locale)
+
+    assert "Aethoria Capital は Aethoria March に改名された。" in observation

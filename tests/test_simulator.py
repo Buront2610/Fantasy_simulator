@@ -175,6 +175,69 @@ class TestSimulatorConstruction:
 
         assert sim.rng.getstate() == before
 
+    def test_record_event_invalid_metadata_does_not_apply_location_impact(self, small_world):
+        sim = Simulator(small_world, events_per_year=0, seed=123)
+        location = small_world.get_location_by_id("loc_aethoria_capital")
+        before_state = (location.safety, location.mood, location.danger, location.rumor_heat)
+        result = EventResult(
+            description="Broken battle.",
+            event_type="battle",
+            year=small_world.year,
+            metadata={"render_params": ["not", "a", "dict"]},
+        )
+
+        with pytest.raises(ValueError, match="render_params must be a dict"):
+            sim._record_event(result, location_id=location.id)
+
+        assert small_world.event_records == []
+        assert (location.safety, location.mood, location.danger, location.rumor_heat) == before_state
+
+    def test_record_event_duplicate_id_does_not_apply_second_location_impact(self, small_world):
+        sim = Simulator(small_world, events_per_year=0, seed=123)
+        location = small_world.get_location_by_id("loc_aethoria_capital")
+        result = EventResult(
+            description="A battle.",
+            event_type="battle",
+            year=small_world.year,
+            metadata={"record_id": "same_record"},
+        )
+        sim._record_event(result, location_id=location.id)
+        before_state = (location.safety, location.mood, location.danger, location.rumor_heat)
+
+        with pytest.raises(ValueError, match="Duplicate event record ID"):
+            sim._record_event(result, location_id=location.id)
+
+        assert len(small_world.event_records) == 1
+        assert (location.safety, location.mood, location.danger, location.rumor_heat) == before_state
+
+    def test_record_world_event_invalid_description_does_not_apply_location_impact(self, small_world):
+        sim = Simulator(small_world, events_per_year=0, seed=123)
+        location = small_world.get_location_by_id("loc_aethoria_capital")
+        before_state = (location.safety, location.mood, location.danger, location.rumor_heat)
+
+        with pytest.raises(ValueError, match="description must be a string"):
+            sim._record_world_event(123, kind="battle", location_id=location.id)
+
+        assert small_world.event_records == []
+        assert (location.safety, location.mood, location.danger, location.rumor_heat) == before_state
+
+    def test_record_world_event_duplicate_id_does_not_apply_second_location_impact(self, small_world):
+        class FixedIdRng:
+            def getrandbits(self, _bits):
+                return 7
+
+        sim = Simulator(small_world, events_per_year=0, seed=123)
+        sim.id_rng = FixedIdRng()
+        location = small_world.get_location_by_id("loc_aethoria_capital")
+        sim._record_world_event("A battle.", kind="battle", location_id=location.id)
+        before_state = (location.safety, location.mood, location.danger, location.rumor_heat)
+
+        with pytest.raises(ValueError, match="Duplicate event record ID"):
+            sim._record_world_event("Another battle.", kind="battle", location_id=location.id)
+
+        assert len(small_world.event_records) == 1
+        assert (location.safety, location.mood, location.danger, location.rumor_heat) == before_state
+
 
 # ---------------------------------------------------------------------------
 # run()
@@ -262,6 +325,33 @@ class TestGetSummary:
     def test_before_run_no_crash(self, sim_small):
         summary = sim_small.get_summary()
         assert isinstance(summary, str)
+
+    def test_notable_moments_render_with_current_locale(self):
+        world = World()
+        hero = Character("Hero", 25, "Male", "Human", "Warrior", location_id="loc_aethoria_capital")
+        rival = Character("Rival", 25, "Male", "Human", "Warrior", location_id="loc_aethoria_capital")
+        world.add_character(hero)
+        world.add_character(rival)
+        sim = Simulator(world, events_per_year=0, seed=1)
+        sim._record_event(
+            EventResult(
+                description="Hero defeated Rival, who did not survive the encounter.",
+                affected_characters=[hero.char_id, rival.char_id],
+                event_type="battle_fatal",
+                year=world.year,
+                metadata={
+                    "summary_key": "events.battle_fatal.summary",
+                    "render_params": {"winner": "Hero", "loser": "Rival"},
+                },
+            ),
+            location_id=hero.location_id,
+        )
+
+        set_locale("ja")
+        summary = sim.get_summary()
+
+        assert "Hero は Rival に勝利したが、Rival はその戦いを生き延びられなかった。" in summary
+        assert "Hero defeated Rival, who did not survive the encounter." not in summary
 
 
 # ---------------------------------------------------------------------------
@@ -365,6 +455,34 @@ class TestGetCharacterStory:
         assert "Canonical story event" in story
         assert "Born beneath a comet." in story
         assert story.index("Canonical story event") < story.index("Born beneath a comet.")
+
+    def test_story_renders_canonical_records_with_current_locale(self):
+        world = World()
+        hero = Character("Hero", 25, "Male", "Human", "Warrior", location_id="loc_aethoria_capital")
+        rival = Character("Rival", 25, "Male", "Human", "Warrior", location_id="loc_aethoria_capital")
+        world.add_character(hero)
+        world.add_character(rival)
+        hero.history.append("Hero defeated Rival.")
+        sim = Simulator(world, events_per_year=0, seed=1)
+        sim._record_event(
+            EventResult(
+                description="Hero defeated Rival.",
+                affected_characters=[hero.char_id, rival.char_id],
+                event_type="battle",
+                year=world.year,
+                metadata={
+                    "summary_key": "events.battle_result.summary",
+                    "render_params": {"winner": "Hero", "loser": "Rival", "loser_injury_status": "none"},
+                },
+            ),
+            location_id=hero.location_id,
+        )
+
+        set_locale("ja")
+        story = sim.get_character_story(hero.char_id)
+
+        assert "Hero は Rival に勝利した。" in story
+        assert story.count("Hero defeated Rival.") == 0
 
     def test_story_orders_legacy_undated_records_by_nominal_date(self):
         world = World()

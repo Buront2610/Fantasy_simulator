@@ -17,6 +17,7 @@ from .character_domain import (
     clamp_relationship_score,
     clamp_skill_level,
 )
+from .character_lifespan import legacy_lifespan_years
 from .character_presentation import character_stat_block, random_stats as roll_random_stats
 from .character_serialization import deserialize_character, serialize_character
 from .content.world_data import NAME_TO_LOCATION_ID, fallback_location_id
@@ -198,16 +199,7 @@ class Character:
 
     @property
     def max_age(self) -> int:
-        lifespans = {
-            "Human": 80,
-            "Elf": 600,
-            "Dwarf": 250,
-            "Halfling": 130,
-            "Orc": 60,
-            "Tiefling": 100,
-            "Dragonborn": 80,
-        }
-        return lifespans.get(self.race, 80)
+        return legacy_lifespan_years(self.race)
 
     def apply_stat_delta(self, deltas: Dict[str, int]) -> None:
         self._abilities = self._abilities.apply_delta(deltas)

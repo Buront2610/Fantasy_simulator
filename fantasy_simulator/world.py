@@ -4,7 +4,7 @@ world.py - World aggregate and compatibility exports.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple
 
 from .event_models import WorldEventRecord
 from .language.engine import LanguageEngine, fallback_evolution_targets
@@ -32,7 +32,7 @@ from .world_persistence import (
     serialize_world_state,
 )
 from .world_route_graph import (
-    ObservableRouteList,
+    RouteCollection,
     replace_routes,
 )
 from .world_event_index import EventHistoryIndex
@@ -146,7 +146,7 @@ class World(
         # PR-G: terrain / site / route layers
         self.terrain_map: Optional[TerrainMap] = None
         self.sites: List[Site] = []
-        self._routes: ObservableRouteList = ObservableRouteList(on_change=self._mark_routes_dirty)
+        self._routes: RouteCollection = RouteCollection(on_change=self._mark_routes_dirty)
         self._site_index: Dict[str, Site] = {}
         self._routes_by_site: Dict[str, List[RouteEdge]] = {}
         self._routes_dirty: bool = True
@@ -166,11 +166,11 @@ class World(
         self._setting_bundle.world_definition.display_name = value
 
     @property
-    def routes(self) -> ObservableRouteList:
+    def routes(self) -> RouteCollection:
         return self._routes
 
     @routes.setter
-    def routes(self, value: List[RouteEdge]) -> None:
+    def routes(self, value: Iterable[RouteEdge]) -> None:
         current_routes = getattr(self, "_routes", [])
         self._routes = replace_routes(
             current_routes,

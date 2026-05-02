@@ -138,6 +138,18 @@ class TestWorld:
         assert routes
         assert rebuild_calls == 0
 
+    def test_route_collection_keeps_world_observer_ownership_after_index_rebuild(self):
+        world = World()
+        route = world.routes[0]
+
+        world._rebuild_route_index()
+        world.routes[0] = route
+        world._routes_dirty = False
+
+        route.blocked = not route.blocked
+
+        assert world._routes_dirty is True
+
     def test_route_block_toggle_invalidates_cache_without_signature_scan(self, monkeypatch):
         world = World()
         route = next(
@@ -1885,8 +1897,10 @@ class TestWorld:
                 description="Canonical clash",
             )
         )
-        world.event_log = ["stale cache entry"]
+        world._restore_display_event_log_for_load(["stale cache entry"])
 
+        with pytest.raises(RuntimeError, match="canonical event_records"):
+            world.event_log = ["stale cache entry"]
         assert world.get_compatibility_event_log() == ["[Year 1001, Month 2, Day 3] Canonical clash"]
 
     def test_event_log_property_projects_canonical_history_over_stale_cache(self):
@@ -1903,7 +1917,7 @@ class TestWorld:
                 description="Canonical clash",
             )
         )
-        world.event_log = ["stale cache entry"]
+        world._restore_display_event_log_for_load(["stale cache entry"])
 
         assert world.event_log == ["[Year 1001, Month 2, Day 3] Canonical clash"]
 

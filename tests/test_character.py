@@ -10,6 +10,7 @@ from fantasy_simulator.character import (
     Relationship,
     random_stats,
 )
+from fantasy_simulator.character_lifespan import legacy_lifespan_years
 from fantasy_simulator.i18n import get_locale, set_locale
 
 
@@ -140,6 +141,10 @@ class TestCharacterProperties:
     def test_max_age_unknown_race(self):
         c = Character("Test", 20, "Male", "Gnome", "Warrior")
         assert c.max_age == 80  # fallback
+
+    def test_max_age_delegates_to_legacy_lifespan_fallback(self):
+        c = Character("Test", 20, "Male", "Tiefling", "Warrior")
+        assert c.max_age == legacy_lifespan_years(c.race)
 
     def test_abilities_property_exposes_value_object(self, hero):
         abilities = hero.abilities

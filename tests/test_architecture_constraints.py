@@ -94,6 +94,53 @@ def _iter_history_attribute_accesses(path: Path) -> list[tuple[str, int]]:
     return matches
 
 
+def _iter_attribute_accesses(path: Path, attribute_name: str) -> list[tuple[str, int, str]]:
+    """Return (base_name, lineno, function_name) for direct attribute reads."""
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    matches: list[tuple[str, int, str]] = []
+
+    class AttributeReadVisitor(ast.NodeVisitor):
+        def __init__(self) -> None:
+            self.function_stack: list[str] = []
+
+        def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+            self.function_stack.append(node.name)
+            self.generic_visit(node)
+            self.function_stack.pop()
+
+        def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+            self.function_stack.append(node.name)
+            self.generic_visit(node)
+            self.function_stack.pop()
+
+        def visit_Attribute(self, node: ast.Attribute) -> None:
+            if (
+                node.attr == attribute_name
+                and isinstance(node.ctx, ast.Load)
+                and isinstance(node.value, ast.Name)
+            ):
+                function_name = self.function_stack[-1] if self.function_stack else "<module>"
+                matches.append((node.value.id, int(getattr(node, "lineno", -1)), function_name))
+            self.generic_visit(node)
+
+    AttributeReadVisitor().visit(tree)
+    return matches
+
+
+def _iter_attribute_calls(path: Path, attribute_name: str) -> list[tuple[str, int]]:
+    """Return (base_name, lineno) for direct `*.attribute_name(...)` calls."""
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    matches: list[tuple[str, int]] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        if not isinstance(node.func, ast.Attribute) or node.func.attr != attribute_name:
+            continue
+        if isinstance(node.func.value, ast.Name):
+            matches.append((node.func.value.id, int(getattr(node, "lineno", -1))))
+    return matches
+
+
 def _production_files() -> list[Path]:
     return sorted(path for path in PACKAGE_ROOT.rglob("*.py") if "__pycache__" not in path.parts)
 
@@ -297,6 +344,38 @@ def test_world_data_imports_stay_in_legacy_compatibility_modules() -> None:
             if target == WORLD_DATA_MODULE or target.startswith(f"{WORLD_DATA_MODULE}.")
         ]
         assert forbidden == [], f"{path} imports legacy world_data compatibility projections: {forbidden}"
+
+
+def test_character_max_age_reads_stay_in_lifecycle_compatibility_fallback() -> None:
+    allowed = {
+        PACKAGE_ROOT / "events_lifecycle.py",
+    }
+
+    for path in _production_files():
+        accesses = _iter_attribute_accesses(path, "max_age")
+        if path in allowed:
+            assert [(base, function_name) for base, _, function_name in accesses] == [
+                ("char", "character_lifespan_years")
+            ], (
+                f"Character.max_age compatibility fallback moved in {path}: {accesses}"
+            )
+            continue
+        assert accesses == [], f"Character.max_age read escaped lifecycle compatibility fallback in {path}: {accesses}"
+
+
+def test_display_event_log_restore_helper_stays_load_only() -> None:
+    allowed = {
+        PACKAGE_ROOT / "world_persistence.py",
+    }
+
+    for path in _production_files():
+        calls = _iter_attribute_calls(path, "_restore_display_event_log_for_load")
+        if path in allowed:
+            assert [base for base, _ in calls] == ["world"], (
+                f"event_log load restore helper moved in {path}: {calls}"
+            )
+            continue
+        assert calls == [], f"event_log load restore helper escaped load path in {path}: {calls}"
 
 
 def test_td3_split_modules_import_event_models_directly_not_events_facade() -> None:
