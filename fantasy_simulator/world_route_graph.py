@@ -79,20 +79,7 @@ class RouteCollection(MutableSequence[RouteEdge]):
 
     @classmethod
     def _ensure_unique_topology(cls, routes: Iterable[RouteEdge]) -> None:
-        seen_route_ids: set[str] = set()
-        seen_route_pairs: set[tuple[str, str]] = set()
-        for route in routes:
-            if route.from_site_id == route.to_site_id:
-                raise ValueError(f"route collection contains self-loop: {route.route_id!r}")
-            if route.route_id in seen_route_ids:
-                raise ValueError(f"route collection contains duplicate route id: {route.route_id!r}")
-            seen_route_ids.add(route.route_id)
-            route_pair = cls._route_pair(route)
-            if route_pair in seen_route_pairs:
-                raise ValueError(
-                    f"route collection contains duplicate route pair: {route_pair[0]}->{route_pair[1]}"
-                )
-            seen_route_pairs.add(route_pair)
+        validate_route_topology(routes)
 
     @staticmethod
     def _validate_route(route: object) -> RouteEdge:
@@ -254,6 +241,30 @@ class RouteCollection(MutableSequence[RouteEdge]):
 ObservableRouteList = RouteCollection
 
 
+def route_pair(route: RouteEdge) -> tuple[str, str]:
+    """Return the undirected endpoint pair used for route topology checks."""
+    first_site_id, second_site_id = sorted((route.from_site_id, route.to_site_id))
+    return first_site_id, second_site_id
+
+
+def validate_route_topology(routes: Iterable[RouteEdge]) -> None:
+    """Reject route identity shapes that would make adjacency ambiguous."""
+    seen_route_ids: set[str] = set()
+    seen_route_pairs: set[tuple[str, str]] = set()
+    for route in routes:
+        if route.from_site_id == route.to_site_id:
+            raise ValueError(f"route collection contains self-loop: {route.route_id!r}")
+        if route.route_id in seen_route_ids:
+            raise ValueError(f"route collection contains duplicate route id: {route.route_id!r}")
+        seen_route_ids.add(route.route_id)
+        current_route_pair = route_pair(route)
+        if current_route_pair in seen_route_pairs:
+            raise ValueError(
+                f"route collection contains duplicate route pair: {current_route_pair[0]}->{current_route_pair[1]}"
+            )
+        seen_route_pairs.add(current_route_pair)
+
+
 def replace_routes(
     current_routes: Iterable[RouteEdge],
     new_routes: Iterable[RouteEdge],
@@ -311,6 +322,7 @@ def rebuild_route_index(
     """Build route adjacency lists keyed by endpoint location ID."""
     site_list = list(sites)
     route_list = list(routes)
+    validate_route_topology(route_list)
     route_owner = getattr(routes, "_owner_token", owner_token)
     attach_route_observers(route_list, on_change=on_change, owner_token=route_owner)
     route_index: Dict[str, List[RouteEdge]] = {site.location_id: [] for site in site_list}

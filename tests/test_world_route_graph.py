@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fantasy_simulator.terrain import RouteEdge, Site
+from fantasy_simulator.world import World
 from fantasy_simulator.world_route_graph import RouteCollection, rebuild_route_index, replace_routes, routes_for_site
 
 
@@ -46,6 +47,67 @@ def test_replace_routes_detaches_old_observers_and_wraps_new_collection() -> Non
     wrapped[0].blocked = True
 
     assert notifications == 1
+
+
+def test_rebuild_route_index_rejects_invalid_plain_iterable_topology() -> None:
+    sites = [
+        Site(location_id="loc_one", x=0, y=0, site_type="city"),
+        Site(location_id="loc_two", x=1, y=0, site_type="village"),
+        Site(location_id="loc_three", x=2, y=0, site_type="village"),
+    ]
+
+    for routes, message in (
+        ([RouteEdge("route_loop", "loc_one", "loc_one", "road")], "self-loop"),
+        (
+            [
+                RouteEdge("route_1", "loc_one", "loc_two", "road"),
+                RouteEdge("route_1", "loc_two", "loc_three", "road"),
+            ],
+            "duplicate route id",
+        ),
+        (
+            [
+                RouteEdge("route_1", "loc_one", "loc_two", "road"),
+                RouteEdge("route_2", "loc_two", "loc_one", "road"),
+            ],
+            "duplicate route pair",
+        ),
+    ):
+        try:
+            rebuild_route_index(sites=sites, routes=routes, on_change=lambda: None)
+        except ValueError as exc:
+            assert message in str(exc)
+            continue
+        raise AssertionError(f"Expected invalid route topology to fail: {message}")
+
+
+def test_world_route_index_rebuild_rejects_direct_route_identity_mutation() -> None:
+    world = World()
+    first = world.routes[0]
+    second = world.routes[1]
+
+    second.route_id = first.route_id
+
+    try:
+        world.get_routes_for_site(second.from_site_id)
+    except ValueError as exc:
+        assert "duplicate route id" in str(exc)
+    else:
+        raise AssertionError("Expected direct duplicate route_id mutation to fail during rebuild")
+
+
+def test_world_route_index_rebuild_rejects_direct_route_self_loop_mutation() -> None:
+    world = World()
+    route = world.routes[0]
+
+    route.to_site_id = route.from_site_id
+
+    try:
+        world.get_routes_for_site(route.from_site_id)
+    except ValueError as exc:
+        assert "self-loop" in str(exc)
+    else:
+        raise AssertionError("Expected direct self-loop mutation to fail during rebuild")
 
 
 def test_replace_routes_preserves_old_observers_when_new_routes_are_invalid() -> None:
