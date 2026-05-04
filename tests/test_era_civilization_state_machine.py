@@ -40,13 +40,27 @@ def _describe(summary_key: str, _render_params: dict, fallback_description: str)
     return fallback_description
 
 
-def test_era_shift_state_machine_returns_noop_for_same_era() -> None:
+def test_era_shift_state_machine_returns_noop_for_same_era_and_same_phase() -> None:
     assert transition_era_shift(
         old_era_key="age_of_embers",
         requested_era_key="age_of_embers",
         old_civilization_phase="stable",
-        requested_civilization_phase="new_era",
+        requested_civilization_phase="stable",
     ) is None
+
+
+def test_era_shift_state_machine_rejects_same_era_phase_change() -> None:
+    try:
+        transition_era_shift(
+            old_era_key="age_of_embers",
+            requested_era_key="age_of_embers",
+            old_civilization_phase="stable",
+            requested_civilization_phase="new_era",
+        )
+    except ValueError as exc:
+        assert "DriftCivilizationPhaseCommand" in str(exc)
+    else:
+        raise AssertionError("Expected same-era phase change to be explicit civilization drift")
 
 
 def test_civilization_phase_state_machine_distinguishes_phase_drift() -> None:
@@ -163,6 +177,50 @@ def test_era_shift_rejects_unknown_authored_era_definition() -> None:
         assert "unknown era definition" in str(exc)
     else:
         raise AssertionError("Expected unknown era validation to fail")
+
+
+def test_era_shift_changeset_rejects_same_era_phase_change() -> None:
+    runtime = _EraRuntime(era_key="age_of_embers", civilization_phase="stable")
+    command = ShiftEraCommand(
+        new_era_key=EraKey("age_of_embers"),
+        year=1002,
+        new_civilization_phase="new_era",
+    )
+
+    try:
+        build_era_shift_change_set(
+            command,
+            era_runtime=runtime,
+            authored_era_keys={"age_of_embers"},
+            describe=_describe,
+        )
+    except ValueError as exc:
+        assert "DriftCivilizationPhaseCommand" in str(exc)
+    else:
+        raise AssertionError("Expected same-era phase change to be rejected")
+
+
+def test_era_and_civilization_fallback_descriptions_are_nonlocalized_compatibility_text() -> None:
+    runtime = _EraRuntime(era_key="age_of_embers", civilization_phase="stable")
+
+    era_change_set = build_era_shift_change_set(
+        ShiftEraCommand(new_era_key=EraKey("age_of_reckoning"), year=1002, cause_key="dragon_war"),
+        era_runtime=runtime,
+        authored_era_keys={"age_of_embers", "age_of_reckoning"},
+        describe=lambda _key, _params, fallback: fallback,
+    )
+    assert era_change_set is not None
+    assert era_change_set.events[0].description == (
+        "The era shifted from age_of_embers to age_of_reckoning; civilization entered new_era."
+    )
+
+    drift_change_set = build_civilization_phase_drift_change_set(
+        DriftCivilizationPhaseCommand(new_phase="crisis", year=1003, reason_key="war_pressure"),
+        era_runtime=runtime,
+        describe=lambda _key, _params, fallback: fallback,
+    )
+    assert drift_change_set is not None
+    assert drift_change_set.events[0].description == "Civilization drifted from stable to crisis due to war_pressure."
 
 
 def test_civilization_phase_drift_changeset_contains_phase_and_score_updates() -> None:

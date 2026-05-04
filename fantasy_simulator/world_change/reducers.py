@@ -168,11 +168,13 @@ def _event_recording_snapshot(
     record_event: EventRecorderInput,
 ) -> Any | None:
     event_count = len(change_set.events)
-    if event_count <= 1:
+    if event_count == 0:
         return None
-    if not _is_event_recorder_port(record_event):
+    if _is_event_recorder_port(record_event):
+        return cast(EventRecorderPort, record_event).snapshot()
+    if event_count > 1:
         raise ValueError("multi-event changesets require a snapshot-capable event recorder")
-    return cast(EventRecorderPort, record_event).snapshot()
+    return None
 
 
 def _is_event_recorder_port(record_event: EventRecorderInput) -> bool:
@@ -193,6 +195,114 @@ def _validate_runtime_requirements(change_set: WorldChangeSet, context: _Reducer
         raise ValueError("terrain_map is required for terrain updates")
     if change_set.era_updates and context.era_runtime is None:
         raise ValueError("era runtime is required for era updates")
+
+
+def _validate_route_update_is_fresh(routes: Iterable[SupportsRouteStatus], update: RouteUpdate) -> None:
+    route = route_by_id(routes, route_id=update.route_id)
+    if route.blocked != update.old_blocked:
+        raise ValueError(
+            f"stale route update for {update.route_id}: blocked is {route.blocked}, "
+            f"expected {update.old_blocked}"
+        )
+
+
+def _validate_location_rename_update_is_fresh(
+    location_index: MutableMapping[str, Any],
+    location_name_index: MutableMapping[str, Any],
+    update: LocationRenameUpdate,
+) -> None:
+    location = location_index[str(update.location_id)]
+    if location.canonical_name != update.old_name:
+        raise ValueError(
+            f"stale location rename update for {update.location_id}: canonical_name is "
+            f"{location.canonical_name!r}, expected {update.old_name!r}"
+        )
+    if tuple(location.aliases) != update.old_aliases:
+        raise ValueError(
+            f"stale location rename update for {update.location_id}: aliases are "
+            f"{tuple(location.aliases)!r}, expected {update.old_aliases!r}"
+        )
+    if location_name_index.get(update.old_name) is not location:
+        raise ValueError(
+            f"stale location rename update for {update.location_id}: name index is missing "
+            f"{update.old_name!r}"
+        )
+
+
+def _validate_location_occupation_update_is_fresh(
+    location_index: MutableMapping[str, Any],
+    update: LocationOccupationUpdate,
+) -> None:
+    location = location_index[str(update.location_id)]
+    expected_faction_id = None if update.old_faction_id is None else str(update.old_faction_id)
+    if location.controlling_faction_id != expected_faction_id:
+        raise ValueError(
+            f"stale location occupation update for {update.location_id}: controlling_faction_id is "
+            f"{location.controlling_faction_id!r}, expected {expected_faction_id!r}"
+        )
+
+
+def _validate_terrain_update_is_fresh(terrain_map: Any, update: TerrainCellUpdate) -> None:
+    cell = _terrain_cell(terrain_map, update)
+    stale_attributes = [
+        attribute
+        for attribute, expected_value in (
+            ("biome", update.old_biome),
+            ("elevation", update.old_elevation),
+            ("moisture", update.old_moisture),
+            ("temperature", update.old_temperature),
+        )
+        if getattr(cell, attribute) != expected_value
+    ]
+    if stale_attributes:
+        attribute = stale_attributes[0]
+        raise ValueError(
+            f"stale terrain update for ({update.x}, {update.y}): {attribute} is "
+            f"{getattr(cell, attribute)!r}, expected {getattr(update, f'old_{attribute}')!r}"
+        )
+
+
+def _validate_era_runtime_update_is_fresh(era_runtime: Any, update: EraRuntimeUpdate) -> None:
+    if str(era_runtime.era_key) != str(update.old_era_key):
+        raise ValueError(
+            f"stale era update: era_key is {str(era_runtime.era_key)!r}, "
+            f"expected {str(update.old_era_key)!r}"
+        )
+    if era_runtime.civilization_phase != update.old_civilization_phase:
+        raise ValueError(
+            f"stale era update: civilization_phase is {era_runtime.civilization_phase!r}, "
+            f"expected {update.old_civilization_phase!r}"
+        )
+    world_scores = _world_scores_mapping(era_runtime, update)
+    if world_scores is not None:
+        for score_update in update.score_updates:
+            actual_value = world_scores.get(score_update.score_key)
+            if actual_value != score_update.old_value:
+                raise ValueError(
+                    f"stale era update: world_scores[{score_update.score_key!r}] is {actual_value!r}, "
+                    f"expected {score_update.old_value!r}"
+                )
+
+
+def _validate_change_set_is_fresh(change_set: WorldChangeSet, context: _ReducerRuntimeContext) -> None:
+    if context.location_index is not None and context.location_name_index is not None:
+        for location_update in change_set.location_updates:
+            _validate_location_rename_update_is_fresh(
+                context.location_index,
+                context.location_name_index,
+                location_update,
+            )
+    if context.location_index is not None:
+        for occupation_update in change_set.occupation_updates:
+            _validate_location_occupation_update_is_fresh(context.location_index, occupation_update)
+    for route_update in change_set.route_updates:
+        _validate_route_update_is_fresh(context.routes, route_update)
+    if context.terrain_map is not None:
+        for terrain_update in change_set.terrain_updates:
+            _validate_terrain_update_is_fresh(context.terrain_map, terrain_update)
+    if context.era_runtime is not None:
+        for era_update in change_set.era_updates:
+            _validate_era_runtime_update_is_fresh(context.era_runtime, era_update)
 
 
 def _apply_runtime_updates(
@@ -281,6 +391,7 @@ def apply_world_change_set(
     )
     event_recording_snapshot = _event_recording_snapshot(change_set, record_event)
     _validate_runtime_requirements(change_set, context)
+    _validate_change_set_is_fresh(change_set, context)
     applied_updates = _AppliedRuntimeUpdates.empty()
     try:
         applied_updates = _apply_runtime_updates(change_set, context)

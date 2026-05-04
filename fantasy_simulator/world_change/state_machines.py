@@ -9,7 +9,8 @@ from typing import Literal, Mapping
 RouteStatus = Literal["open", "blocked"]
 CivilizationPhase = Literal["stable", "crisis", "transition", "new_era", "aftermath"]
 
-# PR-K K0 fixed vocabulary; bundle-authored era rules can replace this in a later slice.
+# PR-K K0 fixed vocabulary; a later WorldRuleSet/EraRuntimeRules slice can replace this with bundle-authored
+# era rules once persistence and migration policy are explicit.
 CIVILIZATION_PHASES: tuple[CivilizationPhase, ...] = (
     "stable",
     "crisis",
@@ -237,12 +238,14 @@ def transition_era_shift(
     old_civilization_phase: str,
     requested_civilization_phase: str,
 ) -> EraShiftTransition | None:
-    """Return an era transition, or ``None`` when the era key is unchanged."""
+    """Return an era transition, or ``None`` when era and phase are unchanged."""
     normalized_old_era = _normalize_era_key(old_era_key, field_name="old_era_key")
     normalized_new_era = _normalize_era_key(requested_era_key, field_name="new_era_key")
     old_phase = validate_civilization_phase(old_civilization_phase)
     new_phase = validate_civilization_phase(requested_civilization_phase)
     if normalized_old_era == normalized_new_era:
+        if old_phase != new_phase:
+            raise ValueError("same-era phase changes must use DriftCivilizationPhaseCommand")
         return None
     return EraShiftTransition(
         old_era_key=normalized_old_era,

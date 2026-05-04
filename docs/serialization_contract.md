@@ -108,7 +108,8 @@ this precedence:
   PR-K guardrail. Canonical `era_shifted` and
   `civilization_phase_drifted` records may exist, but world-level era runtime
   fields must not be treated as durable save fields until a later schema policy
-  is documented.
+  is documented. Era-shift commands change the era key; same-era phase movement
+  is represented by civilization drift records.
 - Non-bundle serialized topology is explicit. It must validate site references,
   route endpoint references, duplicate route IDs, duplicate route pairs, and
   self-loops before hydration succeeds.

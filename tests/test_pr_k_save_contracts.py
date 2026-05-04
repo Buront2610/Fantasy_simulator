@@ -315,6 +315,66 @@ def test_world_change_multi_event_changeset_rejects_non_snapshot_capable_recorde
     assert world.get_events_by_location(route.from_site_id) == []
 
 
+def test_world_change_single_event_port_recording_failure_restores_event_history() -> None:
+    world = World()
+    route = world.routes[0]
+    from_location = world.get_location_by_id(route.from_site_id)
+    assert from_location is not None
+    baseline_records = list(world.event_records)
+    baseline_recent_event_ids = list(from_location.recent_event_ids)
+    recorder = world.world_change_event_recorder()
+
+    class _FailingAfterRecordingPort:
+        snapshot_count = 0
+        restore_count = 0
+
+        def record(self, record: WorldEventRecord) -> WorldEventRecord:
+            recorder.record(record)
+            raise ValueError("recording failed after append")
+
+        def snapshot(self):
+            self.snapshot_count += 1
+            return recorder.snapshot()
+
+        def restore(self, snapshot) -> None:
+            self.restore_count += 1
+            recorder.restore(snapshot)
+
+    failing_recorder = _FailingAfterRecordingPort()
+    change_set = WorldChangeSet(
+        events=(
+            WorldEventRecord(
+                record_id="single-world-change-event",
+                kind="route_blocked",
+                year=1001,
+                location_id=route.from_site_id,
+                description="The route was blocked.",
+            ),
+        ),
+        route_updates=(
+            RouteUpdate(
+                route_id=RouteId(route.route_id),
+                old_blocked=False,
+                new_blocked=True,
+            ),
+        ),
+    )
+
+    with pytest.raises(ValueError, match="recording failed after append"):
+        apply_world_change_set(
+            change_set,
+            routes=world.routes,
+            record_event=failing_recorder,
+        )
+
+    assert failing_recorder.snapshot_count == 1
+    assert failing_recorder.restore_count == 1
+    assert route.blocked is False
+    assert world.event_records == baseline_records
+    assert from_location.recent_event_ids == baseline_recent_event_ids
+    assert world.get_events_by_location(route.from_site_id) == []
+
+
 def test_world_change_rename_recording_failure_rolls_back_runtime_state(monkeypatch) -> None:
     world = World()
     location = world.get_location_by_id("loc_aethoria_capital")

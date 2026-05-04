@@ -279,7 +279,8 @@ terrain-cell mutation:
   terrain unless runtime terrain cells change, then persist a complete
   `terrain_map` snapshot that load validates before overlaying on
   bundle-derived topology. World-level era runtime remains
-  pre-persistence/headless until its save policy is settled.
+  pre-persistence/headless until its save policy is settled. Same-era phase
+  changes are explicit civilization drift commands, not silent era-shift no-ops.
 
 Remaining K0 phases should continue in this order:
 
@@ -293,6 +294,10 @@ Remaining K0 phases should continue in this order:
 | K0-6b | location occupation/control slice and war-map projection. Started. |
 | K0-6c | headless era/civilization transition core and timeline projection. Started, not persisted as runtime fields. |
 | K0-7 | save/migration policy for PR-K dynamic fields. v8 terrain policy set; era runtime pending. |
+
+K0 era/civilization vocabulary is deliberately fixed in code for now. Later
+bundle-authored rules should introduce a `WorldRuleSet`/`EraRuntimeRules` style
+input before expanding phases or world-score keys.
 
 Fitness functions should eventually guard:
 

@@ -402,6 +402,8 @@ class WorldMemoryMixin:
         if location_id is not None:
             if location_id not in self._location_id_index:
                 raise KeyError(location_id)
+            if location is None:
+                raise ValueError(f"terrain cell ({x}, {y}) is not associated with location {location_id}")
             if location is not None and location.id != location_id:
                 raise ValueError(f"terrain cell ({x}, {y}) belongs to location {location.id}, not {location_id}")
         resolved_location_id = location_id if location_id is not None else None if location is None else location.id

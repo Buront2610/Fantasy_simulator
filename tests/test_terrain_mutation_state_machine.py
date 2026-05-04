@@ -290,3 +290,23 @@ def test_world_terrain_cell_change_rejects_unknown_or_mismatched_explicit_locati
     assert capital_cell.to_dict() == capital_payload
     assert grey_pass_cell.to_dict() == grey_pass_payload
     assert world.event_records == []
+
+    unowned_cell = world.terrain_map.get(0, 0)
+    assert unowned_cell is not None
+    unowned_payload = unowned_cell.to_dict()
+    world.grid.pop((0, 0))
+
+    try:
+        world.apply_terrain_cell_change(
+            0,
+            0,
+            biome="forest",
+            location_id="loc_aethoria_capital",
+        )
+    except ValueError as exc:
+        assert "not associated with location" in str(exc)
+    else:
+        raise AssertionError("Expected explicit location validation to fail for an unowned terrain cell")
+
+    assert unowned_cell.to_dict() == unowned_payload
+    assert world.event_records == []
