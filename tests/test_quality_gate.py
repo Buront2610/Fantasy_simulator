@@ -2,11 +2,41 @@
 
 from pathlib import Path
 
-from scripts.quality_gate import TYPECHECK_TARGETS, WORLD_TYPECHECK_EXCLUSIONS, build_profile_commands
+from scripts.quality_gate import (
+    STANDARD_TARGETS,
+    TYPECHECK_TARGETS,
+    WORLD_TYPECHECK_EXCLUSIONS,
+    build_profile_commands,
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PYPROJECT_TEXT = (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+
+EXPECTED_STANDARD_TARGETS = [
+    "tests/test_architecture_constraints.py",
+    "tests/test_quality_gate.py",
+    "tests/test_agent_workflow_docs.py",
+    "tests/test_doc_freshness.py",
+    "tests/test_event_record_read_policy.py",
+    "tests/test_route_mutation_state_machine.py",
+    "tests/test_terrain_mutation_state_machine.py",
+    "tests/test_location_rename_state_machine.py",
+    "tests/test_route_status_projection.py",
+    "tests/test_location_history_projection.py",
+    "tests/test_pr_k_architecture_boundaries.py",
+    "tests/test_pr_k_event_record_contracts.py",
+    "tests/test_pr_k_id_type_smoke.py",
+    "tests/test_era_civilization_state_machine.py",
+    "tests/test_era_timeline_projection.py",
+    "tests/test_pr_k_occupation_state_machine.py",
+    "tests/test_pr_k_observation_projections.py",
+    "tests/test_pr_k_save_contracts.py",
+    "tests/test_war_map_projection.py",
+    "tests/test_world_change_report_projection.py",
+    "tests/test_harness_scenarios.py",
+    "tests/test_map_visible_harness.py",
+]
 
 
 def _pyproject_mypy_files() -> list[str]:
@@ -47,30 +77,15 @@ def test_minimal_profile_accepts_explicit_pytest_targets():
 def test_standard_profile_runs_targeted_harness_suite():
     commands = build_profile_commands("standard")
     assert len(commands) == 1
-    assert commands[0].argv[-7:] == [
-        "tests/test_architecture_constraints.py",
-        "tests/test_quality_gate.py",
-        "tests/test_agent_workflow_docs.py",
-        "tests/test_doc_freshness.py",
-        "tests/test_event_record_read_policy.py",
-        "tests/test_harness_scenarios.py",
-        "tests/test_map_visible_harness.py",
-    ]
+    assert STANDARD_TARGETS == EXPECTED_STANDARD_TARGETS
+    assert commands[0].argv[-len(EXPECTED_STANDARD_TARGETS):] == EXPECTED_STANDARD_TARGETS
 
 
 def test_standard_profile_can_prepend_changed_area_pytest():
     commands = build_profile_commands("standard", pytest_targets=["tests/test_character_creator.py"])
     assert len(commands) == 2
     assert commands[0].argv[-1] == "tests/test_character_creator.py"
-    assert commands[1].argv[-7:] == [
-        "tests/test_architecture_constraints.py",
-        "tests/test_quality_gate.py",
-        "tests/test_agent_workflow_docs.py",
-        "tests/test_doc_freshness.py",
-        "tests/test_event_record_read_policy.py",
-        "tests/test_harness_scenarios.py",
-        "tests/test_map_visible_harness.py",
-    ]
+    assert commands[1].argv[-len(EXPECTED_STANDARD_TARGETS):] == EXPECTED_STANDARD_TARGETS
 
 
 def test_strict_profile_includes_targeted_lint_and_full_pytest():
@@ -102,7 +117,13 @@ def test_world_typecheck_targets_are_complete_or_explicitly_excluded():
         path.as_posix().removeprefix(PROJECT_ROOT.as_posix() + "/")
         for path in (PROJECT_ROOT / "fantasy_simulator").glob("world_*.py")
     }
-    covered = {target for target in TYPECHECK_TARGETS if target.startswith("fantasy_simulator/world_")}
+    covered = {
+        target
+        for target in TYPECHECK_TARGETS
+        if Path(target).parent.as_posix() == "fantasy_simulator"
+        and Path(target).name.startswith("world_")
+        and Path(target).suffix == ".py"
+    }
     excluded = set(WORLD_TYPECHECK_EXCLUSIONS)
 
     assert covered | excluded == world_modules
