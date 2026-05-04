@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import MutableMapping as MutableMappingABC
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from . import world_event_log_facade as event_log_facade
@@ -24,6 +26,106 @@ if TYPE_CHECKING:
     from .character import Character
     from .world_event_index import EventHistoryIndex
     from .world_location_state import LocationState
+
+
+@dataclass(frozen=True)
+class WorldEventRecorderSnapshot:
+    """Snapshot of mutable event-history state used by transactional application services."""
+
+    event_records: List[WorldEventRecord]
+    recent_event_ids: Tuple[Tuple[Any, List[str]], ...]
+    display_event_log: List[str] | None
+    event_index_state: Dict[str, Any] | None
+
+
+class WorldEventRecorderPort:
+    """Explicit event recorder port for atomic world-change reducers."""
+
+    def __init__(self, owner: Any) -> None:
+        self._owner = owner
+
+    def record(self, record: WorldEventRecord) -> WorldEventRecord:
+        return self._owner.record_event(record)
+
+    def snapshot(self) -> WorldEventRecorderSnapshot:
+        locations_by_identity: Dict[int, Any] = {}
+        for source_name in ("_location_id_index", "grid"):
+            source = getattr(self._owner, source_name, None)
+            if not isinstance(source, MutableMappingABC):
+                continue
+            for location in source.values():
+                if hasattr(location, "recent_event_ids"):
+                    locations_by_identity[id(location)] = location
+
+        display_event_log = getattr(self._owner, "_display_event_log", None)
+        event_index = getattr(self._owner, "_event_index", None)
+        event_index_state = None
+        if event_index is not None:
+            event_index_state = {
+                "signature": getattr(event_index, "signature", ()),
+                "record_ids": set(getattr(event_index, "record_ids", set())),
+                "by_location": {
+                    key: list(value) for key, value in getattr(event_index, "by_location", {}).items()
+                },
+                "by_actor": {
+                    key: list(value) for key, value in getattr(event_index, "by_actor", {}).items()
+                },
+                "by_year": {
+                    key: list(value) for key, value in getattr(event_index, "by_year", {}).items()
+                },
+                "by_month": {
+                    key: list(value) for key, value in getattr(event_index, "by_month", {}).items()
+                },
+                "by_kind": {
+                    key: list(value) for key, value in getattr(event_index, "by_kind", {}).items()
+                },
+            }
+
+        return WorldEventRecorderSnapshot(
+            event_records=list(self._owner.event_records),
+            recent_event_ids=tuple(
+                (location, list(location.recent_event_ids))
+                for location in locations_by_identity.values()
+            ),
+            display_event_log=None if not isinstance(display_event_log, list) else list(display_event_log),
+            event_index_state=event_index_state,
+        )
+
+    def restore(self, snapshot: WorldEventRecorderSnapshot) -> None:
+        self._owner.event_records[:] = snapshot.event_records
+
+        for location, recent_event_ids in snapshot.recent_event_ids:
+            location.recent_event_ids = list(recent_event_ids)
+
+        if snapshot.display_event_log is not None:
+            display_event_log = getattr(self._owner, "_display_event_log", None)
+            if isinstance(display_event_log, list):
+                display_event_log[:] = snapshot.display_event_log
+            else:
+                self._owner._display_event_log = list(snapshot.display_event_log)
+
+        event_index = getattr(self._owner, "_event_index", None)
+        if event_index is None or snapshot.event_index_state is None:
+            if event_index is not None and hasattr(event_index, "invalidate"):
+                event_index.invalidate()
+            return
+        event_index.signature = snapshot.event_index_state["signature"]
+        event_index.record_ids = set(snapshot.event_index_state["record_ids"])
+        event_index.by_location = {
+            key: list(value) for key, value in snapshot.event_index_state["by_location"].items()
+        }
+        event_index.by_actor = {
+            key: list(value) for key, value in snapshot.event_index_state["by_actor"].items()
+        }
+        event_index.by_year = {
+            key: list(value) for key, value in snapshot.event_index_state["by_year"].items()
+        }
+        event_index.by_month = {
+            key: list(value) for key, value in snapshot.event_index_state["by_month"].items()
+        }
+        event_index.by_kind = {
+            key: list(value) for key, value in snapshot.event_index_state["by_kind"].items()
+        }
 
 
 class WorldEventMixin:
@@ -66,6 +168,10 @@ class WorldEventMixin:
         )
         event_log_facade.clear_display_event_log(self)
         return stored_record
+
+    def world_change_event_recorder(self) -> WorldEventRecorderPort:
+        """Return an explicit transactional recorder port for world-change reducers."""
+        return WorldEventRecorderPort(self)
 
     def apply_event_impact(self, kind: str, location_id: Optional[str]) -> List[Dict[str, Any]]:
         """Update location state quantities based on an event kind (design §5.5).

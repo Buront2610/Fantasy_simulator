@@ -204,6 +204,7 @@ Command
   -> ChangeSet
   -> Reducer
   -> World Runtime mutation
+  -> Projection hint for future cache invalidation
   -> Projection / ViewModel
   -> UI / report / rumor / story
 ```
@@ -248,6 +249,11 @@ Projection candidates:
 | EraTimelineProjection | era shift and civilization phase history. |
 | RegionChangeProjection | local recent changes for atlas/region/detail views. |
 | WorldChangeReportProjection | monthly/yearly world-change summaries. |
+
+Projection inputs use canonical `World.event_records` insertion order unless a
+specific read model documents a stable sort. `WorldChangeSet.projection_hints`
+are currently adapter/runtime metadata for future projection-cache invalidation;
+they are not a second source of truth.
 
 ## Testing And Fitness Plan
 

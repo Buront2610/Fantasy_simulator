@@ -34,7 +34,7 @@ def test_save_load_roundtrip_preserves_world_change_runtime_state_and_canonical_
         world.apply_location_rename_change(location_id, "Aethoria March", month=2, day=6),
         world.apply_controlling_faction_change(location_id, "stormwatch_wardens", month=2, day=7),
         world.apply_controlling_faction_change(location_id, None, month=2, day=8),
-        world.apply_controlling_faction_change(location_id, "free_city_league", month=2, day=9),
+        world.apply_controlling_faction_change(location_id, "silverbrook_merchant_league", month=2, day=9),
     ]
     assert all(record is not None for record in expected_records)
     expected_payloads = _event_payloads([record for record in expected_records if record is not None])
@@ -52,7 +52,7 @@ def test_save_load_roundtrip_preserves_world_change_runtime_state_and_canonical_
     assert restored_location.id == location_id
     assert restored_location.canonical_name == "Aethoria March"
     assert restored_location.aliases == [old_name]
-    assert restored_location.controlling_faction_id == "free_city_league"
+    assert restored_location.controlling_faction_id == "silverbrook_merchant_league"
     assert restored.world.get_location_by_name("Aethoria March") is restored_location
     assert restored.world.get_location_by_name(old_name) is None
     assert _event_payloads(restored.world.event_records) == expected_payloads
@@ -94,7 +94,7 @@ def test_save_load_roundtrip_preserves_world_change_runtime_state_and_canonical_
     assert [record.render_params["new_faction_id"] for record in control_records] == [
         "stormwatch_wardens",
         None,
-        "free_city_league",
+        "silverbrook_merchant_league",
     ]
     assert {record.record_id for record in control_records}.issubset(set(restored_location.recent_event_ids))
 
@@ -260,7 +260,11 @@ def test_world_change_multi_event_failure_rolls_back_canonical_history_and_recen
     )
 
     with pytest.raises(ValueError, match="Duplicate event record ID"):
-        apply_world_change_set(change_set, routes=world.routes, record_event=world.record_event)
+        apply_world_change_set(
+            change_set,
+            routes=world.routes,
+            record_event=world.world_change_event_recorder(),
+        )
 
     assert route.blocked is False
     assert world.event_records == baseline_records

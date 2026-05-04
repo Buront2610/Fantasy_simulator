@@ -148,6 +148,7 @@ class WorldChangeSet:
     route_updates: tuple[RouteUpdate, ...] = ()
     terrain_updates: tuple[TerrainCellUpdate, ...] = ()
     era_updates: tuple[EraRuntimeUpdate, ...] = ()
+    # Future projection-cache invalidation hook; current projections rebuild from canonical records.
     projection_hints: tuple[str, ...] = ()
 
 

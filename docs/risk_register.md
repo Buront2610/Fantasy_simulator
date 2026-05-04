@@ -35,6 +35,8 @@ work and its serialization guardrails.
   Status: completed for the v8 save/load contract.
   Evidence: unmodified bundle-derived terrain is omitted from saves; mutated
   terrain requires a complete validated `terrain_map` snapshot.
+  Future risk: large worlds may need a sparse terrain overlay or terrain delta
+  log so a single-cell mutation does not force a full-map save diff.
 - Terrain-cell mutation contract.
   Status: completed in the current branch worktree.
   Evidence: `World.apply_terrain_cell_change` records

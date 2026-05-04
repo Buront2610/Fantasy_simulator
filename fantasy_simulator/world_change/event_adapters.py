@@ -24,6 +24,7 @@ def route_status_render_params(event: RouteStatusChanged) -> dict[str, Any]:
         "from_location_id": str(event.from_location_id),
         "to_location_id": str(event.to_location_id),
         "endpoint_location_ids": event.endpoint_location_ids,
+        **_cause_render_params(cause_event_id=event.cause_event_id),
     }
 
 
@@ -81,6 +82,7 @@ def location_rename_render_params(event: LocationRenamed) -> dict[str, Any]:
         "location_id": str(event.location_id),
         "old_name": event.old_name,
         "new_name": event.new_name,
+        **_cause_render_params(cause_event_id=event.cause_event_id),
     }
 
 
@@ -126,6 +128,7 @@ def location_occupation_render_params(event: LocationOccupationChanged) -> dict[
         "location_id": str(event.location_id),
         "old_faction_id": None if event.old_faction_id is None else str(event.old_faction_id),
         "new_faction_id": None if event.new_faction_id is None else str(event.new_faction_id),
+        **_cause_render_params(cause_event_id=event.cause_event_id),
     }
 
 

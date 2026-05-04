@@ -5,6 +5,7 @@ from __future__ import annotations
 import random
 from typing import TYPE_CHECKING, Any, Container, Dict, List, Optional, Tuple
 
+from .content.setting_bundle_inspection import setting_entry_key
 from .event_models import WorldEventRecord
 from .event_rendering import render_event_record
 from .ids import EventRecordId, FactionId, LocationId, RouteId
@@ -60,6 +61,7 @@ class WorldMemoryMixin:
 
         def get_travel_neighboring_locations(self, location_id: str) -> List[LocationState]: ...
         def record_event(self, record: WorldEventRecord) -> WorldEventRecord: ...
+        def world_change_event_recorder(self) -> Any: ...
 
     def _record_world_change(
         self,
@@ -117,6 +119,26 @@ class WorldMemoryMixin:
         if not description:
             raise ValueError("world-change event description must not be empty")
         return description
+
+    def _known_faction_ids_from_setting_bundle(self) -> set[str] | None:
+        bundle = getattr(self, "_setting_bundle", None)
+        if bundle is None:
+            bundle = getattr(self, "setting_bundle", None)
+        world_definition = getattr(bundle, "world_definition", None)
+        faction_entries = getattr(world_definition, "faction_entries", None)
+        if not callable(faction_entries):
+            return None
+
+        faction_ids: set[str] = set()
+        for entry in faction_entries():
+            key = getattr(entry, "key", "")
+            display_name = getattr(entry, "display_name", "")
+            if isinstance(key, str) and key:
+                faction_ids.add(key)
+            if isinstance(display_name, str) and display_name:
+                faction_ids.add(display_name)
+                faction_ids.add(setting_entry_key(display_name))
+        return faction_ids
 
     def _restore_location_rename_state(
         self,
@@ -184,7 +206,7 @@ class WorldMemoryMixin:
         )
 
     def rename_location(self, location_id: str, new_name: str) -> str:
-        """Rename a location and keep the previous name as an alias."""
+        """Legacy mutation helper; prefer ``apply_location_rename_change`` for canonical history."""
         location = self._location_id_index[location_id]
         normalized_name = new_name.strip()
         existing = self._location_name_index.get(normalized_name)
@@ -210,6 +232,7 @@ class WorldMemoryMixin:
         month: int = 1,
         day: int = 1,
         calendar_key: str = "",
+        cause_event_id: Optional[str] = None,
     ) -> WorldEventRecord | None:
         """Rename a location and record the canonical world-change event."""
         command = RenameLocationCommand(
@@ -219,6 +242,7 @@ class WorldMemoryMixin:
             month=month,
             day=day,
             calendar_key=calendar_key,
+            cause_event_id=None if cause_event_id is None else EventRecordId(cause_event_id),
         )
 
         def _describe(summary_key: str, render_params: Dict[str, Any], fallback_description: str) -> str:
@@ -240,14 +264,14 @@ class WorldMemoryMixin:
         stored_records = apply_world_change_set(
             change_set,
             routes=self.routes,
-            record_event=self.record_event,
+            record_event=self.world_change_event_recorder(),
             location_index=self._location_id_index,
             location_name_index=self._location_name_index,
         )
         return stored_records[0] if stored_records else None
 
     def set_location_controlling_faction(self, location_id: str, faction_id: Optional[str]) -> Optional[str]:
-        """Set the controlling faction for a location and return the previous value."""
+        """Legacy mutation helper; prefer ``apply_controlling_faction_change`` for canonical history."""
         return apply_controlling_faction(
             self._location_id_index,
             location_id=location_id,
@@ -264,6 +288,8 @@ class WorldMemoryMixin:
         day: int = 1,
         calendar_key: str = "",
         known_faction_ids: Optional[Container[str]] = None,
+        allow_unknown_faction: bool = False,
+        cause_event_id: Optional[str] = None,
     ) -> WorldEventRecord | None:
         """Set a location's controlling faction and record the canonical world-change event."""
         command = SetLocationControllingFactionCommand(
@@ -273,6 +299,7 @@ class WorldMemoryMixin:
             month=month,
             day=day,
             calendar_key=calendar_key,
+            cause_event_id=None if cause_event_id is None else EventRecordId(cause_event_id),
         )
 
         def _describe(summary_key: str, render_params: Dict[str, Any], fallback_description: str) -> str:
@@ -282,11 +309,16 @@ class WorldMemoryMixin:
                 fallback_description=fallback_description,
             )
 
+        resolved_known_faction_ids = (
+            None
+            if allow_unknown_faction
+            else known_faction_ids if known_faction_ids is not None else self._known_faction_ids_from_setting_bundle()
+        )
         change_set = build_location_occupation_change_set(
             command,
             location_index=self._location_id_index,
             location_name=self._route_location_name,
-            known_faction_ids=known_faction_ids,
+            known_faction_ids=resolved_known_faction_ids,
             describe=_describe,
         )
         if change_set is None:
@@ -294,13 +326,13 @@ class WorldMemoryMixin:
         stored_records = apply_world_change_set(
             change_set,
             routes=self.routes,
-            record_event=self.record_event,
+            record_event=self.world_change_event_recorder(),
             location_index=self._location_id_index,
         )
         return stored_records[0] if stored_records else None
 
     def set_route_blocked(self, route_id: str, blocked: bool) -> bool:
-        """Set route passability and return the previous blocked state."""
+        """Legacy mutation helper; prefer ``apply_route_blocked_change`` for canonical history."""
         return apply_route_blocked_state(self.routes, route_id=route_id, blocked=blocked)
 
     def apply_route_blocked_change(
@@ -312,6 +344,7 @@ class WorldMemoryMixin:
         month: int = 1,
         day: int = 1,
         calendar_key: str = "",
+        cause_event_id: Optional[str] = None,
     ) -> WorldEventRecord | None:
         """Set route passability and record the canonical world-change event."""
         command = SetRouteBlockedCommand(
@@ -321,6 +354,7 @@ class WorldMemoryMixin:
             month=month,
             day=day,
             calendar_key=calendar_key,
+            cause_event_id=None if cause_event_id is None else EventRecordId(cause_event_id),
         )
 
         def _describe(summary_key: str, render_params: Dict[str, Any], fallback_description: str) -> str:
@@ -342,7 +376,7 @@ class WorldMemoryMixin:
         stored_records = apply_world_change_set(
             change_set,
             routes=self.routes,
-            record_event=self.record_event,
+            record_event=self.world_change_event_recorder(),
         )
         return stored_records[0] if stored_records else None
 
@@ -406,7 +440,7 @@ class WorldMemoryMixin:
             change_set,
             routes=self.routes,
             terrain_map=self.terrain_map,
-            record_event=self.record_event,
+            record_event=self.world_change_event_recorder(),
         )
         return stored_records[0] if stored_records else None
 

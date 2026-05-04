@@ -101,6 +101,9 @@ def test_strict_profile_includes_targeted_lint_and_full_pytest():
 def test_pyproject_includes_type_gate_scaffolding():
     assert "[tool.mypy]" in PYPROJECT_TEXT
     assert 'follow_imports = "silent"' in PYPROJECT_TEXT
+    assert '"fantasy_simulator/ids.py"' in PYPROJECT_TEXT
+    assert '"fantasy_simulator/observation"' in PYPROJECT_TEXT
+    assert '"fantasy_simulator/world_change"' in PYPROJECT_TEXT
     assert '"fantasy_simulator/world_actor_api.py"' in PYPROJECT_TEXT
     assert '"fantasy_simulator/world_topology_queries.py"' in PYPROJECT_TEXT
     assert '"fantasy_simulator/worldgen"' in PYPROJECT_TEXT

@@ -9,6 +9,7 @@ from typing import Literal, Mapping
 RouteStatus = Literal["open", "blocked"]
 CivilizationPhase = Literal["stable", "crisis", "transition", "new_era", "aftermath"]
 
+# PR-K K0 fixed vocabulary; bundle-authored era rules can replace this in a later slice.
 CIVILIZATION_PHASES: tuple[CivilizationPhase, ...] = (
     "stable",
     "crisis",
@@ -16,6 +17,7 @@ CIVILIZATION_PHASES: tuple[CivilizationPhase, ...] = (
     "new_era",
     "aftermath",
 )
+# PR-K K0 fixed vocabulary; keep score keys explicit until authored world-score rules land.
 WORLD_SCORE_KEYS = ("prosperity", "safety", "traffic", "mood")
 
 

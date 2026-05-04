@@ -100,7 +100,12 @@ def test_location_history_projection_reads_rename_names_from_impacts() -> None:
 def test_location_history_projection_includes_control_history() -> None:
     world = World()
 
-    first = world.apply_controlling_faction_change("loc_aethoria_capital", "wardens", month=2, day=3)
+    first = world.apply_controlling_faction_change(
+        "loc_aethoria_capital",
+        "stormwatch_wardens",
+        month=2,
+        day=3,
+    )
     second = world.apply_controlling_faction_change("loc_aethoria_capital", None, month=3, day=4)
 
     projection = build_location_history_projection(
@@ -113,6 +118,6 @@ def test_location_history_projection_includes_control_history() -> None:
     assert second is not None
     assert [entry.record_id for entry in projection.control_history] == [first.record_id, second.record_id]
     assert [(entry.old_faction_id, entry.new_faction_id) for entry in projection.control_history] == [
-        (None, "wardens"),
-        ("wardens", None),
+        (None, "stormwatch_wardens"),
+        ("stormwatch_wardens", None),
     ]

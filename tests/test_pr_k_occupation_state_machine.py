@@ -210,14 +210,13 @@ def test_world_occupation_record_follows_pr_k_event_contract() -> None:
     assert "location" not in record.render_params
 
 
-def test_world_occupation_change_can_reject_unknown_faction_when_strict_ids_are_supplied() -> None:
+def test_world_occupation_change_rejects_unknown_faction_by_default() -> None:
     world = World()
 
     try:
         world.apply_controlling_faction_change(
             "loc_aethoria_capital",
             "unknown_faction",
-            known_faction_ids={"stormwatch_wardens"},
         )
     except ValueError as exc:
         assert "unknown faction id" in str(exc)
@@ -226,3 +225,16 @@ def test_world_occupation_change_can_reject_unknown_faction_when_strict_ids_are_
 
     assert world.get_location_by_id("loc_aethoria_capital").controlling_faction_id is None
     assert world.event_records == []
+
+
+def test_world_occupation_change_can_explicitly_allow_unknown_faction() -> None:
+    world = World()
+
+    record = world.apply_controlling_faction_change(
+        "loc_aethoria_capital",
+        "unknown_faction",
+        allow_unknown_faction=True,
+    )
+
+    assert record is not None
+    assert world.get_location_by_id("loc_aethoria_capital").controlling_faction_id == "unknown_faction"

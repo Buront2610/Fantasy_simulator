@@ -24,8 +24,14 @@ this precedence:
 - Event rendering: `WorldEventRecord.summary_key` plus JSON-compatible
   `render_params` is the locale-aware display source when present.
   `description` remains the compatibility fallback text.
+  For new structured records, `description` may reflect the locale active when
+  the record was created; durable display should prefer `summary_key` and
+  semantic `render_params` whenever those fields exist.
   Production display may fall back to `description`; strict rendering paths
   should raise on missing translation keys or params when validating contracts.
+- Event record order: `world.event_records` is canonical insertion order.
+  Projections that need current state consume that order unless a projection
+  explicitly documents and tests a stable sort key.
 - Event visibility/querying: location queries are derived from canonical record
   metadata, including `location_id`, `location:*` tags, `render_params`
   location IDs (`location_id`, `from_location_id`, `to_location_id`,

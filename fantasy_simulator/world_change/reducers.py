@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import MutableMapping as MutableMappingABC
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, MutableMapping
+from typing import Any, Callable, Iterable, MutableMapping, Protocol, cast
 
 from fantasy_simulator.event_models import WorldEventRecord
 
@@ -20,6 +20,19 @@ from .specifications import SupportsRouteStatus, route_by_id
 
 
 EventRecorder = Callable[[WorldEventRecord], WorldEventRecord]
+
+
+class EventRecorderPort(Protocol):
+    """Port used when event recording must be transactionally restorable."""
+
+    def record(self, record: WorldEventRecord) -> WorldEventRecord: ...
+
+    def snapshot(self) -> Any: ...
+
+    def restore(self, snapshot: Any) -> None: ...
+
+
+EventRecorderInput = EventRecorder | EventRecorderPort
 
 
 @dataclass(frozen=True)
@@ -48,106 +61,6 @@ class _AppliedRuntimeUpdates:
             terrain_updates=[],
             era_updates=[],
         )
-
-
-@dataclass(frozen=True)
-class _EventRecordingSnapshot:
-    owner: Any
-    event_records: list[WorldEventRecord]
-    recent_event_ids: tuple[tuple[Any, list[str]], ...]
-    display_event_log: list[str] | None
-    event_index_state: dict[str, Any] | None
-
-    @classmethod
-    def capture(cls, record_event: EventRecorder) -> "_EventRecordingSnapshot | None":
-        owner = getattr(record_event, "__self__", None)
-        event_records = getattr(owner, "event_records", None)
-        if owner is None or not isinstance(event_records, list):
-            return None
-
-        locations_by_identity: dict[int, Any] = {}
-        for source_name in ("_location_id_index", "grid"):
-            source = getattr(owner, source_name, None)
-            if not isinstance(source, MutableMappingABC):
-                continue
-            for location in source.values():
-                if hasattr(location, "recent_event_ids"):
-                    locations_by_identity[id(location)] = location
-
-        display_event_log = getattr(owner, "_display_event_log", None)
-        event_index = getattr(owner, "_event_index", None)
-        event_index_state = None
-        if event_index is not None:
-            event_index_state = {
-                "signature": getattr(event_index, "signature", ()),
-                "record_ids": set(getattr(event_index, "record_ids", set())),
-                "by_location": {
-                    key: list(value) for key, value in getattr(event_index, "by_location", {}).items()
-                },
-                "by_actor": {
-                    key: list(value) for key, value in getattr(event_index, "by_actor", {}).items()
-                },
-                "by_year": {
-                    key: list(value) for key, value in getattr(event_index, "by_year", {}).items()
-                },
-                "by_month": {
-                    key: list(value) for key, value in getattr(event_index, "by_month", {}).items()
-                },
-                "by_kind": {
-                    key: list(value) for key, value in getattr(event_index, "by_kind", {}).items()
-                },
-            }
-
-        return cls(
-            owner=owner,
-            event_records=list(event_records),
-            recent_event_ids=tuple(
-                (location, list(location.recent_event_ids))
-                for location in locations_by_identity.values()
-            ),
-            display_event_log=None if not isinstance(display_event_log, list) else list(display_event_log),
-            event_index_state=event_index_state,
-        )
-
-    def restore(self) -> None:
-        event_records = getattr(self.owner, "event_records", None)
-        if isinstance(event_records, list):
-            event_records[:] = self.event_records
-        else:
-            self.owner.event_records = list(self.event_records)
-
-        for location, recent_event_ids in self.recent_event_ids:
-            location.recent_event_ids = list(recent_event_ids)
-
-        if self.display_event_log is not None:
-            display_event_log = getattr(self.owner, "_display_event_log", None)
-            if isinstance(display_event_log, list):
-                display_event_log[:] = self.display_event_log
-            else:
-                self.owner._display_event_log = list(self.display_event_log)
-
-        event_index = getattr(self.owner, "_event_index", None)
-        if event_index is None or self.event_index_state is None:
-            if event_index is not None and hasattr(event_index, "invalidate"):
-                event_index.invalidate()
-            return
-        event_index.signature = self.event_index_state["signature"]
-        event_index.record_ids = set(self.event_index_state["record_ids"])
-        event_index.by_location = {
-            key: list(value) for key, value in self.event_index_state["by_location"].items()
-        }
-        event_index.by_actor = {
-            key: list(value) for key, value in self.event_index_state["by_actor"].items()
-        }
-        event_index.by_year = {
-            key: list(value) for key, value in self.event_index_state["by_year"].items()
-        }
-        event_index.by_month = {
-            key: list(value) for key, value in self.event_index_state["by_month"].items()
-        }
-        event_index.by_kind = {
-            key: list(value) for key, value in self.event_index_state["by_kind"].items()
-        }
 
 
 def _apply_route_update(routes: Iterable[SupportsRouteStatus], update: RouteUpdate) -> None:
@@ -252,13 +165,21 @@ def _rollback_era_runtime_update(era_runtime: Any, update: EraRuntimeUpdate) -> 
 
 def _event_recording_snapshot(
     change_set: WorldChangeSet,
-    record_event: EventRecorder,
-) -> _EventRecordingSnapshot | None:
+    record_event: EventRecorderInput,
+) -> Any | None:
     event_count = len(change_set.events)
-    snapshot = _EventRecordingSnapshot.capture(record_event) if event_count > 1 else None
-    if event_count > 1 and snapshot is None:
+    if event_count <= 1:
+        return None
+    if not _is_event_recorder_port(record_event):
         raise ValueError("multi-event changesets require a snapshot-capable event recorder")
-    return snapshot
+    return cast(EventRecorderPort, record_event).snapshot()
+
+
+def _is_event_recorder_port(record_event: EventRecorderInput) -> bool:
+    return all(
+        callable(getattr(record_event, method_name, None))
+        for method_name in ("record", "snapshot", "restore")
+    )
 
 
 def _validate_runtime_requirements(change_set: WorldChangeSet, context: _ReducerRuntimeContext) -> None:
@@ -331,16 +252,20 @@ def _rollback_runtime_updates(
 
 def _record_world_change_events(
     events: Iterable[WorldEventRecord],
-    record_event: EventRecorder,
+    record_event: EventRecorderInput,
 ) -> tuple[WorldEventRecord, ...]:
-    return tuple(record_event(record) for record in events)
+    if _is_event_recorder_port(record_event):
+        recorder_port = cast(EventRecorderPort, record_event)
+        return tuple(recorder_port.record(record) for record in events)
+    recorder = cast(EventRecorder, record_event)
+    return tuple(recorder(record) for record in events)
 
 
 def apply_world_change_set(
     change_set: WorldChangeSet,
     *,
     routes: Iterable[SupportsRouteStatus],
-    record_event: EventRecorder,
+    record_event: EventRecorderInput,
     location_index: MutableMapping[str, Any] | None = None,
     location_name_index: MutableMapping[str, Any] | None = None,
     terrain_map: Any | None = None,
@@ -361,7 +286,7 @@ def apply_world_change_set(
         applied_updates = _apply_runtime_updates(change_set, context)
         return _record_world_change_events(change_set.events, record_event)
     except Exception:
-        if event_recording_snapshot is not None:
-            event_recording_snapshot.restore()
+        if event_recording_snapshot is not None and _is_event_recorder_port(record_event):
+            cast(EventRecorderPort, record_event).restore(event_recording_snapshot)
         _rollback_runtime_updates(applied_updates, context)
         raise

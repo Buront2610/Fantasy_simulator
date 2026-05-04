@@ -159,6 +159,43 @@ def test_location_rename_record_follows_pr_k_event_contract() -> None:
     assert render_event_record(record, locale="en", world=world) != record.summary_key
 
 
+def test_world_change_records_preserve_cause_event_id_in_render_params() -> None:
+    world = World()
+    route = world.routes[0]
+
+    route_record = world.apply_route_blocked_change(
+        route.route_id,
+        True,
+        cause_event_id="cause_route",
+    )
+    rename_record = world.apply_location_rename_change(
+        "loc_aethoria_capital",
+        "Aethoria March",
+        cause_event_id="cause_rename",
+    )
+    occupation_record = world.apply_controlling_faction_change(
+        "loc_aethoria_capital",
+        "stormwatch_wardens",
+        cause_event_id="cause_occupation",
+    )
+    terrain_record = world.apply_terrain_cell_change(
+        2,
+        2,
+        biome="forest",
+        location_id="loc_aethoria_capital",
+        cause_event_id="cause_terrain",
+    )
+
+    assert route_record is not None
+    assert rename_record is not None
+    assert occupation_record is not None
+    assert terrain_record is not None
+    assert route_record.render_params["cause_event_id"] == "cause_route"
+    assert rename_record.render_params["cause_event_id"] == "cause_rename"
+    assert occupation_record.render_params["cause_event_id"] == "cause_occupation"
+    assert terrain_record.render_params["cause_event_id"] == "cause_terrain"
+
+
 def test_terrain_cell_mutation_record_follows_pr_k_event_contract() -> None:
     previous_locale = get_locale()
     set_locale("en")
