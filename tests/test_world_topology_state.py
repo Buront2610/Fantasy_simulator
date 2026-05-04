@@ -79,3 +79,50 @@ def test_overlay_serialized_route_state_rejects_endpoint_mismatch() -> None:
                 }
             ],
         )
+
+
+def test_overlay_serialized_route_state_rejects_unknown_route_id_for_canonical_pair() -> None:
+    routes = [RouteEdge("route_1", "loc_one", "loc_two", "road", 3, blocked=False)]
+
+    with pytest.raises(ValueError, match="unknown route id"):
+        overlay_serialized_route_state(
+            routes,
+            [
+                {
+                    "route_id": "route_1",
+                    "from_site_id": "loc_one",
+                    "to_site_id": "loc_two",
+                    "route_type": "road",
+                    "distance": 3,
+                    "blocked": False,
+                },
+                {
+                    "route_id": "route_extra",
+                    "from_site_id": "loc_one",
+                    "to_site_id": "loc_two",
+                    "route_type": "road",
+                    "distance": 3,
+                    "blocked": False,
+                },
+            ],
+        )
+
+
+def test_overlay_serialized_route_state_ignores_stale_unknown_route_topology() -> None:
+    routes = [RouteEdge("route_1", "loc_one", "loc_two", "road", 3, blocked=False)]
+
+    overlay_serialized_route_state(
+        routes,
+        [
+            {
+                "route_id": "route_stale",
+                "from_site_id": "loc_three",
+                "to_site_id": "loc_three",
+                "route_type": "road",
+                "distance": 1,
+                "blocked": True,
+            }
+        ],
+    )
+
+    assert routes[0].blocked is False

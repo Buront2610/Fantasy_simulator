@@ -16,11 +16,17 @@ form that tests can enforce.
 - `fantasy_simulator/world.py`, `events.py`, `character.py`, `terrain.py`,
   `reports.py`, `rumor.py`: domain and reporting primitives shared by higher
   layers.
+- `fantasy_simulator/world_change/`: headless PR-K command, state machine,
+  event-adapter, changeset, and reducer primitives for dynamic world changes.
+- `fantasy_simulator/observation/`: headless read-model projections for reports,
+  atlas/region/detail views, story, and rumor surfaces.
 
 ## Dependency Rules
 
 - `simulation/` must not import `ui/` or `persistence/`.
 - `persistence/` must not import `ui/`.
+- `world_change/` must not import `ui/`, `persistence/`, Rich, or Textual.
+- `observation/` must not import `ui/`, `persistence/`, Rich, or Textual.
 - Core UI modules (`input_backend.py`, `render_backend.py`, `ui_context.py`,
   `ui_helpers.py`, `presenters.py`, `view_models.py`, `map_renderer.py`,
   `atlas_renderer.py`) must not import `simulation/` or `persistence/`.

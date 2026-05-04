@@ -3,10 +3,24 @@
 from __future__ import annotations
 
 import random
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Container, Dict, List, Optional, Tuple
 
-from .event_models import LOCATION_TAG_PREFIX, WorldEventRecord
+from .content.setting_bundle_inspection import setting_entry_key
+from .event_models import WorldEventRecord
 from .event_rendering import render_event_record
+from .ids import EventRecordId, FactionId, LocationId, RouteId
+from .terrain import BIOME_TYPES
+from .world_change import (
+    MutateTerrainCellCommand,
+    RenameLocationCommand,
+    SetLocationControllingFactionCommand,
+    SetRouteBlockedCommand,
+    apply_world_change_set,
+    build_location_occupation_change_set,
+    build_location_rename_change_set,
+    build_route_blocked_change_set,
+    build_terrain_cell_mutation_change_set,
+)
 from .world_actor_index import (
     location_ids as location_ids_for_locations,
     location_name as location_name_for_id,
@@ -16,7 +30,6 @@ from .world_dynamic_changes import (
     apply_controlling_faction,
     apply_location_rename,
     apply_route_blocked_state,
-    route_by_id,
 )
 from .world_location_state import LocationState
 from .world_memory import (
@@ -41,12 +54,14 @@ class WorldMemoryMixin:
         year: int
         grid: Dict[Tuple[int, int], LocationState]
         routes: RouteCollection
+        terrain_map: Any
         memorials: Dict[str, MemorialRecord]
         _location_id_index: Dict[str, LocationState]
         _location_name_index: Dict[str, LocationState]
 
         def get_travel_neighboring_locations(self, location_id: str) -> List[LocationState]: ...
         def record_event(self, record: WorldEventRecord) -> WorldEventRecord: ...
+        def world_change_event_recorder(self) -> Any: ...
 
     def _record_world_change(
         self,
@@ -104,6 +119,26 @@ class WorldMemoryMixin:
         if not description:
             raise ValueError("world-change event description must not be empty")
         return description
+
+    def _known_faction_ids_from_setting_bundle(self) -> set[str] | None:
+        bundle = getattr(self, "_setting_bundle", None)
+        if bundle is None:
+            bundle = getattr(self, "setting_bundle", None)
+        world_definition = getattr(bundle, "world_definition", None)
+        faction_entries = getattr(world_definition, "faction_entries", None)
+        if not callable(faction_entries):
+            return None
+
+        faction_ids: set[str] = set()
+        for entry in faction_entries():
+            key = getattr(entry, "key", "")
+            display_name = getattr(entry, "display_name", "")
+            if isinstance(key, str) and key:
+                faction_ids.add(key)
+            if isinstance(display_name, str) and display_name:
+                faction_ids.add(display_name)
+                faction_ids.add(setting_entry_key(display_name))
+        return faction_ids
 
     def _restore_location_rename_state(
         self,
@@ -171,7 +206,7 @@ class WorldMemoryMixin:
         )
 
     def rename_location(self, location_id: str, new_name: str) -> str:
-        """Rename a location and keep the previous name as an alias."""
+        """Legacy mutation helper; prefer ``apply_location_rename_change`` for canonical history."""
         location = self._location_id_index[location_id]
         normalized_name = new_name.strip()
         existing = self._location_name_index.get(normalized_name)
@@ -197,55 +232,46 @@ class WorldMemoryMixin:
         month: int = 1,
         day: int = 1,
         calendar_key: str = "",
+        cause_event_id: Optional[str] = None,
     ) -> WorldEventRecord | None:
         """Rename a location and record the canonical world-change event."""
-        location = self._location_id_index[location_id]
-        rollback_name = location.canonical_name
-        rollback_aliases = list(location.aliases)
-        old_name = self.rename_location(location_id, new_name)
-        if old_name == location.canonical_name:
-            return None
-        render_params = {
-            "location_id": location_id,
-            "old_name": old_name,
-            "new_name": location.canonical_name,
-        }
-        summary_key = "events.location_renamed.summary"
-        try:
-            return self._record_world_change(
-                kind="location_renamed",
-                location_id=location_id,
-                description=self._world_change_description(
-                    summary_key=summary_key,
-                    render_params=render_params,
-                    fallback_description=f"{old_name} was renamed {location.canonical_name}.",
-                ),
+        command = RenameLocationCommand(
+            location_id=LocationId(location_id),
+            new_name=new_name,
+            year=self.year if year is None else year,
+            month=month,
+            day=day,
+            calendar_key=calendar_key,
+            cause_event_id=None if cause_event_id is None else EventRecordId(cause_event_id),
+        )
+
+        def _describe(summary_key: str, render_params: Dict[str, Any], fallback_description: str) -> str:
+            return self._world_change_description(
                 summary_key=summary_key,
                 render_params=render_params,
-                impacts=[
-                    {
-                        "target_type": "location",
-                        "target_id": location_id,
-                        "attribute": "canonical_name",
-                        "old_value": old_name,
-                        "new_value": location.canonical_name,
-                    }
-                ],
-                year=year,
-                month=month,
-                day=day,
-                calendar_key=calendar_key,
+                fallback_description=fallback_description,
             )
-        except Exception:
-            self._restore_location_rename_state(
-                location_id,
-                canonical_name=rollback_name,
-                aliases=rollback_aliases,
-            )
-            raise
+
+        change_set = build_location_rename_change_set(
+            command,
+            location_index=self._location_id_index,
+            location_name_index=self._location_name_index,
+            max_aliases=self.MAX_ALIASES,
+            describe=_describe,
+        )
+        if change_set is None:
+            return None
+        stored_records = apply_world_change_set(
+            change_set,
+            routes=self.routes,
+            record_event=self.world_change_event_recorder(),
+            location_index=self._location_id_index,
+            location_name_index=self._location_name_index,
+        )
+        return stored_records[0] if stored_records else None
 
     def set_location_controlling_faction(self, location_id: str, faction_id: Optional[str]) -> Optional[str]:
-        """Set the controlling faction for a location and return the previous value."""
+        """Legacy mutation helper; prefer ``apply_controlling_faction_change`` for canonical history."""
         return apply_controlling_faction(
             self._location_id_index,
             location_id=location_id,
@@ -261,56 +287,52 @@ class WorldMemoryMixin:
         month: int = 1,
         day: int = 1,
         calendar_key: str = "",
+        known_faction_ids: Optional[Container[str]] = None,
+        allow_unknown_faction: bool = False,
+        cause_event_id: Optional[str] = None,
     ) -> WorldEventRecord | None:
         """Set a location's controlling faction and record the canonical world-change event."""
-        old_faction_id = self.set_location_controlling_faction(location_id, faction_id)
-        location = self._location_id_index[location_id]
-        new_faction_id = location.controlling_faction_id
-        if old_faction_id == new_faction_id:
-            return None
-        render_params = {
-            "location": location.canonical_name,
-            "location_id": location_id,
-            "old_faction_id": old_faction_id,
-            "new_faction_id": new_faction_id,
-        }
-        old_faction_fallback = old_faction_id or "none"
-        new_faction_fallback = new_faction_id or "none"
-        summary_key = "events.location_faction_changed.summary"
-        try:
-            return self._record_world_change(
-                kind="location_faction_changed",
-                location_id=location_id,
-                description=self._world_change_description(
-                    summary_key=summary_key,
-                    render_params=render_params,
-                    fallback_description=(
-                        f"{location.canonical_name} changed controlling faction from "
-                        f"{old_faction_fallback} to {new_faction_fallback}."
-                    ),
-                ),
+        command = SetLocationControllingFactionCommand(
+            location_id=LocationId(location_id),
+            faction_id=None if faction_id is None else FactionId(faction_id),
+            year=self.year if year is None else year,
+            month=month,
+            day=day,
+            calendar_key=calendar_key,
+            cause_event_id=None if cause_event_id is None else EventRecordId(cause_event_id),
+        )
+
+        def _describe(summary_key: str, render_params: Dict[str, Any], fallback_description: str) -> str:
+            return self._world_change_description(
                 summary_key=summary_key,
                 render_params=render_params,
-                impacts=[
-                    {
-                        "target_type": "location",
-                        "target_id": location_id,
-                        "attribute": "controlling_faction_id",
-                        "old_value": old_faction_id,
-                        "new_value": new_faction_id,
-                    }
-                ],
-                year=year,
-                month=month,
-                day=day,
-                calendar_key=calendar_key,
+                fallback_description=fallback_description,
             )
-        except Exception:
-            self.set_location_controlling_faction(location_id, old_faction_id)
-            raise
+
+        resolved_known_faction_ids = (
+            None
+            if allow_unknown_faction
+            else known_faction_ids if known_faction_ids is not None else self._known_faction_ids_from_setting_bundle()
+        )
+        change_set = build_location_occupation_change_set(
+            command,
+            location_index=self._location_id_index,
+            location_name=self._route_location_name,
+            known_faction_ids=resolved_known_faction_ids,
+            describe=_describe,
+        )
+        if change_set is None:
+            return None
+        stored_records = apply_world_change_set(
+            change_set,
+            routes=self.routes,
+            record_event=self.world_change_event_recorder(),
+            location_index=self._location_id_index,
+        )
+        return stored_records[0] if stored_records else None
 
     def set_route_blocked(self, route_id: str, blocked: bool) -> bool:
-        """Set route passability and return the previous blocked state."""
+        """Legacy mutation helper; prefer ``apply_route_blocked_change`` for canonical history."""
         return apply_route_blocked_state(self.routes, route_id=route_id, blocked=blocked)
 
     def apply_route_blocked_change(
@@ -322,58 +344,107 @@ class WorldMemoryMixin:
         month: int = 1,
         day: int = 1,
         calendar_key: str = "",
+        cause_event_id: Optional[str] = None,
     ) -> WorldEventRecord | None:
         """Set route passability and record the canonical world-change event."""
-        route = route_by_id(self.routes, route_id=route_id)
-        old_blocked = self.set_route_blocked(route_id, blocked)
-        new_blocked = bool(route.blocked)
-        if old_blocked == new_blocked:
-            return None
-        route_kind = "route_blocked" if new_blocked else "route_reopened"
-        summary_key = f"events.{route_kind}.summary"
-        render_params = {
-            "route_id": route_id,
-            "from_location_id": route.from_site_id,
-            "to_location_id": route.to_site_id,
-            "endpoint_location_ids": [route.from_site_id, route.to_site_id],
-        }
-        route_verb = "blocked" if new_blocked else "reopened"
-        from_location = self._route_location_name(route.from_site_id)
-        to_location = self._route_location_name(route.to_site_id)
-        try:
-            return self._record_world_change(
-                kind=route_kind,
-                location_id=route.from_site_id,
-                description=self._world_change_description(
-                    summary_key=summary_key,
-                    render_params=render_params,
-                    fallback_description=(
-                        f"The route from {from_location} to {to_location} was {route_verb}."
-                    ),
-                ),
+        command = SetRouteBlockedCommand(
+            route_id=RouteId(route_id),
+            blocked=blocked,
+            year=self.year if year is None else year,
+            month=month,
+            day=day,
+            calendar_key=calendar_key,
+            cause_event_id=None if cause_event_id is None else EventRecordId(cause_event_id),
+        )
+
+        def _describe(summary_key: str, render_params: Dict[str, Any], fallback_description: str) -> str:
+            return self._world_change_description(
                 summary_key=summary_key,
                 render_params=render_params,
-                tags=[
-                    f"{LOCATION_TAG_PREFIX}{route.from_site_id}",
-                    f"{LOCATION_TAG_PREFIX}{route.to_site_id}",
-                ],
-                impacts=[
-                    {
-                        "target_type": "route",
-                        "target_id": route_id,
-                        "attribute": "blocked",
-                        "old_value": old_blocked,
-                        "new_value": new_blocked,
-                    }
-                ],
-                year=year,
-                month=month,
-                day=day,
-                calendar_key=calendar_key,
+                fallback_description=fallback_description,
             )
-        except Exception:
-            self.set_route_blocked(route_id, old_blocked)
-            raise
+
+        change_set = build_route_blocked_change_set(
+            command,
+            routes=self.routes,
+            location_ids=set(self.location_ids),
+            location_name=self._route_location_name,
+            describe=_describe,
+        )
+        if change_set is None:
+            return None
+        stored_records = apply_world_change_set(
+            change_set,
+            routes=self.routes,
+            record_event=self.world_change_event_recorder(),
+        )
+        return stored_records[0] if stored_records else None
+
+    def apply_terrain_cell_change(
+        self,
+        x: int,
+        y: int,
+        *,
+        biome: Optional[str] = None,
+        elevation: Optional[int] = None,
+        moisture: Optional[int] = None,
+        temperature: Optional[int] = None,
+        location_id: Optional[str] = None,
+        year: Optional[int] = None,
+        month: int = 1,
+        day: int = 1,
+        calendar_key: str = "",
+        reason_key: str = "",
+        cause_event_id: Optional[str] = None,
+    ) -> WorldEventRecord | None:
+        """Mutate one terrain cell and record the canonical world-change event."""
+        location = self.grid.get((x, y))
+        if location_id is not None:
+            if location_id not in self._location_id_index:
+                raise KeyError(location_id)
+            if location is None:
+                raise ValueError(f"terrain cell ({x}, {y}) is not associated with location {location_id}")
+            if location is not None and location.id != location_id:
+                raise ValueError(f"terrain cell ({x}, {y}) belongs to location {location.id}, not {location_id}")
+        resolved_location_id = location_id if location_id is not None else None if location is None else location.id
+        command = MutateTerrainCellCommand(
+            x=x,
+            y=y,
+            biome=biome,
+            elevation=elevation,
+            moisture=moisture,
+            temperature=temperature,
+            location_id=None if resolved_location_id is None else LocationId(resolved_location_id),
+            year=self.year if year is None else year,
+            month=month,
+            day=day,
+            calendar_key=calendar_key,
+            reason_key=reason_key,
+            cause_event_id=None if cause_event_id is None else EventRecordId(cause_event_id),
+        )
+
+        def _describe(summary_key: str, render_params: Dict[str, Any], fallback_description: str) -> str:
+            return self._world_change_description(
+                summary_key=summary_key,
+                render_params=render_params,
+                fallback_description=fallback_description,
+            )
+
+        change_set = build_terrain_cell_mutation_change_set(
+            command,
+            terrain_map=self.terrain_map,
+            allowed_biomes=BIOME_TYPES,
+            describe=_describe,
+        )
+        if change_set is None:
+            return None
+        stored_records = apply_world_change_set(
+            change_set,
+            routes=self.routes,
+            terrain_map=self.terrain_map,
+            record_event=self.world_change_event_recorder(),
+        )
+        return stored_records[0] if stored_records else None
 
     def get_memorials_for_location(self, location_id: str) -> List[MemorialRecord]:
         """Return all ``MemorialRecord`` objects associated with a location."""

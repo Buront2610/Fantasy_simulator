@@ -239,33 +239,35 @@ def test_apply_controlling_faction_change_updates_location_and_records_event():
     world = World()
 
     try:
-        first = world.apply_controlling_faction_change("loc_aethoria_capital", "wardens")
-        second = world.apply_controlling_faction_change("loc_aethoria_capital", "dawn_court")
+        first = world.apply_controlling_faction_change("loc_aethoria_capital", "stormwatch_wardens")
+        second = world.apply_controlling_faction_change(
+            "loc_aethoria_capital",
+            "silverbrook_merchant_league",
+        )
     finally:
         set_locale(previous_locale)
 
     location = world.get_location_by_id("loc_aethoria_capital")
-    assert location.controlling_faction_id == "dawn_court"
+    assert location.controlling_faction_id == "silverbrook_merchant_league"
     assert first.kind == "location_faction_changed"
     assert second.kind == "location_faction_changed"
     assert second.summary_key == "events.location_faction_changed.summary"
     assert second.render_params == {
-        "location": "Aethoria Capital",
         "location_id": "loc_aethoria_capital",
-        "old_faction_id": "wardens",
-        "new_faction_id": "dawn_court",
+        "old_faction_id": "stormwatch_wardens",
+        "new_faction_id": "silverbrook_merchant_league",
     }
     assert second.impacts == [
         {
             "target_type": "location",
             "target_id": "loc_aethoria_capital",
             "attribute": "controlling_faction_id",
-            "old_value": "wardens",
-            "new_value": "dawn_court",
+            "old_value": "stormwatch_wardens",
+            "new_value": "silverbrook_merchant_league",
         }
     ]
     assert render_event_record(second, locale="en") == (
-        "Aethoria Capital changed controlling faction from wardens to dawn_court."
+        "Aethoria Capital changed controlling faction from stormwatch_wardens to silverbrook_merchant_league."
     )
 
 
@@ -273,12 +275,12 @@ def test_apply_controlling_faction_change_noops_when_faction_is_unchanged():
     world = World()
     location = world.get_location_by_id("loc_aethoria_capital")
     assert location is not None
-    location.controlling_faction_id = "wardens"
+    location.controlling_faction_id = "stormwatch_wardens"
 
-    record = world.apply_controlling_faction_change("loc_aethoria_capital", "wardens")
+    record = world.apply_controlling_faction_change("loc_aethoria_capital", "stormwatch_wardens")
 
     assert record is None
-    assert location.controlling_faction_id == "wardens"
+    assert location.controlling_faction_id == "stormwatch_wardens"
     assert world.event_records == []
 
 
@@ -308,7 +310,7 @@ def test_world_change_record_created_in_en_renders_event_log_and_report_in_ja():
     try:
         record = world.apply_controlling_faction_change(
             "loc_aethoria_capital",
-            "wardens",
+            "stormwatch_wardens",
             month=2,
         )
     finally:
@@ -316,10 +318,10 @@ def test_world_change_record_created_in_en_renders_event_log_and_report_in_ja():
 
     set_locale("ja")
     try:
-        expected = "Aethoria Capital の支配勢力が なし から wardens に変わった。"
+        expected = "Aethoria Capital の支配勢力が なし から Stormwatch Wardens に変わった。"
         report = generate_monthly_report(world, record.year, record.month)
 
-        assert render_event_record(record) == expected
+        assert render_event_record(record, world=world) == expected
         assert any(expected in line for line in world.event_log)
         assert expected in report.notable_events
     finally:
@@ -381,7 +383,7 @@ def test_apply_controlling_faction_change_rolls_back_when_recording_fails(monkey
     monkeypatch.setattr(world, "record_event", _fail_record_event)
 
     try:
-        world.apply_controlling_faction_change("loc_aethoria_capital", "wardens")
+        world.apply_controlling_faction_change("loc_aethoria_capital", "stormwatch_wardens")
     except ValueError as exc:
         assert "duplicate record" in str(exc)
     else:

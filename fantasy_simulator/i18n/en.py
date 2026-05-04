@@ -377,6 +377,21 @@ TEXT_EN: Dict[str, str] = {
     'events.location_faction_changed.summary': (
         '{location} changed controlling faction from {old_faction} to {new_faction}.'
     ),
+    'events.terrain_cell_mutated.summary': (
+        'Terrain at ({x}, {y}) changed: {change_summary}.'
+    ),
+    'event_terrain_change_biome': 'biome from {old_biome} to {new_biome}',
+    'event_terrain_change_elevation': 'elevation from {old_elevation} to {new_elevation}',
+    'event_terrain_change_moisture': 'moisture from {old_moisture} to {new_moisture}',
+    'event_terrain_change_temperature': 'temperature from {old_temperature} to {new_temperature}',
+    'event_terrain_change_separator': ', ',
+    'event_terrain_change_noop': 'no visible attributes',
+    'events.era_shifted.summary': (
+        'The era shifted from {old_era_key} to {new_era_key}; civilization entered {new_civilization_phase}.'
+    ),
+    'events.civilization_phase_drifted.summary': (
+        'Civilization drifted from {old_civilization_phase} to {new_civilization_phase}.'
+    ),
     'event_change_no_faction': 'none',
     'times_suffix': 'times',
     'report_monthly_title': 'Aethoria Monthly Report - Year {year}, {season} Month {month}',
@@ -541,6 +556,14 @@ TEXT_EN: Dict[str, str] = {
     'monthly_report_card_locations': '  Notable places: {names}',
     'monthly_report_card_adventures': '  Recent adventures: {items}',
     'monthly_report_card_memory': '  New memories: {items}',
+    'world_change_category_route': 'Route',
+    'world_change_category_location': 'Location',
+    'world_change_category_occupation': 'Occupation',
+    'world_change_category_terrain': 'Terrain',
+    'world_change_category_war': 'War',
+    'world_change_category_era': 'Era',
+    'world_change_category_civilization': 'Civilization',
+    'world_change_category_world_change': 'World change',
     'auto_pause_context': 'Cause context: {actor} @ {location}',
     'auto_pause_supplemental': 'Additional pause reasons: {reasons}',
     # PR-G: terrain / route / site labels

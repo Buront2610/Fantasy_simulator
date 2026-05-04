@@ -36,7 +36,9 @@ jobs:
           fantasy_simulator/event_rendering.py
           fantasy_simulator/events_combat.py
           fantasy_simulator/events_relationships.py
+          fantasy_simulator/ids.py
           fantasy_simulator/location_observation.py
+          fantasy_simulator/observation
           fantasy_simulator/reports.py
           fantasy_simulator/rumor_generation.py
           fantasy_simulator/simulation/event_recorder.py
@@ -82,6 +84,7 @@ jobs:
           fantasy_simulator/world_topology_runtime.py
           fantasy_simulator/world_topology_state.py
           fantasy_simulator/world_topology.py
+          fantasy_simulator/world_change
           fantasy_simulator/worldgen
           tools/worldgen_poc
       - name: Run tests

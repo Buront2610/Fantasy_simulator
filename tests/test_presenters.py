@@ -174,3 +174,55 @@ def test_monthly_report_card_surfaces_hot_rumors():
 
     assert any("Rumors" in line for line in lines)
     assert any("Something happened at the capital." in line for line in lines)
+
+
+def test_monthly_report_card_surfaces_world_change_projection_summary():
+    set_locale("en")
+    world = World()
+    route = world.routes[0]
+    world.apply_route_blocked_change(route.route_id, True, month=3)
+    world.record_event(
+        WorldEventRecord(
+            record_id="rec_occupation",
+            kind="location_faction_changed",
+            year=world.year,
+            month=3,
+            location_id="loc_aethoria_capital",
+            description="Aethoria Capital changed hands.",
+        )
+    )
+
+    card = build_monthly_report_card_view(world, world.year, 3)
+    lines = ReportPresenter.render_monthly_card(card)
+
+    assert [(item.category, item.count) for item in card.world_changes] == [
+        ("occupation", 1),
+        ("route", 1),
+    ]
+    assert any("World News" in line and "Occupation: 1" in line and "Route: 1" in line for line in lines)
+
+
+def test_monthly_report_card_renders_world_change_category_display_labels():
+    set_locale("en")
+    world = World()
+    route = world.routes[0]
+    world.apply_route_blocked_change(route.route_id, True, month=3)
+    world.record_event(
+        WorldEventRecord(
+            record_id="rec_occupation",
+            kind="location_faction_changed",
+            year=world.year,
+            month=3,
+            location_id="loc_aethoria_capital",
+            description="Aethoria Capital changed hands.",
+        )
+    )
+
+    card = build_monthly_report_card_view(world, world.year, 3)
+    lines = ReportPresenter.render_monthly_card(card)
+    world_news_line = next(line for line in lines if "World News" in line)
+
+    assert "Occupation: 1" in world_news_line
+    assert "Route: 1" in world_news_line
+    assert "occupation: 1" not in world_news_line
+    assert "route: 1" not in world_news_line
