@@ -274,11 +274,11 @@ terrain-cell mutation:
   contract tests are part of the standard quality-gate target list, including
   the terrain mutation state-machine target.
 - Save schema remains v8 for these slices because route state, location
-  aliases, controlling faction state, terrain mutation snapshots, and canonical
+  aliases, controlling faction state, terrain mutation records, and canonical
   event records already have durable fields. Bundle-backed worlds omit derived
-  terrain unless runtime terrain cells change, then persist a complete
-  `terrain_map` snapshot that load validates before overlaying on
-  bundle-derived topology. World-level era runtime remains
+  terrain, replay canonical `terrain_cell_mutated` records as a sparse overlay
+  when possible, and fall back to a complete validated `terrain_map` snapshot
+  for direct or unreplayable terrain edits. World-level era runtime remains
   pre-persistence/headless until its save policy is settled. Same-era phase
   changes are explicit civilization drift commands, not silent era-shift no-ops.
 
@@ -326,8 +326,9 @@ rewrite. A successful mutation must:
 - emit one canonical `WorldEventRecord` with kind `terrain_cell_mutated`;
 - reduce the prepared runtime update into `TerrainMap.set_cell()` or an
   equivalent full-cell replacement;
-- keep persistence at schema v8 by relying on the complete `terrain_map`
-  snapshot policy for mutated bundle-backed terrain.
+- keep persistence at schema v8 by replaying canonical terrain mutation records
+  as a sparse overlay when possible, with complete `terrain_map` snapshots
+  retained as the fallback for direct or unreplayable terrain edits.
 
 Required semantic record data:
 

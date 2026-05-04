@@ -6,9 +6,13 @@ from typing import Any, Callable, Dict, Mapping, Type
 
 from .content.setting_bundle import CalendarDefinition, bundle_from_dict_validated
 from .language.state import LanguageEvolutionRecord, LanguageRuntimeState
-from .terrain import AtlasLayout, TerrainMap
+from .terrain import AtlasLayout, BIOME_TYPES, TerrainMap
 from .world_event_record_updates import normalize_event_record_locations
 from .world_topology_state import build_topology_from_locations, restore_serialized_topology
+
+
+_TERRAIN_CELL_MUTATION_KIND = "terrain_cell_mutated"
+_TERRAIN_MUTATION_ATTRIBUTES = ("biome", "elevation", "moisture", "temperature")
 
 
 def _serialized_location_id_aliases(world: Any, serialized_grid: list[Any]) -> Dict[str, str]:
@@ -60,12 +64,10 @@ def _terrain_maps_equal(left: TerrainMap, right: TerrainMap) -> bool:
     return True
 
 
-def _bundle_derived_terrain_matches_current(world: Any) -> bool:
-    """Return whether current terrain still matches the active bundle derivation."""
-    if world.terrain_map is None:
-        return True
+def _bundle_derived_terrain(world: Any) -> TerrainMap | None:
+    """Return the terrain map currently derivable from the active bundle."""
     location_ids = set(world._location_id_index)
-    derived = build_topology_from_locations(
+    return build_topology_from_locations(
         width=world.width,
         height=world.height,
         locations=world.grid.values(),
@@ -76,7 +78,94 @@ def _bundle_derived_terrain_matches_current(world: Any) -> bool:
         ],
         explicit_route_graph=True,
     ).terrain_map
-    return derived is not None and _terrain_maps_equal(world.terrain_map, derived)
+
+
+def _clone_terrain_map(terrain_map: TerrainMap) -> TerrainMap:
+    """Return a detached copy of a terrain map."""
+    return TerrainMap.from_dict(terrain_map.to_dict())
+
+
+def _terrain_record_coords(record: Any) -> tuple[int, int]:
+    """Extract terrain-cell coordinates from a canonical mutation record."""
+    params = record.render_params
+    x = params.get("x")
+    y = params.get("y")
+    if type(x) is not int or type(y) is not int:
+        raise ValueError("terrain_cell_mutated records must include integer x/y render params")
+    return x, y
+
+
+def _terrain_record_value(record: Any, prefix: str, attribute: str) -> Any:
+    """Extract and validate a recorded terrain attribute value."""
+    key = f"{prefix}_{attribute}"
+    if key not in record.render_params:
+        raise ValueError(f"terrain_cell_mutated records must include {key!r}")
+    value = record.render_params[key]
+    if attribute == "biome":
+        if not isinstance(value, str) or value not in BIOME_TYPES:
+            raise ValueError("terrain_cell_mutated biome must be a known terrain biome")
+        return value
+    if type(value) is not int or not 0 <= value <= 255:
+        raise ValueError(f"terrain_cell_mutated {attribute} must be an integer between 0 and 255")
+    return value
+
+
+def _terrain_record_changed_attributes(record: Any) -> list[str]:
+    """Return the validated changed-attribute list from a terrain record."""
+    changed_attributes = record.render_params.get("changed_attributes")
+    if not isinstance(changed_attributes, list) or not changed_attributes:
+        raise ValueError("terrain_cell_mutated records must include non-empty changed_attributes")
+    if any(attribute not in _TERRAIN_MUTATION_ATTRIBUTES for attribute in changed_attributes):
+        raise ValueError("terrain_cell_mutated changed_attributes contains an unknown attribute")
+    if len(set(changed_attributes)) != len(changed_attributes):
+        raise ValueError("terrain_cell_mutated changed_attributes contains duplicates")
+    return [str(attribute) for attribute in changed_attributes]
+
+
+def _apply_terrain_mutation_record(terrain_map: TerrainMap, record: Any) -> None:
+    """Overlay one canonical terrain-cell mutation record onto a terrain map."""
+    if record.kind != _TERRAIN_CELL_MUTATION_KIND:
+        return
+    x, y = _terrain_record_coords(record)
+    terrain_cell_id = record.render_params.get("terrain_cell_id")
+    if terrain_cell_id != f"terrain:{x}:{y}":
+        raise ValueError("terrain_cell_mutated terrain_cell_id must match x/y coordinates")
+    if not terrain_map.in_bounds(x, y):
+        raise ValueError(f"terrain_cell_mutated record is outside terrain bounds: ({x}, {y})")
+    cell = terrain_map.get(x, y)
+    if cell is None:
+        raise ValueError(f"terrain_cell_mutated record targets missing terrain cell: ({x}, {y})")
+    changed_attributes = _terrain_record_changed_attributes(record)
+    expected_changed_attributes: list[str] = []
+    for attribute in _TERRAIN_MUTATION_ATTRIBUTES:
+        old_value = _terrain_record_value(record, "old", attribute)
+        new_value = _terrain_record_value(record, "new", attribute)
+        if getattr(cell, attribute) != old_value:
+            raise ValueError(f"terrain_cell_mutated record is stale for {attribute!r}")
+        if old_value != new_value:
+            expected_changed_attributes.append(attribute)
+    if changed_attributes != expected_changed_attributes:
+        raise ValueError("terrain_cell_mutated changed_attributes disagrees with old/new values")
+    for attribute in _TERRAIN_MUTATION_ATTRIBUTES:
+        setattr(cell, attribute, _terrain_record_value(record, "new", attribute))
+
+
+def _apply_sparse_terrain_event_overlay(terrain_map: TerrainMap, records: list[Any]) -> None:
+    """Replay canonical terrain-cell records as the sparse terrain overlay."""
+    for record in records:
+        _apply_terrain_mutation_record(terrain_map, record)
+
+
+def _terrain_matches_sparse_event_overlay(world: Any, derived: TerrainMap | None) -> bool:
+    """Return whether terrain can be restored from bundle terrain plus canonical records."""
+    if world.terrain_map is None or derived is None:
+        return False
+    replayed = _clone_terrain_map(derived)
+    try:
+        _apply_sparse_terrain_event_overlay(replayed, list(world.event_records))
+    except (AttributeError, TypeError, ValueError):
+        return False
+    return _terrain_maps_equal(world.terrain_map, replayed)
 
 
 def _current_grid_can_overlay_bundle_structure(world: Any) -> bool:
@@ -170,10 +259,12 @@ def serialize_world_state(world: Any) -> Dict[str, Any]:
         },
     }
     bundle_backed_topology = _current_grid_can_overlay_bundle_structure(world)
-    bundle_terrain_is_derived = (
-        bundle_backed_topology and _bundle_derived_terrain_matches_current(world)
+    bundle_terrain = _bundle_derived_terrain(world) if bundle_backed_topology else None
+    bundle_terrain_is_sparse_replayable = bundle_backed_topology and _terrain_matches_sparse_event_overlay(
+        world,
+        bundle_terrain,
     )
-    if world.terrain_map is not None and (not bundle_backed_topology or not bundle_terrain_is_derived):
+    if world.terrain_map is not None and not bundle_terrain_is_sparse_replayable:
         result["terrain_map"] = world.terrain_map.to_dict()
     if world.sites and not bundle_backed_topology:
         result["sites"] = [s.to_dict() for s in world.sites]
@@ -286,6 +377,8 @@ def hydrate_world_state(
                 width=world.width,
                 height=world.height,
             )
+        elif world.terrain_map is not None:
+            _apply_sparse_terrain_event_overlay(world.terrain_map, world.event_records)
         route_endpoint_aliases = _serialized_location_id_aliases(world, serialized_grid)
         serialized_routes = _normalize_serialized_route_endpoints(
             data.get("routes", []),

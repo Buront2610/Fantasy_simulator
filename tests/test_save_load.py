@@ -343,6 +343,9 @@ class TestLoadSimulation:
         cell.temperature = 91
 
         save_simulation(sim, str(path))
+        with open(path, "r", encoding="utf-8") as f:
+            payload = json.load(f)
+        assert "terrain_map" in payload["world"]
         restored = load_simulation(str(path))
 
         assert restored is not None

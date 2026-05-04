@@ -32,11 +32,11 @@ work and its serialization guardrails.
   Evidence: route block/reopen records carry endpoint IDs and `location:*` tags
   so reports and location queries include both connected sites.
 - Terrain snapshot compactness.
-  Status: completed for the v8 save/load contract.
+  Status: completed for the v8 sparse-overlay save/load contract.
   Evidence: unmodified bundle-derived terrain is omitted from saves; mutated
-  terrain requires a complete validated `terrain_map` snapshot.
-  Future risk: large worlds may need a sparse terrain overlay or terrain delta
-  log so a single-cell mutation does not force a full-map save diff.
+  terrain with canonical `terrain_cell_mutated` records is replayed as a sparse
+  overlay without saving a full `terrain_map`; incompatible direct edits still
+  fall back to a complete validated snapshot.
 - Terrain-cell mutation contract.
   Status: completed in the current branch worktree.
   Evidence: `World.apply_terrain_cell_change` records
@@ -78,7 +78,10 @@ work and its serialization guardrails.
   Impact: agents may persist world-level era/civilization fields prematurely,
   creating a schema conflict with the K0 guardrail.
   Guardrail: keep era/civilization projections headless and driven by
-  canonical records until a later save policy declares durable runtime fields.
+  canonical records until a later save policy declares durable runtime fields;
+  stale `world.era_key`, `world.civilization_phase`, `world.world_scores`, and
+  `world.era_runtime` snapshot data must not override `world.event_records`.
+  Policy: `docs/adr/0003-era-civilization-runtime-persistence.md`.
 
 ## Current Status
 
@@ -88,6 +91,7 @@ work and its serialization guardrails.
 - RR-001 route graph is no longer tracked as an open serialization risk.
 - Remaining future risk is additive: new PR-K dynamic world state fields must
   declare their canonical source and conflict behavior before persistence
-  lands. Terrain mutation uses the v8-compatible complete `terrain_map`
-  snapshot policy documented in the serialization contract, while
-  era/civilization runtime state remains pre-persistence.
+  lands. Terrain mutation uses the v8-compatible sparse-overlay policy
+  documented in the serialization contract, with complete `terrain_map`
+  snapshots retained as fallback, while era/civilization runtime state remains
+  pre-persistence.
