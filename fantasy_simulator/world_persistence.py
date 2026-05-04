@@ -168,6 +168,19 @@ def _terrain_matches_sparse_event_overlay(world: Any, derived: TerrainMap | None
     return _terrain_maps_equal(world.terrain_map, replayed)
 
 
+def _bundle_terrain_can_omit_snapshot(world: Any, derived: TerrainMap | None) -> bool:
+    """Return whether bundle terrain can be saved without a full terrain snapshot."""
+    if world.terrain_map is None or derived is None:
+        return False
+    if _terrain_maps_equal(world.terrain_map, derived):
+        return True
+    has_sparse_records = any(
+        getattr(record, "kind", None) == _TERRAIN_CELL_MUTATION_KIND
+        for record in world.event_records
+    )
+    return has_sparse_records and _terrain_matches_sparse_event_overlay(world, derived)
+
+
 def _current_grid_can_overlay_bundle_structure(world: Any) -> bool:
     """Return whether current grid shape can be restored from bundle seeds plus runtime overlay."""
     if world._setting_bundle is None:
@@ -260,11 +273,11 @@ def serialize_world_state(world: Any) -> Dict[str, Any]:
     }
     bundle_backed_topology = _current_grid_can_overlay_bundle_structure(world)
     bundle_terrain = _bundle_derived_terrain(world) if bundle_backed_topology else None
-    bundle_terrain_is_sparse_replayable = bundle_backed_topology and _terrain_matches_sparse_event_overlay(
+    bundle_terrain_is_snapshot_omittable = bundle_backed_topology and _bundle_terrain_can_omit_snapshot(
         world,
         bundle_terrain,
     )
-    if world.terrain_map is not None and not bundle_terrain_is_sparse_replayable:
+    if world.terrain_map is not None and not bundle_terrain_is_snapshot_omittable:
         result["terrain_map"] = world.terrain_map.to_dict()
     if world.sites and not bundle_backed_topology:
         result["sites"] = [s.to_dict() for s in world.sites]
