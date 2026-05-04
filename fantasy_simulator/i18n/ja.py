@@ -370,6 +370,28 @@ TEXT_JA: Dict[str, str] = {
     'events.marriage.summary': (
         '{name1}（{race1} {job1}）と {name2}（{race2} {job2}）は {location} で盛大に結婚した。'
     ),
+    'events.discovery.summary': '{name} は {location} 近くで {item} を発見した。{extra}',
+    'events.skill_training.summary': (
+        '{name} は {effort}、{skill} を鍛えた。（Lv {old_level} -> Lv {new_level}）'
+    ),
+    'events.journey.summary': (
+        '{name} は {old_location} から {destination}（{region_type}）へ旅し、{road_event}。'
+        '{dungeon_bonus}'
+    ),
+    'events.journey_no_destination.summary': '{name} は旅に出ようとしたが、行き先が見つからなかった。',
+    'events.aging_young.summary': '{name} は {age} 歳になった。若さがまだ彼らを前へ押し出している。',
+    'events.aging_prime.summary': '{name} は {age} 歳になり、人生の盛りに入った。',
+    'events.aging_middle.summary': '{name} は {age} 歳になった。髪には白いものが混じり始めた。',
+    'events.aging_old.summary': '{name} は {age} 歳になった。積み重なった歳月の重みがはっきりと見える。',
+    'events.death.summary': '{name}（{race} {job}、{age} 歳）は {cause} 亡くなった。',
+    'events.condition_worsened.summary': '{name} の容態が悪化し、{status}になった。',
+    'events.dying_rescued_by.summary': '{name} は {location} で瀕死の状態に陥ったが、{rescuer} に救われた。',
+    'events.dying_stabilized.summary': '{name} は {location} で瀕死の状態から奇跡的に持ち直した。',
+    'events.marriage_anniversary.summary': '{name1} と {name2} は結婚記念日を祝った。',
+    'events.romance_growing_closer.summary': '{name1} と {name2} は {location} で時を過ごし、関係を深めた。',
+    'events.romance_commitments_blocked.summary': (
+        '{name1} と {name2} は {location} で特別な時間を過ごしたが、既存の関係がそれ以上の進展を妨げた。'
+    ),
     'events.location_renamed.summary': '{old_name} は {new_name} に改名された。',
     'events.route_blocked.summary': '{from_location} から {to_location} への道が封鎖された。',
     'events.route_reopened.summary': '{from_location} から {to_location} への道が再開された。',
@@ -391,6 +413,14 @@ TEXT_JA: Dict[str, str] = {
     'events.civilization_phase_drifted.summary': (
         '文明段階が {old_civilization_phase} から {new_civilization_phase} へ変化した。'
     ),
+    'journey_road_event_0': '道中で盗賊に遭遇したが、はったりで切り抜けた',
+    'journey_road_event_1': '迷子を村まで送り届けた',
+    'journey_road_event_2': '旅芸人の一座に出会い、一夜を過ごした',
+    'journey_road_event_3': '荒野で突然の嵐をしのいだ',
+    'journey_road_event_4': '放浪の吟遊詩人と物語を交わした',
+    'journey_road_event_5': '丘陵を抜ける近道を見つけた',
+    'journey_road_event_6': '飢えた狼の群れにしばらく追われた',
+    'journey_road_event_7': '息をのむような流星雨を目撃した',
     'event_change_no_faction': 'なし',
     'times_suffix': '回',
     'report_monthly_title': 'Aethoria 月報 ─ {year}年 {season}の第{month}月',

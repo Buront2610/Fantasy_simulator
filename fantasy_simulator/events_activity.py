@@ -6,11 +6,21 @@ import random
 from typing import TYPE_CHECKING, Any, Dict, Sequence
 
 from .event_models import EventResult
-from .i18n import tr, tr_term
+from .i18n import tr, tr_for_locale, tr_term
 
 if TYPE_CHECKING:
     from .character import Character
     from .world import World
+
+
+_TRAINING_EFFORT_KEYS = [
+    "training_effort_yard",
+    "training_effort_meditated",
+    "training_effort_master",
+    "training_effort_tireless",
+    "training_effort_scrolls",
+    "training_effort_limits",
+]
 
 
 def resolve_discovery_event(
@@ -26,13 +36,14 @@ def resolve_discovery_event(
     roll = rng.random()
     if roll < 0.4:
         stat_gains = {"intelligence": rng.randint(1, 4), "wisdom": rng.randint(0, 3)}
-        extra = tr("discovery_extra_knowledge")
+        extra_key = "discovery_extra_knowledge"
     elif roll < 0.7:
         stat_gains = {"strength": rng.randint(1, 3), "dexterity": rng.randint(0, 2)}
-        extra = tr("discovery_extra_battle")
+        extra_key = "discovery_extra_battle"
     else:
         stat_gains = {"charisma": rng.randint(1, 4)}
-        extra = tr("discovery_extra_reputation")
+        extra_key = "discovery_extra_reputation"
+    extra = tr(extra_key)
 
     char.apply_stat_delta(stat_gains)
     skill_candidates = list(char.skills.keys()) or ["Dungeoneering"]
@@ -49,6 +60,15 @@ def resolve_discovery_event(
         stat_changes={char.char_id: stat_gains},
         event_type="discovery",
         year=world.year,
+        metadata={
+            "summary_key": "events.discovery.summary",
+            "render_params": {
+                "name": char.name,
+                "item": item,
+                "location_id": char.location_id,
+                "extra_key": extra_key,
+            },
+        },
     )
 
 
@@ -82,16 +102,8 @@ def resolve_skill_training_event(
         stat_bonus = {"charisma": 1}
 
     char.apply_stat_delta(stat_bonus)
-    effort = rng.choice(
-        [
-            tr("training_effort_yard"),
-            tr("training_effort_meditated"),
-            tr("training_effort_master"),
-            tr("training_effort_tireless"),
-            tr("training_effort_scrolls"),
-            tr("training_effort_limits"),
-        ]
-    )
+    effort_key = rng.choice(_TRAINING_EFFORT_KEYS)
+    effort = tr(effort_key)
     localized_skill = tr_term(skill)
     desc = tr(
         "training_narrative",
@@ -108,6 +120,16 @@ def resolve_skill_training_event(
         stat_changes={char.char_id: stat_bonus} if stat_bonus else {},
         event_type="skill_training",
         year=world.year,
+        metadata={
+            "summary_key": "events.skill_training.summary",
+            "render_params": {
+                "name": char.name,
+                "effort_key": effort_key,
+                "skill": skill,
+                "old_level": old_level,
+                "new_level": new_level,
+            },
+        },
     )
 
 
@@ -128,6 +150,10 @@ def resolve_journey_event(
             affected_characters=[char.char_id],
             event_type="journey",
             year=world.year,
+            metadata={
+                "summary_key": "events.journey_no_destination.summary",
+                "render_params": {"name": char.name},
+            },
         )
 
     destination = rng.choice(neighbours)
@@ -135,7 +161,18 @@ def resolve_journey_event(
     char.location_id = destination.id
     world.mark_location_visited(destination.id)
 
-    road_event = rng.choice(list(journey_events))
+    journey_event_list = list(journey_events)
+    road_event = rng.choice(journey_event_list)
+    try:
+        candidate_road_event_key = f"journey_road_event_{journey_event_list.index(road_event)}"
+    except ValueError:
+        road_event_key = ""
+    else:
+        road_event_key = (
+            candidate_road_event_key
+            if tr_for_locale("en", candidate_road_event_key) == road_event
+            else ""
+        )
     desc = tr(
         "journey_narrative",
         name=char.name,
@@ -152,11 +189,27 @@ def resolve_journey_event(
     ))
 
     extra_changes: Dict[str, int] = {}
+    dungeon_bonus = ""
+    dungeon_bonus_params: Dict[str, int | str] = {}
     if destination.region_type == "dungeon":
         bonus = rng.choice(["strength", "dexterity", "intelligence"])
         extra_changes[bonus] = rng.randint(1, 4)
         char.apply_stat_delta(extra_changes)
-        desc += " " + tr("journey_dungeon_bonus", amount=extra_changes[bonus], stat=bonus)
+        dungeon_bonus = " " + tr("journey_dungeon_bonus", amount=extra_changes[bonus], stat=bonus)
+        desc += dungeon_bonus
+        dungeon_bonus_params = {"amount": extra_changes[bonus], "stat": bonus}
+
+    render_params: Dict[str, Any] = {
+        "name": char.name,
+        "from_location_id": old_location_id,
+        "to_location_id": destination.id,
+        "region_type": destination.region_type,
+        "dungeon_bonus_params": dungeon_bonus_params,
+    }
+    if road_event_key:
+        render_params["road_event_key"] = road_event_key
+    else:
+        render_params["road_event"] = road_event
 
     return EventResult(
         description=desc,
@@ -164,4 +217,8 @@ def resolve_journey_event(
         stat_changes={char.char_id: extra_changes} if extra_changes else {},
         event_type="journey",
         year=world.year,
+        metadata={
+            "summary_key": "events.journey.summary",
+            "render_params": render_params,
+        },
     )

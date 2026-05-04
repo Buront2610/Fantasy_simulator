@@ -43,8 +43,11 @@ this precedence:
 - Bundle-backed world structure: embedded `world.setting_bundle` site/route
   seeds beat serialized structure; serialized route/grid data may overlay
   runtime state only after validation.
-- Bundle-backed terrain: derived terrain cells are omitted unless runtime terrain
-  mutations require a complete `terrain_map` snapshot.
+- Bundle-backed terrain: derived terrain cells are omitted. Canonical
+  `terrain_cell_mutated` records are the preferred sparse overlay for
+  single-cell runtime mutations; a complete `terrain_map` snapshot is still
+  emitted when current terrain cannot be rebuilt from bundle terrain plus those
+  canonical records.
 - Route graph shape: bundle `route_seeds` define the canonical graph when a
   bundle is active. An explicit empty route list means intentionally
   disconnected travel, not "infer default roads".
@@ -72,14 +75,19 @@ this precedence:
   `location:*` tags so reports and location queries can see the event from
   either connected site.
 - Terrain-cell mutation records store semantic cell data, not rendered labels.
-  Required `render_params` are `terrain_cell_id`, `x`, `y`, old/new values for
-  changed terrain fields, and `changed_attributes`; optional params include
-  `location_id`, `reason_key`, and `cause_event_id`. Impacts target
-  `terrain_cell` with target ID `terrain:<x>:<y>` for each changed attribute.
-  Location-linked mutations must also include a `location:<location_id>` tag.
+  Required `render_params` are `terrain_cell_id`, `x`, `y`, full old/new values
+  for `biome`, `elevation`, `moisture`, and `temperature`, plus
+  `changed_attributes`. The changed-attribute values must match the old/new
+  differences regardless of list order, and sparse replay must reject stale
+  records whose old values do not match the replayed cell. Optional params include `location_id`,
+  `reason_key`, and `cause_event_id`. Impacts target `terrain_cell` with target
+  ID `terrain:<x>:<y>` for each changed attribute. Location-linked mutations
+  must also include a `location:<location_id>` tag.
 - Compatibility `EventResult` projections may expose `render_params` in
   metadata for legacy readers. That metadata is adapter output, not an
-  additional durable source of truth.
+  additional durable source of truth. If legacy metadata and top-level
+  `WorldEventRecord.summary_key` / `render_params` both exist, the top-level
+  canonical fields win.
 - Migrating pre-current saves may lift legacy `history` and `world.event_log`
   entries into `world.event_records`. Already-migrated legacy records are
   skipped by payload identity so repeated migrations do not duplicate them.
@@ -96,20 +104,29 @@ this precedence:
   must never create routes in a bundle-backed world.
 - Bundle-backed terrain snapshots are v8-compatible overlays. Load must first
   derive bundle topology, then validate that any serialized `terrain_map`
-  snapshot is complete for that topology before applying runtime terrain cell
-  mutations. Completeness means matching width/height, exactly one cell for
-  every in-bounds coordinate, no duplicate coordinates, and no out-of-bounds
-  cells.
+  snapshot is complete for that topology before applying it. Completeness means
+  matching width/height, exactly one cell for every in-bounds coordinate, no
+  duplicate coordinates, and no out-of-bounds cells. When no snapshot is present,
+  load replays canonical `terrain_cell_mutated` records over the derived bundle
+  terrain in canonical event order.
 - Bundle-backed unmodified terrain must stay compact. If the runtime
   `terrain_map` still matches the bundle-derived terrain, new saves omit
-  `terrain_map`; after any terrain-cell mutation, new saves include the full
-  validated snapshot rather than a sparse delta list.
+  `terrain_map`. If terrain differs but canonical `terrain_cell_mutated` records
+  replay to the current terrain, new saves also omit `terrain_map`. Direct
+  terrain edits, incompatible grids, malformed terrain records, or any current
+  terrain state not reproducible from canonical records fall back to the full
+  validated snapshot.
 - Era and civilization projections are headless pre-persistence for the current
   PR-K guardrail. Canonical `era_shifted` and
   `civilization_phase_drifted` records may exist, but world-level era runtime
-  fields must not be treated as durable save fields until a later schema policy
-  is documented. Era-shift commands change the era key; same-era phase movement
-  is represented by civilization drift records.
+  fields such as `world.era_key`, `world.civilization_phase`,
+  `world.world_scores`, or `world.era_runtime` must not be treated as durable
+  save fields until a later schema policy is documented. Era-shift commands
+  change the era key; same-era phase movement is represented by civilization
+  drift records. If stale era/civilization snapshot fields appear in a payload,
+  `world.event_records` wins; when no canonical records exist, projections
+  return unknown state rather than trusting the stale snapshot. See
+  `docs/adr/0003-era-civilization-runtime-persistence.md`.
 - Non-bundle serialized topology is explicit. It must validate site references,
   route endpoint references, duplicate route IDs, duplicate route pairs, and
   self-loops before hydration succeeds.

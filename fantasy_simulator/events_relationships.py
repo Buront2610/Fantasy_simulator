@@ -33,6 +33,10 @@ def resolve_marriage_event(
             affected_characters=[char1.char_id, char2.char_id],
             event_type="anniversary",
             year=world.year,
+            metadata={
+                "summary_key": "events.marriage_anniversary.summary",
+                "render_params": {"name1": char1.name, "name2": char2.name},
+            },
         )
 
     if char1.spouse_id not in (None, char2.char_id) or char2.spouse_id not in (None, char1.char_id):
@@ -49,6 +53,14 @@ def resolve_marriage_event(
             stat_changes={},
             event_type="romance",
             year=world.year,
+            metadata={
+                "summary_key": "events.romance_commitments_blocked.summary",
+                "render_params": {
+                    "name1": char1.name,
+                    "name2": char2.name,
+                    "location_id": char1.location_id,
+                },
+            },
         )
 
     if char1.age < 18 or char2.age < 18 or rel1 < 60 or rel2 < 60 or avg_rel < 70:
@@ -65,6 +77,14 @@ def resolve_marriage_event(
             stat_changes={},
             event_type="romance",
             year=world.year,
+            metadata={
+                "summary_key": "events.romance_growing_closer.summary",
+                "render_params": {
+                    "name1": char1.name,
+                    "name2": char2.name,
+                    "location_id": char1.location_id,
+                },
+            },
         )
 
     char1.spouse_id = char2.char_id
