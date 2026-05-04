@@ -11,6 +11,7 @@ from .i18n import get_locale, tr_for_locale, tr_term_for_locale
 
 
 Translator = Callable[..., str]
+_LOCATION_REQUIRED_CAUSE_KEYS = frozenset({"death_cause_monster"})
 
 
 class EventRenderContext(Protocol):
@@ -228,14 +229,16 @@ def _apply_ordinary_event_params(record: WorldEventRecord, params: dict[str, Any
         params["extra"] = translate(str(params["extra_key"]))
     if "effort_key" in params and "effort" not in params:
         params["effort"] = translate(str(params["effort_key"]))
-    if "road_event_key" in params:
-        rendered_road_event = translate(str(params["road_event_key"]))
-        if rendered_road_event != params["road_event_key"] or "road_event" not in params:
-            params["road_event"] = rendered_road_event
+    road_event_key = params.get("road_event_key")
+    if road_event_key and "road_event" not in params:
+        params["road_event"] = translate(str(road_event_key))
     if "status_key" in params and "status" not in params:
         params["status"] = translate(str(params["status_key"]))
     if "cause_key" in params and "cause" not in params:
-        params["cause"] = translate(str(params["cause_key"]), location=params.get("location", ""))
+        cause_key = str(params["cause_key"])
+        if cause_key in _LOCATION_REQUIRED_CAUSE_KEYS and not params.get("location"):
+            raise KeyError("location")
+        params["cause"] = translate(cause_key, location=params.get("location", ""))
     if record.summary_key == "events.journey.summary" and "dungeon_bonus" not in params:
         bonus_params = params.get("dungeon_bonus_params", {})
         if isinstance(bonus_params, dict) and bonus_params:

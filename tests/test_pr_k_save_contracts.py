@@ -176,6 +176,57 @@ def test_save_load_full_terrain_snapshot_wins_over_sparse_event_replay(tmp_path)
     assert restored_cell.elevation == 77
 
 
+def test_save_load_replays_multiple_sparse_terrain_records_on_same_cell(tmp_path) -> None:
+    world = World()
+    assert world.terrain_map is not None
+    first = world.apply_terrain_cell_change(2, 2, biome="forest", elevation=180)
+    second = world.apply_terrain_cell_change(2, 2, biome="swamp", moisture=200)
+    assert first is not None
+    assert second is not None
+
+    path = tmp_path / "pr-k-terrain-multiple-sparse-records.json"
+    assert save_simulation(Simulator(world, seed=0), str(path)) is True
+    with open(path, "r", encoding="utf-8") as handle:
+        payload = json.load(handle)
+    assert "terrain_map" not in payload["world"]
+
+    restored = load_simulation(str(path))
+
+    assert restored is not None
+    assert restored.world.terrain_map is not None
+    restored_cell = restored.world.terrain_map.get(2, 2)
+    assert restored_cell is not None
+    assert restored_cell.biome == "swamp"
+    assert restored_cell.elevation == 180
+    assert restored_cell.moisture == 200
+    assert [record.record_id for record in restored.world.event_records] == [first.record_id, second.record_id]
+
+
+def test_save_load_accepts_reordered_sparse_terrain_changed_attributes(tmp_path) -> None:
+    world = World()
+    assert world.terrain_map is not None
+    record = world.apply_terrain_cell_change(2, 2, biome="forest", elevation=180)
+    assert record is not None
+
+    path = tmp_path / "pr-k-terrain-reordered-changed-attributes.json"
+    assert save_simulation(Simulator(world, seed=0), str(path)) is True
+    with open(path, "r", encoding="utf-8") as handle:
+        payload = json.load(handle)
+    assert "terrain_map" not in payload["world"]
+    payload["world"]["event_records"][0]["render_params"]["changed_attributes"] = ["elevation", "biome"]
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle)
+
+    restored = load_simulation(str(path))
+
+    assert restored is not None
+    assert restored.world.terrain_map is not None
+    restored_cell = restored.world.terrain_map.get(2, 2)
+    assert restored_cell is not None
+    assert restored_cell.biome == "forest"
+    assert restored_cell.elevation == 180
+
+
 def test_save_load_rejects_stale_sparse_terrain_record_without_snapshot(tmp_path) -> None:
     world = World()
     assert world.terrain_map is not None

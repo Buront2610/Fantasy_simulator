@@ -199,6 +199,18 @@ def resolve_journey_event(
         desc += dungeon_bonus
         dungeon_bonus_params = {"amount": extra_changes[bonus], "stat": bonus}
 
+    render_params: Dict[str, Any] = {
+        "name": char.name,
+        "from_location_id": old_location_id,
+        "to_location_id": destination.id,
+        "region_type": destination.region_type,
+        "dungeon_bonus_params": dungeon_bonus_params,
+    }
+    if road_event_key:
+        render_params["road_event_key"] = road_event_key
+    else:
+        render_params["road_event"] = road_event
+
     return EventResult(
         description=desc,
         affected_characters=[char.char_id],
@@ -207,13 +219,6 @@ def resolve_journey_event(
         year=world.year,
         metadata={
             "summary_key": "events.journey.summary",
-            "render_params": {
-                "name": char.name,
-                "from_location_id": old_location_id,
-                "to_location_id": destination.id,
-                "region_type": destination.region_type,
-                "road_event_key": road_event_key,
-                "dungeon_bonus_params": dungeon_bonus_params,
-            },
+            "render_params": render_params,
         },
     )

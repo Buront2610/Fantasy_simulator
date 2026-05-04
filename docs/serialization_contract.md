@@ -77,15 +77,17 @@ this precedence:
 - Terrain-cell mutation records store semantic cell data, not rendered labels.
   Required `render_params` are `terrain_cell_id`, `x`, `y`, full old/new values
   for `biome`, `elevation`, `moisture`, and `temperature`, plus
-  `changed_attributes`. The changed-attribute list must match the old/new
-  differences, and sparse replay must reject stale records whose old values do
-  not match the replayed cell. Optional params include `location_id`,
+  `changed_attributes`. The changed-attribute values must match the old/new
+  differences regardless of list order, and sparse replay must reject stale
+  records whose old values do not match the replayed cell. Optional params include `location_id`,
   `reason_key`, and `cause_event_id`. Impacts target `terrain_cell` with target
   ID `terrain:<x>:<y>` for each changed attribute. Location-linked mutations
   must also include a `location:<location_id>` tag.
 - Compatibility `EventResult` projections may expose `render_params` in
   metadata for legacy readers. That metadata is adapter output, not an
-  additional durable source of truth.
+  additional durable source of truth. If legacy metadata and top-level
+  `WorldEventRecord.summary_key` / `render_params` both exist, the top-level
+  canonical fields win.
 - Migrating pre-current saves may lift legacy `history` and `world.event_log`
   entries into `world.event_records`. Already-migrated legacy records are
   skipped by payload identity so repeated migrations do not duplicate them.

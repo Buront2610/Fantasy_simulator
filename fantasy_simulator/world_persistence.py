@@ -144,7 +144,7 @@ def _apply_terrain_mutation_record(terrain_map: TerrainMap, record: Any) -> None
             raise ValueError(f"terrain_cell_mutated record is stale for {attribute!r}")
         if old_value != new_value:
             expected_changed_attributes.append(attribute)
-    if changed_attributes != expected_changed_attributes:
+    if set(changed_attributes) != set(expected_changed_attributes):
         raise ValueError("terrain_cell_mutated changed_attributes disagrees with old/new values")
     for attribute in _TERRAIN_MUTATION_ATTRIBUTES:
         setattr(cell, attribute, _terrain_record_value(record, "new", attribute))

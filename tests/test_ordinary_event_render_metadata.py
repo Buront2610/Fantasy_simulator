@@ -1,8 +1,12 @@
 import random
 
+import pytest
+
 from fantasy_simulator.character import Character
+from fantasy_simulator.event_models import WorldEventRecord
 from fantasy_simulator.event_rendering import render_event_record
 from fantasy_simulator.events import EventSystem
+from fantasy_simulator.events_activity import resolve_journey_event
 from fantasy_simulator.i18n import get_locale, set_locale
 from fantasy_simulator.persistence.save_load import load_simulation, save_simulation
 from fantasy_simulator.simulator import Simulator
@@ -108,6 +112,32 @@ def test_journey_event_renders_from_stable_ids_after_cross_locale_save_load(tmp_
         set_locale(previous_locale)
 
 
+def test_journey_custom_road_event_uses_raw_fallback_without_blank_render(tmp_path):
+    previous_locale = get_locale()
+    set_locale("ja")
+    try:
+        world = World()
+        char = _make_char("Alice")
+        world.add_character(char)
+
+        result = resolve_journey_event(
+            char,
+            world,
+            journey_events=["crossed a haunted bridge"],
+            rng=random.Random(0),
+        )
+
+        record, rendered = _save_load_record(result, world, tmp_path, location_id=char.location_id)
+
+        assert record.summary_key == "events.journey.summary"
+        assert "road_event_key" not in record.render_params
+        assert record.render_params["road_event"] == "crossed a haunted bridge"
+        assert "crossed a haunted bridge" in rendered
+        assert "and ." not in rendered
+    finally:
+        set_locale(previous_locale)
+
+
 def test_lifecycle_event_renders_from_metadata_after_cross_locale_save_load(tmp_path):
     previous_locale = get_locale()
     set_locale("ja")
@@ -125,6 +155,28 @@ def test_lifecycle_event_renders_from_metadata_after_cross_locale_save_load(tmp_
         assert rendered == "Elder turned 25. Youth still drives them forward."
     finally:
         set_locale(previous_locale)
+
+
+def test_death_location_required_cause_falls_back_without_world_context():
+    record = WorldEventRecord(
+        record_id="rec_death_monster",
+        kind="death",
+        year=1000,
+        description="fallback death text",
+        summary_key="events.death.summary",
+        render_params={
+            "name": "Elder",
+            "race": "Human",
+            "job": "Warrior",
+            "age": 95,
+            "cause_key": "death_cause_monster",
+            "location_id": "loc_aethoria_capital",
+        },
+    )
+
+    assert render_event_record(record, locale="en", world=None) == "fallback death text"
+    with pytest.raises(KeyError, match="location"):
+        render_event_record(record, locale="en", world=None, strict=True)
 
 
 def test_death_event_renders_from_metadata_after_cross_locale_save_load(tmp_path):
