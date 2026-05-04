@@ -37,6 +37,7 @@ def resolve_aging_event(char: "Character", world: "World", rng: Any = random) ->
             "dexterity": rng.randint(0, 1),
             "wisdom": rng.randint(0, 1),
         }
+        summary_key = "events.aging_young.summary"
         desc = tr("aging_young", name=char.name, age=char.age)
     elif char.age < 50:
         stat_changes = {
@@ -44,6 +45,7 @@ def resolve_aging_event(char: "Character", world: "World", rng: Any = random) ->
             "wisdom": rng.randint(0, 2),
             "strength": rng.randint(-1, 1),
         }
+        summary_key = "events.aging_prime.summary"
         desc = tr("aging_prime", name=char.name, age=char.age)
     elif char.age < max_age * 0.75:
         stat_changes = {
@@ -52,6 +54,7 @@ def resolve_aging_event(char: "Character", world: "World", rng: Any = random) ->
             "dexterity": -rng.randint(0, 2),
             "strength": -rng.randint(0, 1),
         }
+        summary_key = "events.aging_middle.summary"
         desc = tr("aging_middle", name=char.name, age=char.age)
     else:
         stat_changes = {
@@ -60,6 +63,7 @@ def resolve_aging_event(char: "Character", world: "World", rng: Any = random) ->
             "dexterity": -rng.randint(1, 3),
             "constitution": -rng.randint(1, 4),
         }
+        summary_key = "events.aging_old.summary"
         desc = tr("aging_old", name=char.name, age=char.age)
 
     char.apply_stat_delta(stat_changes)
@@ -70,6 +74,10 @@ def resolve_aging_event(char: "Character", world: "World", rng: Any = random) ->
         stat_changes={char.char_id: stat_changes},
         event_type="aging",
         year=world.year,
+        metadata={
+            "summary_key": summary_key,
+            "render_params": {"name": char.name, "age": char.age},
+        },
     )
 
 
@@ -77,16 +85,17 @@ def resolve_death_event(char: "Character", world: "World", rng: Any = random) ->
     """Resolve the canonical death event narrative and side effects."""
     mark_character_dead(char, world)
 
-    cause_options = [
-        tr("death_cause_old_age"),
-        tr("death_cause_monster", location=world.location_name(char.location_id)),
-        tr("death_cause_illness"),
-        tr("death_cause_protecting"),
-        tr("death_cause_dungeon"),
-        tr("death_cause_road"),
+    cause_keys = [
+        "death_cause_old_age",
+        "death_cause_monster",
+        "death_cause_illness",
+        "death_cause_protecting",
+        "death_cause_dungeon",
+        "death_cause_road",
     ]
     max_age = character_lifespan_years(char, world)
-    cause = cause_options[0] if char.age >= max_age * 0.9 else rng.choice(cause_options[1:])
+    cause_key = cause_keys[0] if char.age >= max_age * 0.9 else rng.choice(cause_keys[1:])
+    cause = tr(cause_key, location=world.location_name(char.location_id))
     desc = tr("death_narrative", name=char.name, race=char.race, job=char.job, age=char.age, cause=cause)
     char.add_history(tr("history_passed_away", year=world.year, cause=cause))
     return EventResult(
@@ -94,6 +103,17 @@ def resolve_death_event(char: "Character", world: "World", rng: Any = random) ->
         affected_characters=[char.char_id],
         event_type="death",
         year=world.year,
+        metadata={
+            "summary_key": "events.death.summary",
+            "render_params": {
+                "name": char.name,
+                "race": char.race,
+                "job": char.job,
+                "age": char.age,
+                "cause_key": cause_key,
+                "location_id": char.location_id,
+            },
+        },
     )
 
 
@@ -133,6 +153,13 @@ def check_natural_death(
                 affected_characters=[char.char_id],
                 event_type="condition_worsened",
                 year=world.year,
+                metadata={
+                    "summary_key": "events.condition_worsened.summary",
+                    "render_params": {
+                        "name": char.name,
+                        "status_key": f"injury_status_{char.injury_status}",
+                    },
+                },
             )
     return None
 
@@ -187,12 +214,20 @@ def check_dying_resolution(
                 rescuer=rescuer.name,
                 location=world.location_name(char.location_id),
             )
+            summary_key = "events.dying_rescued_by.summary"
+            render_params = {
+                "name": char.name,
+                "rescuer": rescuer.name,
+                "location_id": char.location_id,
+            }
         else:
             desc = tr(
                 "dying_stabilized",
                 name=char.name,
                 location=world.location_name(char.location_id),
             )
+            summary_key = "events.dying_stabilized.summary"
+            render_params = {"name": char.name, "location_id": char.location_id}
         char.add_history(
             tr("history_narrowly_survived", year=world.year)
         )
@@ -203,6 +238,8 @@ def check_dying_resolution(
             year=world.year,
             metadata={
                 "relation_tag_updates": relation_tag_updates,
+                "summary_key": summary_key,
+                "render_params": render_params,
                 **({"record_id": rescue_source_id} if rescue_source_id is not None else {}),
             },
         )

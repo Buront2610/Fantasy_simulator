@@ -371,6 +371,33 @@ TEXT_EN: Dict[str, str] = {
         '{name1} ({race1} {job1}) and {name2} ({race2} {job2}) were married in {location} '
         'amid great celebration!'
     ),
+    'events.discovery.summary': '{name} discovered {item} near {location}. {extra}',
+    'events.skill_training.summary': (
+        '{name} {effort} and improved {skill} (Lv {old_level} -> Lv {new_level}).'
+    ),
+    'events.journey.summary': (
+        '{name} journeyed from {old_location} to {destination} ({region_type}) and '
+        '{road_event}.{dungeon_bonus}'
+    ),
+    'events.journey_no_destination.summary': '{name} wanted to travel but could find no destination.',
+    'events.aging_young.summary': '{name} turned {age}. Youth still drives them forward.',
+    'events.aging_prime.summary': '{name} turned {age}, entering the prime of life.',
+    'events.aging_middle.summary': '{name} turned {age}. Silver threads appear in their hair.',
+    'events.aging_old.summary': '{name} turned {age}. The weight of years shows clearly now.',
+    'events.death.summary': '{name} ({race} {job}, age {age}) died {cause}.',
+    'events.condition_worsened.summary': "{name}'s condition worsened to {status}.",
+    'events.dying_rescued_by.summary': (
+        '{name} was on the brink of death at {location}, but was saved by {rescuer}.'
+    ),
+    'events.dying_stabilized.summary': '{name} miraculously stabilized from a dying state at {location}.',
+    'events.marriage_anniversary.summary': '{name1} and {name2} celebrated another year of their marriage.',
+    'events.romance_growing_closer.summary': (
+        '{name1} and {name2} spent time together at {location}, growing closer.'
+    ),
+    'events.romance_commitments_blocked.summary': (
+        '{name1} and {name2} shared a meaningful moment at {location}, but existing commitments kept the '
+        'relationship from deepening.'
+    ),
     'events.location_renamed.summary': '{old_name} was renamed {new_name}.',
     'events.route_blocked.summary': 'The route from {from_location} to {to_location} was blocked.',
     'events.route_reopened.summary': 'The route from {from_location} to {to_location} reopened.',
@@ -392,6 +419,14 @@ TEXT_EN: Dict[str, str] = {
     'events.civilization_phase_drifted.summary': (
         'Civilization drifted from {old_civilization_phase} to {new_civilization_phase}.'
     ),
+    'journey_road_event_0': 'encountered bandits on the road but bluffed their way past',
+    'journey_road_event_1': 'helped a lost child find their village',
+    'journey_road_event_2': 'stumbled upon a travelling circus and spent the night',
+    'journey_road_event_3': 'survived a sudden storm in the open wild',
+    'journey_road_event_4': 'traded stories with a wandering bard',
+    'journey_road_event_5': 'discovered a shortcut through the hills',
+    'journey_road_event_6': 'was briefly chased by a hungry wolf pack',
+    'journey_road_event_7': 'witnessed a breathtaking meteor shower',
     'event_change_no_faction': 'none',
     'times_suffix': 'times',
     'report_monthly_title': 'Aethoria Monthly Report - Year {year}, {season} Month {month}',

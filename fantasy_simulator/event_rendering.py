@@ -7,7 +7,7 @@ from typing import Any, Callable, Optional, Protocol
 
 from .content.setting_bundle_inspection import setting_entry_key
 from .event_models import WorldEventRecord
-from .i18n import get_locale, tr_for_locale
+from .i18n import get_locale, tr_for_locale, tr_term_for_locale
 
 
 Translator = Callable[..., str]
@@ -84,6 +84,25 @@ def _display_biome(value: Any, *, translate: Translator) -> str:
     return biome_id if rendered == key else rendered
 
 
+def _display_term(value: Any, *, locale: Optional[str]) -> str:
+    return tr_term_for_locale(locale or get_locale(), str(value))
+
+
+def _display_stat(value: Any, *, translate: Translator) -> str:
+    stat_key = {
+        "strength": "stat_str",
+        "intelligence": "stat_int",
+        "dexterity": "stat_dex",
+        "wisdom": "stat_wis",
+        "charisma": "stat_cha",
+        "constitution": "stat_con",
+    }.get(str(value))
+    if stat_key is None:
+        return str(value)
+    rendered = translate(stat_key)
+    return stat_key if rendered == stat_key else rendered
+
+
 def _terrain_change_summary(params: dict[str, Any], *, translate: Translator) -> str:
     parts: list[str] = []
     if params.get("old_biome") != params.get("new_biome"):
@@ -123,18 +142,37 @@ def _terrain_change_summary(params: dict[str, Any], *, translate: Translator) ->
     return translate("event_terrain_change_separator").join(parts)
 
 
-def _render_params(
-    record: WorldEventRecord,
+def _apply_term_params(params: dict[str, Any], *, locale: Optional[str], translate: Translator) -> None:
+    for key in ("item", "skill", "race", "job", "race1", "job1", "race2", "job2", "region_type"):
+        if key in params:
+            params[key] = _display_term(params[key], locale=locale)
+    if "stat" in params:
+        params["stat"] = _display_stat(params["stat"], translate=translate)
+
+
+def _apply_location_params(
+    params: dict[str, Any],
     *,
     world: EventRenderContext | None = None,
-    translate: Translator,
-) -> dict[str, Any]:
-    params = deepcopy(record.render_params)
-
+) -> None:
     if "location" not in params:
-        location_name = _location_display_name(params.get("location_id") or record.location_id, world)
+        location_name = _location_display_name(params.get("location_id"), world)
         if location_name is not None:
             params["location"] = location_name
+    if "old_location" not in params:
+        old_location_name = _location_display_name(
+            params.get("old_location_id") or params.get("from_location_id"),
+            world,
+        )
+        if old_location_name is not None:
+            params["old_location"] = old_location_name
+    if "destination" not in params:
+        destination_name = _location_display_name(
+            params.get("destination_location_id") or params.get("to_location_id"),
+            world,
+        )
+        if destination_name is not None:
+            params["destination"] = destination_name
 
     if "from_location" not in params:
         from_location_name = _location_display_name(params.get("from_location_id"), world)
@@ -145,6 +183,14 @@ def _render_params(
         if to_location_name is not None:
             params["to_location"] = to_location_name
 
+
+def _apply_world_change_params(
+    record: WorldEventRecord,
+    params: dict[str, Any],
+    *,
+    world: EventRenderContext | None,
+    translate: Translator,
+) -> None:
     if record.summary_key == "events.location_faction_changed.summary":
         if "old_faction_id" in params:
             params["old_faction"] = _display_faction(
@@ -165,6 +211,9 @@ def _render_params(
             params["new_biome"] = _display_biome(params["new_biome"], translate=translate)
         if "change_summary" not in params:
             params["change_summary"] = _terrain_change_summary(params, translate=translate)
+
+
+def _apply_battle_params(record: WorldEventRecord, params: dict[str, Any], *, translate: Translator) -> None:
     if record.summary_key == "events.battle_result.summary" and "injury" not in params:
         injury_status = params.get("loser_injury_status")
         loser = params.get("loser")
@@ -172,6 +221,50 @@ def _render_params(
             params["injury"] = " " + translate(f"battle_injury_{injury_status}", name=loser)
         else:
             params["injury"] = ""
+
+
+def _apply_ordinary_event_params(record: WorldEventRecord, params: dict[str, Any], *, translate: Translator) -> None:
+    if "extra_key" in params and "extra" not in params:
+        params["extra"] = translate(str(params["extra_key"]))
+    if "effort_key" in params and "effort" not in params:
+        params["effort"] = translate(str(params["effort_key"]))
+    if "road_event_key" in params:
+        rendered_road_event = translate(str(params["road_event_key"]))
+        if rendered_road_event != params["road_event_key"] or "road_event" not in params:
+            params["road_event"] = rendered_road_event
+    if "status_key" in params and "status" not in params:
+        params["status"] = translate(str(params["status_key"]))
+    if "cause_key" in params and "cause" not in params:
+        params["cause"] = translate(str(params["cause_key"]), location=params.get("location", ""))
+    if record.summary_key == "events.journey.summary" and "dungeon_bonus" not in params:
+        bonus_params = params.get("dungeon_bonus_params", {})
+        if isinstance(bonus_params, dict) and bonus_params:
+            stat = _display_stat(bonus_params.get("stat", ""), translate=translate)
+            params["dungeon_bonus"] = " " + translate(
+                "journey_dungeon_bonus",
+                amount=bonus_params.get("amount", ""),
+                stat=stat,
+            )
+        else:
+            params["dungeon_bonus"] = ""
+
+
+def _render_params(
+    record: WorldEventRecord,
+    *,
+    world: EventRenderContext | None = None,
+    translate: Translator,
+    locale: Optional[str] = None,
+) -> dict[str, Any]:
+    params = deepcopy(record.render_params)
+    if "location_id" not in params and record.location_id is not None:
+        params["location_id"] = record.location_id
+
+    _apply_term_params(params, locale=locale, translate=translate)
+    _apply_location_params(params, world=world)
+    _apply_world_change_params(record, params, world=world, translate=translate)
+    _apply_battle_params(record, params, translate=translate)
+    _apply_ordinary_event_params(record, params, translate=translate)
     return params
 
 
@@ -197,6 +290,7 @@ def render_event_record(
             record,
             world=world,
             translate=resolved_translate,
+            locale=locale,
         ))
     except (KeyError, IndexError, TypeError, ValueError):
         if strict:
