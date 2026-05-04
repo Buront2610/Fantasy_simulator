@@ -288,17 +288,99 @@ class TestLoadSimulation:
         assert restored is not None
         assert restored.world.event_log == sim.world.event_log
 
-    def test_round_trip_preserves_bundle_backed_blocked_route_state(self, tmp_path):
+    def test_round_trip_preserves_bundle_backed_route_overlay_by_route_id(self, tmp_path):
         path = tmp_path / "blocked-route.json"
         sim = Simulator(World(), seed=0)
-        sim.world.routes[0].blocked = True
+        route = sim.world.routes[1]
+        route_id = route.route_id
+        endpoints = {route.from_site_id, route.to_site_id}
+        route.route_type = "trail"
+        route.distance += 7
+        route.blocked = True
 
         save_simulation(sim, str(path))
         restored = load_simulation(str(path))
 
         assert restored is not None
-        assert restored.world.routes[0].route_id == sim.world.routes[0].route_id
-        assert restored.world.routes[0].blocked is True
+        restored_route = next(item for item in restored.world.routes if item.route_id == route_id)
+        assert {restored_route.from_site_id, restored_route.to_site_id} == endpoints
+        assert restored_route.route_type == "trail"
+        assert restored_route.distance == route.distance
+        assert restored_route.blocked is True
+        assert {item.route_id for item in restored.world.routes} == {item.route_id for item in sim.world.routes}
+
+    def test_load_preserves_bundle_backed_route_overlay_when_payload_order_changes(self, tmp_path):
+        path = tmp_path / "route-overlay-order.json"
+        sim = Simulator(World(), seed=0)
+        route = sim.world.routes[2]
+        route_id = route.route_id
+        endpoints = {route.from_site_id, route.to_site_id}
+        route.blocked = True
+        save_simulation(sim, str(path))
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        data["world"]["routes"] = list(reversed(data["world"]["routes"]))
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+
+        restored = load_simulation(str(path))
+
+        assert restored is not None
+        restored_route = next(item for item in restored.world.routes if item.route_id == route_id)
+        assert {restored_route.from_site_id, restored_route.to_site_id} == endpoints
+        assert restored_route.blocked is True
+        assert {item.route_id for item in restored.world.routes} == {item.route_id for item in sim.world.routes}
+
+    def test_round_trip_preserves_bundle_backed_terrain_mutation(self, tmp_path):
+        path = tmp_path / "mutated-terrain.json"
+        sim = Simulator(World(), seed=0)
+        assert sim.world.terrain_map is not None
+        cell = sim.world.terrain_map.get(0, 0)
+        assert cell is not None
+        cell.biome = "swamp"
+        cell.elevation = 77
+        cell.moisture = 222
+        cell.temperature = 91
+
+        save_simulation(sim, str(path))
+        restored = load_simulation(str(path))
+
+        assert restored is not None
+        assert restored.world.terrain_map is not None
+        restored_cell = restored.world.terrain_map.get(0, 0)
+        assert restored_cell is not None
+        assert restored_cell.biome == "swamp"
+        assert restored_cell.elevation == 77
+        assert restored_cell.moisture == 222
+        assert restored_cell.temperature == 91
+
+    def test_save_load_preserves_mutated_bundle_terrain_and_route_overlay_together(self, tmp_path):
+        path = tmp_path / "terrain-and-route-overlay.json"
+        sim = Simulator(World(), seed=0)
+        assert sim.world.terrain_map is not None
+        cell = sim.world.terrain_map.get(0, 0)
+        assert cell is not None
+        cell.biome = "swamp"
+        cell.elevation = 77
+        route = sim.world.routes[1]
+        route_id = route.route_id
+        route.blocked = True
+        site_count = len(sim.world.sites)
+        route_ids = {item.route_id for item in sim.world.routes}
+
+        save_simulation(sim, str(path))
+        restored = load_simulation(str(path))
+
+        assert restored is not None
+        assert restored.world.terrain_map is not None
+        restored_cell = restored.world.terrain_map.get(0, 0)
+        assert restored_cell is not None
+        assert restored_cell.biome == "swamp"
+        assert restored_cell.elevation == 77
+        restored_route = next(item for item in restored.world.routes if item.route_id == route_id)
+        assert restored_route.blocked is True
+        assert len(restored.world.sites) == site_count
+        assert {item.route_id for item in restored.world.routes} == route_ids
 
     def test_load_normalizes_bundle_backed_route_endpoint_aliases(self, tmp_path):
         path = tmp_path / "stale-bundle-route-endpoint.json"
@@ -672,6 +754,22 @@ class TestLoadSimulation:
 
         assert restored is None
 
+    def test_load_returns_none_for_bundle_backed_unknown_route_overlay(self, tmp_path):
+        path = tmp_path / "unknown-bundle-route.json"
+        sim = Simulator(World(), seed=0)
+        save_simulation(sim, str(path))
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        unknown_route = dict(data["world"]["routes"][0])
+        unknown_route["route_id"] = "route_not_in_bundle"
+        data["world"]["routes"].append(unknown_route)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+
+        restored = load_simulation(str(path))
+
+        assert restored is None
+
     def test_load_returns_none_for_bundle_backed_route_overlay_with_mismatched_endpoints(self, tmp_path):
         path = tmp_path / "bundle-route-endpoints.json"
         sim = Simulator(World(), seed=0)
@@ -679,6 +777,42 @@ class TestLoadSimulation:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
         data["world"]["routes"][0]["from_site_id"] = "loc_thornwood"
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+
+        restored = load_simulation(str(path))
+
+        assert restored is None
+
+    def test_load_returns_none_for_incomplete_bundle_backed_terrain_snapshot(self, tmp_path):
+        path = tmp_path / "incomplete-bundle-terrain.json"
+        sim = Simulator(World(), seed=0)
+        assert sim.world.terrain_map is not None
+        cell = sim.world.terrain_map.get(0, 0)
+        assert cell is not None
+        cell.biome = "swamp"
+        save_simulation(sim, str(path))
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        data["world"]["terrain_map"]["cells"].pop()
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+
+        restored = load_simulation(str(path))
+
+        assert restored is None
+
+    def test_load_returns_none_for_duplicate_bundle_backed_terrain_cell(self, tmp_path):
+        path = tmp_path / "duplicate-bundle-terrain-cell.json"
+        sim = Simulator(World(), seed=0)
+        assert sim.world.terrain_map is not None
+        cell = sim.world.terrain_map.get(0, 0)
+        assert cell is not None
+        cell.biome = "swamp"
+        save_simulation(sim, str(path))
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        data["world"]["terrain_map"]["cells"].append(dict(data["world"]["terrain_map"]["cells"][0]))
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f)
 

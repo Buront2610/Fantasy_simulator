@@ -31,6 +31,17 @@ work and its serialization guardrails.
   Status: completed in the current branch worktree.
   Evidence: route block/reopen records carry endpoint IDs and `location:*` tags
   so reports and location queries include both connected sites.
+- Terrain snapshot compactness.
+  Status: completed for the v8 save/load contract.
+  Evidence: unmodified bundle-derived terrain is omitted from saves; mutated
+  terrain requires a complete validated `terrain_map` snapshot.
+- Terrain-cell mutation contract.
+  Status: completed in the current branch worktree.
+  Evidence: `World.apply_terrain_cell_change` records
+  `terrain_cell_mutated` events with semantic `render_params` and
+  `terrain_cell` impacts, mutates runtime `TerrainMap` state, reports through
+  the terrain-change category, and is covered by the quality-gate terrain
+  mutation target.
 
 ## Remaining Risks
 
@@ -61,6 +72,11 @@ work and its serialization guardrails.
   Guardrail: behavior-only hydration changes require focused save/load
   conflict tests even when `CURRENT_VERSION` stays unchanged; schema-version
   bumps still require migration tests and README/agent doc freshness updates.
+- Era runtime persistence is intentionally deferred.
+  Impact: agents may persist world-level era/civilization fields prematurely,
+  creating a schema conflict with the K0 guardrail.
+  Guardrail: keep era/civilization projections headless and driven by
+  canonical records until a later save policy declares durable runtime fields.
 
 ## Current Status
 
@@ -69,4 +85,7 @@ work and its serialization guardrails.
   derived-cache rebuild behavior were tightened.
 - RR-001 route graph is no longer tracked as an open serialization risk.
 - Remaining future risk is additive: new PR-K dynamic world state fields must
-  declare their canonical source and conflict behavior before persistence lands.
+  declare their canonical source and conflict behavior before persistence
+  lands. Terrain mutation uses the v8-compatible complete `terrain_map`
+  snapshot policy documented in the serialization contract, while
+  era/civilization runtime state remains pre-persistence.

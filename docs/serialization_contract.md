@@ -37,6 +37,8 @@ this precedence:
 - Bundle-backed world structure: embedded `world.setting_bundle` site/route
   seeds beat serialized structure; serialized route/grid data may overlay
   runtime state only after validation.
+- Bundle-backed terrain: derived terrain cells are omitted unless runtime terrain
+  mutations require a complete `terrain_map` snapshot.
 - Route graph shape: bundle `route_seeds` define the canonical graph when a
   bundle is active. An explicit empty route list means intentionally
   disconnected travel, not "infer default roads".
@@ -50,6 +52,10 @@ this precedence:
   projected from canonical records.
 - New world-change APIs are idempotent: if the requested state already matches
   the current state, they do not append a canonical `world_change` record.
+- World-change runtime mutations are transactional with canonical recording:
+  if recording the `WorldEventRecord` fails, route state and location
+  rename/control/terrain runtime state plus derived event indexes must remain
+  unchanged.
 - `render_params` values must be JSON-compatible scalars, lists, or dicts with
   string keys. Store semantic values such as IDs or `null`, not translated
   surface strings, so records can render cleanly in another locale. If a record
@@ -59,6 +65,12 @@ this precedence:
   `from_location_id`, `to_location_id`, `endpoint_location_ids`, and matching
   `location:*` tags so reports and location queries can see the event from
   either connected site.
+- Terrain-cell mutation records store semantic cell data, not rendered labels.
+  Required `render_params` are `terrain_cell_id`, `x`, `y`, old/new values for
+  changed terrain fields, and `changed_attributes`; optional params include
+  `location_id`, `reason_key`, and `cause_event_id`. Impacts target
+  `terrain_cell` with target ID `terrain:<x>:<y>` for each changed attribute.
+  Location-linked mutations must also include a `location:<location_id>` tag.
 - Compatibility `EventResult` projections may expose `render_params` in
   metadata for legacy readers. That metadata is adapter output, not an
   additional durable source of truth.
@@ -73,7 +85,24 @@ this precedence:
 - Bundle-backed topology rebuilds from active bundle seeds, then overlays
   serialized runtime state such as blocked routes when endpoints still match.
   Mismatched or duplicate route overlays must fail load rather than silently
-  inventing topology.
+  inventing topology. Unknown serialized route entries that do not target a
+  canonical route pair are treated as stale legacy structure and ignored; they
+  must never create routes in a bundle-backed world.
+- Bundle-backed terrain snapshots are v8-compatible overlays. Load must first
+  derive bundle topology, then validate that any serialized `terrain_map`
+  snapshot is complete for that topology before applying runtime terrain cell
+  mutations. Completeness means matching width/height, exactly one cell for
+  every in-bounds coordinate, no duplicate coordinates, and no out-of-bounds
+  cells.
+- Bundle-backed unmodified terrain must stay compact. If the runtime
+  `terrain_map` still matches the bundle-derived terrain, new saves omit
+  `terrain_map`; after any terrain-cell mutation, new saves include the full
+  validated snapshot rather than a sparse delta list.
+- Era and civilization projections are headless pre-persistence for the current
+  PR-K guardrail. Canonical `era_shifted` and
+  `civilization_phase_drifted` records may exist, but world-level era runtime
+  fields must not be treated as durable save fields until a later schema policy
+  is documented.
 - Non-bundle serialized topology is explicit. It must validate site references,
   route endpoint references, duplicate route IDs, duplicate route pairs, and
   self-loops before hydration succeeds.

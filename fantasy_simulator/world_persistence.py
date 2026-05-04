@@ -6,9 +6,9 @@ from typing import Any, Callable, Dict, Mapping, Type
 
 from .content.setting_bundle import CalendarDefinition, bundle_from_dict_validated
 from .language.state import LanguageEvolutionRecord, LanguageRuntimeState
-from .terrain import AtlasLayout
+from .terrain import AtlasLayout, TerrainMap
 from .world_event_record_updates import normalize_event_record_locations
-from .world_topology_state import restore_serialized_topology
+from .world_topology_state import build_topology_from_locations, restore_serialized_topology
 
 
 def _serialized_location_id_aliases(world: Any, serialized_grid: list[Any]) -> Dict[str, str]:
@@ -47,6 +47,103 @@ def _normalize_serialized_route_endpoints(
     return normalized_routes
 
 
+def _terrain_maps_equal(left: TerrainMap, right: TerrainMap) -> bool:
+    """Return whether two terrain maps have the same full cell state."""
+    if left.width != right.width or left.height != right.height:
+        return False
+    if set(left.cells) != set(right.cells):
+        return False
+    for coord, left_cell in left.cells.items():
+        right_cell = right.cells[coord]
+        if left_cell.to_dict() != right_cell.to_dict():
+            return False
+    return True
+
+
+def _bundle_derived_terrain_matches_current(world: Any) -> bool:
+    """Return whether current terrain still matches the active bundle derivation."""
+    if world.terrain_map is None:
+        return True
+    location_ids = set(world._location_id_index)
+    derived = build_topology_from_locations(
+        width=world.width,
+        height=world.height,
+        locations=world.grid.values(),
+        route_specs=[
+            seed.to_dict()
+            for seed in world._setting_bundle.world_definition.route_seeds
+            if seed.from_site_id in location_ids and seed.to_site_id in location_ids
+        ],
+        explicit_route_graph=True,
+    ).terrain_map
+    return derived is not None and _terrain_maps_equal(world.terrain_map, derived)
+
+
+def _current_grid_can_overlay_bundle_structure(world: Any) -> bool:
+    """Return whether current grid shape can be restored from bundle seeds plus runtime overlay."""
+    if world._setting_bundle is None:
+        return False
+
+    expected_by_id = {
+        seed.location_id: seed
+        for seed in world._setting_bundle.world_definition.site_seeds
+        if 0 <= seed.x < world.width and 0 <= seed.y < world.height
+    }
+    current_by_id: Dict[str, Any] = {}
+    for location in world.grid.values():
+        normalized_id = world.normalize_location_id(location.id, location_name=location.canonical_name)
+        if normalized_id is None or normalized_id in current_by_id:
+            return False
+        current_by_id[normalized_id] = location
+    if set(current_by_id) != set(expected_by_id):
+        return False
+
+    for location_id, seed in expected_by_id.items():
+        location = current_by_id[location_id]
+        if (
+            location.region_type != seed.region_type
+            or int(location.x) != int(seed.x)
+            or int(location.y) != int(seed.y)
+        ):
+            return False
+    return True
+
+
+def _restore_bundle_terrain_snapshot(terrain_map_data: Any, *, width: int, height: int) -> TerrainMap:
+    """Restore a bundle-backed terrain override and require a complete grid."""
+    if not isinstance(terrain_map_data, dict):
+        raise ValueError("Serialized terrain_map must be a dict")
+    if terrain_map_data.get("width") != width or terrain_map_data.get("height") != height:
+        raise ValueError("Serialized terrain_map dimensions disagree with world dimensions")
+    raw_cells = terrain_map_data.get("cells")
+    if not isinstance(raw_cells, list):
+        raise ValueError("Serialized terrain_map cells must be a list")
+
+    seen_coords: set[tuple[int, int]] = set()
+    for cell_data in raw_cells:
+        if not isinstance(cell_data, dict):
+            raise ValueError("Serialized terrain_map cells must be dicts")
+        x = cell_data.get("x")
+        y = cell_data.get("y")
+        if type(x) is not int or type(y) is not int:
+            raise ValueError("Serialized terrain_map cell coordinates must be integers")
+        if not 0 <= x < width or not 0 <= y < height:
+            raise ValueError("Serialized terrain_map cell is outside world bounds")
+        coord = (x, y)
+        if coord in seen_coords:
+            raise ValueError(f"Serialized terrain_map contains duplicate cell: {coord!r}")
+        seen_coords.add(coord)
+
+    expected_coords = {
+        (x, y)
+        for y in range(height)
+        for x in range(width)
+    }
+    if seen_coords != expected_coords:
+        raise ValueError("Serialized terrain_map must contain every world cell exactly once")
+    return TerrainMap.from_dict(terrain_map_data)
+
+
 def serialize_world_state(world: Any) -> Dict[str, Any]:
     """Build the serialized payload for a world instance."""
     lore_text = world._setting_bundle.world_definition.lore_text
@@ -72,8 +169,11 @@ def serialize_world_state(world: Any) -> Dict[str, Any]:
             for key, state in world._language_runtime_states.items()
         },
     }
-    bundle_backed_topology = world._setting_bundle is not None and world._grid_matches_bundle_seeds()
-    if world.terrain_map is not None and not bundle_backed_topology:
+    bundle_backed_topology = _current_grid_can_overlay_bundle_structure(world)
+    bundle_terrain_is_derived = (
+        bundle_backed_topology and _bundle_derived_terrain_matches_current(world)
+    )
+    if world.terrain_map is not None and (not bundle_backed_topology or not bundle_terrain_is_derived):
         result["terrain_map"] = world.terrain_map.to_dict()
     if world.sites and not bundle_backed_topology:
         result["sites"] = [s.to_dict() for s in world.sites]
@@ -180,6 +280,12 @@ def hydrate_world_state(
 
     if bundle_backed_structure:
         world._build_terrain_from_grid()
+        if "terrain_map" in data:
+            world.terrain_map = _restore_bundle_terrain_snapshot(
+                data["terrain_map"],
+                width=world.width,
+                height=world.height,
+            )
         route_endpoint_aliases = _serialized_location_id_aliases(world, serialized_grid)
         serialized_routes = _normalize_serialized_route_endpoints(
             data.get("routes", []),

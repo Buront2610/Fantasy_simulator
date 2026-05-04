@@ -105,6 +105,7 @@ def overlay_serialized_route_state(
     """Overlay mutable route state onto the canonical route graph."""
     if not serialized_routes:
         return
+    route_list = list(routes)
     serialized_by_id: Dict[str, Dict[str, Any]] = {}
     for item in serialized_routes:
         if not isinstance(item, dict):
@@ -114,15 +115,26 @@ def overlay_serialized_route_state(
         if route_id in serialized_by_id:
             raise ValueError(f"Serialized route overlay contains duplicate route id: {route_id!r}")
         serialized_by_id[route_id] = payload
-    for route in routes:
-        route_payload = serialized_by_id.get(route.route_id)
-        if route_payload is None:
+    known_route_ids = {route.route_id for route in route_list}
+    known_route_pairs = {
+        tuple(sorted((route.from_site_id, route.to_site_id)))
+        for route in route_list
+    }
+    unknown_route_ids = sorted(set(serialized_by_id) - known_route_ids)
+    for route_id in unknown_route_ids:
+        unknown_route_payload = serialized_by_id[route_id]
+        route_pair = tuple(sorted((unknown_route_payload["from_site_id"], unknown_route_payload["to_site_id"])))
+        if route_pair in known_route_pairs:
+            raise ValueError(f"Serialized route overlay references unknown route id: {route_id!r}")
+    for route in route_list:
+        overlay_payload = serialized_by_id.get(route.route_id)
+        if overlay_payload is None:
             continue
-        if route_payload["from_site_id"] != route.from_site_id or route_payload["to_site_id"] != route.to_site_id:
+        if overlay_payload["from_site_id"] != route.from_site_id or overlay_payload["to_site_id"] != route.to_site_id:
             raise ValueError(f"Serialized route overlay disagrees with canonical endpoints: {route.route_id!r}")
-        route.route_type = route_payload["route_type"]
-        route.distance = route_payload["distance"]
-        route.blocked = route_payload["blocked"]
+        route.route_type = overlay_payload["route_type"]
+        route.distance = overlay_payload["distance"]
+        route.blocked = overlay_payload["blocked"]
 
 
 def validate_topology_integrity(

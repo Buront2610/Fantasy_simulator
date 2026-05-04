@@ -250,7 +250,6 @@ def test_apply_controlling_faction_change_updates_location_and_records_event():
     assert second.kind == "location_faction_changed"
     assert second.summary_key == "events.location_faction_changed.summary"
     assert second.render_params == {
-        "location": "Aethoria Capital",
         "location_id": "loc_aethoria_capital",
         "old_faction_id": "wardens",
         "new_faction_id": "dawn_court",
@@ -319,7 +318,7 @@ def test_world_change_record_created_in_en_renders_event_log_and_report_in_ja():
         expected = "Aethoria Capital の支配勢力が なし から wardens に変わった。"
         report = generate_monthly_report(world, record.year, record.month)
 
-        assert render_event_record(record) == expected
+        assert render_event_record(record, world=world) == expected
         assert any(expected in line for line in world.event_log)
         assert expected in report.notable_events
     finally:

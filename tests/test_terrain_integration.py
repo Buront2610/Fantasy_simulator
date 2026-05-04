@@ -156,6 +156,46 @@ class TestWorldTerrainRoundTrip:
         assert "sites" not in d
         assert "routes" in d
 
+    def test_to_dict_includes_mutated_bundle_backed_terrain_snapshot(self):
+        world = World()
+        assert world.terrain_map is not None
+        cell = world.terrain_map.get(0, 0)
+        assert cell is not None
+        cell.biome = "swamp"
+        cell.elevation = 77
+        cell.moisture = 222
+        cell.temperature = 91
+
+        d = world.to_dict()
+        restored = World.from_dict(d)
+
+        assert "terrain_map" in d
+        assert "sites" not in d
+        assert "routes" in d
+        assert restored.terrain_map is not None
+        restored_cell = restored.terrain_map.get(0, 0)
+        assert restored_cell is not None
+        assert restored_cell.biome == "swamp"
+        assert restored_cell.elevation == 77
+        assert restored_cell.moisture == 222
+        assert restored_cell.temperature == 91
+        _assert_world_bounds_invariants(restored)
+
+    def test_to_dict_omits_terrain_after_bundle_backed_location_rename(self):
+        world = World()
+        record = world.apply_location_rename_change("loc_aethoria_capital", "Starhold")
+
+        d = world.to_dict()
+        restored = World.from_dict(d)
+
+        assert record is not None
+        assert "terrain_map" not in d
+        assert "sites" not in d
+        location = restored.get_location_by_id("loc_aethoria_capital")
+        assert location is not None
+        assert location.canonical_name == "Starhold"
+        _assert_world_bounds_invariants(restored)
+
     def test_round_trip_preserves_terrain(self):
         world = World()
         d = world.to_dict()
