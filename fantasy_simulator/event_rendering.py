@@ -77,6 +77,52 @@ def _display_faction(value: Any, *, world: EventRenderContext | None = None, tra
     return _faction_display_name(faction_id, world) or faction_id
 
 
+def _display_biome(value: Any, *, translate: Translator) -> str:
+    biome_id = str(value)
+    key = f"terrain_biome_{biome_id}"
+    rendered = translate(key)
+    return biome_id if rendered == key else rendered
+
+
+def _terrain_change_summary(params: dict[str, Any], *, translate: Translator) -> str:
+    parts: list[str] = []
+    if params.get("old_biome") != params.get("new_biome"):
+        parts.append(
+            translate(
+                "event_terrain_change_biome",
+                old_biome=params.get("old_biome", ""),
+                new_biome=params.get("new_biome", ""),
+            )
+        )
+    if params.get("old_elevation") != params.get("new_elevation"):
+        parts.append(
+            translate(
+                "event_terrain_change_elevation",
+                old_elevation=params.get("old_elevation", ""),
+                new_elevation=params.get("new_elevation", ""),
+            )
+        )
+    if params.get("old_moisture") != params.get("new_moisture"):
+        parts.append(
+            translate(
+                "event_terrain_change_moisture",
+                old_moisture=params.get("old_moisture", ""),
+                new_moisture=params.get("new_moisture", ""),
+            )
+        )
+    if params.get("old_temperature") != params.get("new_temperature"):
+        parts.append(
+            translate(
+                "event_terrain_change_temperature",
+                old_temperature=params.get("old_temperature", ""),
+                new_temperature=params.get("new_temperature", ""),
+            )
+        )
+    if not parts:
+        return translate("event_terrain_change_noop")
+    return translate("event_terrain_change_separator").join(parts)
+
+
 def _render_params(
     record: WorldEventRecord,
     *,
@@ -112,6 +158,13 @@ def _render_params(
                 world=world,
                 translate=translate,
             )
+    if record.summary_key == "events.terrain_cell_mutated.summary":
+        if "old_biome" in params:
+            params["old_biome"] = _display_biome(params["old_biome"], translate=translate)
+        if "new_biome" in params:
+            params["new_biome"] = _display_biome(params["new_biome"], translate=translate)
+        if "change_summary" not in params:
+            params["change_summary"] = _terrain_change_summary(params, translate=translate)
     if record.summary_key == "events.battle_result.summary" and "injury" not in params:
         injury_status = params.get("loser_injury_status")
         loser = params.get("loser")

@@ -376,6 +376,21 @@ TEXT_JA: Dict[str, str] = {
     'events.location_faction_changed.summary': (
         '{location} の支配勢力が {old_faction} から {new_faction} に変わった。'
     ),
+    'events.terrain_cell_mutated.summary': (
+        '座標 ({x}, {y}) の地形変化: {change_summary}。'
+    ),
+    'event_terrain_change_biome': '生物群系が {old_biome} から {new_biome}',
+    'event_terrain_change_elevation': '標高が {old_elevation} から {new_elevation}',
+    'event_terrain_change_moisture': '湿度が {old_moisture} から {new_moisture}',
+    'event_terrain_change_temperature': '気温が {old_temperature} から {new_temperature}',
+    'event_terrain_change_separator': '、',
+    'event_terrain_change_noop': '可視属性なし',
+    'events.era_shifted.summary': (
+        '時代が {old_era_key} から {new_era_key} へ移り、文明は {new_civilization_phase} に入った。'
+    ),
+    'events.civilization_phase_drifted.summary': (
+        '文明段階が {old_civilization_phase} から {new_civilization_phase} へ変化した。'
+    ),
     'event_change_no_faction': 'なし',
     'times_suffix': '回',
     'report_monthly_title': 'Aethoria 月報 ─ {year}年 {season}の第{month}月',
@@ -536,6 +551,14 @@ TEXT_JA: Dict[str, str] = {
     'monthly_report_card_locations': '  注目地点: {names}',
     'monthly_report_card_adventures': '  最近の冒険: {items}',
     'monthly_report_card_memory': '  新しい記憶: {items}',
+    'world_change_category_route': '経路',
+    'world_change_category_location': '地点',
+    'world_change_category_occupation': '支配',
+    'world_change_category_terrain': '地形',
+    'world_change_category_war': '戦争',
+    'world_change_category_era': '時代',
+    'world_change_category_civilization': '文明',
+    'world_change_category_world_change': '世界変化',
     'auto_pause_context': '停止要因: {actor} @ {location}',
     'auto_pause_supplemental': '補足停止理由: {reasons}',
     # PR-G: terrain / route / site labels

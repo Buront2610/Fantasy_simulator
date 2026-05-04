@@ -97,4 +97,10 @@ class ReportPresenter:
             lines.append(tr("monthly_report_card_memory", items=" | ".join(card.new_memory_items)))
         if card.hot_rumors:
             lines.append(f"  {tr('report_section_rumors')}: {' | '.join(card.hot_rumors)}")
+        if card.world_changes:
+            summary = ", ".join(
+                f"{tr(f'world_change_category_{change.category}')}: {change.count}"
+                for change in card.world_changes
+            )
+            lines.append(f"  {tr('report_section_world')}: {summary}")
         return lines

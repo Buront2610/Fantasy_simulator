@@ -11,6 +11,7 @@ from typing import Dict, List, TYPE_CHECKING
 
 from ..event_rendering import render_event_record
 from ..i18n import tr
+from ..observation import build_world_change_report_projection
 from ..world_event_index import location_ids_for_record
 from ..location_observation import (
     LocationObservationView,
@@ -31,6 +32,7 @@ __all__ = [
     "MonthlyReportCardView",
     "NotificationItemView",
     "RumorSummaryView",
+    "WorldChangeSummaryView",
     "build_location_observation_view",
     "build_monthly_report_card_view",
     "build_notification_views",
@@ -60,6 +62,12 @@ class LocationHistoryView:
 
 
 @dataclass
+class WorldChangeSummaryView:
+    category: str
+    count: int
+
+
+@dataclass
 class MonthlyReportCardView:
     year: int
     month: int
@@ -69,6 +77,7 @@ class MonthlyReportCardView:
     completed_adventures: List[str] = field(default_factory=list)
     new_memory_items: List[str] = field(default_factory=list)
     hot_rumors: List[str] = field(default_factory=list)
+    world_changes: List[WorldChangeSummaryView] = field(default_factory=list)
 
 
 @dataclass
@@ -147,6 +156,16 @@ def build_monthly_report_card_view(world: "World", year: int, month: int) -> Mon
     else:
         month_label = str(month)
 
+    world_change_projection = build_world_change_report_projection(
+        event_records=records,
+        year=year,
+        month=month,
+    )
+    world_changes = [
+        WorldChangeSummaryView(category=count.category, count=count.count)
+        for count in world_change_projection.counts_by_category
+    ]
+
     hot_rumors: List[str] = []
     if hasattr(world, "event_records") and hasattr(world, "rumors") and hasattr(world, "location_name"):
         hot_rumors = [
@@ -164,4 +183,5 @@ def build_monthly_report_card_view(world: "World", year: int, month: int) -> Mon
         completed_adventures=completed_adventures[:3],
         new_memory_items=new_memory[:3],
         hot_rumors=hot_rumors,
+        world_changes=world_changes,
     )
