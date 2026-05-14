@@ -93,6 +93,36 @@ class TestI18n:
         set_locale("en")
         assert tr("auto_pause_years_elapsed") == "Time has passed"
 
+    def test_auto_pause_recommendation_templates_render(self):
+        set_locale("ja")
+        assert tr("auto_pause_subreasons") == "重要な理由:"
+        assert tr("auto_pause_recommendations") == "推奨確認:"
+        assert "Mira" in tr("auto_pause_subreason_actor_in_danger", actor="Mira", location="Capital")
+        assert "Mira" in tr("auto_pause_recommendation_inspect_character", actor="Mira", location="Capital")
+        set_locale("en")
+        assert tr("auto_pause_subreasons") == "Why this matters:"
+        assert tr("auto_pause_recommendations") == "Recommended checks:"
+        assert "Mira" in tr("auto_pause_subreason_actor_in_danger", actor="Mira", location="Capital")
+        assert "Mira" in tr("auto_pause_recommendation_inspect_character", actor="Mira", location="Capital")
+
+    def test_rumor_board_templates_render(self):
+        set_locale("ja")
+        assert tr("rumor_board_menu") == "噂一覧"
+        assert "Aethoria" in tr("rumor_board_meta", location="Aethoria", age=2, spread=4, event_id="evt1")
+        assert "Aethoria" in tr("rumor_board_detail_source", location="Aethoria", age=2, spread=4)
+        set_locale("en")
+        assert tr("rumor_board_menu") == "Rumor board"
+        assert "evt1" in tr("rumor_board_meta", location="Aethoria", age=2, spread=4, event_id="evt1")
+        assert "Aethoria" in tr("rumor_board_detail_source", location="Aethoria", age=2, spread=4)
+
+    def test_dashboard_templates_render(self):
+        set_locale("ja")
+        assert tr("dashboard_menu") == "世界ダッシュボード"
+        assert "Aethoria" in tr("dashboard_title", world="Aethoria")
+        set_locale("en")
+        assert tr("dashboard_menu") == "World dashboard"
+        assert "Aethoria" in tr("dashboard_title", world="Aethoria")
+
     @pytest.mark.parametrize("locale", ["en", "ja"])
     @pytest.mark.parametrize(
         "key",

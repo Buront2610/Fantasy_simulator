@@ -18,6 +18,7 @@ from ..location_observation import (
     RumorSummaryView,
     build_location_observation_view,
     build_rumor_summary_views,
+    render_rumor_brief,
 )
 
 if TYPE_CHECKING:
@@ -33,10 +34,12 @@ __all__ = [
     "NotificationItemView",
     "RumorSummaryView",
     "WorldChangeSummaryView",
+    "WorldDashboardView",
     "build_location_observation_view",
     "build_monthly_report_card_view",
     "build_notification_views",
     "build_rumor_summary_views",
+    "build_world_dashboard_view",
 ]
 
 
@@ -77,6 +80,23 @@ class MonthlyReportCardView:
     completed_adventures: List[str] = field(default_factory=list)
     new_memory_items: List[str] = field(default_factory=list)
     hot_rumors: List[str] = field(default_factory=list)
+    world_changes: List[WorldChangeSummaryView] = field(default_factory=list)
+
+
+@dataclass
+class WorldDashboardView:
+    world_name: str
+    year: int
+    month: int
+    month_label: str
+    alive_count: int
+    deceased_count: int
+    active_adventure_count: int
+    pending_choice_count: int
+    major_events: List[str] = field(default_factory=list)
+    watched_actors: List[str] = field(default_factory=list)
+    hot_rumors: List[str] = field(default_factory=list)
+    dangerous_locations: List[str] = field(default_factory=list)
     world_changes: List[WorldChangeSummaryView] = field(default_factory=list)
 
 
@@ -184,4 +204,107 @@ def build_monthly_report_card_view(world: "World", year: int, month: int) -> Mon
         new_memory_items=new_memory[:3],
         hot_rumors=hot_rumors,
         world_changes=world_changes,
+    )
+
+
+def build_world_dashboard_view(
+    world: "World",
+    *,
+    current_month: int,
+    pending_choice_count: int = 0,
+) -> WorldDashboardView:
+    """Build a compact observer dashboard from canonical world state."""
+    records = list(getattr(world, "event_records", []))
+    recent_records = sorted(
+        records,
+        key=lambda record: (
+            record.severity,
+            record.year,
+            record.month,
+            record.day,
+            record.absolute_day,
+            record.record_id,
+        ),
+        reverse=True,
+    )
+    notable_records = [record for record in recent_records if record.severity >= 3] or recent_records
+    major_events = [_render_view_event(record, world) for record in notable_records[:5]]
+
+    alive_count = sum(1 for character in getattr(world, "characters", []) if character.alive)
+    deceased_count = sum(1 for character in getattr(world, "characters", []) if not character.alive)
+    watched_actors = [
+        _format_dashboard_actor(world, character)
+        for character in getattr(world, "characters", [])
+        if character.favorite or character.spotlighted or character.playable
+    ][:5]
+    dangerous_locations = [
+        tr(
+            "dashboard_location_status",
+            location=location.canonical_name,
+            danger=location.danger,
+            rumor=location.rumor_heat,
+        )
+        for location in sorted(
+            getattr(world, "grid", {}).values(),
+            key=lambda item: (-item.danger, -item.rumor_heat, item.canonical_name.lower()),
+        )[:5]
+    ]
+    hot_rumors = [
+        render_rumor_brief(rumor)
+        for rumor in build_rumor_summary_views(world, limit=5)
+    ]
+    month_label = _dashboard_month_label(world, current_month)
+    world_change_projection = build_world_change_report_projection(
+        event_records=records,
+        year=getattr(world, "year", 0),
+    )
+    world_changes = [
+        WorldChangeSummaryView(category=count.category, count=count.count)
+        for count in world_change_projection.counts_by_category
+    ]
+
+    return WorldDashboardView(
+        world_name=getattr(world, "name", ""),
+        year=getattr(world, "year", 0),
+        month=current_month,
+        month_label=month_label,
+        alive_count=alive_count,
+        deceased_count=deceased_count,
+        active_adventure_count=len(getattr(world, "active_adventures", [])),
+        pending_choice_count=pending_choice_count,
+        major_events=major_events,
+        watched_actors=watched_actors,
+        hot_rumors=hot_rumors,
+        dangerous_locations=dangerous_locations,
+        world_changes=world_changes,
+    )
+
+
+def _dashboard_month_label(world: "World", current_month: int) -> str:
+    if hasattr(world, "month_display_name_for_date"):
+        try:
+            return world.month_display_name_for_date(world.year, current_month)
+        except TypeError:
+            return world.month_display_name(current_month)
+    return str(current_month)
+
+
+def _format_dashboard_actor(world: "World", character) -> str:
+    markers = []
+    if character.favorite:
+        markers.append(tr("dashboard_marker_favorite"))
+    if character.spotlighted:
+        markers.append(tr("dashboard_marker_spotlighted"))
+    if character.playable:
+        markers.append(tr("dashboard_marker_playable"))
+    marker_text = f" [{' / '.join(markers)}]" if markers else ""
+    injury = tr(f"injury_status_{character.injury_status}")
+    life_status = tr("alive") if character.alive else tr("status_dead")
+    return tr(
+        "dashboard_actor_status",
+        name=character.name,
+        markers=marker_text,
+        status=life_status,
+        injury=injury,
+        location=world.location_name(character.location_id),
     )

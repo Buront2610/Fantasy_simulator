@@ -281,6 +281,26 @@ def _capture_projection_contract(locale: str) -> dict[str, Any]:
     return _capture_projection_contract_cached(locale)
 
 
+def _capture_simulation_statistics(world_seed: int) -> dict[str, int]:
+    """Capture broad seeded-run balance signals without pinning exact stories."""
+    set_locale("en")
+    sim = Simulator(build_seeded_world(world_seed), events_per_year=4, adventure_steps_per_year=2, seed=99)
+    sim.advance_months(24)
+    kind_counts = Counter(record.kind for record in sim.world.event_records)
+    active_months = {
+        (record.year, record.month)
+        for record in sim.world.event_records
+    }
+    return {
+        "event_count": len(sim.world.event_records),
+        "non_aging_event_count": sum(count for kind, count in kind_counts.items() if kind != "aging"),
+        "kind_diversity": len(kind_counts),
+        "active_month_count": len(active_months),
+        "alive_count": sum(1 for char in sim.world.characters if char.alive),
+        "active_rumor_count": sum(1 for rumor in sim.world.rumors if not rumor.is_expired),
+    }
+
+
 @pytest.fixture(autouse=True)
 def _restore_locale():
     previous = get_locale()
@@ -391,6 +411,20 @@ def test_seeded_projection_contract_matches_expected_inputs() -> None:
 
 def test_seeded_projection_contract_is_locale_stable() -> None:
     assert _capture_projection_contract("ja") == _capture_projection_contract("en")
+
+
+def test_seeded_long_run_statistics_stay_in_expected_bounds() -> None:
+    summaries = [_capture_simulation_statistics(seed) for seed in (7, 8, 9)]
+
+    for summary in summaries:
+        assert 12 <= summary["event_count"] <= 36
+        assert 4 <= summary["non_aging_event_count"] <= 20
+        assert summary["kind_diversity"] >= 3
+        assert summary["active_month_count"] >= 6
+        assert summary["alive_count"] >= 3
+        assert summary["active_rumor_count"] <= 20
+
+    assert sum(summary["non_aging_event_count"] for summary in summaries) >= 20
 
 
 def test_midyear_save_load_preserves_projection_contract(tmp_path) -> None:
