@@ -1,12 +1,87 @@
 """Presenter/view-model regression tests."""
 
 from fantasy_simulator.i18n import set_locale
-from fantasy_simulator.ui.presenters import ReportPresenter
+from fantasy_simulator.ui.presenters import LanguagePresenter, ReportPresenter
 from fantasy_simulator.ui.view_models import build_monthly_report_card_view, build_notification_views
 from fantasy_simulator.rumor import Rumor
 from fantasy_simulator.world import CalendarChangeRecord, World
 from fantasy_simulator.events import WorldEventRecord
 from fantasy_simulator.content.setting_bundle import CalendarDefinition, CalendarMonthDefinition
+
+
+def test_language_presenter_surfaces_runtime_lore_details_concisely():
+    set_locale("en")
+    status = {
+        "language_key": "child",
+        "display_name": "Child Speech",
+        "lineage": ["Proto", "Child Speech"],
+        "sample_forms": {
+            "given_names": ["Darin", "Sela"],
+            "surnames": ["Torhand"],
+            "lexicon": ["dara", "shel", "mor"],
+            "toponym": "Dareth",
+        },
+        "runtime_state": {
+            "derived_name_stems": ["dar", "mor", "sel", "extra"],
+            "derived_toponym_suffixes": ["eth", "ath"],
+        },
+        "sound_shifts": {"a": "e", "t": "d", "s": "sh", "k": "g", "p": "b"},
+        "recent_evolution_records": [
+            {
+                "year": 1200,
+                "source_token": "s",
+                "target_token": "sh",
+                "rule_position": "initial",
+            },
+            {
+                "year": 1210,
+                "added_name_stem": "mor",
+                "rule_position": "any",
+            },
+            {
+                "year": 1220,
+                "added_toponym_suffix": "ath",
+                "rule_position": "final",
+            },
+        ],
+        "evolution_count": 3,
+    }
+
+    lines = LanguagePresenter.render_status(status)
+
+    assert "    Given names: Darin, Sela (+dar, mor, sel)" in lines
+    assert "    Lexicon: dara, shel, mor" in lines
+    assert "    Toponym: Dareth (+eth, ath)" in lines
+    assert "    Evolution events: 3 (a>e, t>d, s>sh, k>g)" in lines
+    assert "      1220: +ath (final)" in lines
+    assert "      1210: +mor" in lines
+    assert "      1200: s>sh (initial)" in lines
+
+
+def test_language_presenter_keeps_legacy_minimal_status_output():
+    set_locale("en")
+    status = {
+        "language_key": "plain",
+        "display_name": "Plain",
+        "lineage": ["Plain"],
+        "sample_forms": {
+            "given_names": ["Ala"],
+            "surnames": [],
+            "lexicon": [],
+            "toponym": "Alaton",
+        },
+        "evolution_count": 0,
+    }
+
+    lines = LanguagePresenter.render_status(status)
+
+    assert lines == [
+        "  Plain",
+        "    Lineage: Plain",
+        "    Given names: Ala",
+        "    Toponym: Alaton",
+        "    Evolution events: 0",
+    ]
 
 
 def test_monthly_report_card_is_built_from_event_records():

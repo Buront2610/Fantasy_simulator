@@ -30,6 +30,7 @@ class TestEntrypointSmoke:
             input="6\n",
             capture_output=True,
             text=True,
+            encoding="utf-8",
             cwd=_PROJECT_ROOT,
             timeout=timeout,
         )
@@ -70,6 +71,7 @@ class TestEntrypointSmoke:
             [sys.executable, "-c", "import fantasy_simulator"],
             capture_output=True,
             text=True,
+            encoding="utf-8",
             cwd=_PROJECT_ROOT,
             timeout=10,
         )

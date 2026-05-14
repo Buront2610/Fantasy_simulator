@@ -28,3 +28,14 @@ def test_production_code_does_not_call_display_only_log_event_adapter():
                 offenders.append(f"{path}:{node.lineno}")
 
     assert offenders == []
+
+
+def test_production_code_does_not_assign_event_log_adapter_directly():
+    offenders = []
+    for path in PRODUCTION_ROOT.rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Attribute) and isinstance(node.ctx, ast.Store) and node.attr == "event_log":
+                offenders.append(f"{path}:{node.lineno}")
+
+    assert offenders == []

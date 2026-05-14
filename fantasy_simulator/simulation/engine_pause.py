@@ -92,14 +92,20 @@ class EnginePauseMixin:
         supplemental_reasons: List[str],
     ) -> Dict[str, Any]:
         """Build the public auto-pause result payload."""
+        recommended_actions = self._pause_recommendations_for_reasons(
+            pause_reason,
+            supplemental_reasons,
+        )
         return {
             "days_advanced": days_advanced,
             "months_advanced": months_advanced,
             "years_advanced": years_advanced,
             "pause_reason": pause_reason,
             "pause_priority": self.AUTO_PAUSE_PRIORITIES.get(pause_reason, 0),
+            "pause_subreasons": self._pause_subreasons_for_reason(pause_reason),
             "supplemental_reasons": supplemental_reasons,
             "pause_context": self._pause_context_for_reason(pause_reason),
+            "recommended_actions": recommended_actions,
         }
 
     def _check_pause_conditions(self) -> Optional[str]:
@@ -146,7 +152,15 @@ class EnginePauseMixin:
 
     def _pause_context_for_reason(self, reason: str) -> Dict[str, str]:
         """Return lightweight context (character/location) for a pause reason."""
-        if reason.startswith("dying"):
+        if reason == "dying_spotlighted":
+            for char in self.world.characters:
+                if char.alive and char.is_dying and char.spotlighted:
+                    return {"character": char.name, "location": self.world.location_name(char.location_id)}
+        if reason == "dying_favorite":
+            for char in self.world.characters:
+                if char.alive and char.is_dying and char.favorite:
+                    return {"character": char.name, "location": self.world.location_name(char.location_id)}
+        if reason == "dying_any":
             for char in self.world.characters:
                 if char.alive and char.is_dying:
                     return {"character": char.name, "location": self.world.location_name(char.location_id)}
@@ -161,7 +175,70 @@ class EnginePauseMixin:
                     return {"character": watched.name, "location": self.world.location_name(run.origin)}
             run = self._recently_completed_adventures[-1]
             return {"character": run.character_name, "location": self.world.location_name(run.origin)}
+        if reason == "condition_worsened_favorite":
+            for char in self.world.characters:
+                if char.favorite and char.char_id in self._favorites_worsened_this_year:
+                    return {"character": char.name, "location": self.world.location_name(char.location_id)}
         return {}
+
+    def _pause_recommendations_for_reasons(
+        self,
+        pause_reason: str,
+        supplemental_reasons: List[str],
+    ) -> List[Dict[str, str]]:
+        """Return concise follow-up checks for the pause result."""
+        recommendations: List[Dict[str, str]] = []
+        for reason in [pause_reason, *supplemental_reasons]:
+            recommendations.extend(self._pause_recommendations_for_reason(reason))
+
+        deduped: List[Dict[str, str]] = []
+        seen = set()
+        for item in recommendations:
+            key = (
+                item.get("key", ""),
+                item.get("character", ""),
+                item.get("location", ""),
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(item)
+        return deduped[:3]
+
+    def _pause_recommendations_for_reason(self, reason: str) -> List[Dict[str, str]]:
+        """Map an auto-pause reason to player-facing follow-up actions."""
+        context = self._pause_context_for_reason(reason)
+        character = context.get("character", "")
+        location = context.get("location", "")
+        if reason.startswith("dying") or reason == "condition_worsened_favorite":
+            actions = [{"key": "inspect_character", "character": character, "location": location}]
+            if location:
+                actions.append({"key": "inspect_location", "character": character, "location": location})
+            return actions
+        if reason == "pending_decision":
+            return [{"key": "review_pending_adventure", "character": character, "location": location}]
+        if reason == "party_returned":
+            return [{"key": "review_party_returned", "character": character, "location": location}]
+        if reason == "years_elapsed":
+            return [{"key": "review_recent_events", "character": character, "location": location}]
+        return []
+
+    def _pause_subreasons_for_reason(self, reason: str) -> List[Dict[str, str]]:
+        """Return explanatory details for the primary pause reason."""
+        context = self._pause_context_for_reason(reason)
+        character = context.get("character", "")
+        location = context.get("location", "")
+        if reason.startswith("dying"):
+            return [{"key": "actor_in_danger", "character": character, "location": location}]
+        if reason == "condition_worsened_favorite":
+            return [{"key": "watched_condition_worsened", "character": character, "location": location}]
+        if reason == "pending_decision":
+            return [{"key": "adventure_needs_decision", "character": character, "location": location}]
+        if reason == "party_returned":
+            return [{"key": "watched_party_returned", "character": character, "location": location}]
+        if reason == "years_elapsed":
+            return [{"key": "auto_window_elapsed", "character": character, "location": location}]
+        return []
 
     def _watched_party_member(self, run: AdventureRun):
         """Return a watched member of the run, if one exists."""

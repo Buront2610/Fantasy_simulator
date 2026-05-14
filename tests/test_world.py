@@ -1886,7 +1886,8 @@ class TestWorld:
         from fantasy_simulator.events import WorldEventRecord
 
         world = World()
-        world.event_log = ["stale cache entry"]
+        with pytest.warns(DeprecationWarning, match="compatibility path"):
+            world.event_log = ["stale cache entry"]
         world.record_event(
             WorldEventRecord(
                 record_id="r1",

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from fantasy_simulator.event_models import WorldEventRecord
 from fantasy_simulator.i18n import get_locale, set_locale
 from fantasy_simulator.world import World
@@ -211,3 +213,12 @@ def test_event_log_setter_rejects_stale_display_assignment_after_canonical_histo
         raise AssertionError("event_log assignment should fail after canonical history exists")
 
     assert world.event_log == ["[Year 1001, Month 1, Day 1] Canonical clash"]
+
+
+def test_event_log_setter_warns_as_compatibility_path() -> None:
+    world = World()
+
+    with pytest.warns(DeprecationWarning, match="compatibility path"):
+        world.event_log = ["legacy display line"]
+
+    assert list(world.event_log) == ["legacy display line"]

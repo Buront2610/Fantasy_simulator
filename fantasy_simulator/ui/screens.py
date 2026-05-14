@@ -12,6 +12,7 @@ from .screen_adventures import (  # noqa: F401
     _show_adventure_details as _show_adventure_details,
     _show_adventure_summaries as _show_adventure_summaries,
 )
+from .screen_dashboard import _show_world_dashboard as _show_world_dashboard  # noqa: F401
 from .screen_history import (  # noqa: F401
     _month_season_hint as _month_season_hint,
     _show_location_history as _show_location_history,
@@ -44,6 +45,7 @@ from .screen_persistence import (  # noqa: F401
 )
 from .screen_results import _show_results as _show_results  # noqa: F401
 from .screen_roster import _show_roster as _show_roster  # noqa: F401
+from .screen_rumors import _show_rumor_board as _show_rumor_board  # noqa: F401
 from .screen_setup import (  # noqa: F401
     screen_custom_simulation as screen_custom_simulation,
     screen_new_simulation as screen_new_simulation,

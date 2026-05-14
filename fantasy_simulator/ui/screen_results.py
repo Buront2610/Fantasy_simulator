@@ -9,6 +9,7 @@ from .screen_adventures import (
     _show_adventure_details,
     _show_adventure_summaries,
 )
+from .screen_dashboard import _show_world_dashboard
 from .screen_history import (
     _show_location_history,
     _show_monthly_report,
@@ -17,6 +18,7 @@ from .screen_history import (
 from .screen_map import _show_world_map
 from .screen_persistence import _save_simulation_snapshot
 from .screen_roster import _show_roster
+from .screen_rumors import _show_rumor_board
 from .screen_simulation import _advance_auto, _advance_simulation
 from .ui_context import UIContext, _default_ctx
 
@@ -38,8 +40,10 @@ def _show_results(sim: Simulator, ctx: UIContext | None = None) -> None:
                 ("advance_1_year", tr("advance_1_year")),
                 ("advance_5_years", tr("advance_5_years")),
                 ("advance_auto", tr("advance_auto")),
+                ("world_dashboard", tr("dashboard_menu")),
                 ("yearly_report", tr("yearly_report")),
                 ("monthly_report", tr("monthly_report")),
+                ("rumor_board", tr("rumor_board_menu")),
                 ("world_map", tr("world_map")),
                 ("character_roster", tr("character_roster")),
                 ("event_log_last_30", tr("event_log_last_30")),
@@ -62,12 +66,16 @@ def _show_results(sim: Simulator, ctx: UIContext | None = None) -> None:
             _advance_simulation(sim, 5, ctx=ctx)
         elif action == "advance_auto":
             _advance_auto(sim, ctx=ctx)
+        elif action == "world_dashboard":
+            _show_world_dashboard(sim, ctx=ctx)
         elif action == "yearly_report":
             out.print_line()
             out.print_line(sim.get_latest_yearly_report())
             inp.pause()
         elif action == "monthly_report":
             _show_monthly_report(sim, ctx=ctx)
+        elif action == "rumor_board":
+            _show_rumor_board(sim, ctx=ctx)
         elif action == "world_map":
             _show_world_map(sim, ctx=ctx)
         elif action == "character_roster":
