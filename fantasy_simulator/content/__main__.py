@@ -82,30 +82,20 @@ def _cmd_preview_names(args: argparse.Namespace) -> int:
 def _cmd_diff(args: argparse.Namespace) -> int:
     old = build_setting_bundle_authoring_summary(_load(args.old_bundle))
     new = build_setting_bundle_authoring_summary(_load(args.new_bundle))
-    fields = (
-        "site_count",
-        "route_count",
-        "language_count",
-        "culture_count",
-        "faction_count",
-        "glossary_count",
-        "language_community_count",
-    )
+    old_summary = asdict(old)
+    new_summary = asdict(new)
     changed = False
-    for field in fields:
-        old_value = getattr(old, field)
-        new_value = getattr(new, field)
+    for field in sorted(old_summary):
+        old_value = old_summary[field]
+        new_value = new_summary[field]
         if old_value != new_value:
             changed = True
-            print(f"{field}: {old_value} -> {new_value}")
-    if old.language_keys != new.language_keys:
-        changed = True
-        print("language_keys changed")
-    if old.site_counts_by_region_type != new.site_counts_by_region_type:
-        changed = True
-        print("site_counts_by_region_type changed")
+            if isinstance(old_value, (int, str)) and isinstance(new_value, (int, str)):
+                print(f"{field}: {old_value} -> {new_value}")
+            else:
+                print(f"{field} changed")
     if not changed:
-        print("authoring summary diff: no changes")
+        print("authoring summary diff: no authoring summary field changes")
     else:
         print("authoring summary diff: changes shown above")
     return 0

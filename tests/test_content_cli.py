@@ -62,7 +62,7 @@ def test_content_diff_reports_no_changes_for_same_bundle(capsys) -> None:
     ])
 
     assert exit_code == 0
-    assert "authoring summary diff: no changes" in capsys.readouterr().out
+    assert "authoring summary diff: no authoring summary field changes" in capsys.readouterr().out
 
 
 def test_content_diff_reports_changed_route_count(tmp_path, capsys) -> None:

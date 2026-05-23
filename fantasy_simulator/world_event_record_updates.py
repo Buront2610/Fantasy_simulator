@@ -105,6 +105,22 @@ def event_record_with_added_tags(
     return replace(record, tags=list(dict.fromkeys([*record.tags, *tags])))
 
 
+def _assert_render_param_matches(
+    render_params: dict[str, Any],
+    key: str,
+    canonical_value: Any,
+    *,
+    record_id: str,
+) -> None:
+    if not canonical_value or key not in render_params:
+        return
+    if render_params[key] != canonical_value:
+        raise ValueError(
+            f"render_params[{key!r}] conflicts with canonical {key} "
+            f"for event {record_id!r}: {render_params[key]!r} != {canonical_value!r}"
+        )
+
+
 def event_record_with_semantic_render_params(record: WorldEventRecord) -> WorldEventRecord:
     """Return a copy whose render params include stable actor/location IDs when renderable."""
     if not record.summary_key and not record.render_params:
@@ -114,6 +130,30 @@ def event_record_with_semantic_render_params(record: WorldEventRecord) -> WorldE
     if record.primary_actor_id:
         actor_ids.append(record.primary_actor_id)
     actor_ids.extend(record.secondary_actor_ids)
+    _assert_render_param_matches(
+        render_params,
+        "primary_actor_id",
+        record.primary_actor_id,
+        record_id=record.record_id,
+    )
+    _assert_render_param_matches(
+        render_params,
+        "secondary_actor_ids",
+        list(record.secondary_actor_ids),
+        record_id=record.record_id,
+    )
+    _assert_render_param_matches(
+        render_params,
+        "actor_ids",
+        list(actor_ids),
+        record_id=record.record_id,
+    )
+    _assert_render_param_matches(
+        render_params,
+        "location_id",
+        record.location_id,
+        record_id=record.record_id,
+    )
     if record.primary_actor_id and not render_params.get("primary_actor_id"):
         render_params["primary_actor_id"] = record.primary_actor_id
     if record.secondary_actor_ids and "secondary_actor_ids" not in render_params:

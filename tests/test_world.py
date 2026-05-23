@@ -1490,6 +1490,72 @@ class TestWorld:
         assert record.render_params["actor_ids"] == ["char_a", "char_b"]
         assert record.render_params["location_id"] == "loc_aethoria_capital"
 
+    def test_semantic_render_params_reject_conflicting_primary_actor_id(self):
+        from fantasy_simulator.events import WorldEventRecord
+        world = World()
+
+        with pytest.raises(ValueError, match="primary_actor_id"):
+            world.record_event(
+                WorldEventRecord(
+                    record_id="semantic-conflict-primary",
+                    kind="battle",
+                    year=1001,
+                    primary_actor_id="char_a",
+                    summary_key="events.battle.summary",
+                    render_params={"primary_actor_id": "char_b"},
+                )
+            )
+
+    def test_semantic_render_params_reject_conflicting_location_id(self):
+        from fantasy_simulator.events import WorldEventRecord
+        world = World()
+
+        with pytest.raises(ValueError, match="location_id"):
+            world.record_event(
+                WorldEventRecord(
+                    record_id="semantic-conflict-location",
+                    kind="journey",
+                    year=1001,
+                    location_id="loc_aethoria_capital",
+                    summary_key="events.journey.summary",
+                    render_params={"location_id": "loc_thornwood"},
+                )
+            )
+
+    def test_semantic_render_params_reject_conflicting_actor_ids(self):
+        from fantasy_simulator.events import WorldEventRecord
+        world = World()
+
+        with pytest.raises(ValueError, match="actor_ids"):
+            world.record_event(
+                WorldEventRecord(
+                    record_id="semantic-conflict-actors",
+                    kind="battle",
+                    year=1001,
+                    primary_actor_id="char_a",
+                    secondary_actor_ids=["char_b"],
+                    summary_key="events.battle.summary",
+                    render_params={"actor_ids": ["char_a", "char_c"]},
+                )
+            )
+
+    def test_semantic_render_params_reject_conflicting_secondary_actor_ids(self):
+        from fantasy_simulator.events import WorldEventRecord
+        world = World()
+
+        with pytest.raises(ValueError, match="secondary_actor_ids"):
+            world.record_event(
+                WorldEventRecord(
+                    record_id="semantic-conflict-secondary",
+                    kind="battle",
+                    year=1001,
+                    primary_actor_id="char_a",
+                    secondary_actor_ids=["char_b"],
+                    summary_key="events.battle.summary",
+                    render_params={"secondary_actor_ids": ["char_c"]},
+                )
+            )
+
     def test_event_record_indexes_notice_direct_compatibility_mutation(self):
         from fantasy_simulator.events import WorldEventRecord
         world = World()
