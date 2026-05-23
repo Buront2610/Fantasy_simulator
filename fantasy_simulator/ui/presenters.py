@@ -5,7 +5,7 @@ Keeps text composition out of screen orchestration functions.
 
 from __future__ import annotations
 
-from typing import List
+from typing import Any, List
 
 from ..i18n import tr
 from ..location_observation import (
@@ -65,22 +65,97 @@ class LanguagePresenter:
             f"  {status.get('display_name', status.get('language_key', ''))}",
             f"    {tr('language_lineage_label')}: {lineage}",
         ]
-        given_names = ", ".join(samples.get("given_names", []))
+        runtime_state = status.get("runtime_state", {})
+        derived_name_stems = LanguagePresenter._join_strings(runtime_state.get("derived_name_stems", []), limit=3)
+        derived_toponym_suffixes = LanguagePresenter._join_strings(
+            runtime_state.get("derived_toponym_suffixes", []),
+            limit=3,
+        )
+        given_names = LanguagePresenter._join_strings(samples.get("given_names", []), limit=3)
         surnames = ", ".join(samples.get("surnames", []))
-        lexicon = ", ".join(samples.get("lexicon", []))
+        lexicon = LanguagePresenter._join_strings(samples.get("lexicon", []), limit=5)
+        sound_shifts = LanguagePresenter._format_sound_shifts(status.get("sound_shifts", {}), limit=4)
         if given_names:
+            if derived_name_stems:
+                given_names = f"{given_names} (+{derived_name_stems})"
             lines.append(f"    {tr('language_given_names_label')}: {given_names}")
         if surnames:
             lines.append(f"    {tr('language_surnames_label')}: {surnames}")
         if lexicon:
             lines.append(f"    {tr('language_lexicon_label')}: {lexicon}")
         if samples.get("toponym"):
-            lines.append(f"    {tr('language_toponym_label')}: {samples['toponym']}")
+            toponym = str(samples["toponym"])
+            if derived_toponym_suffixes:
+                toponym = f"{toponym} (+{derived_toponym_suffixes})"
+            lines.append(f"    {tr('language_toponym_label')}: {toponym}")
+        evolution_count = str(status.get("evolution_count", 0))
+        if sound_shifts:
+            evolution_count = f"{evolution_count} ({sound_shifts})"
         lines.append(
             f"    {tr('language_evolution_count_label')}: "
-            f"{status.get('evolution_count', 0)}"
+            f"{evolution_count}"
+        )
+        lines.extend(
+            f"      {record_line}"
+            for record_line in LanguagePresenter._format_recent_evolution_records(
+                status.get("recent_evolution_records", []),
+                limit=3,
+            )
         )
         return lines
+
+    @staticmethod
+    def _join_strings(values: Any, *, limit: int) -> str:
+        if not isinstance(values, list):
+            return ""
+        return ", ".join(str(value) for value in values[:limit] if str(value))
+
+    @staticmethod
+    def _format_sound_shifts(sound_shifts: Any, *, limit: int) -> str:
+        if not isinstance(sound_shifts, dict):
+            return ""
+        shifts = [
+            f"{source}>{target}"
+            for source, target in sound_shifts.items()
+            if str(source) and str(target)
+        ]
+        return ", ".join(shifts[:limit])
+
+    @staticmethod
+    def _format_recent_evolution_records(records: Any, *, limit: int) -> List[str]:
+        if not isinstance(records, list):
+            return []
+        return [
+            line
+            for line in (
+                LanguagePresenter._format_evolution_record(record)
+                for record in reversed(records[-limit:])
+            )
+            if line
+        ]
+
+    @staticmethod
+    def _format_evolution_record(record: Any) -> str:
+        if not isinstance(record, dict):
+            return ""
+        year = str(record.get("year", "")).strip()
+        changes = []
+        source = str(record.get("source_token", "")).strip()
+        target = str(record.get("target_token", "")).strip()
+        if source:
+            changes.append(f"{source}>{target}")
+        name_stem = str(record.get("added_name_stem", "")).strip()
+        if name_stem:
+            changes.append(f"+{name_stem}")
+        toponym_suffix = str(record.get("added_toponym_suffix", "")).strip()
+        if toponym_suffix:
+            changes.append(f"+{toponym_suffix}")
+        if not changes:
+            return ""
+        rule_position = str(record.get("rule_position", "")).strip()
+        detail = f" ({rule_position})" if rule_position and rule_position != "any" else ""
+        prefix = f"{year}: " if year else ""
+        return f"{prefix}{', '.join(changes)}{detail}"
 
 
 class ReportPresenter:

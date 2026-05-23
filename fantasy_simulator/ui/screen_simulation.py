@@ -95,6 +95,26 @@ def _advance_auto(sim: Simulator, ctx: UIContext | None = None) -> None:
         actor = pause_context.get("character", "-")
         location = pause_context.get("location", "-")
         out.print_dim(f"  {tr('auto_pause_context', actor=actor, location=location)}")
+    subreasons = result.get("pause_subreasons", [])
+    if subreasons:
+        out.print_dim(f"  {tr('auto_pause_subreasons')}")
+        for item in subreasons[:3]:
+            subreason_key = item.get("key", "auto_window_elapsed")
+            actor = item.get("character", "-") or "-"
+            location = item.get("location", "-") or "-"
+            out.print_dim(
+                f"    - {tr(f'auto_pause_subreason_{subreason_key}', actor=actor, location=location)}"
+            )
     if supplemental:
         extras = ", ".join(tr(f"auto_pause_{r}") for r in supplemental[:3])
         out.print_dim(f"  {tr('auto_pause_supplemental', reasons=extras)}")
+    recommendations = result.get("recommended_actions", [])
+    if recommendations:
+        out.print_dim(f"  {tr('auto_pause_recommendations')}")
+        for item in recommendations[:3]:
+            action_key = item.get("key", "review_recent_events")
+            actor = item.get("character", "-") or "-"
+            location = item.get("location", "-") or "-"
+            out.print_dim(
+                f"    - {tr(f'auto_pause_recommendation_{action_key}', actor=actor, location=location)}"
+            )

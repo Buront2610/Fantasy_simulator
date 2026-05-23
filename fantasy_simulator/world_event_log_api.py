@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Iterable, List, Optional
 
@@ -35,6 +36,11 @@ class WorldEventLogMixin:
     @event_log.setter
     def event_log(self, value: List[str]) -> None:
         event_log_facade.set_event_log_entries(self, value)
+        warnings.warn(
+            "event_log assignment is a compatibility path; use record_event() or load restore helpers",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     def _restore_display_event_log_for_load(self, value: Iterable[str]) -> None:
         """Restore legacy display-only event log entries during save hydration."""

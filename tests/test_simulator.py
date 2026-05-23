@@ -210,6 +210,30 @@ class TestSimulatorConstruction:
         assert len(small_world.event_records) == 1
         assert (location.safety, location.mood, location.danger, location.rumor_heat) == before_state
 
+    def test_record_event_enriches_render_params_with_semantic_ids(self, small_world):
+        sim = Simulator(small_world, events_per_year=0, seed=123)
+        hero = small_world.characters[0]
+        rival = small_world.characters[1]
+        result = EventResult(
+            description="Hero and rival met.",
+            affected_characters=[hero.char_id, rival.char_id],
+            event_type="meeting",
+            year=small_world.year,
+            metadata={
+                "summary_key": "events.meeting_positive.summary",
+                "render_params": {"name1": hero.name, "name2": rival.name},
+            },
+        )
+
+        sim._record_event(result, location_id=hero.location_id)
+
+        record = small_world.event_records[-1]
+        assert record.render_params["primary_actor_id"] == hero.char_id
+        assert record.render_params["secondary_actor_ids"] == [rival.char_id]
+        assert record.render_params["actor_ids"] == [hero.char_id, rival.char_id]
+        assert record.render_params["location_id"] == hero.location_id
+        assert record.render_params["name1"] == hero.name
+
     def test_record_world_event_invalid_description_does_not_apply_location_impact(self, small_world):
         sim = Simulator(small_world, events_per_year=0, seed=123)
         location = small_world.get_location_by_id("loc_aethoria_capital")

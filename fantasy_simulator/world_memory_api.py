@@ -470,6 +470,16 @@ class WorldMemoryMixin:
     def get_location_by_id(self, location_id: str) -> Optional[LocationState]:
         return self._location_id_index.get(location_id)
 
+    def find_location_by_id_or_name(self, value: str) -> Optional[LocationState]:
+        """Return a location matching an ID or canonical name, case-insensitively."""
+        normalized = value.strip().lower()
+        if not normalized:
+            return None
+        for location in self._location_id_index.values():
+            if location.id.lower() == normalized or location.canonical_name.lower() == normalized:
+                return location
+        return None
+
     def location_name(self, location_id: str) -> str:
         return location_name_for_id(self._location_id_index, location_id)
 

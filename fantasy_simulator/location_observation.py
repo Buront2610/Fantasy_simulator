@@ -20,6 +20,7 @@ class RumorSummaryView:
     category: str = "event"
     source_location_id: str | None = None
     source_location_name: str = ""
+    source_event_id: str | None = None
     age_in_months: int = 0
     spread_level: int = 0
 
@@ -77,6 +78,7 @@ def build_rumor_summary_views(
                 if rumor.source_location_id
                 else ""
             ),
+            source_event_id=rumor.source_event_id,
             age_in_months=rumor.age_in_months,
             spread_level=rumor.spread_level,
         )

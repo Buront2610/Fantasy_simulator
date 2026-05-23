@@ -52,3 +52,12 @@ def events_by_kind(
 ) -> List[WorldEventRecord]:
     """Return all event records for a specific canonical event kind."""
     return event_index.by_kind_value(event_records, kind)
+
+
+def event_by_id(
+    event_index: EventHistoryIndex,
+    event_records: List[WorldEventRecord],
+    record_id: str,
+) -> WorldEventRecord | None:
+    """Return one event record by canonical record id."""
+    return event_index.by_record_id(event_records, record_id)

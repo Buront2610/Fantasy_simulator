@@ -1459,6 +1459,121 @@ class TestWorld:
         assert [record.kind for record in world.get_events_by_month(1001, 2)] == ["battle", "meeting"]
         assert [record.month for record in world.get_events_by_kind("battle")] == [2, 3]
 
+    def test_event_record_indexes_support_record_id_lookup(self):
+        from fantasy_simulator.events import WorldEventRecord
+        world = World()
+        first = world.record_event(WorldEventRecord(record_id="r1", kind="battle", year=1001, month=2))
+        world.record_event(WorldEventRecord(record_id="r2", kind="meeting", year=1001, month=2))
+
+        assert world.get_event_by_id("r1") is first
+        assert world.get_event_by_id("missing") is None
+
+    def test_direct_record_event_adds_semantic_render_param_ids(self):
+        from fantasy_simulator.events import WorldEventRecord
+        world = World()
+        record = world.record_event(
+            WorldEventRecord(
+                record_id="semantic-direct",
+                kind="battle",
+                year=1001,
+                month=2,
+                location_id="loc_aethoria_capital",
+                primary_actor_id="char_a",
+                secondary_actor_ids=["char_b"],
+                summary_key="events.battle.summary",
+                render_params={"actor": "Aldric", "target": "Mira"},
+            )
+        )
+
+        assert record.render_params["primary_actor_id"] == "char_a"
+        assert record.render_params["secondary_actor_ids"] == ["char_b"]
+        assert record.render_params["actor_ids"] == ["char_a", "char_b"]
+        assert record.render_params["location_id"] == "loc_aethoria_capital"
+
+    def test_semantic_render_params_reject_conflicting_primary_actor_id(self):
+        from fantasy_simulator.events import WorldEventRecord
+        world = World()
+
+        with pytest.raises(ValueError, match="primary_actor_id"):
+            world.record_event(
+                WorldEventRecord(
+                    record_id="semantic-conflict-primary",
+                    kind="battle",
+                    year=1001,
+                    primary_actor_id="char_a",
+                    summary_key="events.battle.summary",
+                    render_params={"primary_actor_id": "char_b"},
+                )
+            )
+
+    def test_semantic_render_params_reject_conflicting_location_id(self):
+        from fantasy_simulator.events import WorldEventRecord
+        world = World()
+
+        with pytest.raises(ValueError, match="location_id"):
+            world.record_event(
+                WorldEventRecord(
+                    record_id="semantic-conflict-location",
+                    kind="journey",
+                    year=1001,
+                    location_id="loc_aethoria_capital",
+                    summary_key="events.journey.summary",
+                    render_params={"location_id": "loc_thornwood"},
+                )
+            )
+
+    def test_semantic_render_params_reject_conflicting_actor_ids(self):
+        from fantasy_simulator.events import WorldEventRecord
+        world = World()
+
+        with pytest.raises(ValueError, match="actor_ids"):
+            world.record_event(
+                WorldEventRecord(
+                    record_id="semantic-conflict-actors",
+                    kind="battle",
+                    year=1001,
+                    primary_actor_id="char_a",
+                    secondary_actor_ids=["char_b"],
+                    summary_key="events.battle.summary",
+                    render_params={"actor_ids": ["char_a", "char_c"]},
+                )
+            )
+
+    def test_semantic_render_params_reject_conflicting_secondary_actor_ids(self):
+        from fantasy_simulator.events import WorldEventRecord
+        world = World()
+
+        with pytest.raises(ValueError, match="secondary_actor_ids"):
+            world.record_event(
+                WorldEventRecord(
+                    record_id="semantic-conflict-secondary",
+                    kind="battle",
+                    year=1001,
+                    primary_actor_id="char_a",
+                    secondary_actor_ids=["char_b"],
+                    summary_key="events.battle.summary",
+                    render_params={"secondary_actor_ids": ["char_c"]},
+                )
+            )
+
+    def test_unknown_location_id_does_not_leak_into_semantic_render_params_or_indexes(self):
+        from fantasy_simulator.events import WorldEventRecord
+        world = World()
+
+        record = world.record_event(
+            WorldEventRecord(
+                record_id="semantic-missing-location",
+                kind="journey",
+                year=world.year,
+                location_id="loc_missing",
+                summary_key="events.journey.summary",
+            )
+        )
+
+        assert record.location_id is None
+        assert record.render_params["location_id"] is None
+        assert world.get_events_by_location("loc_missing") == []
+
     def test_event_record_indexes_notice_direct_compatibility_mutation(self):
         from fantasy_simulator.events import WorldEventRecord
         world = World()
@@ -1469,6 +1584,7 @@ class TestWorld:
         world.event_records.append(WorldEventRecord(record_id="r2", kind="meeting", year=1001, month=2))
 
         assert [record.record_id for record in world.get_events_by_month(1001, 2)] == ["r1", "r2"]
+        assert world.get_event_by_id("r2").kind == "meeting"
 
     def test_event_records_in_to_dict_round_trip(self):
         from fantasy_simulator.events import WorldEventRecord
@@ -1479,6 +1595,13 @@ class TestWorld:
         assert len(restored.event_records) == 1
         assert restored.event_records[0].kind == "battle"
         assert restored.event_records[0].location_id == "loc_thornwood"
+
+    def test_find_location_by_id_or_name_is_case_insensitive(self):
+        world = World()
+
+        assert world.find_location_by_id_or_name("LOC_AETHORIA_CAPITAL").id == "loc_aethoria_capital"
+        assert world.find_location_by_id_or_name("aethoria capital").id == "loc_aethoria_capital"
+        assert world.find_location_by_id_or_name("missing") is None
 
     def test_world_round_trip_preserves_location_state(self):
         world = World()
@@ -1886,7 +2009,8 @@ class TestWorld:
         from fantasy_simulator.events import WorldEventRecord
 
         world = World()
-        world.event_log = ["stale cache entry"]
+        with pytest.warns(DeprecationWarning, match="compatibility path"):
+            world.event_log = ["stale cache entry"]
         world.record_event(
             WorldEventRecord(
                 record_id="r1",

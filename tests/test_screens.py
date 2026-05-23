@@ -51,6 +51,8 @@ class TestScreensImport(unittest.TestCase):
             _run_simulation,
             _save_simulation_snapshot,
             _select_language,
+            _show_rumor_board,
+            _show_world_dashboard,
             _show_results,
         )
         self.assertTrue(callable(_build_default_world))
@@ -60,6 +62,8 @@ class TestScreensImport(unittest.TestCase):
         self.assertTrue(callable(_save_simulation_snapshot))
         self.assertTrue(callable(_load_simulation_snapshot))
         self.assertTrue(callable(_select_language))
+        self.assertTrue(callable(_show_rumor_board))
+        self.assertTrue(callable(_show_world_dashboard))
 
 
 class TestBuildDefaultWorld(unittest.TestCase):
@@ -282,6 +286,349 @@ class TestAdventureAndLocationViews(unittest.TestCase):
         self.assertIn("Capital event 5", text)
         self.assertIn("older visitor record", text)
         self.assertIn("older event", text)
+
+
+class TestAutoAdvanceScreen(unittest.TestCase):
+    def test_auto_advance_screen_prints_recommended_checks(self) -> None:
+        from fantasy_simulator.ui.screen_simulation import _advance_auto
+        from fantasy_simulator.ui.ui_context import UIContext
+        from fantasy_simulator.ui.render_backend import PrintRenderBackend
+
+        set_locale("en")
+        sim = SimpleNamespace(
+            world=SimpleNamespace(
+                characters=[SimpleNamespace(alive=True)],
+                months_per_year=12,
+                year=1000,
+            ),
+            get_pending_adventure_choices=lambda: [],
+            advance_until_pause=lambda max_years: {
+                "months_advanced": 0,
+                "pause_reason": "dying_favorite",
+                "pause_context": {"character": "Aldric", "location": "Aethoria Capital"},
+                "pause_subreasons": [
+                    {
+                        "key": "actor_in_danger",
+                        "character": "Aldric",
+                        "location": "Aethoria Capital",
+                    }
+                ],
+                "supplemental_reasons": [],
+                "recommended_actions": [
+                    {
+                        "key": "inspect_character",
+                        "character": "Aldric",
+                        "location": "Aethoria Capital",
+                    }
+                ],
+            },
+        )
+
+        class NoopInputBackend:
+            def read_line(self, prompt: str = "") -> str:
+                return ""
+
+            def read_menu_key(self, pairs, default=None):
+                return pairs[0][0]
+
+            def pause(self, message: str = "") -> None:
+                pass
+
+        ctx = UIContext(inp=NoopInputBackend(), out=PrintRenderBackend())
+        captured = io.StringIO()
+        with redirect_stdout(captured):
+            _advance_auto(sim, ctx=ctx)
+        text = _ANSI_RE.sub("", captured.getvalue())
+
+        self.assertIn("Recommended checks:", text)
+        self.assertIn("Why this matters:", text)
+        self.assertIn("Aldric may die without attention.", text)
+        self.assertIn("Inspect Aldric's condition", text)
+
+
+class TestWorldDashboardScreen(unittest.TestCase):
+    def test_world_dashboard_surfaces_observer_state(self) -> None:
+        from fantasy_simulator.event_models import WorldEventRecord
+        from fantasy_simulator.rumor_models import Rumor
+        from fantasy_simulator.ui.screen_dashboard import _show_world_dashboard
+        from fantasy_simulator.ui.ui_context import UIContext
+        from fantasy_simulator.ui.render_backend import PrintRenderBackend
+
+        set_locale("en")
+        world = World()
+        hero = Character("Mira", 24, "Female", "Human", "Ranger", location_id="loc_aethoria_capital")
+        hero.favorite = True
+        world.add_character(hero)
+        loc = world.get_location_by_id("loc_aethoria_capital")
+        assert loc is not None
+        loc.danger = 91
+        world.record_event(
+            WorldEventRecord(
+                record_id="evt_major",
+                kind="battle",
+                year=world.year,
+                month=1,
+                day=1,
+                location_id="loc_aethoria_capital",
+                severity=4,
+                description="Mira faced danger at the capital.",
+            )
+        )
+        world.rumors.append(
+            Rumor(
+                description="The capital road is dangerous.",
+                reliability="plausible",
+                source_location_id="loc_aethoria_capital",
+            )
+        )
+        sim = Simulator(world, events_per_year=0, seed=1)
+
+        class NoopInputBackend:
+            def read_line(self, prompt: str = "") -> str:
+                return ""
+
+            def read_menu_key(self, pairs, default=None):
+                return pairs[0][0]
+
+            def pause(self, message: str = "") -> None:
+                pass
+
+        ctx = UIContext(inp=NoopInputBackend(), out=PrintRenderBackend())
+        captured = io.StringIO()
+        with redirect_stdout(captured):
+            _show_world_dashboard(sim, ctx=ctx)
+        text = _ANSI_RE.sub("", captured.getvalue())
+
+        self.assertIn("Aethoria Dashboard", text)
+        self.assertIn("Major events", text)
+        self.assertIn("Mira faced danger at the capital.", text)
+        self.assertIn("Watched actors", text)
+        self.assertIn("Mira [favorite]", text)
+        self.assertIn("The capital road is dangerous.", text)
+        self.assertIn("Aethoria Capital (danger 91", text)
+
+
+class TestRumorBoardScreen(unittest.TestCase):
+    class _ScriptedInputBackend:
+        def __init__(self, answers):
+            self.answers = list(answers)
+
+        def read_line(self, prompt: str = "") -> str:
+            return self.answers.pop(0) if self.answers else ""
+
+        def read_menu_key(self, pairs, default=None):
+            return pairs[0][0]
+
+        def pause(self, message: str = "") -> None:
+            pass
+
+    def test_rumor_board_lists_active_rumors_with_context(self) -> None:
+        from fantasy_simulator.rumor_models import Rumor
+        from fantasy_simulator.ui.screen_rumors import _show_rumor_board
+        from fantasy_simulator.ui.ui_context import UIContext
+        from fantasy_simulator.ui.render_backend import PrintRenderBackend
+
+        set_locale("en")
+        world = World()
+        world.rumors.append(
+            Rumor(
+                id="rum_test",
+                description="A road is said to be blocked.",
+                reliability="plausible",
+                source_location_id="loc_aethoria_capital",
+                source_event_id="evt_road",
+                age_in_months=2,
+                spread_level=4,
+            )
+        )
+        sim = Simulator(world, events_per_year=0, seed=1)
+
+        class NoopInputBackend:
+            def read_line(self, prompt: str = "") -> str:
+                return ""
+
+            def read_menu_key(self, pairs, default=None):
+                return pairs[0][0]
+
+            def pause(self, message: str = "") -> None:
+                pass
+
+        ctx = UIContext(inp=NoopInputBackend(), out=PrintRenderBackend())
+        captured = io.StringIO()
+        with redirect_stdout(captured):
+            _show_rumor_board(sim, ctx=ctx)
+        text = _ANSI_RE.sub("", captured.getvalue())
+
+        self.assertIn("RUMOR BOARD", text)
+        self.assertIn("A road is said to be blocked.", text)
+        self.assertIn("source: Aethoria Capital", text)
+        self.assertIn("event: evt_road", text)
+
+    def test_rumor_board_filters_by_location_query_and_clears_filter(self) -> None:
+        from fantasy_simulator.rumor_models import Rumor
+        from fantasy_simulator.ui.screen_rumors import _show_rumor_board
+        from fantasy_simulator.ui.ui_context import UIContext
+        from fantasy_simulator.ui.render_backend import PrintRenderBackend
+
+        set_locale("en")
+        world = World()
+        world.rumors.extend([
+            Rumor(
+                id="rum_capital",
+                description="Capital rumor.",
+                reliability="plausible",
+                source_location_id="loc_aethoria_capital",
+            ),
+            Rumor(
+                id="rum_thornwood",
+                description="Forest rumor.",
+                reliability="plausible",
+                source_location_id="loc_thornwood",
+            ),
+        ])
+        sim = Simulator(world, events_per_year=0, seed=1)
+
+        ctx = UIContext(
+            inp=self._ScriptedInputBackend(["l", "aethoria capital", "c", ""]),
+            out=PrintRenderBackend(),
+        )
+        captured = io.StringIO()
+        with redirect_stdout(captured):
+            _show_rumor_board(sim, ctx=ctx)
+        text = _ANSI_RE.sub("", captured.getvalue())
+
+        self.assertIn("Filter: Aethoria Capital", text)
+        self.assertIn("Capital rumor.", text)
+        self.assertIn("Rumor source filter cleared.", text)
+        self.assertIn("Forest rumor.", text)
+
+    def test_rumor_board_handles_invalid_filter_choice_missing_event_and_empty_state(self) -> None:
+        from fantasy_simulator.rumor_models import Rumor
+        from fantasy_simulator.ui.screen_rumors import _show_rumor_board
+        from fantasy_simulator.ui.ui_context import UIContext
+        from fantasy_simulator.ui.render_backend import PrintRenderBackend
+
+        set_locale("en")
+        world = World()
+        world.rumors.append(
+            Rumor(
+                id="rum_missing",
+                description="Missing source rumor.",
+                reliability="plausible",
+                source_location_id="loc_aethoria_capital",
+                source_event_id="evt_missing",
+            )
+        )
+        sim = Simulator(world, events_per_year=0, seed=1)
+
+        ctx = UIContext(
+            inp=self._ScriptedInputBackend(["z", "l", "missing place", "1", ""]),
+            out=PrintRenderBackend(),
+        )
+        captured = io.StringIO()
+        with redirect_stdout(captured):
+            _show_rumor_board(sim, ctx=ctx)
+        text = _ANSI_RE.sub("", captured.getvalue())
+
+        self.assertIn("Invalid choice", text)
+        self.assertIn("No matching location: missing place", text)
+        self.assertIn("Source event is no longer available: evt_missing", text)
+
+        world.rumors.clear()
+        captured = io.StringIO()
+        with redirect_stdout(captured):
+            _show_rumor_board(sim, ctx=UIContext(inp=self._ScriptedInputBackend([""]), out=PrintRenderBackend()))
+        empty_text = _ANSI_RE.sub("", captured.getvalue())
+        self.assertIn("No active rumors are circulating.", empty_text)
+
+    def test_rumor_board_excludes_expired_rumors(self) -> None:
+        from fantasy_simulator.rumor_models import Rumor
+        from fantasy_simulator.ui.screen_rumors import _show_rumor_board
+        from fantasy_simulator.ui.ui_context import UIContext
+        from fantasy_simulator.ui.render_backend import PrintRenderBackend
+
+        set_locale("en")
+        world = World()
+        world.rumors.append(
+            Rumor(
+                id="rum_expired",
+                description="Expired rumor.",
+                reliability="plausible",
+                source_location_id="loc_aethoria_capital",
+                age_in_months=999,
+            )
+        )
+        sim = Simulator(world, events_per_year=0, seed=1)
+        captured = io.StringIO()
+        with redirect_stdout(captured):
+            _show_rumor_board(
+                sim,
+                ctx=UIContext(inp=self._ScriptedInputBackend([""]), out=PrintRenderBackend()),
+            )
+        text = _ANSI_RE.sub("", captured.getvalue())
+
+        self.assertIn("No active rumors are circulating.", text)
+        self.assertNotIn("Expired rumor.", text)
+
+    def test_rumor_board_detail_links_source_event_and_location(self) -> None:
+        from fantasy_simulator.event_models import WorldEventRecord
+        from fantasy_simulator.rumor_models import Rumor
+        from fantasy_simulator.ui.screen_rumors import _show_rumor_board
+        from fantasy_simulator.ui.ui_context import UIContext
+        from fantasy_simulator.ui.render_backend import PrintRenderBackend
+
+        set_locale("en")
+        world = World()
+        world.record_event(
+            WorldEventRecord(
+                record_id="evt_road",
+                kind="journey",
+                year=world.year,
+                month=1,
+                day=1,
+                location_id="loc_aethoria_capital",
+                description="A road incident was recorded.",
+                summary_key="events.journey.summary",
+                render_params={"actor": "Aldric"},
+            )
+        )
+        world.rumors.append(
+            Rumor(
+                id="rum_test",
+                description="A road is said to be blocked.",
+                reliability="certain",
+                source_location_id="loc_aethoria_capital",
+                source_event_id="evt_road",
+                age_in_months=1,
+                spread_level=7,
+            )
+        )
+        sim = Simulator(world, events_per_year=0, seed=1)
+
+        class ScriptedInputBackend:
+            def __init__(self) -> None:
+                self.answers = ["1", ""]
+
+            def read_line(self, prompt: str = "") -> str:
+                return self.answers.pop(0)
+
+            def read_menu_key(self, pairs, default=None):
+                return pairs[0][0]
+
+            def pause(self, message: str = "") -> None:
+                pass
+
+        ctx = UIContext(inp=ScriptedInputBackend(), out=PrintRenderBackend())
+        captured = io.StringIO()
+        with redirect_stdout(captured):
+            _show_rumor_board(sim, ctx=ctx)
+        text = _ANSI_RE.sub("", captured.getvalue())
+
+        self.assertIn("RUMOR DETAIL", text)
+        self.assertIn("Source event", text)
+        self.assertIn("A road incident was recorded.", text)
+        self.assertIn("Related location", text)
+        self.assertIn("Recent events", text)
 
 
 if __name__ == "__main__":

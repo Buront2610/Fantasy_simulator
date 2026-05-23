@@ -13,6 +13,7 @@ from .world_event_history import (
     record_world_event,
 )
 from .world_event_queries import (
+    event_by_id,
     events_by_actor,
     events_by_kind,
     events_by_location,
@@ -20,6 +21,7 @@ from .world_event_queries import (
     events_by_year,
 )
 from .world_event_state import apply_event_impact_to_location
+from .world_event_record_updates import event_record_with_semantic_render_params
 from .world_location_state import clamp_state as _clamp_state
 
 if TYPE_CHECKING:
@@ -64,6 +66,7 @@ class WorldEventRecorderPort:
             event_index_state = {
                 "signature": getattr(event_index, "signature", ()),
                 "record_ids": set(getattr(event_index, "record_ids", set())),
+                "by_id": dict(getattr(event_index, "by_id", {})),
                 "by_location": {
                     key: list(value) for key, value in getattr(event_index, "by_location", {}).items()
                 },
@@ -111,6 +114,7 @@ class WorldEventRecorderPort:
             return
         event_index.signature = snapshot.event_index_state["signature"]
         event_index.record_ids = set(snapshot.event_index_state["record_ids"])
+        event_index.by_id = dict(snapshot.event_index_state.get("by_id", {}))
         event_index.by_location = {
             key: list(value) for key, value in snapshot.event_index_state["by_location"].items()
         }
@@ -155,7 +159,7 @@ class WorldEventMixin:
 
         Returns the canonical stored record (may be a normalized copy).
         """
-        record = WorldEventRecord.from_dict(record.to_dict())
+        record = event_record_with_semantic_render_params(WorldEventRecord.from_dict(record.to_dict()))
         stored_record = record_world_event(
             record=record,
             event_records=self.event_records,
@@ -207,3 +211,7 @@ class WorldEventMixin:
     def get_events_by_kind(self, kind: str) -> List[WorldEventRecord]:
         """Return all event records for a specific canonical event kind."""
         return events_by_kind(self._event_index, self.event_records, kind)
+
+    def get_event_by_id(self, record_id: str) -> WorldEventRecord | None:
+        """Return one event record by canonical record id."""
+        return event_by_id(self._event_index, self.event_records, record_id)

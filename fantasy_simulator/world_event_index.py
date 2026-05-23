@@ -70,6 +70,7 @@ class EventHistoryIndex:
 
     signature: Tuple[Any, ...] = ()
     record_ids: Set[str] = field(default_factory=set)
+    by_id: Dict[str, WorldEventRecord] = field(default_factory=dict)
     by_location: Dict[str, List[WorldEventRecord]] = field(default_factory=dict)
     by_actor: Dict[str, List[WorldEventRecord]] = field(default_factory=dict)
     by_year: Dict[int, List[WorldEventRecord]] = field(default_factory=dict)
@@ -89,10 +90,12 @@ class EventHistoryIndex:
         by_year: Dict[int, List[WorldEventRecord]] = {}
         by_month: Dict[Tuple[int, int], List[WorldEventRecord]] = {}
         by_kind: Dict[str, List[WorldEventRecord]] = {}
+        by_id: Dict[str, WorldEventRecord] = {}
         record_ids: Set[str] = set()
 
         for record in records:
             record_ids.add(record.record_id)
+            by_id[record.record_id] = record
             for location_id in location_ids_for_record(record):
                 by_location.setdefault(location_id, []).append(record)
             indexed_actor_ids: Set[str] = set()
@@ -109,6 +112,7 @@ class EventHistoryIndex:
             by_kind.setdefault(record.kind, []).append(record)
 
         self.record_ids = record_ids
+        self.by_id = by_id
         self.by_location = by_location
         self.by_actor = by_actor
         self.by_year = by_year
@@ -135,3 +139,7 @@ class EventHistoryIndex:
     def by_kind_value(self, records: List[WorldEventRecord], kind: str) -> List[WorldEventRecord]:
         self.ensure_current(records)
         return list(self.by_kind.get(kind, []))
+
+    def by_record_id(self, records: List[WorldEventRecord], record_id: str) -> WorldEventRecord | None:
+        self.ensure_current(records)
+        return self.by_id.get(record_id)
