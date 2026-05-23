@@ -10,6 +10,7 @@ from typing import Callable, Dict, List, Mapping, Optional, Protocol, Set
 
 from .event_models import WorldEventRecord
 from .world_event_index import location_ids_for_record
+from .world_event_record_updates import event_record_with_normalized_location_references
 from .rule_override_resolution import (
     DEFAULT_EVENT_IMPACT_RULES,
     clone_default_event_impact_rules as _clone_default_event_impact_rules,
@@ -81,11 +82,13 @@ def append_canonical_event_record(
 
     Returns the canonical record instance actually stored in ``event_records``.
     """
-    stored_record = record
-    if record.location_id is not None and record.location_id not in location_index:
-        cloned = record.to_dict()
-        cloned["location_id"] = None
-        stored_record = WorldEventRecord.from_dict(cloned)
+    def normalize_location_id(location_id: str | None) -> str | None:
+        if location_id is None:
+            return None
+        return location_id if location_id in location_index else None
+
+    normalized_record = event_record_with_normalized_location_references(record, normalize_location_id)
+    stored_record = record if normalized_record == record else normalized_record
 
     if existing_record_ids is not None:
         duplicate = stored_record.record_id in existing_record_ids

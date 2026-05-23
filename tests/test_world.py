@@ -1556,6 +1556,24 @@ class TestWorld:
                 )
             )
 
+    def test_unknown_location_id_does_not_leak_into_semantic_render_params_or_indexes(self):
+        from fantasy_simulator.events import WorldEventRecord
+        world = World()
+
+        record = world.record_event(
+            WorldEventRecord(
+                record_id="semantic-missing-location",
+                kind="journey",
+                year=world.year,
+                location_id="loc_missing",
+                summary_key="events.journey.summary",
+            )
+        )
+
+        assert record.location_id is None
+        assert record.render_params["location_id"] is None
+        assert world.get_events_by_location("loc_missing") == []
+
     def test_event_record_indexes_notice_direct_compatibility_mutation(self):
         from fantasy_simulator.events import WorldEventRecord
         world = World()
