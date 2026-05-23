@@ -21,8 +21,8 @@ def test_pyproject_declares_pytest_defaults() -> None:
 
 def test_pyproject_declares_cli_entry_points() -> None:
     assert "[project.scripts]" in PYPROJECT_TEXT
-    assert 'fantasy-simulator = "fantasy_simulator.main:main"' in PYPROJECT_TEXT
-    assert 'fantasy-sim = "fantasy_simulator.main:main"' in PYPROJECT_TEXT
+    assert 'fantasy-simulator = "fantasy_simulator.__main__:main"' in PYPROJECT_TEXT
+    assert 'fantasy-sim = "fantasy_simulator.__main__:main"' in PYPROJECT_TEXT
 
 
 def test_gitignore_covers_packaging_artifacts() -> None:

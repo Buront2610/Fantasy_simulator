@@ -11,8 +11,8 @@ requires-python = ">=3.10"
 dependencies = []
 
 [project.scripts]
-fantasy-simulator = "fantasy_simulator.main:main"
-fantasy-sim = "fantasy_simulator.main:main"
+fantasy-simulator = "fantasy_simulator.__main__:main"
+fantasy-sim = "fantasy_simulator.__main__:main"
 
 [project.optional-dependencies]
 dev = [

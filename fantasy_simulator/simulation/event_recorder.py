@@ -126,6 +126,26 @@ class EventRecorderMixin:
             source_char.add_relation_tag(target_id, tag, source_event_id=record_id)
 
     @staticmethod
+    def _enrich_semantic_render_params(record: WorldEventRecord) -> None:
+        """Attach stable semantic IDs to event-rendering params without dropping legacy labels."""
+        if not record.summary_key and not record.render_params:
+            return
+        render_params = dict(record.render_params)
+        actor_ids: List[str] = []
+        if record.primary_actor_id:
+            actor_ids.append(record.primary_actor_id)
+        actor_ids.extend(record.secondary_actor_ids)
+        if record.primary_actor_id and not render_params.get("primary_actor_id"):
+            render_params["primary_actor_id"] = record.primary_actor_id
+        if record.secondary_actor_ids and "secondary_actor_ids" not in render_params:
+            render_params["secondary_actor_ids"] = list(record.secondary_actor_ids)
+        if actor_ids and "actor_ids" not in render_params:
+            render_params["actor_ids"] = list(actor_ids)
+        if record.location_id and "location_id" not in render_params:
+            render_params["location_id"] = record.location_id
+        record.render_params = render_params
+
+    @staticmethod
     def _classify_adventure_summary(
         previous_state: str, run: AdventureRun,
     ) -> Tuple[str, str, int]:
@@ -171,6 +191,7 @@ class EventRecorderMixin:
         impacts = self.world.apply_event_impact(result.event_type, canonical_location_id)
         if impacts:
             record.impacts = list(impacts)
+        self._enrich_semantic_render_params(record)
         record = self.world.record_event(record)
         if self.should_notify(record):
             self.pending_notifications.append(record)
