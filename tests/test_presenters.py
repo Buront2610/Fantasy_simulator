@@ -2,7 +2,11 @@
 
 from fantasy_simulator.i18n import set_locale
 from fantasy_simulator.ui.presenters import LanguagePresenter, ReportPresenter
-from fantasy_simulator.ui.view_models import build_monthly_report_card_view, build_notification_views
+from fantasy_simulator.ui.view_models import (
+    build_monthly_report_card_view,
+    build_notification_views,
+    build_world_dashboard_view,
+)
 from fantasy_simulator.rumor import Rumor
 from fantasy_simulator.world import CalendarChangeRecord, World
 from fantasy_simulator.events import WorldEventRecord
@@ -275,6 +279,75 @@ def test_monthly_report_card_surfaces_world_change_projection_summary():
         ("route", 1),
     ]
     assert any("World News" in line and "Occupation: 1" in line and "Route: 1" in line for line in lines)
+
+
+def test_world_dashboard_major_events_are_severity_first():
+    set_locale("en")
+    world = World()
+    world.record_event(
+        WorldEventRecord(
+            record_id="recent",
+            year=world.year,
+            month=5,
+            day=1,
+            kind="meeting",
+            severity=3,
+            description="A recent moderate event.",
+        )
+    )
+    world.record_event(
+        WorldEventRecord(
+            record_id="older",
+            year=world.year,
+            month=1,
+            day=1,
+            kind="battle",
+            severity=5,
+            description="An older severe event.",
+        )
+    )
+
+    dashboard = build_world_dashboard_view(world, current_month=5)
+
+    assert dashboard.major_events[:2] == [
+        "An older severe event.",
+        "A recent moderate event.",
+    ]
+
+
+def test_world_dashboard_hot_rumors_are_spread_and_heat_first():
+    set_locale("en")
+    world = World()
+    capital = world.get_location_by_id("loc_aethoria_capital")
+    thornwood = world.get_location_by_id("loc_thornwood")
+    assert capital is not None
+    assert thornwood is not None
+    capital.rumor_heat = 1
+    thornwood.rumor_heat = 9
+    world.rumors.append(
+        Rumor(
+            id="rumor_old_low_spread",
+            description="Fresh but quiet rumor.",
+            reliability="plausible",
+            source_location_id="loc_aethoria_capital",
+            spread_level=1,
+            age_in_months=0,
+        )
+    )
+    world.rumors.append(
+        Rumor(
+            id="rumor_hot",
+            description="Widespread forest rumor.",
+            reliability="plausible",
+            source_location_id="loc_thornwood",
+            spread_level=8,
+            age_in_months=3,
+        )
+    )
+
+    dashboard = build_world_dashboard_view(world, current_month=1)
+
+    assert dashboard.hot_rumors[0].startswith("Widespread forest rumor.")
 
 
 def test_monthly_report_card_renders_world_change_category_display_labels():

@@ -409,6 +409,19 @@ class TestWorldDashboardScreen(unittest.TestCase):
 
 
 class TestRumorBoardScreen(unittest.TestCase):
+    class _ScriptedInputBackend:
+        def __init__(self, answers):
+            self.answers = list(answers)
+
+        def read_line(self, prompt: str = "") -> str:
+            return self.answers.pop(0) if self.answers else ""
+
+        def read_menu_key(self, pairs, default=None):
+            return pairs[0][0]
+
+        def pause(self, message: str = "") -> None:
+            pass
+
     def test_rumor_board_lists_active_rumors_with_context(self) -> None:
         from fantasy_simulator.rumor_models import Rumor
         from fantasy_simulator.ui.screen_rumors import _show_rumor_board
@@ -450,6 +463,112 @@ class TestRumorBoardScreen(unittest.TestCase):
         self.assertIn("A road is said to be blocked.", text)
         self.assertIn("source: Aethoria Capital", text)
         self.assertIn("event: evt_road", text)
+
+    def test_rumor_board_filters_by_location_query_and_clears_filter(self) -> None:
+        from fantasy_simulator.rumor_models import Rumor
+        from fantasy_simulator.ui.screen_rumors import _show_rumor_board
+        from fantasy_simulator.ui.ui_context import UIContext
+        from fantasy_simulator.ui.render_backend import PrintRenderBackend
+
+        set_locale("en")
+        world = World()
+        world.rumors.extend([
+            Rumor(
+                id="rum_capital",
+                description="Capital rumor.",
+                reliability="plausible",
+                source_location_id="loc_aethoria_capital",
+            ),
+            Rumor(
+                id="rum_thornwood",
+                description="Forest rumor.",
+                reliability="plausible",
+                source_location_id="loc_thornwood",
+            ),
+        ])
+        sim = Simulator(world, events_per_year=0, seed=1)
+
+        ctx = UIContext(
+            inp=self._ScriptedInputBackend(["l", "aethoria capital", "c", ""]),
+            out=PrintRenderBackend(),
+        )
+        captured = io.StringIO()
+        with redirect_stdout(captured):
+            _show_rumor_board(sim, ctx=ctx)
+        text = _ANSI_RE.sub("", captured.getvalue())
+
+        self.assertIn("Filter: Aethoria Capital", text)
+        self.assertIn("Capital rumor.", text)
+        self.assertIn("Rumor source filter cleared.", text)
+        self.assertIn("Forest rumor.", text)
+
+    def test_rumor_board_handles_invalid_filter_choice_missing_event_and_empty_state(self) -> None:
+        from fantasy_simulator.rumor_models import Rumor
+        from fantasy_simulator.ui.screen_rumors import _show_rumor_board
+        from fantasy_simulator.ui.ui_context import UIContext
+        from fantasy_simulator.ui.render_backend import PrintRenderBackend
+
+        set_locale("en")
+        world = World()
+        world.rumors.append(
+            Rumor(
+                id="rum_missing",
+                description="Missing source rumor.",
+                reliability="plausible",
+                source_location_id="loc_aethoria_capital",
+                source_event_id="evt_missing",
+            )
+        )
+        sim = Simulator(world, events_per_year=0, seed=1)
+
+        ctx = UIContext(
+            inp=self._ScriptedInputBackend(["z", "l", "missing place", "1", ""]),
+            out=PrintRenderBackend(),
+        )
+        captured = io.StringIO()
+        with redirect_stdout(captured):
+            _show_rumor_board(sim, ctx=ctx)
+        text = _ANSI_RE.sub("", captured.getvalue())
+
+        self.assertIn("Invalid choice", text)
+        self.assertIn("No matching location: missing place", text)
+        self.assertIn("Source event is no longer available: evt_missing", text)
+
+        world.rumors.clear()
+        captured = io.StringIO()
+        with redirect_stdout(captured):
+            _show_rumor_board(sim, ctx=UIContext(inp=self._ScriptedInputBackend([""]), out=PrintRenderBackend()))
+        empty_text = _ANSI_RE.sub("", captured.getvalue())
+        self.assertIn("No active rumors are circulating.", empty_text)
+
+    def test_rumor_board_excludes_expired_rumors(self) -> None:
+        from fantasy_simulator.rumor_models import Rumor
+        from fantasy_simulator.ui.screen_rumors import _show_rumor_board
+        from fantasy_simulator.ui.ui_context import UIContext
+        from fantasy_simulator.ui.render_backend import PrintRenderBackend
+
+        set_locale("en")
+        world = World()
+        world.rumors.append(
+            Rumor(
+                id="rum_expired",
+                description="Expired rumor.",
+                reliability="plausible",
+                source_location_id="loc_aethoria_capital",
+                age_in_months=999,
+            )
+        )
+        sim = Simulator(world, events_per_year=0, seed=1)
+        captured = io.StringIO()
+        with redirect_stdout(captured):
+            _show_rumor_board(
+                sim,
+                ctx=UIContext(inp=self._ScriptedInputBackend([""]), out=PrintRenderBackend()),
+            )
+        text = _ANSI_RE.sub("", captured.getvalue())
+
+        self.assertIn("No active rumors are circulating.", text)
+        self.assertNotIn("Expired rumor.", text)
 
     def test_rumor_board_detail_links_source_event_and_location(self) -> None:
         from fantasy_simulator.event_models import WorldEventRecord

@@ -74,10 +74,9 @@ def _read_location_filter(world: "World", ctx: UIContext) -> str | None:
     value = ctx.inp.read_line(tr("rumor_board_filter_prompt")).strip()
     if not value:
         return None
-    lowered = value.lower()
-    for location in world.grid.values():
-        if location.id.lower() == lowered or location.canonical_name.lower() == lowered:
-            return location.id
+    location = world.find_location_by_id_or_name(value)
+    if location is not None:
+        return location.id
     ctx.out.print_error(f"  {tr('rumor_board_filter_not_found', location=value)}")
     return None
 
@@ -96,14 +95,7 @@ def _show_rumor_detail(sim: Simulator, rumor: RumorSummaryView, ctx: UIContext) 
     )
     out.print_dim(f"  {source_meta}")
     if rumor.source_event_id:
-        record = next(
-            (
-                event_record
-                for event_record in sim.world.event_records
-                if event_record.record_id == rumor.source_event_id
-            ),
-            None,
-        )
+        record = sim.world.get_event_by_id(rumor.source_event_id)
         if record is None:
             out.print_dim(f"  {tr('rumor_board_event_missing', event_id=rumor.source_event_id)}")
         else:

@@ -251,7 +251,7 @@ def build_world_dashboard_view(
     ]
     hot_rumors = [
         render_rumor_brief(rumor)
-        for rumor in build_rumor_summary_views(world, limit=5)
+        for rumor in _dashboard_hot_rumors(world, limit=5)
     ]
     month_label = _dashboard_month_label(world, current_month)
     world_change_projection = build_world_change_report_projection(
@@ -287,6 +287,27 @@ def _dashboard_month_label(world: "World", current_month: int) -> str:
         except TypeError:
             return world.month_display_name(current_month)
     return str(current_month)
+
+
+def _dashboard_hot_rumors(world: "World", *, limit: int) -> List[RumorSummaryView]:
+    """Return observer-dashboard rumors ordered by current attention value."""
+    rumors = build_rumor_summary_views(world)
+
+    def source_rumor_heat(rumor: RumorSummaryView) -> int:
+        if not rumor.source_location_id or not hasattr(world, "get_location_by_id"):
+            return 0
+        location = world.get_location_by_id(rumor.source_location_id)
+        return getattr(location, "rumor_heat", 0) if location is not None else 0
+
+    rumors.sort(
+        key=lambda rumor: (
+            -rumor.spread_level,
+            -source_rumor_heat(rumor),
+            rumor.age_in_months,
+            rumor.rumor_id,
+        )
+    )
+    return rumors[: max(0, limit)]
 
 
 def _format_dashboard_actor(world: "World", character) -> str:

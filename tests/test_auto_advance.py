@@ -238,7 +238,9 @@ class TestPartyReturnedPause:
         context = sim._pause_context_for_reason("party_returned")
 
         assert reason == "party_returned"
+        assert context["character_id"] == companion.char_id
         assert context["character"] == companion.name
+        assert context["location_id"] == "loc_aethoria_capital"
         assert context["location"] == "Aethoria Capital"
 
     def test_recently_completed_cleared_each_year(self, sim):

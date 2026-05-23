@@ -1459,6 +1459,37 @@ class TestWorld:
         assert [record.kind for record in world.get_events_by_month(1001, 2)] == ["battle", "meeting"]
         assert [record.month for record in world.get_events_by_kind("battle")] == [2, 3]
 
+    def test_event_record_indexes_support_record_id_lookup(self):
+        from fantasy_simulator.events import WorldEventRecord
+        world = World()
+        first = world.record_event(WorldEventRecord(record_id="r1", kind="battle", year=1001, month=2))
+        world.record_event(WorldEventRecord(record_id="r2", kind="meeting", year=1001, month=2))
+
+        assert world.get_event_by_id("r1") is first
+        assert world.get_event_by_id("missing") is None
+
+    def test_direct_record_event_adds_semantic_render_param_ids(self):
+        from fantasy_simulator.events import WorldEventRecord
+        world = World()
+        record = world.record_event(
+            WorldEventRecord(
+                record_id="semantic-direct",
+                kind="battle",
+                year=1001,
+                month=2,
+                location_id="loc_aethoria_capital",
+                primary_actor_id="char_a",
+                secondary_actor_ids=["char_b"],
+                summary_key="events.battle.summary",
+                render_params={"actor": "Aldric", "target": "Mira"},
+            )
+        )
+
+        assert record.render_params["primary_actor_id"] == "char_a"
+        assert record.render_params["secondary_actor_ids"] == ["char_b"]
+        assert record.render_params["actor_ids"] == ["char_a", "char_b"]
+        assert record.render_params["location_id"] == "loc_aethoria_capital"
+
     def test_event_record_indexes_notice_direct_compatibility_mutation(self):
         from fantasy_simulator.events import WorldEventRecord
         world = World()
@@ -1469,6 +1500,7 @@ class TestWorld:
         world.event_records.append(WorldEventRecord(record_id="r2", kind="meeting", year=1001, month=2))
 
         assert [record.record_id for record in world.get_events_by_month(1001, 2)] == ["r1", "r2"]
+        assert world.get_event_by_id("r2").kind == "meeting"
 
     def test_event_records_in_to_dict_round_trip(self):
         from fantasy_simulator.events import WorldEventRecord
@@ -1479,6 +1511,13 @@ class TestWorld:
         assert len(restored.event_records) == 1
         assert restored.event_records[0].kind == "battle"
         assert restored.event_records[0].location_id == "loc_thornwood"
+
+    def test_find_location_by_id_or_name_is_case_insensitive(self):
+        world = World()
+
+        assert world.find_location_by_id_or_name("LOC_AETHORIA_CAPITAL").id == "loc_aethoria_capital"
+        assert world.find_location_by_id_or_name("aethoria capital").id == "loc_aethoria_capital"
+        assert world.find_location_by_id_or_name("missing") is None
 
     def test_world_round_trip_preserves_location_state(self):
         world = World()

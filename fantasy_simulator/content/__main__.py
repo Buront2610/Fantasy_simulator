@@ -105,7 +105,9 @@ def _cmd_diff(args: argparse.Namespace) -> int:
         changed = True
         print("site_counts_by_region_type changed")
     if not changed:
-        print("no authoring summary changes")
+        print("authoring summary diff: no changes")
+    else:
+        print("authoring summary diff: changes shown above")
     return 0
 
 

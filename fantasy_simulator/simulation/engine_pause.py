@@ -150,35 +150,56 @@ class EnginePauseMixin:
         reasons.sort(key=lambda x: -x[1])
         return [reason for reason, _ in reasons]
 
+    def _pause_context_for_character(self, char) -> Dict[str, str]:
+        return {
+            "character_id": char.char_id,
+            "character": char.name,
+            "location_id": char.location_id,
+            "location": self.world.location_name(char.location_id),
+        }
+
+    def _pause_context_for_adventure(self, run: AdventureRun, *, location_id: str) -> Dict[str, str]:
+        return {
+            "character_id": run.character_id,
+            "character": run.character_name,
+            "location_id": location_id,
+            "location": self.world.location_name(location_id),
+        }
+
     def _pause_context_for_reason(self, reason: str) -> Dict[str, str]:
         """Return lightweight context (character/location) for a pause reason."""
         if reason == "dying_spotlighted":
             for char in self.world.characters:
                 if char.alive and char.is_dying and char.spotlighted:
-                    return {"character": char.name, "location": self.world.location_name(char.location_id)}
+                    return self._pause_context_for_character(char)
         if reason == "dying_favorite":
             for char in self.world.characters:
                 if char.alive and char.is_dying and char.favorite:
-                    return {"character": char.name, "location": self.world.location_name(char.location_id)}
+                    return self._pause_context_for_character(char)
         if reason == "dying_any":
             for char in self.world.characters:
                 if char.alive and char.is_dying:
-                    return {"character": char.name, "location": self.world.location_name(char.location_id)}
+                    return self._pause_context_for_character(char)
         if reason == "pending_decision":
             for run in self.world.active_adventures:
                 if run.pending_choice is not None:
-                    return {"character": run.character_name, "location": self.world.location_name(run.destination)}
+                    return self._pause_context_for_adventure(run, location_id=run.destination)
         if reason == "party_returned" and self._recently_completed_adventures:
             for run in reversed(self._recently_completed_adventures):
                 watched = self._watched_party_member(run)
                 if watched is not None:
-                    return {"character": watched.name, "location": self.world.location_name(run.origin)}
+                    return {
+                        "character_id": watched.char_id,
+                        "character": watched.name,
+                        "location_id": run.origin,
+                        "location": self.world.location_name(run.origin),
+                    }
             run = self._recently_completed_adventures[-1]
-            return {"character": run.character_name, "location": self.world.location_name(run.origin)}
+            return self._pause_context_for_adventure(run, location_id=run.origin)
         if reason == "condition_worsened_favorite":
             for char in self.world.characters:
                 if char.favorite and char.char_id in self._favorites_worsened_this_year:
-                    return {"character": char.name, "location": self.world.location_name(char.location_id)}
+                    return self._pause_context_for_character(char)
         return {}
 
     def _pause_recommendations_for_reasons(
@@ -196,8 +217,8 @@ class EnginePauseMixin:
         for item in recommendations:
             key = (
                 item.get("key", ""),
-                item.get("character", ""),
-                item.get("location", ""),
+                item.get("character_id", item.get("character", "")),
+                item.get("location_id", item.get("location", "")),
             )
             if key in seen:
                 continue
@@ -210,17 +231,49 @@ class EnginePauseMixin:
         context = self._pause_context_for_reason(reason)
         character = context.get("character", "")
         location = context.get("location", "")
+        character_id = context.get("character_id", "")
+        location_id = context.get("location_id", "")
         if reason.startswith("dying") or reason == "condition_worsened_favorite":
-            actions = [{"key": "inspect_character", "character": character, "location": location}]
+            actions = [{
+                "key": "inspect_character",
+                "character_id": character_id,
+                "character": character,
+                "location_id": location_id,
+                "location": location,
+            }]
             if location:
-                actions.append({"key": "inspect_location", "character": character, "location": location})
+                actions.append({
+                    "key": "inspect_location",
+                    "character_id": character_id,
+                    "character": character,
+                    "location_id": location_id,
+                    "location": location,
+                })
             return actions
         if reason == "pending_decision":
-            return [{"key": "review_pending_adventure", "character": character, "location": location}]
+            return [{
+                "key": "review_pending_adventure",
+                "character_id": character_id,
+                "character": character,
+                "location_id": location_id,
+                "location": location,
+            }]
         if reason == "party_returned":
-            return [{"key": "review_party_returned", "character": character, "location": location}]
+            return [{
+                "key": "review_party_returned",
+                "character_id": character_id,
+                "character": character,
+                "location_id": location_id,
+                "location": location,
+            }]
         if reason == "years_elapsed":
-            return [{"key": "review_recent_events", "character": character, "location": location}]
+            return [{
+                "key": "review_recent_events",
+                "character_id": character_id,
+                "character": character,
+                "location_id": location_id,
+                "location": location,
+            }]
         return []
 
     def _pause_subreasons_for_reason(self, reason: str) -> List[Dict[str, str]]:
@@ -228,16 +281,24 @@ class EnginePauseMixin:
         context = self._pause_context_for_reason(reason)
         character = context.get("character", "")
         location = context.get("location", "")
+        character_id = context.get("character_id", "")
+        location_id = context.get("location_id", "")
+        payload = {
+            "character_id": character_id,
+            "character": character,
+            "location_id": location_id,
+            "location": location,
+        }
         if reason.startswith("dying"):
-            return [{"key": "actor_in_danger", "character": character, "location": location}]
+            return [{"key": "actor_in_danger", **payload}]
         if reason == "condition_worsened_favorite":
-            return [{"key": "watched_condition_worsened", "character": character, "location": location}]
+            return [{"key": "watched_condition_worsened", **payload}]
         if reason == "pending_decision":
-            return [{"key": "adventure_needs_decision", "character": character, "location": location}]
+            return [{"key": "adventure_needs_decision", **payload}]
         if reason == "party_returned":
-            return [{"key": "watched_party_returned", "character": character, "location": location}]
+            return [{"key": "watched_party_returned", **payload}]
         if reason == "years_elapsed":
-            return [{"key": "auto_window_elapsed", "character": character, "location": location}]
+            return [{"key": "auto_window_elapsed", **payload}]
         return []
 
     def _watched_party_member(self, run: AdventureRun):

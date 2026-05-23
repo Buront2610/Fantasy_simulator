@@ -103,3 +103,27 @@ def event_record_with_added_tags(
 ) -> WorldEventRecord:
     """Return a copy of *record* with unique appended tags."""
     return replace(record, tags=list(dict.fromkeys([*record.tags, *tags])))
+
+
+def event_record_with_semantic_render_params(record: WorldEventRecord) -> WorldEventRecord:
+    """Return a copy whose render params include stable actor/location IDs when renderable."""
+    if not record.summary_key and not record.render_params:
+        return record
+    render_params = dict(record.render_params)
+    actor_ids: list[str] = []
+    if record.primary_actor_id:
+        actor_ids.append(record.primary_actor_id)
+    actor_ids.extend(record.secondary_actor_ids)
+    if record.primary_actor_id and not render_params.get("primary_actor_id"):
+        render_params["primary_actor_id"] = record.primary_actor_id
+    if record.secondary_actor_ids and "secondary_actor_ids" not in render_params:
+        render_params["secondary_actor_ids"] = list(record.secondary_actor_ids)
+    if actor_ids and "actor_ids" not in render_params:
+        render_params["actor_ids"] = list(actor_ids)
+    has_semantic_location_params = any(
+        key.endswith("_location_id") or key.endswith("_location_ids")
+        for key in render_params
+    )
+    if record.location_id and "location_id" not in render_params and not has_semantic_location_params:
+        render_params["location_id"] = record.location_id
+    return replace(record, render_params=render_params)
