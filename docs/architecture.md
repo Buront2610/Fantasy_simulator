@@ -48,6 +48,10 @@ form that tests can enforce.
   canonical records for compatibility.
 - `World.get_compatibility_event_log()` and `QueryMixin.events_by_type()` are
   the explicit adapter paths for legacy reads.
+- Legacy world mutation helpers such as `rename_location()`,
+  `set_route_blocked()`, and `set_location_controlling_faction()` are
+  compatibility paths. New production write paths should use canonical
+  world-change commands, changesets, and reducers.
 
 ## Read-Path Rules
 
@@ -76,6 +80,11 @@ form that tests can enforce.
   truth.
 - Event-impact / propagation rules are loaded from `SettingBundle` when
   provided, with bundled defaults as fallback.
+- PR-K world-change event records must satisfy the registered
+  `world_change.event_contracts` render-param, tag, and impact contracts.
+- Route, location, terrain, era, and score transitions should preserve their
+  aggregate invariants under repeated command sequences; property tests should
+  cover broad sequence behavior in addition to example tests.
 
 ## Deterministic Harness Expectations
 

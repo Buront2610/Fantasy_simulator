@@ -6,9 +6,30 @@ import json
 
 from fantasy_simulator.event_models import WorldEventRecord
 from fantasy_simulator.event_rendering import render_event_record
+from fantasy_simulator.ids import EraKey
 from fantasy_simulator.i18n import get_locale, set_locale
 from fantasy_simulator.terrain import RouteEdge
 from fantasy_simulator.world import World
+from fantasy_simulator.world_change import (
+    DriftCivilizationPhaseCommand,
+    ShiftEraCommand,
+    build_civilization_phase_drift_change_set,
+    build_era_shift_change_set,
+)
+from fantasy_simulator.world_change.event_contracts import (
+    WORLD_CHANGE_EVENT_CONTRACTS,
+    validate_world_change_event_contract,
+)
+
+
+class _EraRuntime:
+    era_key = "age_of_embers"
+    civilization_phase = "stable"
+    world_scores = {"prosperity": 50, "safety": 50, "traffic": 50, "mood": 50}
+
+
+def _describe(_summary_key: str, _render_params: dict[str, object], fallback: str) -> str:
+    return fallback
 
 
 def _assert_route_change_record_contract(
@@ -75,6 +96,8 @@ def test_route_block_and_reopen_records_follow_pr_k_event_contract() -> None:
         expected_old_value=False,
         expected_new_value=True,
     )
+    validate_world_change_event_contract(blocked_record)
+    validate_world_change_event_contract(reopened_record)
     _assert_route_change_record_contract(
         world=world,
         route=route,
@@ -157,6 +180,7 @@ def test_location_rename_record_follows_pr_k_event_contract() -> None:
     assert world.get_events_by_location("loc_aethoria_capital") == [record]
     assert record.record_id in world.get_location_by_id("loc_aethoria_capital").recent_event_ids
     assert render_event_record(record, locale="en", world=world) != record.summary_key
+    validate_world_change_event_contract(record)
 
 
 def test_world_change_records_preserve_cause_event_id_in_render_params() -> None:
@@ -194,6 +218,7 @@ def test_world_change_records_preserve_cause_event_id_in_render_params() -> None
     assert rename_record.render_params["cause_event_id"] == "cause_rename"
     assert occupation_record.render_params["cause_event_id"] == "cause_occupation"
     assert terrain_record.render_params["cause_event_id"] == "cause_terrain"
+    validate_world_change_event_contract(occupation_record)
 
 
 def test_terrain_cell_mutation_record_follows_pr_k_event_contract() -> None:
@@ -288,6 +313,47 @@ def test_terrain_cell_mutation_record_follows_pr_k_event_contract() -> None:
     assert world.get_events_by_location("loc_aethoria_capital") == [record]
     assert record.record_id in world.get_location_by_id("loc_aethoria_capital").recent_event_ids
     assert render_event_record(record, locale="en", world=world) != record.summary_key
+    validate_world_change_event_contract(record)
+
+
+def test_world_change_event_contract_registry_covers_pr_k_event_kinds() -> None:
+    assert set(WORLD_CHANGE_EVENT_CONTRACTS) == {
+        "route_blocked",
+        "route_reopened",
+        "location_renamed",
+        "location_faction_changed",
+        "terrain_cell_mutated",
+        "era_shifted",
+        "civilization_phase_drifted",
+    }
+
+
+def test_era_world_change_records_follow_registered_event_contracts() -> None:
+    runtime = _EraRuntime()
+    era_shift = build_era_shift_change_set(
+        ShiftEraCommand(
+            new_era_key=EraKey("age_of_reckoning"),
+            new_civilization_phase="new_era",
+            year=1001,
+        ),
+        era_runtime=runtime,
+        authored_era_keys={"age_of_embers", "age_of_reckoning"},
+        describe=_describe,
+    )
+    phase_drift = build_civilization_phase_drift_change_set(
+        DriftCivilizationPhaseCommand(
+            new_phase="crisis",
+            score_deltas={"prosperity": -20},
+            year=1001,
+        ),
+        era_runtime=runtime,
+        describe=_describe,
+    )
+
+    assert era_shift is not None
+    assert phase_drift is not None
+    validate_world_change_event_contract(era_shift.events[0])
+    validate_world_change_event_contract(phase_drift.events[0])
 
 
 def test_terrain_cell_mutation_summary_renders_localized_biome_terms_in_ja_strict_mode() -> None:

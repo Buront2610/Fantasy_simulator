@@ -169,6 +169,35 @@ def test_architecture_guard_reports_package_import_cycles(tmp_path: Path) -> Non
     assert "pkg.domain.beta" in violations[0].message
 
 
+def test_architecture_guard_reports_legacy_mutation_helper_calls(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "pkg" / "feature.py",
+        "\n".join(
+            [
+                "def run(world):",
+                "    world.rename_location('loc_a', 'New Name')",
+            ]
+        ),
+    )
+
+    config = {
+        "source_roots": ["pkg"],
+        "call_boundary_rules": [
+            {
+                "name": "production_uses_canonical_api",
+                "include": ["pkg/*.py"],
+                "forbid_calls": ["rename_location"],
+            }
+        ],
+    }
+
+    violations = run_checks(tmp_path, config)
+
+    assert len(violations) == 1
+    assert violations[0].rule == "production_uses_canonical_api"
+    assert "forbidden call 'world.rename_location'" in violations[0].message
+
+
 def test_repository_architecture_guard_config_is_valid_json() -> None:
     config_path = PROJECT_ROOT / "architecture_guard.json"
 

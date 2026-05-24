@@ -41,6 +41,7 @@ STANDARD_TARGETS = [
     "tests/test_pr_k_save_contracts.py",
     "tests/test_war_map_projection.py",
     "tests/test_world_change_report_projection.py",
+    "tests/test_world_change_properties.py",
     "tests/test_harness_scenarios.py",
     "tests/test_map_visible_harness.py",
 ]

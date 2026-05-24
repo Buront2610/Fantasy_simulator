@@ -151,6 +151,22 @@
         "open",
         "print"
       ]
+    },
+    {
+      "name": "production_code_uses_canonical_world_change_api",
+      "description": "Legacy world mutation helpers must not become new production write paths.",
+      "include": [
+        "fantasy_simulator/*.py",
+        "fantasy_simulator/**/*.py"
+      ],
+      "exclude": [
+        "fantasy_simulator/world_memory_api.py"
+      ],
+      "forbid_calls": [
+        "rename_location",
+        "set_location_controlling_faction",
+        "set_route_blocked"
+      ]
     }
   ],
   "acyclic_package_rules": [
