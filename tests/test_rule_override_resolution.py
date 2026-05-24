@@ -66,6 +66,22 @@ def test_validate_propagation_rules_rejects_decay_outside_probability_range() ->
         validate_propagation_rules(rules)
 
 
+def test_validate_propagation_rules_rejects_bool_for_numeric_fields() -> None:
+    rules = clone_default_propagation_rules()
+    rules["danger"]["decay"] = True
+
+    with pytest.raises(ValueError, match="must be numeric"):
+        validate_propagation_rules(rules)
+
+
+def test_validate_propagation_rules_rejects_bool_for_int_fields() -> None:
+    rules = clone_default_propagation_rules()
+    rules["danger"]["cap"] = False
+
+    with pytest.raises(ValueError, match="must be int"):
+        validate_propagation_rules(rules)
+
+
 def test_validate_propagation_rules_allows_disabled_road_damage_threshold_sentinel() -> None:
     rules = clone_default_propagation_rules()
     rules["road_damage_from_danger"]["danger_threshold"] = 101

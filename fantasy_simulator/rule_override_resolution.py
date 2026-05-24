@@ -12,6 +12,34 @@ from .world_topology import (
 
 DISABLED_ROAD_DAMAGE_THRESHOLD = 101
 
+_PROPAGATION_REQUIRED_KEYS = {
+    "danger": ("decay", "cap", "min_source"),
+    "traffic": ("decay", "cap", "min_source"),
+    "mood_from_ruin": ("source_threshold", "neighbor_penalty", "max_neighbors"),
+    "road_damage_from_danger": ("danger_threshold", "road_penalty"),
+    "topology": ("mode", "include_blocked_routes"),
+}
+
+_PROPAGATION_INT_KEYS = {
+    "danger": ("cap", "min_source"),
+    "traffic": ("cap", "min_source"),
+    "mood_from_ruin": ("source_threshold", "neighbor_penalty", "max_neighbors"),
+    "road_damage_from_danger": ("danger_threshold", "road_penalty"),
+}
+
+_PROPAGATION_NUMERIC_KEYS = {
+    "danger": ("decay",),
+    "traffic": ("decay",),
+}
+
+_PROPAGATION_BOOL_KEYS = {
+    "topology": ("include_blocked_routes",),
+}
+
+_PROPAGATION_STRING_KEYS = {
+    "topology": ("mode",),
+}
+
 
 _VALID_IMPACT_ATTRIBUTES = {
     "prosperity",
@@ -93,61 +121,46 @@ def _validate_percentage_threshold(*, section: str, key: str, value: Any) -> Non
         raise ValueError(f"PROPAGATION_RULES[{section!r}][{key!r}] must be between 0 and 100")
 
 
-def is_disabled_threshold(value: int) -> bool:
-    """Return True when a threshold intentionally disables a propagation effect."""
-    return value == DISABLED_ROAD_DAMAGE_THRESHOLD
-
-
-def validate_propagation_rules(rules: Mapping[str, Mapping[str, Any]]) -> None:
-    """Validate propagation rule schema (DbC fail-fast for configuration errors)."""
-    required = {
-        "danger": ("decay", "cap", "min_source"),
-        "traffic": ("decay", "cap", "min_source"),
-        "mood_from_ruin": ("source_threshold", "neighbor_penalty", "max_neighbors"),
-        "road_damage_from_danger": ("danger_threshold", "road_penalty"),
-        "topology": ("mode", "include_blocked_routes"),
-    }
-    expected_int = {
-        "danger": ("cap", "min_source"),
-        "traffic": ("cap", "min_source"),
-        "mood_from_ruin": ("source_threshold", "neighbor_penalty", "max_neighbors"),
-        "road_damage_from_danger": ("danger_threshold", "road_penalty"),
-    }
-    expected_numeric = {
-        "danger": ("decay",),
-        "traffic": ("decay",),
-    }
-    expected_bool = {
-        "topology": ("include_blocked_routes",),
-    }
-    expected_string = {
-        "topology": ("mode",),
-    }
-
-    for section, keys in required.items():
+def _require_propagation_keys(rules: Mapping[str, Mapping[str, Any]]) -> None:
+    for section, keys in _PROPAGATION_REQUIRED_KEYS.items():
         if section not in rules:
             raise ValueError(f"PROPAGATION_RULES missing section: {section}")
         values = rules[section]
         for key in keys:
             if key not in values:
                 raise ValueError(f"PROPAGATION_RULES[{section!r}] missing key: {key}")
-        for key in expected_int.get(section, ()):
-            value = values[key]
-            if not isinstance(value, int) or isinstance(value, bool):
-                raise ValueError(f"PROPAGATION_RULES[{section!r}][{key!r}] must be int, got {type(value)!r}")
-        for key in expected_numeric.get(section, ()):
-            value = values[key]
-            if not isinstance(value, (int, float)) or isinstance(value, bool):
-                raise ValueError(f"PROPAGATION_RULES[{section!r}][{key!r}] must be numeric, got {type(value)!r}")
-        for key in expected_bool.get(section, ()):
-            value = values[key]
-            if not isinstance(value, bool):
-                raise ValueError(f"PROPAGATION_RULES[{section!r}][{key!r}] must be bool, got {type(value)!r}")
-        for key in expected_string.get(section, ()):
-            value = values[key]
-            if not isinstance(value, str):
-                raise ValueError(f"PROPAGATION_RULES[{section!r}][{key!r}] must be str, got {type(value)!r}")
 
+
+def _validate_typed_propagation_keys(rules: Mapping[str, Mapping[str, Any]]) -> None:
+    for section, keys in _PROPAGATION_INT_KEYS.items():
+        _validate_expected_type(rules, section=section, keys=keys, expected_type=int, label="int")
+    for section, keys in _PROPAGATION_NUMERIC_KEYS.items():
+        _validate_expected_type(rules, section=section, keys=keys, expected_type=(int, float), label="numeric")
+    for section, keys in _PROPAGATION_BOOL_KEYS.items():
+        _validate_expected_type(rules, section=section, keys=keys, expected_type=bool, label="bool")
+    for section, keys in _PROPAGATION_STRING_KEYS.items():
+        _validate_expected_type(rules, section=section, keys=keys, expected_type=str, label="str")
+
+
+def _validate_expected_type(
+    rules: Mapping[str, Mapping[str, Any]],
+    *,
+    section: str,
+    keys: tuple[str, ...],
+    expected_type: type | tuple[type, ...],
+    label: str,
+) -> None:
+    for key in keys:
+        value = rules[section][key]
+        if not isinstance(value, expected_type) or _bool_matches_non_bool_type(value, expected_type):
+            raise ValueError(f"PROPAGATION_RULES[{section!r}][{key!r}] must be {label}, got {type(value)!r}")
+
+
+def _bool_matches_non_bool_type(value: Any, expected_type: type | tuple[type, ...]) -> bool:
+    return isinstance(value, bool) and expected_type is not bool
+
+
+def _validate_propagation_value_ranges(rules: Mapping[str, Mapping[str, Any]]) -> None:
     _validate_probability(section="danger", key="decay", value=rules["danger"]["decay"])
     _validate_probability(section="traffic", key="decay", value=rules["traffic"]["decay"])
     _validate_non_negative_int(section="danger", key="cap", value=rules["danger"]["cap"])
@@ -169,6 +182,11 @@ def validate_propagation_rules(rules: Mapping[str, Mapping[str, Any]]) -> None:
         key="max_neighbors",
         value=rules["mood_from_ruin"]["max_neighbors"],
     )
+    _validate_road_damage_rules(rules)
+    _validate_topology_rules(rules)
+
+
+def _validate_road_damage_rules(rules: Mapping[str, Mapping[str, Any]]) -> None:
     danger_threshold = rules["road_damage_from_danger"]["danger_threshold"]
     if danger_threshold < 0:
         raise ValueError("PROPAGATION_RULES['road_damage_from_danger']['danger_threshold'] must be >= 0")
@@ -182,12 +200,27 @@ def validate_propagation_rules(rules: Mapping[str, Mapping[str, Any]]) -> None:
         key="road_penalty",
         value=rules["road_damage_from_danger"]["road_penalty"],
     )
+
+
+def _validate_topology_rules(rules: Mapping[str, Mapping[str, Any]]) -> None:
     topology_mode = rules["topology"]["mode"]
     if topology_mode not in VALID_PROPAGATION_TOPOLOGIES:
         raise ValueError(
             "PROPAGATION_RULES['topology']['mode'] must be one of "
             f"{', '.join(VALID_PROPAGATION_TOPOLOGIES)}"
         )
+
+
+def is_disabled_threshold(value: int) -> bool:
+    """Return True when a threshold intentionally disables a propagation effect."""
+    return value == DISABLED_ROAD_DAMAGE_THRESHOLD
+
+
+def validate_propagation_rules(rules: Mapping[str, Mapping[str, Any]]) -> None:
+    """Validate propagation rule schema (DbC fail-fast for configuration errors)."""
+    _require_propagation_keys(rules)
+    _validate_typed_propagation_keys(rules)
+    _validate_propagation_value_ranges(rules)
 
 
 def clone_default_event_impact_rules() -> Dict[str, Dict[str, int]]:

@@ -21,6 +21,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 STANDARD_TARGETS = [
     "tests/test_architecture_constraints.py",
+    "tests/test_architecture_guard.py",
     "tests/test_quality_gate.py",
     "tests/test_agent_workflow_docs.py",
     "tests/test_doc_freshness.py",

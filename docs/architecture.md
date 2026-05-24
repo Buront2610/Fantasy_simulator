@@ -104,3 +104,16 @@ form that tests can enforce.
   that suite; newly split `world_*` API/facade/helper modules belong in the
   focused mypy target list when they become maintenance surfaces, unless
   `scripts/quality_gate.py` records an explicit temporary exclusion reason.
+- `scripts/architecture_guard.py` plus `architecture_guard.json` define the
+  machine-checkable architecture fitness rules for CI/CD: dependency
+  boundaries, headless-domain I/O bans, deterministic reducer imports, and
+  acyclic-package rules for inner packages, plus maintainability budgets for
+  cyclomatic complexity, cognitive complexity, function length, class size,
+  public method count, and first-party fan-out.
+  Existing hotspots are recorded as explicit per-target budgets so future work
+  cannot quietly make them larger. Relaxed budgets require a reason and are
+  reported as stale once a refactor brings the target back under the default
+  budget. Default budgets intentionally stay below the current extreme hotspots
+  (`cyclomatic <= 20`, `cognitive <= 25`, `function lines <= 80`, `public
+  methods <= 12`, `class lines <= 220`, `first-party imports <= 12`); anything
+  larger needs a named explanation in `architecture_guard.json`.
