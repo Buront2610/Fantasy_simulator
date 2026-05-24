@@ -122,7 +122,11 @@ form that tests can enforce.
   Existing hotspots are recorded as explicit per-target budgets so future work
   cannot quietly make them larger. Relaxed budgets require a reason and are
   reported as stale once a refactor brings the target back under the default
-  budget. Default budgets intentionally stay below the current extreme hotspots
-  (`cyclomatic <= 20`, `cognitive <= 25`, `function lines <= 80`, `public
-  methods <= 12`, `class lines <= 220`, `first-party imports <= 12`); anything
-  larger needs a named explanation in `architecture_guard.json`.
+  budget, and typoed or deleted override targets fail as unused debt entries.
+  Path globs are depth-aware (`*.py` means direct child, `**/*.py` is
+  recursive). Call-boundary rules are lightweight syntax checks over direct AST
+  calls; they are fitness functions, not data-flow or alias analysis. Default
+  budgets intentionally stay below the current extreme hotspots (`cyclomatic <=
+  20`, `cognitive <= 25`, `function lines <= 80`, `public methods <= 12`,
+  `class lines <= 220`, `first-party imports <= 12`); anything larger needs a
+  named explanation in `architecture_guard.json`.

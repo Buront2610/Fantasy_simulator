@@ -168,6 +168,7 @@ TYPECHECK_TARGETS = [
     "fantasy_simulator/world_topology.py",
     "fantasy_simulator/world_change",
     "fantasy_simulator/worldgen",
+    "scripts/architecture_guard.py",
     "tools/worldgen_poc",
 ]
 

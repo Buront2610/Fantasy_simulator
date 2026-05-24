@@ -11,10 +11,11 @@ from fantasy_simulator.ids import LocationId, RouteId
 from fantasy_simulator.terrain import RouteEdge, TerrainCell, TerrainMap
 from fantasy_simulator.world_change import (
     LocationRenameUpdate,
+    MutateTerrainCellCommand,
     RouteUpdate,
-    TerrainCellUpdate,
     WorldChangeSet,
     apply_world_change_set,
+    build_terrain_cell_mutation_change_set,
 )
 from fantasy_simulator.world_change.state_machines import transition_world_scores
 
@@ -159,11 +160,11 @@ def test_world_score_transitions_are_bounded(scores: dict[str, int], deltas: dic
 @settings(max_examples=40)
 @given(
     st.sampled_from(["forest", "plains", "swamp"]),
-    st.integers(min_value=0, max_value=255),
-    st.integers(min_value=0, max_value=255),
-    st.integers(min_value=0, max_value=255),
+    st.integers(min_value=-50, max_value=300),
+    st.integers(min_value=-50, max_value=300),
+    st.integers(min_value=-50, max_value=300),
 )
-def test_terrain_cell_mutation_scalars_stay_in_byte_range(
+def test_terrain_cell_mutation_scalar_commands_enforce_byte_range(
     biome: str,
     elevation: int,
     moisture: int,
@@ -173,27 +174,36 @@ def test_terrain_cell_mutation_scalars_stay_in_byte_range(
     terrain_map.set_cell(TerrainCell(x=0, y=0, biome="forest", elevation=128, moisture=128, temperature=128))
     cell = terrain_map.get(0, 0)
     assert cell is not None
-
-    change_set = WorldChangeSet(
-        events=(_record("rec_terrain"),),
-        terrain_updates=(
-            TerrainCellUpdate(
-                x=0,
-                y=0,
-                old_biome=cell.biome,
-                new_biome=biome,
-                old_elevation=cell.elevation,
-                new_elevation=elevation,
-                old_moisture=cell.moisture,
-                new_moisture=moisture,
-                old_temperature=cell.temperature,
-                new_temperature=temperature,
-            ),
-        ),
+    command = MutateTerrainCellCommand(
+        x=0,
+        y=0,
+        biome=biome,
+        elevation=elevation,
+        moisture=moisture,
+        temperature=temperature,
+        year=1001,
     )
 
-    apply_world_change_set(change_set, routes=[], terrain_map=terrain_map, record_event=_record_event([]))
+    if not (0 <= elevation <= 255 and 0 <= moisture <= 255 and 0 <= temperature <= 255):
+        with pytest.raises(ValueError, match="must be between 0 and 255"):
+            build_terrain_cell_mutation_change_set(
+                command,
+                terrain_map=terrain_map,
+                allowed_biomes={"forest", "plains", "swamp"},
+                describe=lambda _summary_key, _params, fallback: fallback,
+            )
+        return
 
+    change_set = build_terrain_cell_mutation_change_set(
+        command,
+        terrain_map=terrain_map,
+        allowed_biomes={"forest", "plains", "swamp"},
+        describe=lambda _summary_key, _params, fallback: fallback,
+    )
+    if change_set is not None:
+        apply_world_change_set(change_set, routes=[], terrain_map=terrain_map, record_event=_record_event([]))
+
+    assert cell.biome == biome
     assert 0 <= cell.elevation <= 255
     assert 0 <= cell.moisture <= 255
     assert 0 <= cell.temperature <= 255

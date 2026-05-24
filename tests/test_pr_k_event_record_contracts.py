@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+from typing import Mapping
+
+import pytest
 
 from fantasy_simulator.event_models import WorldEventRecord
 from fantasy_simulator.event_rendering import render_event_record
@@ -23,9 +26,9 @@ from fantasy_simulator.world_change.event_contracts import (
 
 
 class _EraRuntime:
-    era_key = "age_of_embers"
-    civilization_phase = "stable"
-    world_scores = {"prosperity": 50, "safety": 50, "traffic": 50, "mood": 50}
+    era_key: str = "age_of_embers"
+    civilization_phase: str = "stable"
+    world_scores: Mapping[str, int] = {"prosperity": 50, "safety": 50, "traffic": 50, "mood": 50}
 
 
 def _describe(_summary_key: str, _render_params: dict[str, object], fallback: str) -> str:
@@ -174,11 +177,14 @@ def test_location_rename_record_follows_pr_k_event_contract() -> None:
             "new_value": "Aethoria March",
         }
     ]
+    assert "location:loc_aethoria_capital" in record.tags
 
     json.dumps(record.render_params)
     assert WorldEventRecord.from_dict(record.to_dict()).to_dict() == record.to_dict()
     assert world.get_events_by_location("loc_aethoria_capital") == [record]
-    assert record.record_id in world.get_location_by_id("loc_aethoria_capital").recent_event_ids
+    location = world.get_location_by_id("loc_aethoria_capital")
+    assert location is not None
+    assert record.record_id in location.recent_event_ids
     assert render_event_record(record, locale="en", world=world) != record.summary_key
     validate_world_change_event_contract(record)
 
@@ -311,7 +317,9 @@ def test_terrain_cell_mutation_record_follows_pr_k_event_contract() -> None:
     assert WorldEventRecord.from_dict(record.to_dict()).to_dict() == record.to_dict()
     assert world.get_events_by_kind("terrain_cell_mutated") == [record]
     assert world.get_events_by_location("loc_aethoria_capital") == [record]
-    assert record.record_id in world.get_location_by_id("loc_aethoria_capital").recent_event_ids
+    location = world.get_location_by_id("loc_aethoria_capital")
+    assert location is not None
+    assert record.record_id in location.recent_event_ids
     assert render_event_record(record, locale="en", world=world) != record.summary_key
     validate_world_change_event_contract(record)
 
@@ -326,6 +334,73 @@ def test_world_change_event_contract_registry_covers_pr_k_event_kinds() -> None:
         "era_shifted",
         "civilization_phase_drifted",
     }
+
+
+def _mutated_record(record: WorldEventRecord, **updates: object) -> WorldEventRecord:
+    payload = record.to_dict()
+    payload.update(updates)
+    return WorldEventRecord.from_dict(payload)
+
+
+def test_world_change_event_contract_rejects_malformed_impacts() -> None:
+    world = World()
+    record = world.apply_location_rename_change("loc_aethoria_capital", "Aethoria March")
+    assert record is not None
+
+    malformed = _mutated_record(record, impacts=[{}])
+
+    with pytest.raises(ValueError, match="missing keys"):
+        validate_world_change_event_contract(malformed)
+
+
+def test_world_change_event_contract_rejects_unknown_impact_attributes() -> None:
+    world = World()
+    record = world.apply_location_rename_change("loc_aethoria_capital", "Aethoria March")
+    assert record is not None
+    impact = dict(record.impacts[0])
+    impact["attribute"] = "display_name"
+
+    invalid = _mutated_record(record, impacts=[impact])
+
+    with pytest.raises(ValueError, match="unknown impact attributes"):
+        validate_world_change_event_contract(invalid)
+
+
+def test_world_change_event_contract_rejects_missing_location_tags() -> None:
+    world = World()
+    record = world.apply_location_rename_change("loc_aethoria_capital", "Aethoria March")
+    assert record is not None
+
+    invalid = _mutated_record(record, tags=["world_change"])
+
+    with pytest.raises(ValueError, match="missing location tag"):
+        validate_world_change_event_contract(invalid)
+
+
+def test_terrain_event_contract_rejects_changed_attribute_mismatch() -> None:
+    world = World()
+    record = world.apply_terrain_cell_change(2, 2, biome="forest", elevation=180)
+    assert record is not None
+    render_params = dict(record.render_params)
+    render_params["changed_attributes"] = ["biome"]
+
+    invalid = _mutated_record(record, render_params=render_params)
+
+    with pytest.raises(ValueError, match="changed_attributes disagree"):
+        validate_world_change_event_contract(invalid)
+
+
+def test_terrain_event_contract_rejects_impact_render_param_mismatch() -> None:
+    world = World()
+    record = world.apply_terrain_cell_change(2, 2, biome="forest", elevation=180)
+    assert record is not None
+    render_params = dict(record.render_params)
+    render_params["new_elevation"] = 181
+
+    invalid = _mutated_record(record, render_params=render_params)
+
+    with pytest.raises(ValueError, match="impact values disagree"):
+        validate_world_change_event_contract(invalid)
 
 
 def test_era_world_change_records_follow_registered_event_contracts() -> None:

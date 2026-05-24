@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from scripts.architecture_guard import load_config, run_checks, validate_config
+from scripts.architecture_guard import _path_matches, load_config, run_checks, validate_config
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -92,6 +92,12 @@ def test_architecture_guard_reports_cognitive_complexity_budget(tmp_path: Path) 
     assert "pkg/domain/branching.py::tangled" in violations[0].message
 
 
+def test_path_globs_are_depth_aware() -> None:
+    assert _path_matches("fantasy_simulator/world.py", ["fantasy_simulator/*.py"])
+    assert not _path_matches("fantasy_simulator/world_change/foo.py", ["fantasy_simulator/*.py"])
+    assert _path_matches("fantasy_simulator/world_change/foo.py", ["fantasy_simulator/**/*.py"])
+
+
 def test_complexity_overrides_require_reason() -> None:
     config = {
         "source_roots": ["pkg"],
@@ -111,6 +117,27 @@ def test_complexity_overrides_require_reason() -> None:
         assert "requires a non-empty reason" in str(exc)
     else:
         raise AssertionError("Expected budget overrides without a reason to fail")
+
+
+def test_complexity_budgets_reject_bool_values() -> None:
+    for complexity in (
+        {"max_function_lines": True},
+        {
+            "overrides": [
+                {
+                    "target": "pkg/domain/service.py::Service",
+                    "reason": "Example override.",
+                    "max_class_lines": True,
+                }
+            ]
+        },
+    ):
+        try:
+            validate_config({"source_roots": ["pkg"], "complexity": complexity})
+        except TypeError as exc:
+            assert "Expected an integer or null" in str(exc)
+        else:
+            raise AssertionError("Expected bool complexity budget to fail")
 
 
 def test_relaxed_complexity_overrides_fail_when_no_longer_needed(tmp_path: Path) -> None:
@@ -144,6 +171,31 @@ def test_relaxed_complexity_overrides_fail_when_no_longer_needed(tmp_path: Path)
     assert len(violations) == 1
     assert violations[0].rule == "stale_complexity_override"
     assert "remove relaxed override 99" in violations[0].message
+
+
+def test_missing_complexity_override_targets_fail(tmp_path: Path) -> None:
+    _write(tmp_path / "pkg" / "domain" / "simple.py", "def run():\n    return 1\n")
+
+    config = {
+        "source_roots": ["pkg"],
+        "complexity": {
+            "include": ["pkg/**/*.py"],
+            "max_cognitive_complexity": 5,
+            "overrides": [
+                {
+                    "target": "pkg/domain/simple.py::rn",
+                    "reason": "Typo should not be silently ignored.",
+                    "max_cognitive_complexity": 99,
+                }
+            ],
+        },
+    }
+
+    violations = run_checks(tmp_path, config)
+
+    assert len(violations) == 1
+    assert violations[0].rule == "unused_complexity_override"
+    assert "pkg/domain/simple.py::rn" in violations[0].message
 
 
 def test_architecture_guard_reports_package_import_cycles(tmp_path: Path) -> None:

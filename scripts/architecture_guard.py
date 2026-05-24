@@ -104,7 +104,35 @@ def _as_list(value: object) -> list[str]:
 
 
 def _path_matches(path: str, patterns: Sequence[str]) -> bool:
-    return any(fnmatch.fnmatchcase(path, pattern) for pattern in patterns)
+    return any(_path_matches_pattern(path, pattern) for pattern in patterns)
+
+
+def _path_matches_pattern(path: str, pattern: str) -> bool:
+    """Match POSIX-style globs while treating "/" as a path separator."""
+    path_parts = tuple(part for part in path.split("/") if part)
+    pattern_parts = tuple(part for part in pattern.split("/") if part)
+    memo: dict[tuple[int, int], bool] = {}
+
+    def matches_from(path_index: int, pattern_index: int) -> bool:
+        key = (path_index, pattern_index)
+        if key in memo:
+            return memo[key]
+        if pattern_index == len(pattern_parts):
+            matched = path_index == len(path_parts)
+        elif pattern_parts[pattern_index] == "**":
+            matched = matches_from(path_index, pattern_index + 1) or (
+                path_index < len(path_parts) and matches_from(path_index + 1, pattern_index)
+            )
+        else:
+            matched = (
+                path_index < len(path_parts)
+                and fnmatch.fnmatchcase(path_parts[path_index], pattern_parts[pattern_index])
+                and matches_from(path_index + 1, pattern_index + 1)
+            )
+        memo[key] = matched
+        return matched
+
+    return matches_from(0, 0)
 
 
 def _select_sources(
@@ -200,6 +228,7 @@ def _is_forbidden_import(
     allowed: Sequence[str],
     allowed_prefixes: Sequence[str],
 ) -> bool:
+    """Evaluate import boundaries; *_prefixes are raw string prefixes for families like ``world_``."""
     if any(_matches_dotted_prefix(target, prefix) for prefix in allowed):
         return False
     if any(target.startswith(prefix) for prefix in allowed_prefixes):
@@ -276,6 +305,7 @@ def _check_call_rules(
     sources: Sequence[SourceFile],
     rules: Sequence[Mapping[str, Any]],
 ) -> list[Violation]:
+    """Check direct call expressions; this intentionally does not do data-flow analysis."""
     violations: list[Violation] = []
     for rule in rules:
         rule_name = str(rule["name"])
@@ -656,7 +686,7 @@ def _override_map(overrides: Sequence[Mapping[str, Any]], metric_name: str) -> d
             continue
         target = str(override["target"])
         limit = override[metric_name]
-        if not isinstance(limit, int):
+        if type(limit) is not int:
             raise TypeError(f"Override {target!r} has a non-integer {metric_name}")
         values[target] = limit
     return values
@@ -736,8 +766,17 @@ def _check_metric_budget(
         "max_first_party_imports",
     ]
     override_limits = {metric_name: _override_map(overrides, metric_name) for metric_name in metric_names}
+    observed_targets_by_budget = {
+        "max_cyclomatic_complexity": {metric.target for metric in function_metrics},
+        "max_cognitive_complexity": {metric.target for metric in function_metrics},
+        "max_function_lines": {metric.target for metric in function_metrics},
+        "max_public_methods": {metric.target for metric in class_metrics},
+        "max_class_lines": {metric.target for metric in class_metrics},
+        "max_first_party_imports": {metric.target for metric in module_metrics},
+    }
 
     violations: list[Violation] = []
+    violations.extend(_unused_override_violations(overrides, observed_targets_by_budget, selected))
     for function_metric in function_metrics:
         checks = [
             ("cyclomatic complexity", function_metric.cyclomatic_complexity, "max_cyclomatic_complexity"),
@@ -845,10 +884,36 @@ def _check_metric_budget(
     return violations
 
 
+def _unused_override_violations(
+    overrides: Sequence[Mapping[str, Any]],
+    observed_targets_by_budget: Mapping[str, set[str]],
+    selected: Sequence[SourceFile],
+) -> list[Violation]:
+    path = selected[0].path if selected else PROJECT_ROOT / "architecture_guard.json"
+    violations: list[Violation] = []
+    for override in overrides:
+        target = str(override["target"])
+        for budget_key, observed_targets in observed_targets_by_budget.items():
+            if budget_key not in override or target in observed_targets:
+                continue
+            violations.append(
+                Violation(
+                    rule="unused_complexity_override",
+                    path=path,
+                    line=1,
+                    message=(
+                        f"complexity override {budget_key} target {target!r} "
+                        "does not match any observed metric target"
+                    ),
+                )
+            )
+    return violations
+
+
 def _optional_int(value: object) -> int | None:
     if value is None:
         return None
-    if isinstance(value, int):
+    if type(value) is int:
         return value
     raise TypeError(f"Expected an integer or null, got {value!r}")
 
@@ -870,6 +935,8 @@ def validate_config(config: Mapping[str, Any]) -> None:
     overrides = complexity_config.get("overrides", [])
     if not isinstance(overrides, list) or not all(isinstance(override, Mapping) for override in overrides):
         raise TypeError("complexity.overrides must be a list of JSON objects")
+    for key in BUDGET_OVERRIDE_KEYS:
+        _optional_int(complexity_config.get(key))
     for override in overrides:
         _validate_complexity_override(override)
 
@@ -883,6 +950,9 @@ def _validate_complexity_override(override: Mapping[str, Any]) -> None:
     reason = override.get("reason")
     if not isinstance(reason, str) or not reason.strip():
         raise TypeError(f"complexity override for {target!r} requires a non-empty reason")
+    for key in BUDGET_OVERRIDE_KEYS:
+        if key in override:
+            _optional_int(override[key])
 
 
 def run_checks(project_root: Path, config: Mapping[str, Any]) -> list[Violation]:
