@@ -76,6 +76,46 @@ class EventResult:
         )
 
 
+def _validate_legacy_affected_characters_payload(payload: Dict[str, Any]) -> None:
+    raw_affected_characters = payload.get("affected_characters", [])
+    if not isinstance(raw_affected_characters, list) or any(
+        not isinstance(character_id, str) for character_id in raw_affected_characters
+    ):
+        raise ValueError("legacy_event_result.affected_characters must be a list of strings")
+
+
+def _validate_legacy_stat_changes_payload(stat_changes: Any) -> None:
+    if not isinstance(stat_changes, dict):
+        raise ValueError("legacy_event_result.stat_changes must be a dict")
+    for character_id, character_stat_changes in stat_changes.items():
+        if not isinstance(character_id, str):
+            raise ValueError("legacy_event_result.stat_changes keys must be strings")
+        if not isinstance(character_stat_changes, dict):
+            raise ValueError("legacy_event_result.stat_changes values must be dicts")
+        _validate_legacy_character_stat_changes_payload(character_stat_changes)
+
+
+def _validate_legacy_character_stat_changes_payload(stat_changes: Dict[Any, Any]) -> None:
+    for stat_name, delta in stat_changes.items():
+        if not isinstance(stat_name, str):
+            raise ValueError("legacy_event_result.stat names must be strings")
+        if not isinstance(delta, int) or isinstance(delta, bool):
+            raise ValueError("legacy_event_result stat deltas must be integers")
+
+
+def _validate_legacy_event_result_scalars(projected: EventResult) -> None:
+    if not isinstance(projected.description, str):
+        raise ValueError("legacy_event_result.description must be a string")
+    if not isinstance(projected.event_type, str):
+        raise ValueError("legacy_event_result.event_type must be a string")
+    if not isinstance(projected.summary_key, str):
+        raise ValueError("legacy_event_result.summary_key must be a string")
+    if not isinstance(projected.year, int) or isinstance(projected.year, bool):
+        raise ValueError("legacy_event_result.year must be an integer")
+    if not isinstance(projected.metadata, dict):
+        raise ValueError("legacy_event_result.metadata must be a dict")
+
+
 @dataclass(slots=True)
 class WorldEventRecord:
     """A structured record of a world event for history and analysis."""
@@ -158,37 +198,13 @@ class WorldEventRecord:
             return None
         if not isinstance(payload, dict):
             raise ValueError("legacy_event_result must be a dict when provided")
-        raw_affected_characters = payload.get("affected_characters", [])
-        if not isinstance(raw_affected_characters, list) or any(
-            not isinstance(character_id, str) for character_id in raw_affected_characters
-        ):
-            raise ValueError("legacy_event_result.affected_characters must be a list of strings")
+        _validate_legacy_affected_characters_payload(payload)
         try:
             projected = EventResult.from_dict(payload)
         except (AttributeError, KeyError, TypeError, ValueError) as exc:
             raise ValueError("legacy_event_result must be a valid EventResult payload") from exc
-        if not isinstance(projected.description, str):
-            raise ValueError("legacy_event_result.description must be a string")
-        if not isinstance(projected.stat_changes, dict):
-            raise ValueError("legacy_event_result.stat_changes must be a dict")
-        for character_id, stat_changes in projected.stat_changes.items():
-            if not isinstance(character_id, str):
-                raise ValueError("legacy_event_result.stat_changes keys must be strings")
-            if not isinstance(stat_changes, dict):
-                raise ValueError("legacy_event_result.stat_changes values must be dicts")
-            for stat_name, delta in stat_changes.items():
-                if not isinstance(stat_name, str):
-                    raise ValueError("legacy_event_result.stat names must be strings")
-                if not isinstance(delta, int) or isinstance(delta, bool):
-                    raise ValueError("legacy_event_result stat deltas must be integers")
-        if not isinstance(projected.event_type, str):
-            raise ValueError("legacy_event_result.event_type must be a string")
-        if not isinstance(projected.summary_key, str):
-            raise ValueError("legacy_event_result.summary_key must be a string")
-        if not isinstance(projected.year, int) or isinstance(projected.year, bool):
-            raise ValueError("legacy_event_result.year must be an integer")
-        if not isinstance(projected.metadata, dict):
-            raise ValueError("legacy_event_result.metadata must be a dict")
+        _validate_legacy_event_result_scalars(projected)
+        _validate_legacy_stat_changes_payload(projected.stat_changes)
         return projected.to_dict()
 
     @staticmethod

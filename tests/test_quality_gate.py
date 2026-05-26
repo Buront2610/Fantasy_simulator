@@ -15,6 +15,7 @@ PYPROJECT_TEXT = (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
 EXPECTED_STANDARD_TARGETS = [
     "tests/test_architecture_constraints.py",
+    "tests/test_architecture_guard.py",
     "tests/test_quality_gate.py",
     "tests/test_agent_workflow_docs.py",
     "tests/test_doc_freshness.py",
@@ -34,6 +35,7 @@ EXPECTED_STANDARD_TARGETS = [
     "tests/test_pr_k_save_contracts.py",
     "tests/test_war_map_projection.py",
     "tests/test_world_change_report_projection.py",
+    "tests/test_world_change_properties.py",
     "tests/test_harness_scenarios.py",
     "tests/test_map_visible_harness.py",
 ]

@@ -109,7 +109,7 @@ def location_renamed_to_record(
         calendar_key=event.calendar_key,
         summary_key=event.summary_key,
         render_params=location_rename_render_params(event),
-        tags=["world_change"],
+        tags=["world_change", f"{LOCATION_TAG_PREFIX}{event.location_id}"],
         impacts=[
             {
                 "target_type": "location",
