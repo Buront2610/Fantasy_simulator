@@ -16,6 +16,11 @@ Use this file when the task is primarily code review or risk assessment.
 - Does it bypass i18n rules for user-facing text?
 - Does it introduce a layer dependency that the structural tests should forbid?
 - Does it modify roadmap or guardrail docs without keeping them aligned?
+- Does PR-K wording distinguish the active mainline milestone from the already
+  merged K0 guardrail/contract slices?
+- For world-change work, is the slice still inside the Command -> validation ->
+  state machine -> domain event -> `WorldEventRecord` -> `ChangeSet` -> reducer
+  -> projection/view model -> UI/report -> tests path?
 - Is verification proportional to the scope of the change?
 - If it blocks completion, what is the smallest follow-up subagent that should handle it?
 
