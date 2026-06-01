@@ -107,7 +107,7 @@
   - UI renderer complexity
   - geometry / atlas algorithm
   - intentional protocol surface
-- 各 override に削除条件、分割候補、先行テストを持たせる。
+- 各 override に owner / maintainer、削除条件、分割候補、先行テストを持たせる。
 - すぐ削れない override は `accepted_until` 相当の見直し時期を文書化する。
 - intentional な protocol surface は「残す例外」として別扱いにし、削減対象と混ぜない。
 
@@ -119,11 +119,33 @@
 
 **完了条件**:
 
-- 全 override に reason だけでなく、削除または維持の判断軸がある。
+- 全 override に owner、reason、削除条件または accepted reason がある。
 - 新規 override 追加時に、削除条件または accepted reason を要求できる。
 - 直近 1 つ以上の override が削減され、運用が机上計画で終わっていない。
 
-### Phase 1-C: Event history index write path 最適化
+### Phase 1-C: Roadmap / docs を PR-K・PR #78 後の状態へ同期
+
+**目的**: `docs/implementation_plan.md` を source of truth とする運用を守り、PR-K world-change contract 群と
+architecture fitness guard merge 後の状態を README / context docs / implementation plan に反映する。
+
+**作業**:
+
+- README の Near-Term Priorities と `docs/implementation_plan.md` の PR 状態を棚卸しする。
+- PR-K が「次の mainline milestone」と読める箇所と、PR-K 契約テスト・world-change guardrail が既に入った箇所を
+  分けて記述する。
+- PR #78 architecture fitness guard 相当の成果を、標準 / strict quality gate、複雑度 guard、PR-K 契約テストの
+  現行 guardrail として記録する。
+- `docs/contexts/review.md` や関連 handoff docs が古い前提を持つ場合は、同じ PR で同期する。
+
+**完了条件**:
+
+- `docs/implementation_plan.md`、README、review / implementation context docs の近接優先事項が矛盾しない。
+- 「PR-K そのものが未着手」なのか「PR-K contract / guardrail は merge 済みで、残り slice がある」のかを
+  読み分けられる。
+- architecture fitness guard の標準 / strict quality gate で守られる範囲が、README または architecture docs から
+  辿れる。
+
+### Phase 1-D: Event history index write path 最適化
 
 **目的**: `World.event_records` を canonical store とする設計は維持しつつ、event append 時に query 用派生 index の
 full signature 作成や full rebuild が繰り返される構造を避ける。
@@ -150,28 +172,6 @@ full signature 作成や full rebuild が繰り返される構造を避ける。
 - duplicate ID check は O(1) の `record_ids` で行われる。
 - query 経路では従来通り `by_location` / `by_actor` / `by_year` / `by_month` / `by_kind` が正しい。
 - direct mutation 互換と save/load round-trip の characterization tests が通る。
-
-### Phase 1-D: Roadmap / docs を PR-K・PR #78 後の状態へ同期
-
-**目的**: `docs/implementation_plan.md` を source of truth とする運用を守り、PR-K world-change contract 群と
-architecture fitness guard merge 後の状態を README / context docs / implementation plan に反映する。
-
-**作業**:
-
-- README の Near-Term Priorities と `docs/implementation_plan.md` の PR 状態を棚卸しする。
-- PR-K が「次の mainline milestone」と読める箇所と、PR-K 契約テスト・world-change guardrail が既に入った箇所を
-  分けて記述する。
-- PR #78 architecture fitness guard 相当の成果を、標準 / strict quality gate、複雑度 guard、PR-K 契約テストの
-  現行 guardrail として記録する。
-- `docs/contexts/review.md` や関連 handoff docs が古い前提を持つ場合は、同じ PR で同期する。
-
-**完了条件**:
-
-- `docs/implementation_plan.md`、README、review / implementation context docs の近接優先事項が矛盾しない。
-- 「PR-K そのものが未着手」なのか「PR-K contract / guardrail は merge 済みで、残り slice がある」のかを
-  読み分けられる。
-- architecture fitness guard の標準 / strict quality gate で守られる範囲が、README または architecture docs から
-  辿れる。
 
 ### Phase 1-E: Persistence serializer / hydrator split
 
@@ -317,9 +317,9 @@ self-loop、duplicate route id、duplicate endpoint pair の invariant を colle
 | TR-0 | 本計画の追加 | docs only | 低 |
 | TR-1 | Python version ADR と告知計画 | docs / CI 方針のみ | 低 |
 | TR-2 | Override ledger 追加 | docs / guard metadata | 低〜中 |
-| TR-3 | Event index write path inventory / design | docs / tests | 中 |
-| TR-4 | Event index write path optimization | refactor / tests | 高 |
-| TR-5 | PR-K / PR #78 後の roadmap sync | docs | 中 |
+| TR-3 | PR-K / PR #78 後の roadmap sync | docs | 中 |
+| TR-4 | Event index write path inventory / design | docs / tests | 中 |
+| TR-5 | Event index write path optimization | refactor / tests | 高 |
 | TR-6 | Persistence inventory と fixtures 追加 | docs / tests | 中 |
 | TR-7 | Serializer split | refactor | 中 |
 | TR-8 | Hydrator split | refactor | 高 |
@@ -336,6 +336,7 @@ self-loop、duplicate route id、duplicate endpoint pair の invariant を colle
 ## 5. 計測指標
 
 - `architecture_guard.json` overrides 数と、accepted / reducible / intentional の内訳
+- 各計測指標の owner / 更新頻度 / 記録 PR
 - `world_persistence.py` の complexity override 有無
 - event append 通常 path における `EventHistoryIndex.ensure_current()` / full rebuild 呼び出し回数
 - `advance_months(60)` 相当の seeded path における event index full rebuild 回数
@@ -355,8 +356,8 @@ self-loop、duplicate route id、duplicate endpoint pair の invariant を colle
 実装順を上書きしない。
 
 1. TR-1 と TR-2 を先に行い、version と debt ledger の意思決定基盤を作る。
-2. TR-3 / TR-4 で event index write path を軽くし、最初に効く性能リスクを抑える。
-3. TR-5 で roadmap / docs を PR-K・PR #78 後の状態へ同期する。
+2. TR-3 で roadmap / docs を PR-K・PR #78 後の状態へ同期し、source-of-truth のズレを先に閉じる。
+3. TR-4 / TR-5 で event index write path を軽くし、最初に効く性能リスクを抑える。
 4. TR-6 で persistence の fixture と payload inventory を固める。
 5. TR-7 / TR-8 で serializer / hydrator を分割する。
 6. TR-9 で performance regression guard を入れ、以降の最適化が戻らないようにする。
