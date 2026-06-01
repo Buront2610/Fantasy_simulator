@@ -45,7 +45,7 @@
 | P1 | Python version | Python 3.10 EOL 前に最低要件更新の判断点を置く | CI / 配布 / 型機能の先行リスクを下げる |
 | P1 | Guard override | 複雑度 override に owner と削除条件を持たせる | 例外予算を削減可能な backlog に変える |
 | P1 | Event index write path | append 前後の full rebuild / full signature 作成を避ける | 長期実行時の O(n²) 寄り劣化を抑える |
-| P1 | Roadmap sync | PR-K / PR #78 merge 後の状態へ計画書・README・context docs を同期する | 古い roadmap による設計判断ミスを防ぐ |
+| P1 | Roadmap sync | PR-K / PR #78 merge 後の状態へ計画書・README・context docs を同期済み。以後は PR-K slice ごとに追随更新する | 古い roadmap による設計判断ミスを防ぐ |
 | P1 | Persistence split | hydrate / serialize の横断責務を分割する | save/load regression の事故率を下げる |
 | P2 | Performance regression | rebuild 回数など deterministic な性能予算を監視する | flaky な時間計測なしで性能劣化を検知する |
 | P2 | Semantic events | locale-aware rendering を通常イベントへ広げる | i18n と replay 表示の安定性を上げる |
@@ -317,7 +317,7 @@ self-loop、duplicate route id、duplicate endpoint pair の invariant を colle
 | TR-0 | 本計画の追加 | docs only | 低 |
 | TR-1 | Python version ADR と告知計画 | docs / CI 方針のみ | 低 |
 | TR-2 | Override ledger 追加 | docs / guard metadata | 低〜中 |
-| TR-3 | PR-K / PR #78 後の roadmap sync | docs | 中 |
+| TR-3 | PR-K / PR #78 後の roadmap sync | docs | ✅ 完了。以後は PR-K slice ごとの追随更新 |
 | TR-4 | Event index write path inventory / design | docs / tests | 中 |
 | TR-5 | Event index write path optimization | refactor / tests | 高 |
 | TR-6 | Persistence inventory と fixtures 追加 | docs / tests | 中 |
