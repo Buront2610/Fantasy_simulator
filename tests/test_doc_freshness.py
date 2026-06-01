@@ -59,8 +59,10 @@ def test_pyproject_declares_dev_and_ui_dependency_groups() -> None:
     assert '"flake8>=7.0"' in PYPROJECT_TEXT
     assert '"rich"' in PYPROJECT_TEXT
     assert '"prompt_toolkit"' in PYPROJECT_TEXT
+    assert '"wcwidth>=0.2.13"' in PYPROJECT_TEXT
     assert "uv sync --extra dev" in README_TEXT
     assert 'python -m pip install -e ".[dev]"' in README_TEXT
+    assert "`wcwidth`" in README_TEXT
 
 
 def test_readme_points_to_implementation_plan_for_roadmap() -> None:

@@ -48,6 +48,7 @@ Requirements:
 - Optional UI extras:
   - `rich` (thin Rich render shell)
   - `prompt_toolkit` (input assistance backend)
+  - `wcwidth` (wide-character display width handling)
 
 Install development dependencies:
 

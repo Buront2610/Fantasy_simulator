@@ -35,6 +35,7 @@
 | `docs/architecture.md` | 現行の依存境界、正規データ源、CI で強制する構造制約の要約 | 本書の補助 |
 | `docs/next_version_plan.md` | vNext の目標設計、将来像、To-Be の仕様詳細 | 参照用 |
 | `docs/ui_renovation_plan.md` | UI の段階的刷新方針と技術選定 | 参照用 |
+| `docs/technical_review_action_plan.md` | 技術選定レビュー由来の負債削減計画、PR 候補、完了条件 | 参照用 |
 | `README.md` | 現在の公開サマリー、起動方法、近接優先事項 | 本書と同期 |
 
 ### 2.2 運用ルール
