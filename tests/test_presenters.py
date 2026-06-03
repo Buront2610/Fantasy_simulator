@@ -346,6 +346,39 @@ def test_monthly_report_card_surfaces_world_change_projection_summary():
     assert any("Occupation: Aethoria Capital changed hands." in line for line in lines)
 
 
+def test_monthly_report_card_clusters_world_change_threads_by_category():
+    set_locale("en")
+    world = World()
+    route = world.routes[0]
+    blocked = world.apply_route_blocked_change(route.route_id, True, year=world.year, month=3, day=1)
+    reopened = world.apply_route_blocked_change(route.route_id, False, year=world.year, month=3, day=2)
+    terrain = world.apply_terrain_cell_change(
+        2,
+        2,
+        biome="forest",
+        year=world.year,
+        month=3,
+        day=3,
+        location_id="loc_aethoria_capital",
+    )
+
+    card = build_monthly_report_card_view(world, world.year, 3)
+    lines = ReportPresenter.render_monthly_card(card)
+
+    assert blocked is not None
+    assert reopened is not None
+    assert terrain is not None
+    assert [(thread.category, thread.count) for thread in card.world_change_threads] == [
+        ("route", 2),
+        ("terrain", 1),
+    ]
+    assert card.world_change_threads[0].headline.endswith("reopened.")
+    assert world.location_name(route.from_site_id) in card.world_change_threads[0].location_names
+    assert any("World-change threads" in line for line in lines)
+    assert any("Route: 2 change(s)" in line and "reopened." in line for line in lines)
+    assert any("Terrain: 1 change(s)" in line and "Aethoria Capital" in line for line in lines)
+
+
 def test_monthly_report_card_surfaces_edited_headlines_before_raw_sections():
     set_locale("en")
     world = World()

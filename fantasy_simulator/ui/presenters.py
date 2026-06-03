@@ -202,6 +202,18 @@ class ReportPresenter:
             lines.append(tr("monthly_report_card_memory", items=" | ".join(card.new_memory_items)))
         if card.hot_rumors:
             lines.append(f"  {tr('report_section_rumors')}: {' | '.join(card.hot_rumors)}")
+        if card.world_change_threads:
+            lines.append(f"  {tr('report_section_world_change_threads')}:")
+            lines.extend(
+                tr(
+                    "report_world_change_thread_line",
+                    category=tr(f"world_change_category_{thread.category}"),
+                    count=thread.count,
+                    locations=", ".join(thread.location_names) or tr("report_thread_no_locations"),
+                    headline=thread.headline,
+                )
+                for thread in card.world_change_threads
+            )
         if card.world_changes:
             summary = ", ".join(
                 f"{tr(f'world_change_category_{change.category}')}: {change.count}"
@@ -248,6 +260,18 @@ class ReportPresenter:
                     headline=thread.headline,
                 )
                 for thread in card.location_threads
+            )
+        if card.world_change_threads:
+            lines.append(f"  {tr('report_section_world_change_threads')}:")
+            lines.extend(
+                tr(
+                    "report_world_change_thread_line",
+                    category=tr(f"world_change_category_{thread.category}"),
+                    count=thread.count,
+                    locations=", ".join(thread.location_names) or tr("report_thread_no_locations"),
+                    headline=thread.headline,
+                )
+                for thread in card.world_change_threads
             )
         if card.world_changes:
             summary = ", ".join(

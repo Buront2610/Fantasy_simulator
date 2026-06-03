@@ -45,6 +45,7 @@ __all__ = [
     "ReportHeadlineView",
     "ReportLocationThreadView",
     "ReportWatchedThreadView",
+    "ReportWorldChangeThreadView",
     "RumorSummaryView",
     "WorldChangeEntryView",
     "WorldChangeSummaryView",
@@ -178,6 +179,14 @@ class ReportWatchedThreadView:
 
 
 @dataclass
+class ReportWorldChangeThreadView:
+    category: str
+    count: int
+    headline: str = ""
+    location_names: List[str] = field(default_factory=list)
+
+
+@dataclass
 class MonthlyReportCardView:
     year: int
     month: int
@@ -185,6 +194,7 @@ class MonthlyReportCardView:
     headline_events: List[ReportHeadlineView] = field(default_factory=list)
     location_threads: List[ReportLocationThreadView] = field(default_factory=list)
     watched_threads: List[ReportWatchedThreadView] = field(default_factory=list)
+    world_change_threads: List[ReportWorldChangeThreadView] = field(default_factory=list)
     highlighted_characters: List[str] = field(default_factory=list)
     highlighted_locations: List[str] = field(default_factory=list)
     completed_adventures: List[str] = field(default_factory=list)
@@ -201,6 +211,7 @@ class YearlyReportCardView:
     headline_events: List[ReportHeadlineView] = field(default_factory=list)
     location_threads: List[ReportLocationThreadView] = field(default_factory=list)
     watched_threads: List[ReportWatchedThreadView] = field(default_factory=list)
+    world_change_threads: List[ReportWorldChangeThreadView] = field(default_factory=list)
     highlighted_locations: List[str] = field(default_factory=list)
     world_changes: List[WorldChangeSummaryView] = field(default_factory=list)
     world_change_entries: List[WorldChangeEntryView] = field(default_factory=list)
@@ -304,6 +315,45 @@ def _world_change_views(
             )
         )
     return summaries, entries
+
+
+def _world_change_thread_views(
+    world: "World",
+    entries: List[WorldChangeEntryView],
+    *,
+    limit: int,
+) -> List[ReportWorldChangeThreadView]:
+    grouped: Dict[str, List[WorldChangeEntryView]] = {}
+    for entry in entries:
+        grouped.setdefault(entry.category, []).append(entry)
+
+    views: List[ReportWorldChangeThreadView] = []
+    for category, category_entries in grouped.items():
+        ranked_entries = sorted(
+            category_entries,
+            key=lambda entry: (entry.year, entry.month, entry.day, entry.record_id),
+            reverse=True,
+        )
+        location_names: List[str] = []
+        for entry in ranked_entries:
+            for location_id in entry.location_ids:
+                location_name = _location_name(world, location_id)
+                if location_name not in location_names:
+                    location_names.append(location_name)
+                if len(location_names) >= 3:
+                    break
+            if len(location_names) >= 3:
+                break
+        views.append(
+            ReportWorldChangeThreadView(
+                category=category,
+                count=len(category_entries),
+                headline=ranked_entries[0].text if ranked_entries else "",
+                location_names=location_names,
+            )
+        )
+    views.sort(key=lambda view: (-view.count, view.category))
+    return views[: max(0, limit)]
 
 
 def _headline_category(record: "WorldEventRecord") -> str:
@@ -782,6 +832,7 @@ def build_monthly_report_card_view(world: "World", year: int, month: int) -> Mon
         headline_events=_headline_event_views(world, records, limit=3),
         location_threads=_location_thread_views(world, records, limit=3),
         watched_threads=_watched_thread_views(world, records, limit=3),
+        world_change_threads=_world_change_thread_views(world, world_change_entries, limit=3),
         highlighted_characters=highlights,
         highlighted_locations=location_highlights,
         completed_adventures=completed_adventures[:3],
@@ -814,6 +865,7 @@ def build_yearly_report_card_view(world: "World", year: int) -> YearlyReportCard
         headline_events=_headline_event_views(world, records, limit=5),
         location_threads=_location_thread_views(world, records, limit=5),
         watched_threads=_watched_thread_views(world, records, limit=5),
+        world_change_threads=_world_change_thread_views(world, world_change_entries, limit=5),
         highlighted_locations=highlighted_locations,
         world_changes=world_changes,
         world_change_entries=world_change_entries,
