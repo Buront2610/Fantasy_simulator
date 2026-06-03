@@ -47,7 +47,7 @@
 | P1 | Event index write path | append 前後の full rebuild / full signature 作成を避ける | 長期実行時の O(n²) 寄り劣化を抑える |
 | P1 | Roadmap sync | PR-K / PR #78 merge 後の状態へ計画書・README・context docs を同期済み。以後は PR-K slice ごとに追随更新する | 古い roadmap による設計判断ミスを防ぐ |
 | P1 | Persistence split | hydrate / serialize の横断責務を分割する | save/load regression の事故率を下げる |
-| P2 | Performance regression | rebuild 回数など deterministic な性能予算を監視する | flaky な時間計測なしで性能劣化を検知する |
+| P2 | Performance regression | rebuild 回数など deterministic な性能予算を監視する | ✅ event append / 60-month advance path の full rebuild 退行を deterministic に検知する |
 | P2 | Semantic events | locale-aware rendering を通常イベントへ広げる | i18n と replay 表示の安定性を上げる |
 | P2 | Auto-pause scan | pause reason と context の重複走査をまとめる | 読みやすさと日次 auto-advance の速度を改善する |
 | P2 | Guard tooling | 自前 guard をゲーム固有ルールへ絞る | guard tool 保守コストを抑える |
@@ -214,7 +214,7 @@ full signature 作成や full rebuild が繰り返される構造を避ける。
 
 **完了条件**:
 
-- event append と `advance_months(60)` 相当の path で、index full rebuild 回数が予算化されている。
+- event append と `advance_months(60)` 相当の path で、index full rebuild 回数が予算化されている。✅
 - 性能テストは deterministic counter / mock / spy を優先し、通常 CI で flaky にならない。
 - 性能 guard が canonical event store や save/load 互換を弱めない。
 
@@ -323,7 +323,7 @@ self-loop、duplicate route id、duplicate endpoint pair の invariant を colle
 | TR-6 | Persistence inventory と fixtures 追加 | docs / tests | 中 |
 | TR-7 | Serializer split | refactor | 中 |
 | TR-8 | Hydrator split | refactor | 高 |
-| TR-9 | Performance regression guard | tests / scripts | 中 |
+| TR-9 | Performance regression guard | tests / scripts | ✅ 実装済み。event append と 60-month advance の full index rebuild 回数を deterministic に固定 |
 | TR-10 | Semantic event inventory | docs / tests | 低〜中 |
 | TR-11+ | Event family ごとの semantic rendering 移行 | feature/refactor | 中 |
 | TR-12 | Auto-pause scan consolidation | refactor / tests | 中 |

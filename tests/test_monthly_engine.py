@@ -18,6 +18,7 @@ import random as _random
 
 from fantasy_simulator.character import Character
 from fantasy_simulator.character_creator import CharacterCreator
+from fantasy_simulator.event_models import EventResult
 from fantasy_simulator.events import WorldEventRecord
 from fantasy_simulator.simulator import Simulator
 from fantasy_simulator.world import World
@@ -115,6 +116,54 @@ class TestSeeded12MonthProgressionIsDeterministic:
             sim1.advance_months(1)
             sim2.advance_months(1)
             assert sim1.to_dict() == sim2.to_dict()
+
+
+class TestEventIndexPerformanceGuards:
+    """Deterministic guards for canonical event index write-path regressions."""
+
+    def test_simulator_record_event_does_not_full_rebuild_event_index_on_write(self, monkeypatch):
+        world = _build_seeded_world(121, n_chars=2)
+        sim = Simulator(world, events_per_year=0, seed=121)
+        hero = world.characters[0]
+        result = EventResult(
+            description="A localized compatibility line.",
+            affected_characters=[hero.char_id],
+            event_type="meeting",
+            year=world.year,
+            metadata={
+                "record_id": "evt_index_perf",
+                "summary_key": "events.meeting.summary",
+                "render_params": {"actor": hero.name, "other": "Mira"},
+            },
+        )
+
+        def fail_ensure_current(_records):
+            raise AssertionError("canonical event writes must not rebuild query indexes")
+
+        monkeypatch.setattr(world._event_index, "ensure_current", fail_ensure_current)
+
+        sim._record_event(result, location_id=hero.location_id)  # noqa: SLF001 - performance regression seam
+
+        assert world.event_records[-1].record_id == "evt_index_perf"
+        assert "evt_index_perf" in world._event_index.record_ids
+
+    def test_advance_months_does_not_full_rebuild_event_index_on_write(self, monkeypatch):
+        world = _build_seeded_world(122, n_chars=5)
+        sim = Simulator(world, events_per_year=18, adventure_steps_per_year=0, seed=122)
+        rebuilds = 0
+        original_ensure_current = world._event_index.ensure_current
+
+        def counting_ensure_current(records):
+            nonlocal rebuilds
+            rebuilds += 1
+            return original_ensure_current(records)
+
+        monkeypatch.setattr(world._event_index, "ensure_current", counting_ensure_current)
+
+        sim.advance_months(60)
+
+        assert world.event_records
+        assert rebuilds == 0
 
 
 # ---------------------------------------------------------------------------

@@ -54,7 +54,7 @@ class EventRecorderMixin:
         def should_notify(self, record: WorldEventRecord) -> bool: ...
 
     def _ensure_event_record_id_available(self, record_id: str) -> None:
-        self.world._event_index.ensure_current(self.world.event_records)
+        self.world._event_index.ensure_record_ids_current(self.world.event_records)
         if record_id in self.world._event_index.record_ids:
             raise ValueError(f"Duplicate event record ID: {record_id!r}")
 
