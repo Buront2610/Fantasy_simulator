@@ -1,16 +1,75 @@
 """Presenter/view-model regression tests."""
 
 from fantasy_simulator.i18n import set_locale
+from fantasy_simulator.ui.screen_dashboard import _render_world_dashboard
+from fantasy_simulator.ui.ui_context import UIContext
 from fantasy_simulator.ui.presenters import LanguagePresenter, ReportPresenter
 from fantasy_simulator.ui.view_models import (
     build_monthly_report_card_view,
     build_notification_views,
     build_world_dashboard_view,
+    build_yearly_report_card_view,
 )
 from fantasy_simulator.rumor import Rumor
 from fantasy_simulator.world import CalendarChangeRecord, World
 from fantasy_simulator.events import WorldEventRecord
 from fantasy_simulator.content.setting_bundle import CalendarDefinition, CalendarMonthDefinition
+
+
+class CaptureOutput:
+    def __init__(self):
+        self.lines = []
+
+    def print_line(self, text=""):
+        self.lines.append(text)
+
+    def print_heading(self, text):
+        self.lines.append(text)
+
+    def print_separator(self, char="=", width=62):
+        self.lines.append(char * width)
+
+    def print_error(self, text):
+        self.lines.append(text)
+
+    def print_success(self, text):
+        self.lines.append(text)
+
+    def print_warning(self, text):
+        self.lines.append(text)
+
+    def print_wrapped(self, text, indent=4):
+        self.lines.append(" " * indent + text)
+
+    def print_dim(self, text):
+        self.lines.append(text)
+
+    def print_highlighted(self, text):
+        self.lines.append(text)
+
+    def print_menu(self, prompt, key_label_pairs, default=None):
+        self.lines.append(prompt)
+
+    def format_status(self, text, positive):
+        return text
+
+    def print_panel(self, title, text):
+        self.lines.append(title)
+        self.lines.append(text)
+
+    def get_terminal_width(self):
+        return 80
+
+
+class NoopInput:
+    def read_line(self, prompt):
+        return ""
+
+    def read_menu_key(self, key_label_pairs, default=None):
+        return default or ""
+
+    def pause(self, message=""):
+        return None
 
 
 def test_language_presenter_surfaces_runtime_lore_details_concisely():
@@ -278,7 +337,12 @@ def test_monthly_report_card_surfaces_world_change_projection_summary():
         ("occupation", 1),
         ("route", 1),
     ]
+    assert [(item.record_id, item.category) for item in card.world_change_entries] == [
+        (world.event_records[0].record_id, "route"),
+        ("rec_occupation", "occupation"),
+    ]
     assert any("World News" in line and "Occupation: 1" in line and "Route: 1" in line for line in lines)
+    assert any("Occupation: Aethoria Capital changed hands." in line for line in lines)
 
 
 def test_world_dashboard_major_events_are_severity_first():
@@ -350,6 +414,146 @@ def test_world_dashboard_hot_rumors_are_spread_and_heat_first():
     assert dashboard.hot_rumors[0].startswith("Widespread forest rumor.")
 
 
+def test_world_dashboard_surfaces_active_wars_until_war_ends():
+    set_locale("en")
+    world = World()
+    world.apply_war_declaration(
+        "stormwatch_wardens",
+        "silverbrook_merchant_league",
+        location_ids=("loc_aethoria_capital", "loc_silverbrook"),
+        year=world.year,
+        month=2,
+    )
+
+    dashboard = build_world_dashboard_view(world, current_month=2)
+
+    assert [item.text for item in dashboard.active_wars] == [
+        "Stormwatch Wardens declared war on Silverbrook Merchant League."
+    ]
+
+    world.apply_war_ended(
+        "silverbrook_merchant_league",
+        "stormwatch_wardens",
+        location_ids=("loc_silverbrook", "loc_aethoria_capital"),
+        year=world.year,
+        month=3,
+    )
+    dashboard = build_world_dashboard_view(world, current_month=3)
+
+    assert dashboard.active_wars == []
+
+
+def test_world_dashboard_surfaces_current_era_and_civilization_phase():
+    set_locale("en")
+    world = World()
+    world.apply_era_shift(
+        "age_of_reckoning",
+        authored_era_keys={"age_of_embers", "age_of_reckoning"},
+        year=world.year,
+        month=2,
+    )
+    world.apply_civilization_phase_drift(
+        "crisis",
+        score_deltas={"safety": -10},
+        year=world.year,
+        month=3,
+    )
+
+    dashboard = build_world_dashboard_view(world, current_month=3)
+
+    assert dashboard.era_status is not None
+    assert dashboard.era_status.era_id == "age_of_reckoning"
+    assert dashboard.era_status.civilization_phase == "crisis"
+    assert dashboard.era_status.text == "era: age_of_reckoning | civilization: crisis"
+
+
+def test_world_dashboard_surfaces_current_occupations_until_release():
+    set_locale("en")
+    world = World()
+    occupied = world.apply_controlling_faction_change(
+        "loc_aethoria_capital",
+        "stormwatch_wardens",
+        year=world.year,
+        month=2,
+    )
+
+    dashboard = build_world_dashboard_view(world, current_month=2)
+
+    assert occupied is not None
+    assert [item.record_id for item in dashboard.current_occupations] == [occupied.record_id]
+    assert dashboard.current_occupations[0].location_id == "loc_aethoria_capital"
+    assert dashboard.current_occupations[0].controlling_faction_id == "stormwatch_wardens"
+    assert dashboard.current_occupations[0].text == (
+        "Aethoria Capital changed controlling faction from none to Stormwatch Wardens."
+    )
+
+    world.apply_controlling_faction_change(
+        "loc_aethoria_capital",
+        None,
+        year=world.year,
+        month=3,
+    )
+    dashboard = build_world_dashboard_view(world, current_month=3)
+
+    assert dashboard.current_occupations == []
+
+
+def test_world_dashboard_surfaces_current_route_closures_until_reopen():
+    set_locale("en")
+    world = World()
+    route = world.routes[0]
+    blocked = world.apply_route_blocked_change(route.route_id, True, year=world.year, month=2)
+
+    dashboard = build_world_dashboard_view(world, current_month=2)
+
+    assert blocked is not None
+    assert [item.route_id for item in dashboard.current_route_closures] == [route.route_id]
+    assert [item.record_id for item in dashboard.current_route_closures] == [blocked.record_id]
+    assert dashboard.current_route_closures[0].from_location_id == route.from_site_id
+    assert dashboard.current_route_closures[0].to_location_id == route.to_site_id
+    assert dashboard.current_route_closures[0].text == (
+        f"The route from {world.location_name(route.from_site_id)} "
+        f"to {world.location_name(route.to_site_id)} was blocked."
+    )
+
+    world.apply_route_blocked_change(route.route_id, False, year=world.year, month=3)
+    dashboard = build_world_dashboard_view(world, current_month=3)
+
+    assert dashboard.current_route_closures == []
+
+
+def test_world_dashboard_surfaces_recent_world_change_entries():
+    set_locale("en")
+    world = World()
+    route = world.routes[0]
+    blocked = world.apply_route_blocked_change(route.route_id, True, year=world.year, month=2)
+    declared = world.apply_war_declaration(
+        "stormwatch_wardens",
+        "silverbrook_merchant_league",
+        year=world.year,
+        month=3,
+    )
+
+    dashboard = build_world_dashboard_view(world, current_month=3)
+
+    assert blocked is not None
+    assert declared is not None
+    assert [(item.record_id, item.category) for item in dashboard.world_change_entries] == [
+        (blocked.record_id, "route"),
+        (declared.record_id, "war"),
+    ]
+
+    output = CaptureOutput()
+    _render_world_dashboard(dashboard, ctx=UIContext(inp=NoopInput(), out=output))
+
+    assert "  Recent world changes" in output.lines
+    assert any("Route: " in line and "was blocked." in line for line in output.lines)
+    assert any(
+        "War: " in line and "Stormwatch Wardens declared war on Silverbrook Merchant League." in line
+        for line in output.lines
+    )
+
+
 def test_monthly_report_card_renders_world_change_category_display_labels():
     set_locale("en")
     world = World()
@@ -374,3 +578,32 @@ def test_monthly_report_card_renders_world_change_category_display_labels():
     assert "Route: 1" in world_news_line
     assert "occupation: 1" not in world_news_line
     assert "route: 1" not in world_news_line
+
+
+def test_yearly_report_card_surfaces_world_change_projection_details():
+    set_locale("en")
+    world = World()
+    route = world.routes[0]
+    world.apply_route_blocked_change(route.route_id, True, month=3)
+    world.apply_war_declaration(
+        "stormwatch_wardens",
+        "silverbrook_merchant_league",
+        year=world.year,
+        month=4,
+        day=2,
+    )
+
+    card = build_yearly_report_card_view(world, world.year)
+    lines = ReportPresenter.render_yearly_card(card)
+
+    assert [(item.category, item.count) for item in card.world_changes] == [
+        ("route", 1),
+        ("war", 1),
+    ]
+    assert [item.category for item in card.world_change_entries] == ["route", "war"]
+    assert any("Yearly highlights" in line for line in lines)
+    assert any("World News" in line and "Route: 1" in line and "War: 1" in line for line in lines)
+    assert any(
+        "War:" in line and "Stormwatch Wardens declared war on Silverbrook Merchant League." in line
+        for line in lines
+    )

@@ -80,6 +80,7 @@ def render_world_overview(info: MapRenderInfo) -> str:
     lines.append(f"      m = {tr('map_legend_memorial')}")
     lines.append(f"      a = {tr('map_legend_alias')}")
     lines.append(f"      + = {tr('map_legend_recent_death')}")
+    lines.append(f"      w = {tr('map_legend_world_change')}")
     lines.append(f"      * = {tr('map_legend_highlighted')}")
 
     return "\n".join(lines)

@@ -18,7 +18,8 @@ from .world_event_api import WorldEventMixin
 from .world_event_log_api import WorldEventLogMixin
 from .world_language_api import WorldLanguageMixin
 from .world_actor_api import WorldActorMixin
-from .world_memory_api import WorldMemoryMixin
+from .world_era_api import WorldEraMixin
+from .world_memory_api import WorldConflictMixin, WorldLocationLookupMixin, WorldMemoryMixin
 from .world_structure_api import WorldStructureMixin
 from .world_topology_api import WorldTopologyMixin
 from .world_bundle_transition import (
@@ -79,7 +80,7 @@ class World(
     WorldStructureMixin,
     WorldTopologyMixin,
     WorldActorMixin,
-    WorldMemoryMixin,
+    WorldConflictMixin, WorldEraMixin, WorldMemoryMixin, WorldLocationLookupMixin,
     WorldLanguageMixin,
     WorldCalendarMixin,
     WorldEventMixin,

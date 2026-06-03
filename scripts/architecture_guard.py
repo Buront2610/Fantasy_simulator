@@ -950,6 +950,12 @@ def _validate_complexity_override(override: Mapping[str, Any]) -> None:
     reason = override.get("reason")
     if not isinstance(reason, str) or not reason.strip():
         raise TypeError(f"complexity override for {target!r} requires a non-empty reason")
+    owner = override.get("owner")
+    if not isinstance(owner, str) or not owner.strip():
+        raise TypeError(f"complexity override for {target!r} requires a non-empty owner")
+    removal_condition = override.get("removal_condition")
+    if not isinstance(removal_condition, str) or not removal_condition.strip():
+        raise TypeError(f"complexity override for {target!r} requires a non-empty removal_condition")
     for key in BUDGET_OVERRIDE_KEYS:
         if key in override:
             _optional_int(override[key])

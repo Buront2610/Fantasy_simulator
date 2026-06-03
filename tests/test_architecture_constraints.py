@@ -239,6 +239,7 @@ def test_direct_event_log_access_stays_in_compatibility_layers() -> None:
     allowed = {
         PACKAGE_ROOT / "world.py",
         PACKAGE_ROOT / "world_persistence.py",
+        PACKAGE_ROOT / "world_persistence_hydrator.py",
         PACKAGE_ROOT / "simulation" / "queries.py",
     }
     for path in _production_files():
@@ -365,7 +366,7 @@ def test_character_max_age_reads_stay_in_lifecycle_compatibility_fallback() -> N
 
 def test_display_event_log_restore_helper_stays_load_only() -> None:
     allowed = {
-        PACKAGE_ROOT / "world_persistence.py",
+        PACKAGE_ROOT / "world_persistence_hydrator.py",
     }
 
     for path in _production_files():
@@ -376,6 +377,15 @@ def test_display_event_log_restore_helper_stays_load_only() -> None:
             )
             continue
         assert calls == [], f"event_log load restore helper escaped load path in {path}: {calls}"
+
+
+def test_world_persistence_facade_only_reexports_split_modules() -> None:
+    text = (PACKAGE_ROOT / "world_persistence.py").read_text(encoding="utf-8")
+
+    assert "def serialize_world_state" not in text
+    assert "def hydrate_world_state" not in text
+    assert "from .world_persistence_hydrator import hydrate_world_state" in text
+    assert "from .world_persistence_serializer import serialize_world_state" in text
 
 
 def test_td3_split_modules_import_event_models_directly_not_events_facade() -> None:

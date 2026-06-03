@@ -109,6 +109,14 @@ this precedence:
   duplicate coordinates, and no out-of-bounds cells. When no snapshot is present,
   load replays canonical `terrain_cell_mutated` records over the derived bundle
   terrain in canonical event order.
+- Simulator-owned `world_changes_per_year` is a separate natural world-change
+  generation budget for canonical PR-K slices such as route disruption,
+  location-linked terrain mutation, natural era shift, civilization drift,
+  natural rename, war open/end, and war-driven location-control shift. It must
+  round-trip independently from `events_per_year` so ordinary character-event
+  density remains comparable across saves. Natural generation should try other
+  PR-K generators within the same budget slot when the initially selected
+  generator cannot produce a valid change for the current world state.
 - Bundle-backed unmodified terrain must stay compact. If the runtime
   `terrain_map` still matches the bundle-derived terrain, new saves omit
   `terrain_map`. If terrain differs but canonical `terrain_cell_mutated` records
@@ -116,16 +124,29 @@ this precedence:
   terrain edits, incompatible grids, malformed terrain records, or any current
   terrain state not reproducible from canonical records fall back to the full
   validated snapshot.
-- Era and civilization projections are headless pre-persistence for the current
-  PR-K guardrail. Canonical `era_shifted` and
-  `civilization_phase_drifted` records may exist, but world-level era runtime
-  fields such as `world.era_key`, `world.civilization_phase`,
-  `world.world_scores`, or `world.era_runtime` must not be treated as durable
-  save fields until a later schema policy is documented. Era-shift commands
-  change the era key; same-era phase movement is represented by civilization
-  drift records. If stale era/civilization snapshot fields appear in a payload,
-  `world.event_records` wins; when no canonical records exist, projections
-  return unknown state rather than trusting the stale snapshot. See
+- Route block/reopen records may project endpoint pressure into ordinary saved
+  `LocationState` fields and live traces. This does not add a route runtime
+  save shape; the route blocked flag remains route state, and the local pressure
+  is preserved through the existing location-state serialization contract.
+- War declaration/end records may project local pressure into ordinary saved
+  `LocationState` fields and live traces. Active faction-war state remains a
+  read model derived from canonical `war_declared` / `war_ended` records rather
+  than a durable runtime save field.
+- Location rename records may project local attention pressure into ordinary
+  saved `LocationState` fields and live traces. The canonical name and aliases
+  remain the durable identity state; the projected attention pressure uses the
+  existing location-state serialization contract.
+- Era runtime projections are headless pre-persistence for the current PR-K
+  guardrail. Canonical `era_shifted` and `civilization_phase_drifted` records
+  may exist, and era/civilization pressure may be projected into saved
+  `LocationState` fields, but world-level era runtime fields such as
+  `world.era_key`, `world.civilization_phase`, `world.world_scores`, or
+  `world.era_runtime` must not be treated as durable save fields until a later
+  schema policy is documented. Era-shift commands change the era key; same-era
+  phase movement is represented by civilization drift records. If stale
+  era/civilization snapshot fields appear in a payload, `world.event_records`
+  wins; when no canonical records exist, projections return unknown state
+  rather than trusting the stale snapshot. See
   `docs/adr/0003-era-civilization-runtime-persistence.md`.
 - Non-bundle serialized topology is explicit. It must validate site references,
   route endpoint references, duplicate route IDs, duplicate route pairs, and

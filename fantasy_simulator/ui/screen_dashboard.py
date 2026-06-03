@@ -35,12 +35,34 @@ def _render_world_dashboard(view: WorldDashboardView, ctx: UIContext) -> None:
     _render_section(tr("dashboard_watched_actors"), view.watched_actors, ctx=ctx)
     _render_section(tr("dashboard_hot_rumors"), view.hot_rumors, ctx=ctx)
     _render_section(tr("dashboard_dangerous_locations"), view.dangerous_locations, ctx=ctx)
+    if view.era_status is not None:
+        _render_section(tr("dashboard_era_status"), [view.era_status.text], ctx=ctx)
+    if view.current_route_closures:
+        _render_section(
+            tr("dashboard_current_route_closures"),
+            [item.text for item in view.current_route_closures],
+            ctx=ctx,
+        )
+    if view.current_occupations:
+        _render_section(
+            tr("dashboard_current_occupations"),
+            [item.text for item in view.current_occupations],
+            ctx=ctx,
+        )
+    if view.active_wars:
+        _render_section(tr("dashboard_active_wars"), [item.text for item in view.active_wars], ctx=ctx)
     if view.world_changes:
         lines = [
             f"{tr(f'world_change_category_{item.category}')}: {item.count}"
             for item in view.world_changes
         ]
         _render_section(tr("dashboard_world_changes"), lines, ctx=ctx)
+    if view.world_change_entries:
+        lines = [
+            f"{tr(f'world_change_category_{item.category}')}: {item.text}"
+            for item in view.world_change_entries[:5]
+        ]
+        _render_section(tr("dashboard_recent_world_changes"), lines, ctx=ctx)
 
 
 def _render_section(title: str, lines: list[str], ctx: UIContext) -> None:

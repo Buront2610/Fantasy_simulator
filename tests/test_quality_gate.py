@@ -36,6 +36,7 @@ EXPECTED_STANDARD_TARGETS = [
     "tests/test_war_map_projection.py",
     "tests/test_world_change_report_projection.py",
     "tests/test_world_change_properties.py",
+    "tests/test_natural_world_changes.py",
     "tests/test_harness_scenarios.py",
     "tests/test_map_visible_harness.py",
 ]

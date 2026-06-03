@@ -215,6 +215,7 @@ class TestDailyPhasePipeline:
             "injury_recovery",
             "adventure",
             "random_events",
+            "world_changes",
         ]
         assert [phase.kind.value for phase in sim._day_phase_plan(mid_month_day)] == [
             "dying_resolution",
@@ -222,6 +223,7 @@ class TestDailyPhasePipeline:
             "injury_recovery",
             "adventure",
             "random_events",
+            "world_changes",
         ]
         assert [phase.kind.value for phase in sim._day_phase_plan(last_day)] == [
             "dying_resolution",
@@ -229,6 +231,7 @@ class TestDailyPhasePipeline:
             "injury_recovery",
             "adventure",
             "random_events",
+            "world_changes",
             "month_end",
         ]
 

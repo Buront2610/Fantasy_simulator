@@ -60,12 +60,30 @@ class OccupationEntry:
 
 
 @dataclass(frozen=True)
+class WarRelationshipEntry:
+    """An active faction war relationship derived from event history."""
+
+    record_id: str
+    aggressor_faction_id: str
+    target_faction_id: str
+    faction_ids: tuple[str, str]
+    location_ids: tuple[str, ...]
+    year: int
+    month: int
+    day: int
+    description: str
+    summary_key: str = ""
+    render_params: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class WarMapProjection:
     """Read model for war/conflict events and current occupation state."""
 
     events: tuple[WarMapEventEntry, ...]
     occupation_history: tuple[OccupationEntry, ...]
     current_occupations: tuple[OccupationEntry, ...]
+    active_wars: tuple[WarRelationshipEntry, ...]
     affected_location_ids: tuple[str, ...]
     faction_ids: tuple[str, ...]
 
@@ -181,6 +199,40 @@ def _occupation_entry(record: WorldEventRecord) -> OccupationEntry | None:
     )
 
 
+def _war_pair(record: WorldEventRecord) -> tuple[str, str] | None:
+    aggressor = string_param(record, "aggressor_faction_id")
+    target = string_param(record, "target_faction_id")
+    if aggressor is None or target is None:
+        faction_ids = _record_faction_ids(record)
+        if len(faction_ids) >= 2:
+            aggressor, target = faction_ids[0], faction_ids[1]
+    if aggressor is None or target is None or aggressor == target:
+        return None
+    first, second = sorted((aggressor, target))
+    return first, second
+
+
+def _war_relationship_entry(record: WorldEventRecord) -> WarRelationshipEntry | None:
+    pair = _war_pair(record)
+    if pair is None:
+        return None
+    aggressor = string_param(record, "aggressor_faction_id") or pair[0]
+    target = string_param(record, "target_faction_id") or pair[1]
+    return WarRelationshipEntry(
+        record_id=record.record_id,
+        aggressor_faction_id=aggressor,
+        target_faction_id=target,
+        faction_ids=(pair[0], pair[1]),
+        location_ids=record_location_ids(record),
+        year=record.year,
+        month=record.month,
+        day=record.day,
+        description=record.description,
+        summary_key=record.summary_key,
+        render_params=semantic_render_params(record),
+    )
+
+
 def build_war_map_projection(
     *,
     event_records: Iterable[WorldEventRecord],
@@ -189,6 +241,7 @@ def build_war_map_projection(
     events: list[WarMapEventEntry] = []
     occupation_history: list[OccupationEntry] = []
     current_by_location: dict[str, OccupationEntry] = {}
+    active_wars_by_pair: dict[tuple[str, str], WarRelationshipEntry] = {}
     affected_location_ids: list[str] = []
     faction_ids: list[str] = []
 
@@ -218,6 +271,15 @@ def build_war_map_projection(
             )
         )
 
+        if record.kind == "war_declared":
+            relationship = _war_relationship_entry(record)
+            if relationship is not None:
+                active_wars_by_pair[relationship.faction_ids] = relationship
+        elif record.kind == "war_ended":
+            pair = _war_pair(record)
+            if pair is not None:
+                active_wars_by_pair.pop(pair, None)
+
         occupation = _occupation_entry(record)
         if occupation is None:
             continue
@@ -234,6 +296,7 @@ def build_war_map_projection(
         events=tuple(events),
         occupation_history=tuple(occupation_history),
         current_occupations=tuple(current_by_location[location_id] for location_id in sorted(current_by_location)),
+        active_wars=tuple(active_wars_by_pair[pair] for pair in sorted(active_wars_by_pair)),
         affected_location_ids=tuple(affected_location_ids),
         faction_ids=tuple(faction_ids),
     )

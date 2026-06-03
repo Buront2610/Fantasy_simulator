@@ -97,13 +97,21 @@ class TestI18n:
         set_locale("ja")
         assert tr("auto_pause_subreasons") == "重要な理由:"
         assert tr("auto_pause_recommendations") == "推奨確認:"
+        assert tr("auto_pause_context_actor", actor="Mira") == "停止要因: Mira"
+        assert tr("auto_pause_context_location", location="Capital") == "停止地点: Capital"
         assert "Mira" in tr("auto_pause_subreason_actor_in_danger", actor="Mira", location="Capital")
         assert "Mira" in tr("auto_pause_recommendation_inspect_character", actor="Mira", location="Capital")
+        assert "Capital" in tr("auto_pause_subreason_world_change_notification", actor="", location="Capital")
+        assert tr("auto_pause_recommendation_review_world_dashboard", actor="", location="Capital")
         set_locale("en")
         assert tr("auto_pause_subreasons") == "Why this matters:"
         assert tr("auto_pause_recommendations") == "Recommended checks:"
+        assert tr("auto_pause_context_actor", actor="Mira") == "Cause context: Mira"
+        assert tr("auto_pause_context_location", location="Capital") == "Cause context: Capital"
         assert "Mira" in tr("auto_pause_subreason_actor_in_danger", actor="Mira", location="Capital")
         assert "Mira" in tr("auto_pause_recommendation_inspect_character", actor="Mira", location="Capital")
+        assert "Capital" in tr("auto_pause_subreason_world_change_notification", actor="", location="Capital")
+        assert tr("auto_pause_recommendation_review_world_dashboard", actor="", location="Capital")
 
     def test_rumor_board_templates_render(self):
         set_locale("ja")

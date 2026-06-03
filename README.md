@@ -289,8 +289,54 @@ supports:
 - Treat the TD-1〜TD-4 technical-debt backlog as closed: canonical event-store
   adapters, bundle-owned world seeds, responsibility splits, and guardrail/doc
   sync now have tests around their intended boundaries.
-- PR-J's first formal `SettingBundle` authoring pass is complete; the next
-  mainline milestone is dynamic world-change work (PR-K).
+- PR-J's first formal `SettingBundle` authoring pass is complete. PR-K is the
+  active mainline milestone: K0 guardrail slices for route/rename/occupation/
+  terrain/era projection have started, and the remaining work is to finish K0
+  characterization, typed-ID ratchet, persistence policy gaps, and
+  user-visible world-change integration.
+- Treat the technical-review stream as PR-K support work: Python-version ADR,
+  architecture override ledger metadata, and the v8 serializer/hydrator split
+  reduce risk without changing the save JSON shape prematurely. The canonical
+  event write path keeps duplicate-detection record IDs current without
+  rebuilding the full mutation-sensitive event signature on each append, while
+  read-side indexes still rebuild on demand. Ordinary activity, journey,
+  lifecycle, health, relationship, and combat replay coverage now share the
+  same semantic-record direction as auto-pause candidate collection;
+  notification thresholds also read canonical actor ids plus semantic actor-id
+  metadata.
+  PR-K command boundaries normalize location, route, faction, event, era, and
+  terrain-linked IDs before domain events become records, and war declaration,
+  war ending, plus era/civilization APIs round-trip through canonical records
+  without new runtime save fields. Era shifts and civilization score drift now
+  also project into saved location-state pressure from canonical records.
+  Monthly and yearly report cards now
+  surface concrete world-change entries from the same canonical projections;
+  the observer dashboard also includes a recent world-change entry list, and
+  region/atlas maps mark sites touched by recent world-change records.
+  Simulations now have a separate `world_changes_per_year` budget for natural
+  route disruptions/reopenings, location-linked terrain mutations, and
+  civilization drift, natural era shifts, natural official renames, plus faction-war
+  openings/endings and war-driven location-control shifts; CLI-created runs
+  enable this at 1/year without mixing it into ordinary character-event
+  density. If a selected natural generator cannot produce a valid change in
+  the current world state, the same budget slot falls back to another PR-K
+  generator before giving up. Natural world-change records also pass through
+  the notification threshold path, so they surface in pending notifications
+  and can stop auto-advance with a world-change pause reason instead of only
+  appearing later in reports or maps.
+  Route block/reopen records now apply deterministic pressure to both endpoint
+  locations, so travel disruption reaches state, trace, map, and save/load
+  views. The dashboard now also surfaces currently blocked routes from the
+  route-status projection until they reopen.
+  War declarations and war endings now apply deterministic local pressure to
+  affected sites while preserving the canonical-record projection/report path,
+  and the war-map projection derives active faction wars from open/close
+  records for dashboard visibility. The dashboard also surfaces current
+  occupation/control state and current era/civilization phase from canonical
+  projections. Controlling faction changes and location renames likewise adjust
+  local pressure and traces after canonical recording succeeds, and
+  location-linked terrain mutations now push local terrain pressure into state,
+  trace, map, and save/load views.
 - Treat worldgen PoC work as parallel technical validation, not the next
   blocking mainline milestone.
 

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Container, Iterable, Mapping, Protocol
+from typing import Callable, Container, Iterable, Mapping, MutableMapping, Protocol, TypeVar
 
-from fantasy_simulator.ids import FactionId, RouteId
+from fantasy_simulator.ids import EraKey, EventRecordId, FactionId, LocationId, RouteId
 
 from .commands import (
+    DeclareWarCommand,
     DriftCivilizationPhaseCommand,
+    EndWarCommand,
     RenameLocationCommand,
     SetLocationControllingFactionCommand,
     SetRouteBlockedCommand,
@@ -55,15 +57,39 @@ class SupportsTerrainMapState(Protocol):
 class SupportsEraRuntimeState(Protocol):
     era_key: str
     civilization_phase: str
-    world_scores: Mapping[str, int]
+    world_scores: MutableMapping[str, int]
+
+
+TId = TypeVar("TId")
+
+
+def normalize_required_id(value: object, *, field_name: str, id_type: Callable[[str], TId]) -> TId:
+    """Normalize a required typed ID at a PR-K command boundary."""
+    normalized = str(value).strip()
+    if not normalized:
+        raise ValueError(f"{field_name} must not be blank")
+    return id_type(normalized)
+
+
+def normalize_optional_id(
+    value: object | None,
+    *,
+    id_type: Callable[[str], TId],
+) -> TId | None:
+    """Normalize an optional typed ID, treating blank values as absent."""
+    if value is None:
+        return None
+    normalized = str(value).strip()
+    return id_type(normalized) if normalized else None
 
 
 def route_by_id(routes: Iterable[SupportsRouteStatus], *, route_id: RouteId) -> SupportsRouteStatus:
     """Return a route by ID or raise ``KeyError``."""
+    normalized_route_id = normalize_required_id(route_id, field_name="route_id", id_type=RouteId)
     for route in routes:
-        if route.route_id == route_id:
+        if route.route_id == normalized_route_id:
             return route
-    raise KeyError(str(route_id))
+    raise KeyError(str(normalized_route_id))
 
 
 def validate_set_route_blocked_command(
@@ -92,9 +118,10 @@ def validate_rename_location_command(
     location_name_index: Mapping[str, SupportsLocationNameState],
 ) -> tuple[SupportsLocationNameState, str]:
     """Validate that a location rename command can be evaluated."""
-    location = location_index.get(str(command.location_id))
+    location_id = normalize_required_id(command.location_id, field_name="location_id", id_type=LocationId)
+    location = location_index.get(str(location_id))
     if location is None:
-        raise KeyError(str(command.location_id))
+        raise KeyError(str(location_id))
     normalized_name = command.new_name.strip()
     if not normalized_name:
         raise ValueError("new_name must not be blank")
@@ -106,10 +133,63 @@ def validate_rename_location_command(
 
 def normalize_faction_id(faction_id: FactionId | str | None) -> FactionId | None:
     """Return a normalized faction ID, with blank values treated as no faction."""
-    if faction_id is None:
-        return None
-    normalized = str(faction_id).strip()
-    return FactionId(normalized) if normalized else None
+    return normalize_optional_id(faction_id, id_type=FactionId)
+
+
+def normalize_event_record_id(event_record_id: EventRecordId | str | None) -> EventRecordId | None:
+    """Return a normalized event-record ID, with blank values treated as absent."""
+    return normalize_optional_id(event_record_id, id_type=EventRecordId)
+
+
+def validate_declare_war_command(
+    command: DeclareWarCommand,
+    *,
+    known_faction_ids: Container[str],
+    location_ids: Container[str],
+) -> tuple[FactionId, FactionId, tuple[LocationId, ...]]:
+    """Validate a headless war declaration command."""
+    aggressor = normalize_faction_id(command.aggressor_faction_id)
+    target = normalize_faction_id(command.target_faction_id)
+    if aggressor is None:
+        raise ValueError("aggressor_faction_id must not be blank")
+    if target is None:
+        raise ValueError("target_faction_id must not be blank")
+    for faction_id in (aggressor, target):
+        if str(faction_id) not in known_faction_ids:
+            raise ValueError(f"unknown faction id: {faction_id}")
+
+    normalized_locations: list[LocationId] = []
+    for location_id in command.location_ids:
+        normalized = normalize_required_id(location_id, field_name="location_ids", id_type=LocationId)
+        if str(normalized) not in location_ids:
+            raise ValueError(f"unknown location id: {normalized}")
+        if normalized not in normalized_locations:
+            normalized_locations.append(normalized)
+    return aggressor, target, tuple(normalized_locations)
+
+
+def validate_end_war_command(
+    command: EndWarCommand,
+    *,
+    known_faction_ids: Container[str],
+    location_ids: Container[str],
+) -> tuple[FactionId, FactionId, tuple[LocationId, ...]]:
+    """Validate a headless war-ending command."""
+    return validate_declare_war_command(
+        DeclareWarCommand(
+            aggressor_faction_id=command.aggressor_faction_id,
+            target_faction_id=command.target_faction_id,
+            location_ids=command.location_ids,
+            year=command.year,
+            month=command.month,
+            day=command.day,
+            calendar_key=command.calendar_key,
+            cause_key=command.cause_key,
+            cause_event_id=command.cause_event_id,
+        ),
+        known_faction_ids=known_faction_ids,
+        location_ids=location_ids,
+    )
 
 
 def validate_set_location_controlling_faction_command(
@@ -119,9 +199,10 @@ def validate_set_location_controlling_faction_command(
     known_faction_ids: Container[str] | None = None,
 ) -> tuple[SupportsLocationOccupationState, FactionId | None]:
     """Validate that a location occupation/control command can be evaluated."""
-    location = location_index.get(str(command.location_id))
+    location_id = normalize_required_id(command.location_id, field_name="location_id", id_type=LocationId)
+    location = location_index.get(str(location_id))
     if location is None:
-        raise KeyError(str(command.location_id))
+        raise KeyError(str(location_id))
     normalized_faction_id = normalize_faction_id(command.faction_id)
     if (
         normalized_faction_id is not None
@@ -197,17 +278,15 @@ def validate_shift_era_command(
     """Validate that an era shift references known authored era definitions."""
     known_eras = _known_era_keys(authored_era_keys)
     current_era_key = str(era_runtime.era_key).strip()
-    requested_era_key = str(command.new_era_key).strip()
+    requested_era_key = normalize_required_id(command.new_era_key, field_name="new_era_key", id_type=EraKey)
     if not current_era_key:
         raise ValueError("runtime era must not be blank")
-    if not requested_era_key:
-        raise ValueError("new_era_key must not be blank")
     if current_era_key not in known_eras:
         raise ValueError(f"runtime era references unknown era definition: {current_era_key}")
-    if requested_era_key not in known_eras:
+    if str(requested_era_key) not in known_eras:
         raise ValueError(f"new era references unknown era definition: {requested_era_key}")
     validate_civilization_phase(era_runtime.civilization_phase)
-    return requested_era_key, validate_civilization_phase(command.new_civilization_phase)
+    return str(requested_era_key), validate_civilization_phase(command.new_civilization_phase)
 
 
 def validate_drift_civilization_phase_command(

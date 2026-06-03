@@ -147,6 +147,16 @@ class TestOverlaySuffix(unittest.TestCase):
         )
         self.assertEqual(_overlay_suffix(cell), "!$?ma+")
 
+    def test_world_change_overlay(self) -> None:
+        cell = MapCellInfo(
+            location_id="x", canonical_name="X", region_type="city",
+            icon="@", safety_label="ok", danger=10, traffic_indicator="",
+            population=0, x=0, y=0, danger_band="low",
+            recent_world_change_count=1,
+        )
+        self.assertEqual(_overlay_suffix(cell), "w")
+        self.assertEqual(_atlas_overlay_suffix(cell), "w")
+
     def test_traffic_high_only(self) -> None:
         cell = MapCellInfo(
             location_id="x", canonical_name="X", region_type="city",
@@ -1350,6 +1360,41 @@ class TestObservationSnapshots(unittest.TestCase):
         )
         self.assertEqual(output, expected)
         set_locale("en")
+
+
+class TestWorldChangeMapObservation(unittest.TestCase):
+    """PR-K dynamic world changes are visible in map view models and renderers."""
+
+    def test_map_info_marks_locations_touched_by_world_change_records(self) -> None:
+        set_locale("en")
+        world = World()
+        route = world.routes[0]
+        world.apply_route_blocked_change(route.route_id, True, month=1)
+
+        info = build_map_info(world)
+        from_cell = next(cell for cell in info.cells.values() if cell.location_id == route.from_site_id)
+        to_cell = next(cell for cell in info.cells.values() if cell.location_id == route.to_site_id)
+
+        self.assertEqual(from_cell.recent_world_change_count, 1)
+        self.assertEqual(to_cell.recent_world_change_count, 1)
+        self.assertEqual(from_cell.recent_world_change_categories, ("route",))
+        self.assertIn("w", _overlay_suffix(from_cell))
+
+    def test_region_focus_and_legends_surface_world_change_overlay(self) -> None:
+        set_locale("en")
+        world = World()
+        route = world.routes[0]
+        world.apply_route_blocked_change(route.route_id, True, month=1)
+        info = build_map_info(world)
+
+        region = render_region_map(info, route.from_site_id, radius=2)
+        overview = render_world_overview(info)
+        atlas = render_atlas_overview(info)
+
+        self.assertIn("World change:", region)
+        self.assertIn("Route", region)
+        self.assertIn("w = Recent world change", overview)
+        self.assertIn("w=Recent world change", atlas)
 
 
 class TestAtlasLabeledSites(unittest.TestCase):

@@ -36,6 +36,16 @@ class RumorReportEntry:
 
 
 @dataclass
+class WorldChangeReportLine:
+    """A rendered PR-K world-change entry within a report."""
+
+    record_id: str
+    category: str
+    text: str
+    location_ids: List[str] = field(default_factory=list)
+
+
+@dataclass
 class MonthlyReport:
     """Data model for a monthly report."""
 
@@ -47,6 +57,7 @@ class MonthlyReport:
     notable_events: List[str] = field(default_factory=list)
     location_entries: List[LocationReportEntry] = field(default_factory=list)
     rumor_entries: List[RumorReportEntry] = field(default_factory=list)
+    world_change_entries: List[WorldChangeReportLine] = field(default_factory=list)
     total_events: int = 0
 
 
@@ -58,5 +69,6 @@ class YearlyReport:
     character_entries: List[CharacterReportEntry] = field(default_factory=list)
     notable_events: List[str] = field(default_factory=list)
     location_entries: List[LocationReportEntry] = field(default_factory=list)
+    world_change_entries: List[WorldChangeReportLine] = field(default_factory=list)
     total_events: int = 0
     deaths_this_year: int = 0

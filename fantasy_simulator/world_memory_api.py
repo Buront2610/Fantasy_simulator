@@ -1,30 +1,27 @@
-"""Memory, dynamic-location, and lookup methods for :class:`fantasy_simulator.world.World`."""
+"""Memory and dynamic-location methods for :class:`fantasy_simulator.world.World`."""
 
 from __future__ import annotations
 
-import random
-from typing import TYPE_CHECKING, Any, Container, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Container, Dict, Iterable, List, Optional, Tuple
 
-from .content.setting_bundle_inspection import setting_entry_key
 from .event_models import WorldEventRecord
 from .event_rendering import render_event_record
 from .ids import EventRecordId, FactionId, LocationId, RouteId
-from .terrain import BIOME_TYPES
+from . import world_conflict_pressure
 from .world_change import (
+    DeclareWarCommand,
+    EndWarCommand,
     MutateTerrainCellCommand,
     RenameLocationCommand,
     SetLocationControllingFactionCommand,
     SetRouteBlockedCommand,
     apply_world_change_set,
+    build_war_ended_change_set,
+    build_war_declaration_change_set,
     build_location_occupation_change_set,
     build_location_rename_change_set,
     build_route_blocked_change_set,
     build_terrain_cell_mutation_change_set,
-)
-from .world_actor_index import (
-    location_ids as location_ids_for_locations,
-    location_name as location_name_for_id,
-    location_names as location_names_for_locations,
 )
 from .world_dynamic_changes import (
     apply_controlling_faction,
@@ -32,6 +29,7 @@ from .world_dynamic_changes import (
     apply_route_blocked_state,
 )
 from .world_location_state import LocationState
+from .world_location_lookup_api import WorldLocationLookupMixin
 from .world_memory import (
     add_alias as add_location_alias,
     add_live_trace as add_location_live_trace,
@@ -42,6 +40,173 @@ from .world_records import MemorialRecord
 
 if TYPE_CHECKING:
     from .world_route_graph import RouteCollection
+
+
+__all__ = ["WorldConflictMixin", "WorldLocationLookupMixin", "WorldMemoryMixin"]
+
+
+def _setting_entry_key(name: str) -> str:
+    return name.strip().lower().replace(" ", "_").replace("-", "_").replace("'", "")
+
+
+def _render_world_change_description(
+    *,
+    summary_key: str,
+    render_params: Dict[str, Any],
+    fallback_description: str,
+    world_context: Any = None,
+) -> str:
+    record = WorldEventRecord(
+        description=fallback_description,
+        summary_key=summary_key,
+        render_params=render_params,
+    )
+    try:
+        description = render_event_record(record, world=world_context)
+    except TypeError:
+        description = render_event_record(record)
+    if not description:
+        raise ValueError("world-change event description must not be empty")
+    return description
+
+
+class WorldConflictMixin:
+    """Headless PR-K conflict/war API methods."""
+
+    if TYPE_CHECKING:
+        year: int
+        routes: RouteCollection
+        MAX_LIVE_TRACES: int
+        _location_id_index: Dict[str, LocationState]
+
+        def _known_faction_ids_from_setting_bundle(self) -> set[str] | None: ...
+
+        def _world_change_description(
+            self,
+            *,
+            summary_key: str,
+            render_params: Dict[str, Any],
+            fallback_description: str,
+        ) -> str: ...
+
+        @property
+        def location_ids(self) -> List[str]: ...
+
+        def world_change_event_recorder(self) -> Any: ...
+
+    def apply_war_declaration(
+        self,
+        aggressor_faction_id: str,
+        target_faction_id: str,
+        *,
+        location_ids: Iterable[str] = (),
+        year: Optional[int] = None,
+        month: int = 1,
+        day: int = 1,
+        calendar_key: str = "",
+        cause_key: str = "",
+        cause_event_id: Optional[str] = None,
+        known_faction_ids: Optional[Container[str]] = None,
+    ) -> WorldEventRecord:
+        """Record a headless faction war declaration as a canonical world-change event."""
+        command = DeclareWarCommand(
+            aggressor_faction_id=FactionId(aggressor_faction_id),
+            target_faction_id=FactionId(target_faction_id),
+            location_ids=tuple(LocationId(location_id) for location_id in location_ids),
+            year=self.year if year is None else year,
+            month=month,
+            day=day,
+            calendar_key=calendar_key,
+            cause_key=cause_key,
+            cause_event_id=None if cause_event_id is None else EventRecordId(cause_event_id),
+        )
+
+        def _describe(summary_key: str, render_params: Dict[str, Any], fallback_description: str) -> str:
+            return self._world_change_description(
+                summary_key=summary_key,
+                render_params=render_params,
+                fallback_description=fallback_description,
+            )
+
+        resolved_known_faction_ids = known_faction_ids
+        if resolved_known_faction_ids is None:
+            resolved_known_faction_ids = self._known_faction_ids_from_setting_bundle()
+        change_set = build_war_declaration_change_set(
+            command,
+            known_faction_ids=resolved_known_faction_ids or set(),
+            location_ids=set(self.location_ids),
+            describe=_describe,
+        )
+        stored_records = apply_world_change_set(
+            change_set,
+            routes=self.routes,
+            record_event=self.world_change_event_recorder(),
+        )
+        record = stored_records[0]
+        world_conflict_pressure.apply_war_pressure_to_locations(
+            record,
+            location_index=self._location_id_index,
+            max_live_traces=self.MAX_LIVE_TRACES,
+            world_context=self,
+        )
+        return record
+
+    def apply_war_ended(
+        self,
+        aggressor_faction_id: str,
+        target_faction_id: str,
+        *,
+        location_ids: Iterable[str] = (),
+        year: Optional[int] = None,
+        month: int = 1,
+        day: int = 1,
+        calendar_key: str = "",
+        cause_key: str = "",
+        cause_event_id: Optional[str] = None,
+        known_faction_ids: Optional[Container[str]] = None,
+    ) -> WorldEventRecord:
+        """Record a headless faction war ending as a canonical world-change event."""
+        command = EndWarCommand(
+            aggressor_faction_id=FactionId(aggressor_faction_id),
+            target_faction_id=FactionId(target_faction_id),
+            location_ids=tuple(LocationId(location_id) for location_id in location_ids),
+            year=self.year if year is None else year,
+            month=month,
+            day=day,
+            calendar_key=calendar_key,
+            cause_key=cause_key,
+            cause_event_id=None if cause_event_id is None else EventRecordId(cause_event_id),
+        )
+
+        def _describe(summary_key: str, render_params: Dict[str, Any], fallback_description: str) -> str:
+            return self._world_change_description(
+                summary_key=summary_key,
+                render_params=render_params,
+                fallback_description=fallback_description,
+            )
+
+        resolved_known_faction_ids = known_faction_ids
+        if resolved_known_faction_ids is None:
+            resolved_known_faction_ids = self._known_faction_ids_from_setting_bundle()
+        change_set = build_war_ended_change_set(
+            command,
+            known_faction_ids=resolved_known_faction_ids or set(),
+            location_ids=set(self.location_ids),
+            describe=_describe,
+        )
+        stored_records = apply_world_change_set(
+            change_set,
+            routes=self.routes,
+            record_event=self.world_change_event_recorder(),
+        )
+        record = stored_records[0]
+        world_conflict_pressure.apply_war_pressure_to_locations(
+            record,
+            location_index=self._location_id_index,
+            max_live_traces=self.MAX_LIVE_TRACES,
+            world_context=self,
+        )
+        return record
 
 
 class WorldMemoryMixin:
@@ -63,38 +228,6 @@ class WorldMemoryMixin:
         def record_event(self, record: WorldEventRecord) -> WorldEventRecord: ...
         def world_change_event_recorder(self) -> Any: ...
 
-    def _record_world_change(
-        self,
-        *,
-        kind: str,
-        location_id: Optional[str],
-        description: str,
-        summary_key: str,
-        render_params: Dict[str, Any],
-        impacts: List[Dict[str, Any]],
-        tags: Optional[List[str]] = None,
-        year: Optional[int] = None,
-        month: int = 1,
-        day: int = 1,
-        calendar_key: str = "",
-    ) -> WorldEventRecord:
-        record = WorldEventRecord(
-            kind=kind,
-            year=self.year if year is None else year,
-            month=month,
-            day=day,
-            location_id=location_id,
-            description=description,
-            severity=2,
-            visibility="public",
-            calendar_key=calendar_key,
-            summary_key=summary_key,
-            render_params=render_params,
-            tags=list(dict.fromkeys(["world_change", *(tags or [])])),
-            impacts=impacts,
-        )
-        return self.record_event(record)
-
     def _route_location_name(self, location_id: str) -> str:
         location = self._location_id_index.get(location_id)
         if location is None:
@@ -109,16 +242,12 @@ class WorldMemoryMixin:
         fallback_description: str,
     ) -> str:
         """Render a world-change description with a non-empty compatibility fallback."""
-        description = render_event_record(
-            WorldEventRecord(
-                description=fallback_description,
-                summary_key=summary_key,
-                render_params=render_params,
-            )
+        return _render_world_change_description(
+            summary_key=summary_key,
+            render_params=render_params,
+            fallback_description=fallback_description,
+            world_context=self,
         )
-        if not description:
-            raise ValueError("world-change event description must not be empty")
-        return description
 
     def _known_faction_ids_from_setting_bundle(self) -> set[str] | None:
         bundle = getattr(self, "_setting_bundle", None)
@@ -137,7 +266,7 @@ class WorldMemoryMixin:
                 faction_ids.add(key)
             if isinstance(display_name, str) and display_name:
                 faction_ids.add(display_name)
-                faction_ids.add(setting_entry_key(display_name))
+                faction_ids.add(_setting_entry_key(display_name))
         return faction_ids
 
     def _restore_location_rename_state(
@@ -268,7 +397,16 @@ class WorldMemoryMixin:
             location_index=self._location_id_index,
             location_name_index=self._location_name_index,
         )
-        return stored_records[0] if stored_records else None
+        if not stored_records:
+            return None
+        record = stored_records[0]
+        world_conflict_pressure.apply_rename_pressure_to_location(
+            record,
+            location_index=self._location_id_index,
+            max_live_traces=self.MAX_LIVE_TRACES,
+            world_context=self,
+        )
+        return record
 
     def set_location_controlling_faction(self, location_id: str, faction_id: Optional[str]) -> Optional[str]:
         """Legacy mutation helper; prefer ``apply_controlling_faction_change`` for canonical history."""
@@ -329,7 +467,16 @@ class WorldMemoryMixin:
             record_event=self.world_change_event_recorder(),
             location_index=self._location_id_index,
         )
-        return stored_records[0] if stored_records else None
+        if not stored_records:
+            return None
+        record = stored_records[0]
+        world_conflict_pressure.apply_occupation_pressure_to_location(
+            record,
+            location_index=self._location_id_index,
+            max_live_traces=self.MAX_LIVE_TRACES,
+            world_context=self,
+        )
+        return record
 
     def set_route_blocked(self, route_id: str, blocked: bool) -> bool:
         """Legacy mutation helper; prefer ``apply_route_blocked_change`` for canonical history."""
@@ -367,7 +514,7 @@ class WorldMemoryMixin:
         change_set = build_route_blocked_change_set(
             command,
             routes=self.routes,
-            location_ids=set(self.location_ids),
+            location_ids=set(self._location_id_index),
             location_name=self._route_location_name,
             describe=_describe,
         )
@@ -378,7 +525,16 @@ class WorldMemoryMixin:
             routes=self.routes,
             record_event=self.world_change_event_recorder(),
         )
-        return stored_records[0] if stored_records else None
+        if not stored_records:
+            return None
+        record = stored_records[0]
+        world_conflict_pressure.apply_route_pressure_to_locations(
+            record,
+            location_index=self._location_id_index,
+            max_live_traces=self.MAX_LIVE_TRACES,
+            world_context=self,
+        )
+        return record
 
     def apply_terrain_cell_change(
         self,
@@ -398,6 +554,8 @@ class WorldMemoryMixin:
         cause_event_id: Optional[str] = None,
     ) -> WorldEventRecord | None:
         """Mutate one terrain cell and record the canonical world-change event."""
+        from .terrain import BIOME_TYPES
+
         location = self.grid.get((x, y))
         if location_id is not None:
             if location_id not in self._location_id_index:
@@ -444,7 +602,16 @@ class WorldMemoryMixin:
             terrain_map=self.terrain_map,
             record_event=self.world_change_event_recorder(),
         )
-        return stored_records[0] if stored_records else None
+        if not stored_records:
+            return None
+        record = stored_records[0]
+        world_conflict_pressure.apply_terrain_pressure_to_location(
+            record,
+            location_index=self._location_id_index,
+            max_live_traces=self.MAX_LIVE_TRACES,
+            world_context=self,
+        )
+        return record
 
     def get_memorials_for_location(self, location_id: str) -> List[MemorialRecord]:
         """Return all ``MemorialRecord`` objects associated with a location."""
@@ -455,42 +622,3 @@ class WorldMemoryMixin:
                 location_id=location_id,
             )
         )
-
-    @property
-    def location_names(self) -> List[str]:
-        return location_names_for_locations(self.grid.values())
-
-    @property
-    def location_ids(self) -> List[str]:
-        return location_ids_for_locations(self.grid.values())
-
-    def get_location_by_name(self, name: str) -> Optional[LocationState]:
-        return self._location_name_index.get(name)
-
-    def get_location_by_id(self, location_id: str) -> Optional[LocationState]:
-        return self._location_id_index.get(location_id)
-
-    def find_location_by_id_or_name(self, value: str) -> Optional[LocationState]:
-        """Return a location matching an ID or canonical name, case-insensitively."""
-        normalized = value.strip().lower()
-        if not normalized:
-            return None
-        for location in self._location_id_index.values():
-            if location.id.lower() == normalized or location.canonical_name.lower() == normalized:
-                return location
-        return None
-
-    def location_name(self, location_id: str) -> str:
-        return location_name_for_id(self._location_id_index, location_id)
-
-    def get_neighboring_locations(self, location_id: str) -> List[LocationState]:
-        """Compatibility alias for travel adjacency."""
-        return self.get_travel_neighboring_locations(location_id)
-
-    def random_location(self, exclude_dungeon: bool = False, rng: Any = random) -> LocationState:
-        options = list(self.grid.values())
-        if exclude_dungeon:
-            options = [loc for loc in options if loc.region_type != "dungeon"]
-        if not options:
-            raise ValueError("World has no locations.")
-        return rng.choice(options)

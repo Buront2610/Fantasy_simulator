@@ -11,7 +11,12 @@ from typing import Dict, List, TYPE_CHECKING
 
 from ..event_rendering import render_event_record
 from ..i18n import tr
-from ..observation import build_world_change_report_projection
+from ..observation import (
+    build_era_timeline_projection,
+    build_route_status_projection,
+    build_war_map_projection,
+    build_world_change_report_projection,
+)
 from ..world_event_index import location_ids_for_record
 from ..location_observation import (
     LocationObservationView,
@@ -28,18 +33,25 @@ if TYPE_CHECKING:
 
 __all__ = [
     "AdventureSummaryView",
+    "ActiveWarView",
+    "CurrentOccupationView",
+    "CurrentRouteClosureView",
+    "EraStatusView",
     "LocationHistoryView",
     "LocationObservationView",
     "MonthlyReportCardView",
     "NotificationItemView",
     "RumorSummaryView",
+    "WorldChangeEntryView",
     "WorldChangeSummaryView",
     "WorldDashboardView",
+    "YearlyReportCardView",
     "build_location_observation_view",
     "build_monthly_report_card_view",
     "build_notification_views",
     "build_rumor_summary_views",
     "build_world_dashboard_view",
+    "build_yearly_report_card_view",
 ]
 
 
@@ -71,6 +83,60 @@ class WorldChangeSummaryView:
 
 
 @dataclass
+class WorldChangeEntryView:
+    record_id: str
+    category: str
+    text: str
+    location_ids: List[str] = field(default_factory=list)
+    year: int = 0
+    month: int = 0
+    day: int = 0
+
+
+@dataclass
+class ActiveWarView:
+    record_id: str
+    aggressor_faction_id: str
+    target_faction_id: str
+    text: str
+    location_ids: List[str] = field(default_factory=list)
+    year: int = 0
+    month: int = 0
+    day: int = 0
+
+
+@dataclass
+class CurrentOccupationView:
+    record_id: str
+    location_id: str
+    previous_faction_id: str | None
+    controlling_faction_id: str
+    text: str
+    year: int = 0
+    month: int = 0
+    day: int = 0
+
+
+@dataclass
+class CurrentRouteClosureView:
+    route_id: str
+    record_id: str
+    from_location_id: str
+    to_location_id: str
+    text: str
+    year: int = 0
+    month: int = 0
+    day: int = 0
+
+
+@dataclass
+class EraStatusView:
+    era_id: str | None
+    civilization_phase: str | None
+    text: str
+
+
+@dataclass
 class MonthlyReportCardView:
     year: int
     month: int
@@ -81,6 +147,16 @@ class MonthlyReportCardView:
     new_memory_items: List[str] = field(default_factory=list)
     hot_rumors: List[str] = field(default_factory=list)
     world_changes: List[WorldChangeSummaryView] = field(default_factory=list)
+    world_change_entries: List[WorldChangeEntryView] = field(default_factory=list)
+
+
+@dataclass
+class YearlyReportCardView:
+    year: int
+    total_events: int = 0
+    highlighted_locations: List[str] = field(default_factory=list)
+    world_changes: List[WorldChangeSummaryView] = field(default_factory=list)
+    world_change_entries: List[WorldChangeEntryView] = field(default_factory=list)
 
 
 @dataclass
@@ -98,6 +174,11 @@ class WorldDashboardView:
     hot_rumors: List[str] = field(default_factory=list)
     dangerous_locations: List[str] = field(default_factory=list)
     world_changes: List[WorldChangeSummaryView] = field(default_factory=list)
+    active_wars: List[ActiveWarView] = field(default_factory=list)
+    current_occupations: List[CurrentOccupationView] = field(default_factory=list)
+    current_route_closures: List[CurrentRouteClosureView] = field(default_factory=list)
+    era_status: EraStatusView | None = None
+    world_change_entries: List[WorldChangeEntryView] = field(default_factory=list)
 
 
 @dataclass
@@ -129,12 +210,159 @@ def build_notification_views(
     ]
 
 
-def build_monthly_report_card_view(world: "World", year: int, month: int) -> MonthlyReportCardView:
+def _records_for_year(world: "World", year: int) -> List["WorldEventRecord"]:
+    if hasattr(world, "get_events_by_year"):
+        return list(world.get_events_by_year(year))
+    event_records = getattr(world, "event_records", [])
+    return [record for record in event_records if record.year == year]
+
+
+def _records_for_month(world: "World", year: int, month: int) -> List["WorldEventRecord"]:
     if hasattr(world, "get_events_by_month"):
-        records = world.get_events_by_month(year, month)
-    else:
-        event_records = getattr(world, "event_records", [])
-        records = [r for r in event_records if r.year == year and r.month == month]
+        return list(world.get_events_by_month(year, month))
+    return [record for record in getattr(world, "event_records", []) if record.year == year and record.month == month]
+
+
+def _world_change_views(
+    world: "World",
+    records: List["WorldEventRecord"],
+    *,
+    year: int,
+    month: int | None = None,
+) -> tuple[List[WorldChangeSummaryView], List[WorldChangeEntryView]]:
+    world_change_projection = build_world_change_report_projection(
+        event_records=records,
+        year=year,
+        month=month,
+    )
+    records_by_id = {record.record_id: record for record in records}
+    summaries = [
+        WorldChangeSummaryView(category=count.category, count=count.count)
+        for count in world_change_projection.counts_by_category
+    ]
+    entries = []
+    for entry in world_change_projection.entries:
+        record = records_by_id.get(entry.record_id)
+        text = entry.description if record is None else _render_view_event(record, world)
+        entries.append(
+            WorldChangeEntryView(
+                record_id=entry.record_id,
+                category=entry.category,
+                text=text,
+                location_ids=list(entry.location_ids),
+                year=entry.year,
+                month=entry.month,
+                day=entry.day,
+            )
+        )
+    return summaries, entries
+
+
+def _active_war_views(world: "World", records: List["WorldEventRecord"]) -> List[ActiveWarView]:
+    projection = build_war_map_projection(event_records=records)
+    records_by_id = {record.record_id: record for record in records}
+    views: List[ActiveWarView] = []
+    for entry in projection.active_wars:
+        record = records_by_id.get(entry.record_id)
+        text = entry.description if record is None else _render_view_event(record, world)
+        views.append(
+            ActiveWarView(
+                record_id=entry.record_id,
+                aggressor_faction_id=entry.aggressor_faction_id,
+                target_faction_id=entry.target_faction_id,
+                text=text,
+                location_ids=list(entry.location_ids),
+                year=entry.year,
+                month=entry.month,
+                day=entry.day,
+            )
+        )
+    return views
+
+
+def _current_occupation_views(world: "World", records: List["WorldEventRecord"]) -> List[CurrentOccupationView]:
+    projection = build_war_map_projection(event_records=records)
+    records_by_id = {record.record_id: record for record in records}
+    views: List[CurrentOccupationView] = []
+    for entry in projection.current_occupations:
+        if entry.controlling_faction_id is None:
+            continue
+        record = records_by_id.get(entry.record_id)
+        text = entry.description if record is None else _render_view_event(record, world)
+        views.append(
+            CurrentOccupationView(
+                record_id=entry.record_id,
+                location_id=entry.location_id,
+                previous_faction_id=entry.previous_faction_id,
+                controlling_faction_id=entry.controlling_faction_id,
+                text=text,
+                year=entry.year,
+                month=entry.month,
+                day=entry.day,
+            )
+        )
+    return views
+
+
+def _location_name(world: "World", location_id: str) -> str:
+    if hasattr(world, "location_name"):
+        return world.location_name(location_id)
+    return location_id
+
+
+def _current_route_closure_views(world: "World", records: List["WorldEventRecord"]) -> List[CurrentRouteClosureView]:
+    records_by_id = {record.record_id: record for record in records}
+    views: List[CurrentRouteClosureView] = []
+    for route in getattr(world, "routes", []):
+        if not getattr(route, "blocked", False):
+            continue
+        projection = build_route_status_projection(
+            routes=getattr(world, "routes", []),
+            event_records=records,
+            route_id=route.route_id,
+        )
+        route_events = list(getattr(projection, "history"))
+        latest = route_events[-1] if route_events else None
+        record = records_by_id.get(latest.record_id) if latest is not None else None
+        text = (
+            _render_view_event(record, world)
+            if record is not None
+            else tr(
+                "dashboard_route_closure_line",
+                from_location=_location_name(world, projection.from_location_id),
+                to_location=_location_name(world, projection.to_location_id),
+            )
+        )
+        views.append(
+            CurrentRouteClosureView(
+                route_id=projection.route_id,
+                record_id=latest.record_id if latest is not None else projection.route_id,
+                from_location_id=projection.from_location_id,
+                to_location_id=projection.to_location_id,
+                text=text,
+                year=latest.year if latest is not None else 0,
+                month=latest.month if latest is not None else 0,
+                day=latest.day if latest is not None else 0,
+            )
+        )
+    return views
+
+
+def _era_status_view(records: List["WorldEventRecord"]) -> EraStatusView | None:
+    projection = build_era_timeline_projection(event_records=records)
+    if projection.current_era_id is None and projection.current_civilization_phase is None:
+        return None
+    era = projection.current_era_id or tr("dashboard_era_unknown")
+    phase = projection.current_civilization_phase or tr("dashboard_civilization_unknown")
+    return EraStatusView(
+        era_id=projection.current_era_id,
+        civilization_phase=projection.current_civilization_phase,
+        text=tr("dashboard_era_status_line", era=era, phase=phase),
+    )
+
+
+def build_monthly_report_card_view(world: "World", year: int, month: int) -> MonthlyReportCardView:
+    records = _records_for_month(world, year, month)
     record_calendar_key = next(
         (record.calendar_key for record in records if getattr(record, "calendar_key", "")),
         "",
@@ -176,15 +404,7 @@ def build_monthly_report_card_view(world: "World", year: int, month: int) -> Mon
     else:
         month_label = str(month)
 
-    world_change_projection = build_world_change_report_projection(
-        event_records=records,
-        year=year,
-        month=month,
-    )
-    world_changes = [
-        WorldChangeSummaryView(category=count.category, count=count.count)
-        for count in world_change_projection.counts_by_category
-    ]
+    world_changes, world_change_entries = _world_change_views(world, records, year=year, month=month)
 
     hot_rumors: List[str] = []
     if hasattr(world, "event_records") and hasattr(world, "rumors") and hasattr(world, "location_name"):
@@ -204,6 +424,32 @@ def build_monthly_report_card_view(world: "World", year: int, month: int) -> Mon
         new_memory_items=new_memory[:3],
         hot_rumors=hot_rumors,
         world_changes=world_changes,
+        world_change_entries=world_change_entries,
+    )
+
+
+def build_yearly_report_card_view(world: "World", year: int) -> YearlyReportCardView:
+    records = _records_for_year(world, year)
+    locs: Dict[str, int] = {}
+    for record in records:
+        for location_id in location_ids_for_record(record):
+            locs[location_id] = locs.get(location_id, 0) + 1
+
+    if hasattr(world, "location_name"):
+        highlighted_locations = [
+            world.location_name(location_id)
+            for location_id, _ in sorted(locs.items(), key=lambda item: -item[1])[:5]
+        ]
+    else:
+        highlighted_locations = [location_id for location_id, _ in sorted(locs.items(), key=lambda item: -item[1])[:5]]
+
+    world_changes, world_change_entries = _world_change_views(world, records, year=year)
+    return YearlyReportCardView(
+        year=year,
+        total_events=len(records),
+        highlighted_locations=highlighted_locations,
+        world_changes=world_changes,
+        world_change_entries=world_change_entries,
     )
 
 
@@ -254,14 +500,11 @@ def build_world_dashboard_view(
         for rumor in _dashboard_hot_rumors(world, limit=5)
     ]
     month_label = _dashboard_month_label(world, current_month)
-    world_change_projection = build_world_change_report_projection(
-        event_records=records,
-        year=getattr(world, "year", 0),
-    )
-    world_changes = [
-        WorldChangeSummaryView(category=count.category, count=count.count)
-        for count in world_change_projection.counts_by_category
-    ]
+    world_changes, world_change_entries = _world_change_views(world, records, year=getattr(world, "year", 0))
+    active_wars = _active_war_views(world, records)
+    current_occupations = _current_occupation_views(world, records)
+    current_route_closures = _current_route_closure_views(world, records)
+    era_status = _era_status_view(records)
 
     return WorldDashboardView(
         world_name=getattr(world, "name", ""),
@@ -277,6 +520,11 @@ def build_world_dashboard_view(
         hot_rumors=hot_rumors,
         dangerous_locations=dangerous_locations,
         world_changes=world_changes,
+        active_wars=active_wars,
+        current_occupations=current_occupations,
+        current_route_closures=current_route_closures,
+        era_status=era_status,
+        world_change_entries=world_change_entries,
     )
 
 

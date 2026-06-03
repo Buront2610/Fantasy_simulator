@@ -9,6 +9,36 @@ from fantasy_simulator.ids import EraKey, EventRecordId, FactionId, LocationId, 
 
 
 @dataclass(frozen=True)
+class DeclareWarCommand:
+    """Request a headless faction war declaration event."""
+
+    aggressor_faction_id: FactionId
+    target_faction_id: FactionId
+    year: int
+    month: int = 1
+    day: int = 1
+    location_ids: tuple[LocationId, ...] = ()
+    calendar_key: str = ""
+    cause_key: str = ""
+    cause_event_id: EventRecordId | None = None
+
+
+@dataclass(frozen=True)
+class EndWarCommand:
+    """Request a headless faction war-ending event."""
+
+    aggressor_faction_id: FactionId
+    target_faction_id: FactionId
+    year: int
+    month: int = 1
+    day: int = 1
+    location_ids: tuple[LocationId, ...] = ()
+    calendar_key: str = ""
+    cause_key: str = ""
+    cause_event_id: EventRecordId | None = None
+
+
+@dataclass(frozen=True)
 class SetRouteBlockedCommand:
     """Request a route blocked/open transition."""
 

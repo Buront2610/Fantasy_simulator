@@ -326,6 +326,8 @@ def test_terrain_cell_mutation_record_follows_pr_k_event_contract() -> None:
 
 def test_world_change_event_contract_registry_covers_pr_k_event_kinds() -> None:
     assert set(WORLD_CHANGE_EVENT_CONTRACTS) == {
+        "war_declared",
+        "war_ended",
         "route_blocked",
         "route_reopened",
         "location_renamed",

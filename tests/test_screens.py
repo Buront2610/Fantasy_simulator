@@ -345,6 +345,60 @@ class TestAutoAdvanceScreen(unittest.TestCase):
         self.assertIn("Aldric may die without attention.", text)
         self.assertIn("Inspect Aldric's condition", text)
 
+    def test_auto_advance_screen_prints_location_only_world_change_context(self) -> None:
+        from fantasy_simulator.ui.screen_simulation import _advance_auto
+        from fantasy_simulator.ui.ui_context import UIContext
+        from fantasy_simulator.ui.render_backend import PrintRenderBackend
+
+        set_locale("en")
+        sim = SimpleNamespace(
+            world=SimpleNamespace(
+                characters=[SimpleNamespace(alive=True)],
+                months_per_year=12,
+                year=1000,
+            ),
+            get_pending_adventure_choices=lambda: [],
+            advance_until_pause=lambda max_years: {
+                "months_advanced": 1,
+                "pause_reason": "world_change_notification",
+                "pause_context": {"location": "Aethoria Capital"},
+                "pause_subreasons": [
+                    {
+                        "key": "world_change_notification",
+                        "location": "Aethoria Capital",
+                    }
+                ],
+                "supplemental_reasons": [],
+                "recommended_actions": [
+                    {
+                        "key": "review_world_dashboard",
+                        "location": "Aethoria Capital",
+                    }
+                ],
+            },
+        )
+
+        class NoopInputBackend:
+            def read_line(self, prompt: str = "") -> str:
+                return ""
+
+            def read_menu_key(self, pairs, default=None):
+                return pairs[0][0]
+
+            def pause(self, message: str = "") -> None:
+                pass
+
+        ctx = UIContext(inp=NoopInputBackend(), out=PrintRenderBackend())
+        captured = io.StringIO()
+        with redirect_stdout(captured):
+            _advance_auto(sim, ctx=ctx)
+        text = _ANSI_RE.sub("", captured.getvalue())
+
+        self.assertIn("Cause context: Aethoria Capital", text)
+        self.assertNotIn("Cause context:  @ Aethoria Capital", text)
+        self.assertIn("A world change requires attention at Aethoria Capital.", text)
+        self.assertIn("Review the world dashboard", text)
+
 
 class TestWorldDashboardScreen(unittest.TestCase):
     def test_world_dashboard_surfaces_observer_state(self) -> None:

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from fantasy_simulator.event_models import WorldEventRecord
+from fantasy_simulator.i18n import get_locale, set_locale
 from fantasy_simulator.observation import build_location_history_projection
+from fantasy_simulator.ui.map_renderer import build_map_info
 from fantasy_simulator.world import World
+from fantasy_simulator.world_location_state import clamp_state
 
 
 def test_location_history_projection_reports_current_name_without_history() -> None:
@@ -45,6 +48,34 @@ def test_location_history_projection_includes_rename_history() -> None:
     ]
     assert [entry.day for entry in projection.rename_history] == [3, 5]
     assert all(record_id in projection.recent_event_ids for record_id in [first.record_id, second.record_id])
+
+
+def test_location_rename_applies_location_state_pressure_and_map_visibility() -> None:
+    previous_locale = get_locale()
+    set_locale("en")
+    world = World()
+    location = world.get_location_by_id("loc_aethoria_capital")
+    assert location is not None
+    before = (location.rumor_heat, location.traffic, location.mood)
+
+    try:
+        record = world.apply_location_rename_change("loc_aethoria_capital", "Aethoria March", month=2, day=3)
+    finally:
+        set_locale(previous_locale)
+
+    assert record is not None
+    assert (location.rumor_heat, location.traffic, location.mood) == (
+        clamp_state(before[0] + 12),
+        clamp_state(before[1] + 4),
+        clamp_state(before[2] + 2),
+    )
+    assert location.live_traces[-1]["char_name"] == "world"
+    assert "new name" in location.live_traces[-1]["text"]
+
+    map_info = build_map_info(world)
+    cell = next(cell for cell in map_info.cells.values() if cell.location_id == "loc_aethoria_capital")
+    assert cell.traffic_indicator == location.traffic_indicator
+    assert cell.mood == location.mood
 
 
 def test_location_history_projection_filters_other_locations() -> None:

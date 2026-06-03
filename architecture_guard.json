@@ -205,223 +205,260 @@
         "target": "fantasy_simulator/character.py::Character",
         "reason": "Legacy aggregate kept for save/load and public constructor compatibility.",
         "max_public_methods": 33,
-        "max_class_lines": 273
+        "max_class_lines": 273,
+        "owner": "architecture-maintainers",
+        "removal_condition": "Remove when fantasy_simulator/character.py::Character fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/events_relationships.py::resolve_marriage_event",
         "reason": "Narrative branch legacy resolver; split once relationship events move to a policy object.",
-        "max_function_lines": 130
+        "max_function_lines": 130,
+        "owner": "architecture-maintainers",
+        "removal_condition": "Remove when fantasy_simulator/events_relationships.py::resolve_marriage_event fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/language/phonology.py::default_feature_sets",
         "reason": "Dense linguistic feature table builder; candidate for data-table extraction.",
-        "max_cyclomatic_complexity": 26
+        "max_cyclomatic_complexity": 26,
+        "owner": "architecture-maintainers",
+        "removal_condition": "Remove when fantasy_simulator/language/phonology.py::default_feature_sets fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/event_models.py::WorldEventRecord",
         "reason": "Canonical event contract still owns validation, serialization, and legacy adapter projection.",
-        "max_class_lines": 285
+        "max_class_lines": 285,
+        "owner": "architecture-maintainers",
+        "removal_condition": "Remove when fantasy_simulator/event_models.py::WorldEventRecord fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/events_activity.py::resolve_journey_event",
         "reason": "Legacy journey resolver combines event selection and narrative consequences.",
-        "max_function_lines": 89
+        "max_function_lines": 89,
+        "owner": "architecture-maintainers",
+        "removal_condition": "Remove when fantasy_simulator/events_activity.py::resolve_journey_event fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/events_lifecycle.py::check_dying_resolution",
         "reason": "Lifecycle resolver keeps death-staging compatibility until policy extraction.",
-        "max_function_lines": 82
+        "max_function_lines": 82,
+        "owner": "architecture-maintainers",
+        "removal_condition": "Remove when fantasy_simulator/events_lifecycle.py::check_dying_resolution fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/reports.py::generate_monthly_report",
         "reason": "Compatibility report composer with several public sections; keep stable while projections migrate.",
-        "max_cyclomatic_complexity": 22,
-        "max_cognitive_complexity": 29,
-        "max_function_lines": 121
+        "max_function_lines": 121,
+        "owner": "architecture-maintainers",
+        "removal_condition": "Remove when fantasy_simulator/reports.py::generate_monthly_report fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/persistence/migration_steps.py::migrate_v2_to_v3",
         "reason": "Historical save migration handles several legacy payload shapes in one migration step.",
         "max_cyclomatic_complexity": 21,
         "max_cognitive_complexity": 30,
-        "max_function_lines": 91
+        "max_function_lines": 91,
+        "owner": "architecture-maintainers",
+        "removal_condition": "Remove when fantasy_simulator/persistence/migration_steps.py::migrate_v2_to_v3 fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/simulation/adventure_coordinator.py::AdventureMixin._advance_adventures",
         "reason": "Adventure advancement remains an orchestration adapter around multiple domain outcomes.",
-        "max_cognitive_complexity": 34
-      },
-      {
-        "target": "fantasy_simulator/simulation/engine_pause.py::EnginePauseMixin._pause_context_for_reason",
-        "reason": "Pause-context adapter centralizes existing auto-stop reasons for UI compatibility.",
-        "max_cyclomatic_complexity": 26,
-        "max_cognitive_complexity": 43
+        "max_cognitive_complexity": 34,
+        "owner": "architecture-maintainers",
+        "removal_condition": "Remove when fantasy_simulator/simulation/adventure_coordinator.py::AdventureMixin._advance_adventures fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/simulation/engine_pause.py::EnginePauseMixin",
         "reason": "Legacy mixin owns multiple pause reason adapters until notification policy is split further.",
-        "max_class_lines": 302
-      },
-      {
-        "target": "fantasy_simulator/simulation/notifications.py::NotificationMixin.should_notify",
-        "reason": "Notification policy currently centralizes several stop conditions for compatibility.",
-        "max_cognitive_complexity": 29
+        "max_class_lines": 302,
+        "owner": "architecture-maintainers",
+        "removal_condition": "Remove when fantasy_simulator/simulation/engine_pause.py::EnginePauseMixin fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/terrain_atlas_landmass.py::_cluster_atlas_sites",
         "reason": "Geometry clustering algorithm with nested spatial checks; preserve behavior before extraction.",
-        "max_cognitive_complexity": 37
+        "max_cognitive_complexity": 37,
+        "owner": "architecture-maintainers",
+        "removal_condition": "Remove when fantasy_simulator/terrain_atlas_landmass.py::_cluster_atlas_sites fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/ui/atlas_routes.py::_draw_routes",
         "reason": "Atlas route drawing mixes visibility, blocking, and shape selection until route view models split.",
-        "max_cognitive_complexity": 35
+        "max_cognitive_complexity": 35,
+        "owner": "architecture-maintainers",
+        "removal_condition": "Remove when fantasy_simulator/ui/atlas_routes.py::_draw_routes fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/ui/atlas_labels.py::_place_labels",
         "reason": "Atlas label placement has collision and fallback branches that need visual regression coverage.",
         "max_cyclomatic_complexity": 26,
-        "max_cognitive_complexity": 50
+        "max_cognitive_complexity": 50,
+        "owner": "architecture-maintainers",
+        "removal_condition": "Remove when fantasy_simulator/ui/atlas_labels.py::_place_labels fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/ui/atlas_masks.py::_cluster_sites",
         "reason": "Legacy atlas mask clustering; candidate for shared geometry helper extraction.",
         "max_cyclomatic_complexity": 21,
-        "max_cognitive_complexity": 38
+        "max_cognitive_complexity": 38,
+        "owner": "architecture-maintainers",
+        "removal_condition": "Remove when fantasy_simulator/ui/atlas_masks.py::_cluster_sites fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/ui/atlas_masks.py::_build_legacy_masks",
         "reason": "Legacy mask generation composes several terrain fallbacks for save/display compatibility.",
         "max_cyclomatic_complexity": 26,
-        "max_cognitive_complexity": 58
+        "max_cognitive_complexity": 58,
+        "owner": "architecture-maintainers",
+        "removal_condition": "Remove when fantasy_simulator/ui/atlas_masks.py::_build_legacy_masks fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/ui/atlas_masks.py::_paint_terrain",
         "reason": "Terrain painting loop mixes adjacency and terrain-kind fallbacks; keep budget fixed until split.",
-        "max_cognitive_complexity": 38
+        "max_cognitive_complexity": 38,
+        "owner": "architecture-maintainers",
+        "removal_condition": "Remove when fantasy_simulator/ui/atlas_masks.py::_paint_terrain fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/ui/map_location_renderer.py::render_location_detail",
         "reason": "CLI detail renderer composes several optional panels; should move to view models over time.",
         "max_cyclomatic_complexity": 27,
         "max_cognitive_complexity": 33,
-        "max_function_lines": 125
+        "max_function_lines": 125,
+        "owner": "architecture-maintainers",
+        "removal_condition": "Remove when fantasy_simulator/ui/map_location_renderer.py::render_location_detail fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/ui/map_region_grid.py::build_region_route_layer",
         "reason": "Route overlay builder has shape and visibility branches; split after map snapshot coverage.",
         "max_cyclomatic_complexity": 22,
-        "max_cognitive_complexity": 37
-      },
-      {
-        "target": "fantasy_simulator/ui/map_view_models.py::build_map_info",
-        "reason": "Map information view model composes legacy terrain, route, and observation details.",
-        "max_cyclomatic_complexity": 21,
-        "max_cognitive_complexity": 29,
-        "max_function_lines": 110
+        "max_cognitive_complexity": 37,
+        "owner": "architecture-maintainers",
+        "removal_condition": "Remove when fantasy_simulator/ui/map_region_grid.py::build_region_route_layer fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/ui/map_world_overview.py::render_world_overview",
         "reason": "World overview renderer still mixes layout and section fallback logic.",
-        "max_cognitive_complexity": 32
+        "max_cognitive_complexity": 32,
+        "owner": "architecture-maintainers",
+        "removal_condition": "Remove when fantasy_simulator/ui/map_world_overview.py::render_world_overview fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/ui/screen_results.py::_show_results",
         "reason": "Interactive result screen dispatch remains a compatibility menu path.",
         "max_cyclomatic_complexity": 23,
         "max_cognitive_complexity": 28,
-        "max_function_lines": 89
+        "max_function_lines": 89,
+        "owner": "architecture-maintainers",
+        "removal_condition": "Remove when fantasy_simulator/ui/screen_results.py::_show_results fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/ui/view_models.py::build_monthly_report_card_view",
         "reason": "View-model bridge preserves current monthly report card shape.",
         "max_cyclomatic_complexity": 27,
-        "max_cognitive_complexity": 30
+        "max_cognitive_complexity": 30,
+        "owner": "architecture-maintainers",
+        "removal_condition": "Remove when fantasy_simulator/ui/view_models.py::build_monthly_report_card_view fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/world_memory_api.py::WorldMemoryMixin",
-        "reason": "World memory facade is a broad compatibility surface during world module split.",
-        "max_public_methods": 19,
-        "max_class_lines": 450
+        "reason": "World memory facade is still a broad dynamic-world compatibility surface during module split.",
+        "max_class_lines": 450,
+        "owner": "architecture-maintainers",
+        "removal_condition": "Remove when fantasy_simulator/world_memory_api.py::WorldMemoryMixin fits the default class-line budget or is split behind narrower compatibility adapters."
       },
       {
         "target": "fantasy_simulator/content/setting_bundle_schema_world.py::WorldDefinition",
         "reason": "Setting bundle schema dataclass exposes authored world sections as public fields.",
-        "max_public_methods": 16
+        "max_public_methods": 16,
+        "owner": "architecture-maintainers",
+        "removal_condition": "Remove when fantasy_simulator/content/setting_bundle_schema_world.py::WorldDefinition fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/language/evolution.py::LanguageEvolutionPlanner",
         "reason": "Language evolution planner keeps several rule helpers together for deterministic naming.",
-        "max_class_lines": 228
+        "max_class_lines": 228,
+        "owner": "architecture-maintainers",
+        "removal_condition": "Remove when fantasy_simulator/language/evolution.py::LanguageEvolutionPlanner fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/language/naming.py::LanguageNameGenerator",
         "reason": "Language name generator owns multiple deterministic generation strategies.",
-        "max_class_lines": 233
+        "max_class_lines": 233,
+        "owner": "architecture-maintainers",
+        "removal_condition": "Remove when fantasy_simulator/language/naming.py::LanguageNameGenerator fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/simulation/timeline.py::TimelineMixin",
         "reason": "Timeline mixin remains a compatibility adapter for month/year advancement behavior.",
-        "max_class_lines": 268
+        "max_class_lines": 268,
+        "owner": "architecture-maintainers",
+        "removal_condition": "Remove when fantasy_simulator/simulation/timeline.py::TimelineMixin fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/ui/render_backend.py::RenderBackend",
         "reason": "Render backend protocol intentionally lists the CLI rendering surface.",
-        "max_public_methods": 13
+        "max_public_methods": 13,
+        "owner": "architecture-maintainers",
+        "removal_condition": "Remove when fantasy_simulator/ui/render_backend.py::RenderBackend fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/ui/render_backend.py::PrintRenderBackend",
         "reason": "Print backend mirrors the render protocol for no-Rich environments.",
-        "max_public_methods": 13
+        "max_public_methods": 13,
+        "owner": "architecture-maintainers",
+        "removal_condition": "Remove when fantasy_simulator/ui/render_backend.py::PrintRenderBackend fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/ui/render_backend.py::RichRenderBackend",
         "reason": "Rich backend mirrors the render protocol while adapting optional Rich features.",
-        "max_public_methods": 13
+        "max_public_methods": 13,
+        "owner": "architecture-maintainers",
+        "removal_condition": "Remove when fantasy_simulator/ui/render_backend.py::RichRenderBackend fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/world_actor_api.py::WorldActorMixin",
         "reason": "World actor facade remains a compatibility surface during world module split.",
-        "max_public_methods": 13
+        "max_public_methods": 13,
+        "owner": "architecture-maintainers",
+        "removal_condition": "Remove when fantasy_simulator/world_actor_api.py::WorldActorMixin fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/world_calendar_api.py::WorldCalendarMixin",
         "reason": "World calendar facade exposes current calendar transition API.",
-        "max_public_methods": 18
-      },
-      {
-        "target": "fantasy_simulator/world_persistence.py::hydrate_world_state",
-        "reason": "Backward-load hydration handles multiple historical schema shapes.",
-        "max_cyclomatic_complexity": 32,
-        "max_cognitive_complexity": 38,
-        "max_function_lines": 147
-      },
-      {
-        "target": "fantasy_simulator/world_persistence.py::serialize_world_state",
-        "reason": "Serializer preserves current save payload shape while world state remains split across facades.",
-        "max_cyclomatic_complexity": 22
+        "max_public_methods": 18,
+        "owner": "architecture-maintainers",
+        "removal_condition": "Remove when fantasy_simulator/world_calendar_api.py::WorldCalendarMixin fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/world_state_propagation.py::propagate_state_changes",
         "reason": "Propagation applies several authored effects in one compatibility entrypoint.",
         "max_cyclomatic_complexity": 16,
-        "max_cognitive_complexity": 35
+        "max_cognitive_complexity": 35,
+        "owner": "architecture-maintainers",
+        "removal_condition": "Remove when fantasy_simulator/world_state_propagation.py::propagate_state_changes fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/world.py::World",
         "reason": "World remains the public compatibility aggregate while runtime APIs are split into mixins.",
         "max_public_methods": 14,
-        "max_class_lines": 234
+        "max_class_lines": 234,
+        "owner": "architecture-maintainers",
+        "removal_condition": "Remove when fantasy_simulator/world.py::World fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/world.py",
         "reason": "World composition root imports split mixins and facades for the public aggregate.",
-        "max_first_party_imports": 25
+        "max_first_party_imports": 26,
+        "owner": "architecture-maintainers",
+        "removal_condition": "Remove when fantasy_simulator/world.py fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/world_structure_api.py::WorldStructureMixin",
         "reason": "World structure facade is still a broad compatibility surface.",
-        "max_class_lines": 237
+        "max_class_lines": 237,
+        "owner": "architecture-maintainers",
+        "removal_condition": "Remove when fantasy_simulator/world_structure_api.py::WorldStructureMixin fits the default complexity budgets or is split behind a narrower compatibility adapter."
       }
     ]
   }

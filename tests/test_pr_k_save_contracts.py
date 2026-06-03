@@ -8,10 +8,13 @@ import pytest
 
 from fantasy_simulator.event_models import WorldEventRecord
 from fantasy_simulator.ids import RouteId
+from fantasy_simulator.observation import build_era_timeline_projection, build_war_map_projection
 from fantasy_simulator.persistence.save_load import load_simulation, save_simulation
+from fantasy_simulator.reports import generate_monthly_report, generate_yearly_report
 from fantasy_simulator.simulator import Simulator
 from fantasy_simulator.world import World
 from fantasy_simulator.world_change import RouteUpdate, WorldChangeSet, apply_world_change_set
+from fantasy_simulator.world_location_state import clamp_state
 
 
 def _event_payloads(records: list[WorldEventRecord]) -> list[dict]:
@@ -40,6 +43,26 @@ def test_save_load_roundtrip_preserves_world_change_runtime_state_and_canonical_
     ]
     assert all(record is not None for record in expected_records)
     expected_payloads = _event_payloads([record for record in expected_records if record is not None])
+    expected_location_state = (
+        location.danger,
+        location.rumor_heat,
+        location.safety,
+        location.mood,
+        location.road_condition,
+        location.traffic,
+        list(location.live_traces),
+    )
+    route_to_location = world.get_location_by_id(to_location_id)
+    assert route_to_location is not None
+    expected_route_to_state = (
+        route_to_location.danger,
+        route_to_location.rumor_heat,
+        route_to_location.safety,
+        route_to_location.mood,
+        route_to_location.road_condition,
+        route_to_location.traffic,
+        list(route_to_location.live_traces),
+    )
 
     path = tmp_path / "pr-k-world-change-roundtrip.json"
     assert save_simulation(Simulator(world, seed=0), str(path)) is True
@@ -55,6 +78,26 @@ def test_save_load_roundtrip_preserves_world_change_runtime_state_and_canonical_
     assert restored_location.canonical_name == "Aethoria March"
     assert restored_location.aliases == [old_name]
     assert restored_location.controlling_faction_id == "silverbrook_merchant_league"
+    assert (
+        restored_location.danger,
+        restored_location.rumor_heat,
+        restored_location.safety,
+        restored_location.mood,
+        restored_location.road_condition,
+        restored_location.traffic,
+        restored_location.live_traces,
+    ) == expected_location_state
+    restored_route_to_location = restored.world.get_location_by_id(to_location_id)
+    assert restored_route_to_location is not None
+    assert (
+        restored_route_to_location.danger,
+        restored_route_to_location.rumor_heat,
+        restored_route_to_location.safety,
+        restored_route_to_location.mood,
+        restored_route_to_location.road_condition,
+        restored_route_to_location.traffic,
+        restored_route_to_location.live_traces,
+    ) == expected_route_to_state
     assert restored.world.get_location_by_name("Aethoria March") is restored_location
     assert restored.world.get_location_by_name(old_name) is None
     assert _event_payloads(restored.world.event_records) == expected_payloads
@@ -121,6 +164,16 @@ def test_save_load_roundtrip_preserves_terrain_cell_mutation_and_canonical_histo
         day=4,
     )
     assert record is not None
+    location = world.get_location_by_id("loc_aethoria_capital")
+    assert location is not None
+    expected_location_state = (
+        location.danger,
+        location.rumor_heat,
+        location.safety,
+        location.mood,
+        location.road_condition,
+        list(location.live_traces),
+    )
     expected_payloads = _event_payloads([record])
 
     path = tmp_path / "pr-k-terrain-cell-roundtrip.json"
@@ -145,6 +198,159 @@ def test_save_load_roundtrip_preserves_terrain_cell_mutation_and_canonical_histo
     restored_location = restored.world.get_location_by_id("loc_aethoria_capital")
     assert restored_location is not None
     assert record.record_id in restored_location.recent_event_ids
+    assert (
+        restored_location.danger,
+        restored_location.rumor_heat,
+        restored_location.safety,
+        restored_location.mood,
+        restored_location.road_condition,
+        restored_location.live_traces,
+    ) == expected_location_state
+
+
+def test_save_load_roundtrip_preserves_war_declaration_projection_and_report(tmp_path) -> None:
+    world = World()
+    record = world.apply_war_declaration(
+        "stormwatch_wardens",
+        "silverbrook_merchant_league",
+        location_ids=("loc_aethoria_capital", "loc_silverbrook"),
+        year=1001,
+        month=6,
+        day=7,
+        cause_key="border_incident",
+    )
+    capital = world.get_location_by_id("loc_aethoria_capital")
+    silverbrook = world.get_location_by_id("loc_silverbrook")
+    assert capital is not None
+    assert silverbrook is not None
+    expected_capital_state = (capital.danger, capital.rumor_heat, capital.safety, capital.mood, capital.live_traces[-1])
+    expected_silverbrook_state = (
+        silverbrook.danger,
+        silverbrook.rumor_heat,
+        silverbrook.safety,
+        silverbrook.mood,
+        silverbrook.live_traces[-1],
+    )
+    expected_payloads = _event_payloads([record])
+
+    path = tmp_path / "pr-k-war-declaration-roundtrip.json"
+    assert save_simulation(Simulator(world, seed=0), str(path)) is True
+    with open(path, "r", encoding="utf-8") as handle:
+        payload = json.load(handle)
+    assert payload["world"]["event_records"] == expected_payloads
+    assert "war_runtime" not in payload["world"]
+    assert "wars" not in payload["world"]
+
+    restored = load_simulation(str(path))
+
+    assert restored is not None
+    assert _event_payloads(restored.world.event_records) == expected_payloads
+    projection = build_war_map_projection(event_records=restored.world.event_records)
+    assert projection.events[0].record_id == record.record_id
+    assert projection.affected_location_ids == ("loc_aethoria_capital", "loc_silverbrook")
+    assert projection.faction_ids == ("stormwatch_wardens", "silverbrook_merchant_league")
+    restored_capital = restored.world.get_location_by_id("loc_aethoria_capital")
+    restored_silverbrook = restored.world.get_location_by_id("loc_silverbrook")
+    assert restored_capital is not None
+    assert restored_silverbrook is not None
+    assert (
+        restored_capital.danger,
+        restored_capital.rumor_heat,
+        restored_capital.safety,
+        restored_capital.mood,
+        restored_capital.live_traces[-1],
+    ) == expected_capital_state
+    assert (
+        restored_silverbrook.danger,
+        restored_silverbrook.rumor_heat,
+        restored_silverbrook.safety,
+        restored_silverbrook.mood,
+        restored_silverbrook.live_traces[-1],
+    ) == expected_silverbrook_state
+    report = generate_monthly_report(restored.world, 1001, 6)
+    assert [(entry.record_id, entry.category) for entry in report.world_change_entries] == [
+        (record.record_id, "war")
+    ]
+
+
+def test_save_load_roundtrip_preserves_era_civilization_projection_without_runtime_fields(tmp_path) -> None:
+    world = World()
+    capital = world.get_location_by_id("loc_aethoria_capital")
+    assert capital is not None
+    before_capital = (
+        capital.prosperity,
+        capital.safety,
+        capital.mood,
+        capital.traffic,
+        capital.danger,
+        capital.rumor_heat,
+    )
+    era_record = world.apply_era_shift(
+        "age_of_reckoning",
+        authored_era_keys={"age_of_embers", "age_of_reckoning"},
+        year=1002,
+        month=1,
+        cause_key="dragon_war",
+    )
+    drift_record = world.apply_civilization_phase_drift(
+        "crisis",
+        score_deltas={"prosperity": -7, "safety": -20, "mood": -5, "traffic": -3},
+        year=1002,
+        month=2,
+        reason_key="war_pressure",
+    )
+    expected_payloads = _event_payloads([era_record, drift_record])
+    expected_capital_state = (
+        clamp_state(before_capital[0] + 3 - 7),
+        clamp_state(before_capital[1] - 20),
+        clamp_state(before_capital[2] + 4 - 5),
+        clamp_state(before_capital[3] + 6 - 3),
+        clamp_state(before_capital[4] + 10),
+        clamp_state(before_capital[5] + 20 + 10),
+        capital.live_traces[-1],
+    )
+
+    path = tmp_path / "pr-k-era-civilization-roundtrip.json"
+    assert save_simulation(Simulator(world, seed=0), str(path)) is True
+    with open(path, "r", encoding="utf-8") as handle:
+        payload = json.load(handle)
+    assert payload["world"]["event_records"] == expected_payloads
+    assert "era_key" not in payload["world"]
+    assert "civilization_phase" not in payload["world"]
+    assert "world_scores" not in payload["world"]
+    assert "era_runtime" not in payload["world"]
+
+    restored = load_simulation(str(path))
+
+    assert restored is not None
+    assert _event_payloads(restored.world.event_records) == expected_payloads
+    assert not hasattr(restored.world, "era_key")
+    assert not hasattr(restored.world, "civilization_phase")
+    assert not hasattr(restored.world, "world_scores")
+    assert not hasattr(restored.world, "era_runtime")
+    restored_capital = restored.world.get_location_by_id("loc_aethoria_capital")
+    assert restored_capital is not None
+    assert (
+        restored_capital.prosperity,
+        restored_capital.safety,
+        restored_capital.mood,
+        restored_capital.traffic,
+        restored_capital.danger,
+        restored_capital.rumor_heat,
+        restored_capital.live_traces[-1],
+    ) == expected_capital_state
+    projection = build_era_timeline_projection(event_records=restored.world.event_records)
+    assert [entry.record_id for entry in projection.entries] == [
+        era_record.record_id,
+        drift_record.record_id,
+    ]
+    assert projection.current_era_id == "age_of_reckoning"
+    assert projection.current_civilization_phase == "crisis"
+    report = generate_yearly_report(restored.world, 1002)
+    assert [(entry.record_id, entry.category) for entry in report.world_change_entries] == [
+        (era_record.record_id, "era"),
+        (drift_record.record_id, "civilization"),
+    ]
 
 
 def test_save_load_full_terrain_snapshot_wins_over_sparse_event_replay(tmp_path) -> None:

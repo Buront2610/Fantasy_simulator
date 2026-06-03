@@ -270,6 +270,11 @@ terrain-cell mutation:
 - `fantasy_simulator/observation/` contains route status, location history,
   war/occupation, era timeline, and world-change report read models, including
   the terrain-change report category.
+- The observer dashboard consumes the war/occupation and era timeline
+  projections for active wars, current occupation/control state, and current
+  era/civilization visibility without adding durable runtime fields. It also
+  consumes route-status projections for current route-closure visibility and
+  world-change report projections for recent concrete world-change entries.
 - PR-K architecture, event contract, state-machine, projection, and save
   contract tests are part of the standard quality-gate target list, including
   the terrain mutation state-machine target.
@@ -289,9 +294,9 @@ Remaining K0 phases should continue in this order:
 | K0-2 | architecture boundaries, event contracts, legacy-read policy, invariants. |
 | K0-3 | seeded characterization and report/map golden masters. |
 | K0-4 | typed ID ratchet for location, route, faction, event, era, culture. |
-| K0-5 | minimal route block/reopen slice through command, reducer, projection. Started. |
+| K0-5 | minimal route block/reopen slice through command, reducer, projection. Started; currently blocked routes now reach the observer dashboard from route-status projections. |
 | K0-6 | location rename slice and rename history invariants. Started. |
-| K0-6b | location occupation/control slice and war-map projection. Started. |
+| K0-6b | location occupation/control slice and war-map projection. Started; current occupation/control state now reaches the observer dashboard from canonical records. |
 | K0-6c | headless era/civilization transition core and timeline projection. Started, not persisted as runtime fields. |
 | K0-7 | save/migration policy for PR-K dynamic fields. v8 terrain policy set; era runtime pending. |
 

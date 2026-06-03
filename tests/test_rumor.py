@@ -365,6 +365,40 @@ def test_should_notify_favorite_any():
     assert sim.should_notify(record) is True
 
 
+def test_should_notify_favorite_secondary_actor():
+    world = _make_world_with_events()
+    char = world.characters[0]
+    char.favorite = True
+    sim = Simulator(world)
+    record = WorldEventRecord(
+        record_id="evt_fav_secondary",
+        kind="meeting",
+        year=1000,
+        month=6,
+        severity=1,
+        secondary_actor_ids=[char.char_id],
+        description="A minor meeting",
+    )
+    assert sim.should_notify(record) is True
+
+
+def test_should_notify_uses_semantic_actor_ids_fallback():
+    world = _make_world_with_events()
+    char = world.characters[0]
+    char.favorite = True
+    sim = Simulator(world)
+    record = WorldEventRecord(
+        record_id="evt_fav_semantic_actor",
+        kind="meeting",
+        year=1000,
+        month=6,
+        severity=1,
+        render_params={"actor_ids": [char.char_id]},
+        description="A minor meeting",
+    )
+    assert sim.should_notify(record) is True
+
+
 def test_should_notify_low_severity_no_flags():
     world = World()
     char = Character(
@@ -383,6 +417,21 @@ def test_should_notify_low_severity_no_flags():
         description="A quiet day",
     )
     assert sim.should_notify(record) is False
+
+
+def test_should_notify_world_change_records():
+    world = World()
+    sim = Simulator(world)
+    record = WorldEventRecord(
+        record_id="evt_world_change",
+        kind="route_blocked",
+        year=1000,
+        month=6,
+        severity=2,
+        tags=["world_change"],
+        description="A route was blocked.",
+    )
+    assert sim.should_notify(record) is True
 
 
 def test_should_notify_spotlighted_serious():

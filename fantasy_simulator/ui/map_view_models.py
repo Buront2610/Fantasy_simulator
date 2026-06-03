@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 
 from ..narrative.constants import EVENT_KINDS_FATAL
+from ..observation import build_world_change_report_projection
 
 if TYPE_CHECKING:
     from ..terrain import AtlasLayout, Site
@@ -39,6 +40,8 @@ class MapCellInfo:
     has_memorial: bool = False
     has_alias: bool = False
     recent_death_site: bool = False
+    recent_world_change_count: int = 0
+    recent_world_change_categories: Tuple[str, ...] = ()
     terrain_biome: str = "plains"
     terrain_glyph: str = ","
     terrain_elevation: int = 128
@@ -97,12 +100,85 @@ def _band(value: int) -> str:
     return "medium"
 
 
+def _recent_death_site_ids(world: "World") -> set[str]:
+    return {
+        rec.location_id for rec in world.event_records[-120:]
+        if rec.kind in EVENT_KINDS_FATAL and rec.location_id
+    }
+
+
+def _recent_world_change_overlays(world: "World") -> tuple[Dict[str, int], Dict[str, List[str]]]:
+    counts: Dict[str, int] = {}
+    categories_by_location: Dict[str, List[str]] = {}
+    projection = build_world_change_report_projection(
+        event_records=world.event_records[-120:],
+    )
+    for entry in projection.entries:
+        for location_id in entry.location_ids:
+            counts[location_id] = counts.get(location_id, 0) + 1
+            categories = categories_by_location.setdefault(location_id, [])
+            if entry.category not in categories:
+                categories.append(entry.category)
+    return counts, categories_by_location
+
+
+def _copy_terrain_cells(info: MapRenderInfo, world: "World") -> None:
+    if world.terrain_map is None:
+        return
+    for (tx, ty), tcell in world.terrain_map.cells.items():
+        info.terrain_cells[(tx, ty)] = TerrainCellRenderInfo(
+            x=tx,
+            y=ty,
+            biome=tcell.biome,
+            glyph=tcell.glyph,
+            elevation=tcell.elevation,
+            moisture=tcell.moisture,
+            temperature=tcell.temperature,
+        )
+
+
+def _copy_routes(info: MapRenderInfo, world: "World") -> None:
+    for route in world.routes:
+        info.routes.append(RouteRenderInfo(
+            route_id=route.route_id,
+            from_site_id=route.from_site_id,
+            to_site_id=route.to_site_id,
+            route_type=route.route_type,
+            blocked=route.blocked,
+        ))
+
+
+def _terrain_snapshot(world: "World", x: int, y: int) -> tuple[str, str, int, int, int]:
+    from ..terrain import BIOME_GLYPHS
+
+    if world.terrain_map is None:
+        return "plains", ",", 128, 128, 128
+    tcell = world.terrain_map.get(x, y)
+    if tcell is None:
+        return "plains", ",", 128, 128, 128
+    return (
+        tcell.biome,
+        BIOME_GLYPHS.get(tcell.biome, "?"),
+        tcell.elevation,
+        tcell.moisture,
+        tcell.temperature,
+    )
+
+
+def _alive_counts_by_location(world: "World") -> Dict[str, int]:
+    counts: Dict[str, int] = {}
+    for character in world.characters:
+        if character.alive:
+            counts[character.location_id] = counts.get(character.location_id, 0) + 1
+    return counts
+
+
 def build_map_info(
     world: "World",
     highlight_location: Optional[str] = None,
 ) -> MapRenderInfo:
     """Extract a renderer-agnostic map snapshot from a live world."""
-    from ..terrain import AtlasLayout, BIOME_GLYPHS
+    from ..terrain import AtlasLayout
 
     info = MapRenderInfo(
         world_name=world.name,
@@ -115,60 +191,26 @@ def build_map_info(
         ),
     )
 
-    death_site_location_ids = {
-        rec.location_id for rec in world.event_records[-120:]
-        if rec.kind in EVENT_KINDS_FATAL and rec.location_id
-    }
+    death_site_location_ids = _recent_death_site_ids(world)
+    world_change_counts, world_change_categories = _recent_world_change_overlays(world)
     site_at: Dict[Tuple[int, int], "Site"] = {
         (site.x, site.y): site for site in world.sites
     }
 
-    if world.terrain_map is not None:
-        for (tx, ty), tcell in world.terrain_map.cells.items():
-            info.terrain_cells[(tx, ty)] = TerrainCellRenderInfo(
-                x=tx,
-                y=ty,
-                biome=tcell.biome,
-                glyph=tcell.glyph,
-                elevation=tcell.elevation,
-                moisture=tcell.moisture,
-                temperature=tcell.temperature,
-            )
-
-    for route in world.routes:
-        info.routes.append(RouteRenderInfo(
-            route_id=route.route_id,
-            from_site_id=route.from_site_id,
-            to_site_id=route.to_site_id,
-            route_type=route.route_type,
-            blocked=route.blocked,
-        ))
-
-    alive_counts_by_location: Dict[str, int] = {}
-    for character in world.characters:
-        if character.alive:
-            alive_counts_by_location[character.location_id] = (
-                alive_counts_by_location.get(character.location_id, 0) + 1
-            )
+    _copy_terrain_cells(info, world)
+    _copy_routes(info, world)
+    alive_counts_by_location = _alive_counts_by_location(world)
 
     for (x, y), loc in world.grid.items():
         is_highlight = (
             highlight_location is not None
             and (loc.id == highlight_location or loc.canonical_name == highlight_location)
         )
-        terrain_biome = "plains"
-        terrain_glyph = ","
-        terrain_elevation = 128
-        terrain_moisture = 128
-        terrain_temperature = 128
-        if world.terrain_map is not None:
-            tcell = world.terrain_map.get(x, y)
-            if tcell is not None:
-                terrain_biome = tcell.biome
-                terrain_glyph = BIOME_GLYPHS.get(tcell.biome, "?")
-                terrain_elevation = tcell.elevation
-                terrain_moisture = tcell.moisture
-                terrain_temperature = tcell.temperature
+        terrain_biome, terrain_glyph, terrain_elevation, terrain_moisture, terrain_temperature = _terrain_snapshot(
+            world,
+            x,
+            y,
+        )
 
         site = site_at.get((x, y))
         info.cells[(x, y)] = MapCellInfo(
@@ -195,6 +237,8 @@ def build_map_info(
             has_memorial=bool(loc.memorial_ids),
             has_alias=bool(loc.aliases),
             recent_death_site=loc.id in death_site_location_ids,
+            recent_world_change_count=world_change_counts.get(loc.id, 0),
+            recent_world_change_categories=tuple(world_change_categories.get(loc.id, [])),
             terrain_biome=terrain_biome,
             terrain_glyph=terrain_glyph,
             terrain_elevation=terrain_elevation,

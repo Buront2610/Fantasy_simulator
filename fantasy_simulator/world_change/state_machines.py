@@ -34,6 +34,24 @@ class RouteStateTransition:
 
 
 @dataclass(frozen=True)
+class WarDeclarationTransition:
+    """A headless faction war declaration transition."""
+
+    aggressor_faction_id: str
+    target_faction_id: str
+    event_kind: Literal["war_declared"] = "war_declared"
+
+
+@dataclass(frozen=True)
+class WarEndedTransition:
+    """A headless faction war-ending transition."""
+
+    aggressor_faction_id: str
+    target_faction_id: str
+    event_kind: Literal["war_ended"] = "war_ended"
+
+
+@dataclass(frozen=True)
 class LocationNameTransition:
     """An official location name transition."""
 
@@ -122,6 +140,38 @@ def route_status(blocked: bool) -> RouteStatus:
     if not isinstance(blocked, bool):
         raise TypeError("blocked must be a bool")
     return "blocked" if blocked else "open"
+
+
+def transition_war_declaration(
+    aggressor_faction_id: str,
+    target_faction_id: str,
+) -> WarDeclarationTransition:
+    """Return a war declaration transition after validating both factions."""
+    aggressor = aggressor_faction_id.strip()
+    target = target_faction_id.strip()
+    if not aggressor:
+        raise ValueError("aggressor_faction_id must not be blank")
+    if not target:
+        raise ValueError("target_faction_id must not be blank")
+    if aggressor == target:
+        raise ValueError("war declaration requires two distinct factions")
+    return WarDeclarationTransition(aggressor_faction_id=aggressor, target_faction_id=target)
+
+
+def transition_war_ended(
+    aggressor_faction_id: str,
+    target_faction_id: str,
+) -> WarEndedTransition:
+    """Return a war-ending transition after validating both factions."""
+    aggressor = aggressor_faction_id.strip()
+    target = target_faction_id.strip()
+    if not aggressor:
+        raise ValueError("aggressor_faction_id must not be blank")
+    if not target:
+        raise ValueError("target_faction_id must not be blank")
+    if aggressor == target:
+        raise ValueError("war ending requires two distinct factions")
+    return WarEndedTransition(aggressor_faction_id=aggressor, target_faction_id=target)
 
 
 def transition_route_blocked_state(old_blocked: bool, requested_blocked: bool) -> RouteStateTransition | None:

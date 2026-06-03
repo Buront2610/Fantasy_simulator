@@ -267,7 +267,7 @@ def test_apply_controlling_faction_change_updates_location_and_records_event():
         }
     ]
     assert render_event_record(second, locale="en") == (
-        "Aethoria Capital changed controlling faction from stormwatch_wardens to silverbrook_merchant_league."
+        "Aethoria Capital changed controlling faction from Stormwatch Wardens to Silverbrook Merchant League."
     )
 
 

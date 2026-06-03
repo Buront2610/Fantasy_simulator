@@ -33,6 +33,7 @@ from .event_recorder import EventRecorderMixin
 from .notifications import NotificationMixin
 from .queries import QueryMixin
 from .timeline import TimelineMixin
+from .timeline_world_changes import TimelineWorldChangeMixin
 
 if TYPE_CHECKING:
     from ..world import World
@@ -43,7 +44,7 @@ class Simulator(
     EnginePauseMixin,
     EnginePersistenceMixin,
     EventRecorderMixin,
-    TimelineMixin,
+    TimelineMixin, TimelineWorldChangeMixin,
     NotificationMixin,
     AdventureMixin,
     QueryMixin,
@@ -65,11 +66,13 @@ class Simulator(
         world: World,
         events_per_year: int = 8,
         adventure_steps_per_year: int = 3,
+        world_changes_per_year: int = 0,
         seed: Optional[int] = None,
     ) -> None:
         self.world = world
         self.events_per_year = events_per_year
         self.adventure_steps_per_year = adventure_steps_per_year
+        self.world_changes_per_year = world_changes_per_year
         self.event_system = EventSystem()
         # Mutable progress marker for structured event timestamps within the
         # current simulated year. This value is serialized and restored as-is

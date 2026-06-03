@@ -12,6 +12,7 @@ from .view_models import (
     LocationHistoryView,
     build_location_observation_view,
     build_monthly_report_card_view,
+    build_yearly_report_card_view,
 )
 
 
@@ -49,6 +50,21 @@ def _show_monthly_report(sim: Simulator, ctx: UIContext | None = None) -> None:
         out.print_line(f"  {line}")
     out.print_line()
     out.print_line(sim.get_monthly_report(year, month))
+    ctx.inp.pause()
+
+
+def _show_yearly_report(sim: Simulator, ctx: UIContext | None = None) -> None:
+    """Show a yearly report with a compact canonical-record card first."""
+    ctx = _default_ctx(ctx)
+    out = ctx.out
+
+    year = sim.get_latest_completed_report_year()
+    out.print_line()
+    card = build_yearly_report_card_view(sim.world, year)
+    for line in ReportPresenter.render_yearly_card(card):
+        out.print_line(f"  {line}")
+    out.print_line()
+    out.print_line(sim.get_yearly_report(year))
     ctx.inp.pause()
 
 

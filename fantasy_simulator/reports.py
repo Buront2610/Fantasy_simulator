@@ -23,9 +23,11 @@ from .reports_models import (
     LocationReportEntry,
     MonthlyReport,
     RumorReportEntry,
+    WorldChangeReportLine,
     YearlyReport,
 )
 from .rumor import RUMOR_MAX_AGE_MONTHS
+from .observation import build_world_change_report_projection
 from .world_event_index import location_ids_for_record
 
 if TYPE_CHECKING:
@@ -36,6 +38,7 @@ __all__ = [
     "CharacterReportEntry",
     "LocationReportEntry",
     "RumorReportEntry",
+    "WorldChangeReportLine",
     "MonthlyReport",
     "YearlyReport",
     "generate_monthly_report",
@@ -100,6 +103,62 @@ def _render_report_event(world: World, record: WorldEventRecord) -> str:
     return render_event_record(record, world=world)
 
 
+def _world_change_report_lines(
+    world: World,
+    records: List[WorldEventRecord],
+    *,
+    year: int,
+    month: int | None = None,
+) -> List[WorldChangeReportLine]:
+    """Return rendered PR-K world-change lines for a report period."""
+    projection = build_world_change_report_projection(
+        event_records=records,
+        year=year,
+        month=month,
+    )
+    records_by_id = {record.record_id: record for record in records}
+    lines: List[WorldChangeReportLine] = []
+    for entry in projection.entries:
+        record = records_by_id.get(entry.record_id)
+        text = entry.description if record is None else _render_report_event(world, record)
+        lines.append(
+            WorldChangeReportLine(
+                record_id=entry.record_id,
+                category=entry.category,
+                text=text,
+                location_ids=list(entry.location_ids),
+            )
+        )
+    return lines
+
+
+def _location_report_entries(
+    world: World,
+    records: List[WorldEventRecord],
+    *,
+    severity_threshold: int,
+) -> List[LocationReportEntry]:
+    loc_event_map: Dict[str, List[WorldEventRecord]] = {}
+    for record in records:
+        for loc_id in location_ids_for_record(record):
+            loc_event_map.setdefault(loc_id, []).append(record)
+
+    entries: List[LocationReportEntry] = []
+    for loc_id, loc_records in sorted(loc_event_map.items()):
+        notable_loc = [
+            _render_report_event(world, record)
+            for record in loc_records
+            if record.severity >= severity_threshold
+        ]
+        entries.append(LocationReportEntry(
+            location_id=loc_id,
+            name=world.location_name(loc_id),
+            event_count=len(loc_records),
+            notable_events=notable_loc,
+        ))
+    return _sort_location_entries(entries)
+
+
 # ------------------------------------------------------------------
 # Report generation
 # ------------------------------------------------------------------
@@ -147,27 +206,6 @@ def generate_monthly_report(
 
     # Notable events (severity >= threshold)
     notable = [_render_report_event(world, r) for r in records if r.severity >= _SEVERITY_THRESHOLD_MONTHLY]
-
-    # Location summaries
-    loc_event_map: Dict[str, List[WorldEventRecord]] = {}
-    for r in records:
-        for loc_id in location_ids_for_record(r):
-            loc_event_map.setdefault(loc_id, []).append(r)
-
-    loc_entries: List[LocationReportEntry] = []
-    for loc_id, loc_records in sorted(loc_event_map.items()):
-        loc_name = world.location_name(loc_id)
-        notable_loc = [
-            _render_report_event(world, r)
-            for r in loc_records
-            if r.severity >= _SEVERITY_THRESHOLD_MONTHLY
-        ]
-        loc_entries.append(LocationReportEntry(
-            location_id=loc_id,
-            name=loc_name,
-            event_count=len(loc_records),
-            notable_events=notable_loc,
-        ))
 
     # Rumor entries — evaluate expiration and freshness relative to the
     # report's own year/month so that historical rumor membership stays
@@ -221,8 +259,13 @@ def generate_monthly_report(
         season=season,
         character_entries=char_entries,
         notable_events=notable,
-        location_entries=_sort_location_entries(loc_entries),
+        location_entries=_location_report_entries(
+            world,
+            records,
+            severity_threshold=_SEVERITY_THRESHOLD_MONTHLY,
+        ),
         rumor_entries=rumor_entries,
+        world_change_entries=_world_change_report_lines(world, records, year=year, month=month),
         total_events=len(records),
     )
 
@@ -270,32 +313,16 @@ def generate_yearly_report(
     # Notable events for the year (severity >= threshold)
     notable = [_render_report_event(world, r) for r in records if r.severity >= _SEVERITY_THRESHOLD_YEARLY]
 
-    # Location summaries
-    loc_event_map: Dict[str, List[WorldEventRecord]] = {}
-    for r in records:
-        for loc_id in location_ids_for_record(r):
-            loc_event_map.setdefault(loc_id, []).append(r)
-
-    loc_entries: List[LocationReportEntry] = []
-    for loc_id, loc_records in sorted(loc_event_map.items()):
-        loc_name = world.location_name(loc_id)
-        notable_loc = [
-            _render_report_event(world, r)
-            for r in loc_records
-            if r.severity >= _SEVERITY_THRESHOLD_YEARLY
-        ]
-        loc_entries.append(LocationReportEntry(
-            location_id=loc_id,
-            name=loc_name,
-            event_count=len(loc_records),
-            notable_events=notable_loc,
-        ))
-
     return YearlyReport(
         year=year,
         character_entries=char_entries,
         notable_events=notable,
-        location_entries=_sort_location_entries(loc_entries),
+        location_entries=_location_report_entries(
+            world,
+            records,
+            severity_threshold=_SEVERITY_THRESHOLD_YEARLY,
+        ),
+        world_change_entries=_world_change_report_lines(world, records, year=year),
         total_events=len(records),
         deaths_this_year=deaths_this_year,
     )

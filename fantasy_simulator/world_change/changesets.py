@@ -9,7 +9,9 @@ from fantasy_simulator.event_models import WorldEventRecord
 from fantasy_simulator.ids import EraKey, FactionId, LocationId, RouteId
 
 from .commands import (
+    DeclareWarCommand,
     DriftCivilizationPhaseCommand,
+    EndWarCommand,
     MutateTerrainCellCommand,
     RenameLocationCommand,
     SetLocationControllingFactionCommand,
@@ -23,6 +25,8 @@ from .domain_events import (
     LocationRenamed,
     RouteStatusChanged,
     TerrainCellMutated,
+    WarDeclared,
+    WarEnded,
     WorldScoreChanged,
 )
 from .event_adapters import (
@@ -44,6 +48,12 @@ from .event_adapters import (
     terrain_cell_fallback_description,
     terrain_cell_mutated_to_record,
     terrain_cell_render_params,
+    war_declared_fallback_description,
+    war_declared_render_params,
+    war_declared_to_record,
+    war_ended_fallback_description,
+    war_ended_render_params,
+    war_ended_to_record,
 )
 from .specifications import (
     SupportsEraRuntimeState,
@@ -51,7 +61,11 @@ from .specifications import (
     SupportsLocationOccupationState,
     SupportsRouteStatus,
     SupportsTerrainMapState,
+    normalize_event_record_id,
+    normalize_optional_id,
+    validate_declare_war_command,
     validate_drift_civilization_phase_command,
+    validate_end_war_command,
     validate_mutate_terrain_cell_command,
     validate_rename_location_command,
     validate_set_location_controlling_faction_command,
@@ -65,6 +79,8 @@ from .state_machines import (
     transition_location_occupation_state,
     transition_route_blocked_state,
     transition_terrain_cell,
+    transition_war_ended,
+    transition_war_declaration,
     transition_world_scores,
     validate_civilization_phase,
 )
@@ -152,6 +168,78 @@ class WorldChangeSet:
     projection_hints: tuple[str, ...] = ()
 
 
+def build_war_declaration_change_set(
+    command: DeclareWarCommand,
+    *,
+    known_faction_ids: Container[str],
+    location_ids: Container[str],
+    describe: DescriptionBuilder,
+) -> WorldChangeSet:
+    """Build a headless war declaration ChangeSet."""
+    aggressor, target, affected_locations = validate_declare_war_command(
+        command,
+        known_faction_ids=known_faction_ids,
+        location_ids=location_ids,
+    )
+    transition = transition_war_declaration(str(aggressor), str(target))
+    event = WarDeclared(
+        aggressor_faction_id=FactionId(transition.aggressor_faction_id),
+        target_faction_id=FactionId(transition.target_faction_id),
+        location_ids=affected_locations,
+        year=command.year,
+        month=command.month,
+        day=command.day,
+        calendar_key=command.calendar_key,
+        cause_key=command.cause_key,
+        cause_event_id=normalize_event_record_id(command.cause_event_id),
+    )
+    record = war_declared_to_record(
+        event,
+        description=describe(
+            event.summary_key,
+            war_declared_render_params(event),
+            war_declared_fallback_description(event),
+        ),
+    )
+    return WorldChangeSet(events=(record,), projection_hints=("war_map", "world_change_report"))
+
+
+def build_war_ended_change_set(
+    command: EndWarCommand,
+    *,
+    known_faction_ids: Container[str],
+    location_ids: Container[str],
+    describe: DescriptionBuilder,
+) -> WorldChangeSet:
+    """Build a headless war-ending ChangeSet."""
+    aggressor, target, affected_locations = validate_end_war_command(
+        command,
+        known_faction_ids=known_faction_ids,
+        location_ids=location_ids,
+    )
+    transition = transition_war_ended(str(aggressor), str(target))
+    event = WarEnded(
+        aggressor_faction_id=FactionId(transition.aggressor_faction_id),
+        target_faction_id=FactionId(transition.target_faction_id),
+        location_ids=affected_locations,
+        year=command.year,
+        month=command.month,
+        day=command.day,
+        calendar_key=command.calendar_key,
+        cause_key=command.cause_key,
+        cause_event_id=normalize_event_record_id(command.cause_event_id),
+    )
+    record = war_ended_to_record(
+        event,
+        description=describe(
+            event.summary_key,
+            war_ended_render_params(event),
+            war_ended_fallback_description(event),
+        ),
+    )
+    return WorldChangeSet(events=(record,), projection_hints=("war_map", "world_change_report"))
+
+
 def build_route_blocked_change_set(
     command: SetRouteBlockedCommand,
     *,
@@ -171,7 +259,7 @@ def build_route_blocked_change_set(
         return None
 
     event = RouteStatusChanged(
-        route_id=command.route_id,
+        route_id=RouteId(route.route_id),
         from_location_id=LocationId(route.from_site_id),
         to_location_id=LocationId(route.to_site_id),
         old_blocked=transition.old_blocked,
@@ -180,7 +268,7 @@ def build_route_blocked_change_set(
         month=command.month,
         day=command.day,
         calendar_key=command.calendar_key,
-        cause_event_id=command.cause_event_id,
+        cause_event_id=normalize_event_record_id(command.cause_event_id),
     )
     render_params = route_status_render_params(event)
     fallback_description = route_status_fallback_description(event, location_name=location_name)
@@ -224,15 +312,16 @@ def build_location_rename_change_set(
     if transition is None:
         return None
 
+    location_id = LocationId(location.id)
     event = LocationRenamed(
-        location_id=command.location_id,
+        location_id=location_id,
         old_name=transition.old_name,
         new_name=transition.new_name,
         year=command.year,
         month=command.month,
         day=command.day,
         calendar_key=command.calendar_key,
-        cause_event_id=command.cause_event_id,
+        cause_event_id=normalize_event_record_id(command.cause_event_id),
     )
     record = location_renamed_to_record(
         event,
@@ -246,7 +335,7 @@ def build_location_rename_change_set(
         events=(record,),
         location_updates=(
             LocationRenameUpdate(
-                location_id=command.location_id,
+                location_id=location_id,
                 old_name=transition.old_name,
                 new_name=transition.new_name,
                 old_aliases=transition.old_aliases,
@@ -278,17 +367,18 @@ def build_location_occupation_change_set(
     if transition is None:
         return None
 
+    location_id = LocationId(location.id)
     event = LocationOccupationChanged(
-        location_id=command.location_id,
+        location_id=location_id,
         old_faction_id=None if transition.old_faction_id is None else FactionId(transition.old_faction_id),
         new_faction_id=None if transition.new_faction_id is None else FactionId(transition.new_faction_id),
         year=command.year,
         month=command.month,
         day=command.day,
         calendar_key=command.calendar_key,
-        cause_event_id=command.cause_event_id,
+        cause_event_id=normalize_event_record_id(command.cause_event_id),
     )
-    resolved_location_name = location_name(str(command.location_id))
+    resolved_location_name = location_name(str(location_id))
     record = location_occupation_changed_to_record(
         event,
         description=describe(
@@ -301,7 +391,7 @@ def build_location_occupation_change_set(
         events=(record,),
         occupation_updates=(
             LocationOccupationUpdate(
-                location_id=command.location_id,
+                location_id=location_id,
                 old_faction_id=event.old_faction_id,
                 new_faction_id=event.new_faction_id,
             ),
@@ -352,10 +442,10 @@ def build_terrain_cell_mutation_change_set(
         year=command.year,
         month=command.month,
         day=command.day,
-        location_id=command.location_id,
+        location_id=normalize_optional_id(command.location_id, id_type=LocationId),
         calendar_key=command.calendar_key,
         reason_key=command.reason_key,
-        cause_event_id=command.cause_event_id,
+        cause_event_id=normalize_event_record_id(command.cause_event_id),
     )
     record = terrain_cell_mutated_to_record(
         event,
@@ -433,7 +523,7 @@ def build_era_shift_change_set(
         day=command.day,
         calendar_key=command.calendar_key,
         cause_key=command.cause_key,
-        cause_event_id=command.cause_event_id,
+        cause_event_id=normalize_event_record_id(command.cause_event_id),
     )
     record = era_shifted_to_record(
         event,
@@ -485,7 +575,7 @@ def build_civilization_phase_drift_change_set(
         day=command.day,
         calendar_key=command.calendar_key,
         reason_key=command.reason_key,
-        cause_event_id=command.cause_event_id,
+        cause_event_id=normalize_event_record_id(command.cause_event_id),
     )
     record = civilization_phase_drifted_to_record(
         event,

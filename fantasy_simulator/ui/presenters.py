@@ -18,6 +18,7 @@ from .view_models import (
     AdventureSummaryView,
     LocationHistoryView,
     MonthlyReportCardView,
+    YearlyReportCardView,
 )
 
 
@@ -178,4 +179,26 @@ class ReportPresenter:
                 for change in card.world_changes
             )
             lines.append(f"  {tr('report_section_world')}: {summary}")
+            lines.extend(
+                f"    {tr(f'world_change_category_{entry.category}')}: {entry.text}"
+                for entry in card.world_change_entries[:3]
+            )
+        return lines
+
+    @staticmethod
+    def render_yearly_card(card: YearlyReportCardView) -> List[str]:
+        lines = [tr("yearly_report_card_header", year=card.year)]
+        lines.append(tr("yearly_report_card_total_events", count=card.total_events))
+        if card.highlighted_locations:
+            lines.append(tr("monthly_report_card_locations", names=", ".join(card.highlighted_locations)))
+        if card.world_changes:
+            summary = ", ".join(
+                f"{tr(f'world_change_category_{change.category}')}: {change.count}"
+                for change in card.world_changes
+            )
+            lines.append(f"  {tr('report_section_world')}: {summary}")
+            lines.extend(
+                f"    {tr(f'world_change_category_{entry.category}')}: {entry.text}"
+                for entry in card.world_change_entries[:5]
+            )
         return lines

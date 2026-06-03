@@ -12,6 +12,60 @@ RouteEventKind = Literal["route_blocked", "route_reopened"]
 
 
 @dataclass(frozen=True)
+class WarDeclared:
+    """Domain fact that one faction declared war on another."""
+
+    aggressor_faction_id: FactionId
+    target_faction_id: FactionId
+    location_ids: tuple[LocationId, ...]
+    year: int
+    month: int
+    day: int
+    calendar_key: str = ""
+    cause_key: str = ""
+    cause_event_id: EventRecordId | None = None
+
+    @property
+    def kind(self) -> Literal["war_declared"]:
+        return "war_declared"
+
+    @property
+    def summary_key(self) -> str:
+        return "events.war_declared.summary"
+
+    @property
+    def belligerent_faction_ids(self) -> list[str]:
+        return [str(self.aggressor_faction_id), str(self.target_faction_id)]
+
+
+@dataclass(frozen=True)
+class WarEnded:
+    """Domain fact that two factions ended a war."""
+
+    aggressor_faction_id: FactionId
+    target_faction_id: FactionId
+    location_ids: tuple[LocationId, ...]
+    year: int
+    month: int
+    day: int
+    calendar_key: str = ""
+    cause_key: str = ""
+    cause_event_id: EventRecordId | None = None
+
+    @property
+    def kind(self) -> Literal["war_ended"]:
+        return "war_ended"
+
+    @property
+    def summary_key(self) -> str:
+        return "events.war_ended.summary"
+
+    @property
+    def belligerent_faction_ids(self) -> list[str]:
+        return [str(self.aggressor_faction_id), str(self.target_faction_id)]
+
+
+@dataclass(frozen=True)
 class RouteStatusChanged:
     """Domain fact that a route moved between open and blocked states."""
 

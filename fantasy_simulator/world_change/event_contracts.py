@@ -28,6 +28,26 @@ class WorldChangeEventContract:
 
 
 WORLD_CHANGE_EVENT_CONTRACTS: Mapping[str, WorldChangeEventContract] = {
+    "war_declared": WorldChangeEventContract(
+        kind="war_declared",
+        required_render_params=frozenset(
+            {"aggressor_faction_id", "target_faction_id", "belligerent_faction_ids", "location_ids"}
+        ),
+        required_tags=frozenset({"world_change", "war"}),
+        required_impact_attributes=frozenset(),
+        allowed_impact_attributes=frozenset(),
+        requires_impact=False,
+    ),
+    "war_ended": WorldChangeEventContract(
+        kind="war_ended",
+        required_render_params=frozenset(
+            {"aggressor_faction_id", "target_faction_id", "belligerent_faction_ids", "location_ids"}
+        ),
+        required_tags=frozenset({"world_change", "war"}),
+        required_impact_attributes=frozenset(),
+        allowed_impact_attributes=frozenset(),
+        requires_impact=False,
+    ),
     "route_blocked": WorldChangeEventContract(
         kind="route_blocked",
         required_render_params=frozenset({"route_id", "from_location_id", "to_location_id"}),

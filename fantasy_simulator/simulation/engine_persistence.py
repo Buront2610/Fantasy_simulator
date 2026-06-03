@@ -63,6 +63,7 @@ class EnginePersistenceMixin:
             "characters": [char.to_dict() for char in self.world.characters],
             "events_per_year": self.events_per_year,
             "adventure_steps_per_year": self.adventure_steps_per_year,
+            "world_changes_per_year": self.world_changes_per_year,
             "current_month": self.current_month,
             "current_day": self.current_day,
             "elapsed_days": self.elapsed_days,
@@ -101,6 +102,7 @@ class EnginePersistenceMixin:
             world,
             events_per_year=data.get("events_per_year", 8),
             adventure_steps_per_year=data.get("adventure_steps_per_year", 3),
+            world_changes_per_year=data.get("world_changes_per_year", 0),
         )
         set_locale(data.get("locale", get_locale()))
         sim._restore_rng_state(sim.rng, data.get("rng_state"))

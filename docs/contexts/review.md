@@ -1,7 +1,5 @@
 # Review Context
 
-Use this file when the task is primarily code review or risk assessment.
-
 ## Review Priorities
 
 1. Behavioral regressions
@@ -16,6 +14,7 @@ Use this file when the task is primarily code review or risk assessment.
 - Does it bypass i18n rules for user-facing text?
 - Does it introduce a layer dependency that the structural tests should forbid?
 - Does it modify roadmap or guardrail docs without keeping them aligned?
+- Does it treat PR-K K0 slices as unstarted, complete, or persistable without evidence/ADR?
 - Is verification proportional to the scope of the change?
 - If it blocks completion, what is the smallest follow-up subagent that should handle it?
 

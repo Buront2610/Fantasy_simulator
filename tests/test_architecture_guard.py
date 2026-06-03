@@ -119,6 +119,38 @@ def test_complexity_overrides_require_reason() -> None:
         raise AssertionError("Expected budget overrides without a reason to fail")
 
 
+def test_complexity_overrides_require_debt_ledger_metadata() -> None:
+    base_override = {
+        "target": "pkg/domain/service.py::run",
+        "reason": "Formerly complex branch preserved as an example.",
+        "max_cognitive_complexity": 99,
+    }
+
+    for missing_key, message in (
+        ("owner", "requires a non-empty owner"),
+        ("removal_condition", "requires a non-empty removal_condition"),
+    ):
+        override = {
+            **base_override,
+            "owner": "architecture-maintainers",
+            "removal_condition": "Remove when the function fits the default complexity budget.",
+        }
+        override.pop(missing_key)
+        config = {
+            "source_roots": ["pkg"],
+            "complexity": {
+                "overrides": [override],
+            },
+        }
+
+        try:
+            validate_config(config)
+        except TypeError as exc:
+            assert message in str(exc)
+        else:
+            raise AssertionError(f"Expected overrides without {missing_key} to fail")
+
+
 def test_complexity_budgets_reject_bool_values() -> None:
     for complexity in (
         {"max_function_lines": True},
@@ -127,6 +159,8 @@ def test_complexity_budgets_reject_bool_values() -> None:
                 {
                     "target": "pkg/domain/service.py::Service",
                     "reason": "Example override.",
+                    "owner": "architecture-maintainers",
+                    "removal_condition": "Remove when the class fits the default budget.",
                     "max_class_lines": True,
                 }
             ]
@@ -160,6 +194,8 @@ def test_relaxed_complexity_overrides_fail_when_no_longer_needed(tmp_path: Path)
                 {
                     "target": "pkg/domain/simple.py::run",
                     "reason": "Formerly complex branch preserved as an example.",
+                    "owner": "architecture-maintainers",
+                    "removal_condition": "Remove when the function fits the default complexity budget.",
                     "max_cognitive_complexity": 99,
                 }
             ],
@@ -185,6 +221,8 @@ def test_missing_complexity_override_targets_fail(tmp_path: Path) -> None:
                 {
                     "target": "pkg/domain/simple.py::rn",
                     "reason": "Typo should not be silently ignored.",
+                    "owner": "architecture-maintainers",
+                    "removal_condition": "Remove when the target name points at an observed metric.",
                     "max_cognitive_complexity": 99,
                 }
             ],

@@ -62,6 +62,21 @@ def _pick_region_rumor_target(
     return min(rumor_candidates, key=priority)
 
 
+def _pick_world_change_target(
+    visible_cells: List[MapCellInfo],
+    center_cell: MapCellInfo,
+) -> Optional[MapCellInfo]:
+    candidates = [cell for cell in visible_cells if cell.recent_world_change_count]
+    if not candidates:
+        return None
+
+    def priority(cell: MapCellInfo) -> Tuple[int, int, str]:
+        distance = abs(cell.x - center_cell.x) + abs(cell.y - center_cell.y)
+        return (-cell.recent_world_change_count, distance, cell.canonical_name.lower())
+
+    return min(candidates, key=priority)
+
+
 def _has_world_memory(
     cell: MapCellInfo,
     memorials_by_site: Dict[str, List[str]],
@@ -192,6 +207,21 @@ def region_focus_lines(
 
     if rumor_target is not None:
         standout_lines.append(tr("map_region_focus_rumor", location=rumor_target.canonical_name))
+
+    world_change_target = _pick_world_change_target(visible_cells, center_cell)
+    if world_change_target is not None:
+        category = (
+            world_change_target.recent_world_change_categories[0]
+            if world_change_target.recent_world_change_categories
+            else "world_change"
+        )
+        standout_lines.append(
+            tr(
+                "map_region_focus_world_change",
+                location=world_change_target.canonical_name,
+                category=tr(f"world_change_category_{category}"),
+            )
+        )
 
     landmark_target = _pick_landmark_target(
         visible_cells,

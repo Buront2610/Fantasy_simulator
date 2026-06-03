@@ -36,8 +36,7 @@ class TimelineMixin:
     - ``adventure_steps_per_year``: target adventure step budget per year
     - ``event_system``: EventSystem instance
     - ``rng``: RNG for simulation decisions
-    - ``_favorites_worsened_this_year``: set of char IDs
-    - ``_active_seasonal_deltas``: list of (loc, attr, delta) tuples
+    - ``_favorites_worsened_this_year`` and seasonal delta trackers
     """
 
     # Seasonal modifiers applied to locations each month (design §5.7).
@@ -92,6 +91,7 @@ class TimelineMixin:
             DayPhaseKind.INJURY_RECOVERY: self._run_injury_recovery_phase,
             DayPhaseKind.ADVENTURE: self._run_adventure_phase,
             DayPhaseKind.RANDOM_EVENTS: self._run_random_event_phase,
+            DayPhaseKind.WORLD_CHANGES: self._run_world_change_phase,
             DayPhaseKind.MONTH_END: self._run_month_end_phase,
         }
         try:

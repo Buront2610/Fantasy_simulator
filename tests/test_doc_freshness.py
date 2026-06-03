@@ -73,13 +73,18 @@ def test_readme_and_plan_agree_on_next_step() -> None:
     assert "TD-1〜TD-4 の負債解消は完了済み" in PLAN_TEXT
     assert "次に着手すべき実装は **TD-1〜TD-4 の負債解消**" not in PLAN_TEXT
     assert "PR-J's first formal `SettingBundle` authoring pass is complete" in README_TEXT
-    assert "次に着手すべき実装は **PR-K: 動的世界変化**" in PLAN_TEXT
+    assert "PR-K is the\n  active mainline milestone" in README_TEXT
+    assert "現在進めるべき実装は **PR-K: 動的世界変化**" in PLAN_TEXT
+    assert "K0 guardrail slices は\nすでに始まっている" in PLAN_TEXT
     assert "PR-J: 世界観設定整理と初期 Setting Bundle 構築 ← **次はここ**" not in PLAN_TEXT
 
 
 def test_ui_plan_does_not_conflict_with_implementation_plan_next_step() -> None:
     assert "~~PR-J: 世界観設定整理と初期 Setting Bundle 構築~~ ✅" in PLAN_TEXT
-    assert "PR-K: 動的世界変化（war / renaming / terrain mutation / era shift / civilization drift） ← **次はここ**" in PLAN_TEXT
+    assert (
+        "PR-K: 動的世界変化（war / renaming / terrain mutation / era shift / civilization drift） "
+        "← **active mainline**"
+    ) in PLAN_TEXT
     assert "次段は PR-K で動的世界変化へ入る" in UI_PLAN_TEXT
     assert "次段は TD-1〜TD-4" not in UI_PLAN_TEXT
     assert "PR-H2、PR-I、TD-1〜TD-4 の負債解消、PR-J の世界観 authoring は完了" in UI_PLAN_TEXT
