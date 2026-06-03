@@ -142,6 +142,7 @@ def test_terrain_command_boundary_normalizes_optional_location_and_cause_event_i
             y=2,
             biome="forest",
             year=1001,
+            terrain_cell_id=TerrainCellId(" terrain:2:2 "),
             location_id=LocationId(" loc_aethoria_capital "),
             cause_event_id=EventRecordId(" cause-terrain "),
         ),
@@ -151,8 +152,28 @@ def test_terrain_command_boundary_normalizes_optional_location_and_cause_event_i
     )
 
     assert change_set is not None
+    assert change_set.events[0].render_params["terrain_cell_id"] == "terrain:2:2"
     assert change_set.events[0].render_params["location_id"] == "loc_aethoria_capital"
     assert change_set.events[0].render_params["cause_event_id"] == "cause-terrain"
+
+
+def test_terrain_command_boundary_rejects_mismatched_typed_cell_id() -> None:
+    world = World()
+    assert world.terrain_map is not None
+
+    with pytest.raises(ValueError, match=r"terrain_cell_id terrain:1:2 does not match coordinates \(2, 2\)"):
+        build_terrain_cell_mutation_change_set(
+            MutateTerrainCellCommand(
+                x=2,
+                y=2,
+                biome="forest",
+                year=1001,
+                terrain_cell_id=TerrainCellId("terrain:1:2"),
+            ),
+            terrain_map=world.terrain_map,
+            allowed_biomes=BIOME_TYPES,
+            describe=_describe,
+        )
 
 
 def test_era_and_civilization_boundaries_normalize_era_and_cause_event_ids() -> None:

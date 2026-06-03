@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Mapping
 
-from fantasy_simulator.ids import EraKey, EventRecordId, FactionId, LocationId, RouteId
+from fantasy_simulator.ids import EraKey, EventRecordId, FactionId, LocationId, RouteId, TerrainCellId
 
 
 @dataclass(frozen=True)
@@ -90,6 +90,7 @@ class MutateTerrainCellCommand:
     elevation: int | None = None
     moisture: int | None = None
     temperature: int | None = None
+    terrain_cell_id: TerrainCellId | None = None
     location_id: LocationId | None = None
     calendar_key: str = ""
     reason_key: str = ""

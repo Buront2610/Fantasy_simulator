@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Callable, Container, Iterable, Mapping, MutableMapping, Protocol, TypeVar
 
-from fantasy_simulator.ids import EraKey, EventRecordId, FactionId, LocationId, RouteId
+from fantasy_simulator.ids import EraKey, EventRecordId, FactionId, LocationId, RouteId, TerrainCellId
 
 from .commands import (
     DeclareWarCommand,
@@ -219,6 +219,21 @@ def _terrain_coord(value: int, *, field_name: str) -> int:
     return value
 
 
+def _terrain_cell_id_for_coords(x: int, y: int) -> TerrainCellId:
+    return TerrainCellId(f"terrain:{x}:{y}")
+
+
+def normalize_terrain_cell_id(value: object | None, *, x: int, y: int) -> TerrainCellId:
+    """Normalize an optional terrain cell ID and require it to match the requested coordinates."""
+    expected = _terrain_cell_id_for_coords(x, y)
+    normalized = normalize_optional_id(value, id_type=TerrainCellId)
+    if normalized is None:
+        return expected
+    if normalized != expected:
+        raise ValueError(f"terrain_cell_id {normalized} does not match coordinates ({x}, {y})")
+    return normalized
+
+
 def _terrain_scalar(value: int | None, fallback: int, *, field_name: str) -> int:
     if value is None:
         return fallback
@@ -253,6 +268,7 @@ def validate_mutate_terrain_cell_command(
     y = _terrain_coord(command.y, field_name="y")
     if not 0 <= x < terrain_map.width or not 0 <= y < terrain_map.height:
         raise ValueError(f"terrain cell is outside world bounds: ({x}, {y})")
+    normalize_terrain_cell_id(command.terrain_cell_id, x=x, y=y)
     cell = terrain_map.get(x, y)
     if cell is None:
         raise KeyError(f"terrain cell does not exist: ({x}, {y})")
