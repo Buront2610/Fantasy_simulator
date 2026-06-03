@@ -460,6 +460,8 @@ class TestWorldDashboardScreen(unittest.TestCase):
         self.assertIn("Mira [favorite]", text)
         self.assertIn("The capital road is dangerous.", text)
         self.assertIn("Aethoria Capital (danger 91", text)
+        self.assertIn("Follow up", text)
+        self.assertIn("Inspect Mira at Aethoria Capital.", text)
 
 
 class TestRumorBoardScreen(unittest.TestCase):

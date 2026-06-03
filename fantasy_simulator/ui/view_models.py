@@ -37,6 +37,7 @@ __all__ = [
     "CurrentOccupationView",
     "CurrentRouteClosureView",
     "EraStatusView",
+    "FollowUpActionView",
     "LocationHistoryView",
     "LocationObservationView",
     "MonthlyReportCardView",
@@ -137,6 +138,16 @@ class EraStatusView:
 
 
 @dataclass
+class FollowUpActionView:
+    key: str
+    label: str
+    target_type: str
+    target_id: str
+    location_id: str = ""
+    record_id: str = ""
+
+
+@dataclass
 class MonthlyReportCardView:
     year: int
     month: int
@@ -179,6 +190,7 @@ class WorldDashboardView:
     current_route_closures: List[CurrentRouteClosureView] = field(default_factory=list)
     era_status: EraStatusView | None = None
     world_change_entries: List[WorldChangeEntryView] = field(default_factory=list)
+    follow_up_actions: List[FollowUpActionView] = field(default_factory=list)
 
 
 @dataclass
@@ -361,6 +373,164 @@ def _era_status_view(records: List["WorldEventRecord"]) -> EraStatusView | None:
     )
 
 
+def _append_follow_up_action(actions: List[FollowUpActionView], action: FollowUpActionView) -> None:
+    identity = (action.key, action.target_type, action.target_id, action.location_id, action.record_id)
+    if any(
+        (item.key, item.target_type, item.target_id, item.location_id, item.record_id) == identity
+        for item in actions
+    ):
+        return
+    actions.append(action)
+
+
+def _character_follow_up_actions(world: "World", watched_characters: List[object]) -> List[FollowUpActionView]:
+    actions: List[FollowUpActionView] = []
+    for character in watched_characters:
+        character_id = getattr(character, "char_id", "")
+        location_id = getattr(character, "location_id", "")
+        if not character_id:
+            continue
+        actions.append(
+            FollowUpActionView(
+                key="inspect_character",
+                label=tr(
+                    "dashboard_follow_up_inspect_character",
+                    actor=getattr(character, "name", character_id),
+                    location=_location_name(world, location_id) if location_id else "",
+                ),
+                target_type="character",
+                target_id=character_id,
+                location_id=location_id,
+            )
+        )
+    return actions
+
+
+def _route_follow_up_actions(world: "World", routes: List[CurrentRouteClosureView]) -> List[FollowUpActionView]:
+    return [
+        FollowUpActionView(
+            key="inspect_route_closure",
+            label=tr(
+                "dashboard_follow_up_inspect_route_closure",
+                from_location=_location_name(world, route.from_location_id),
+                to_location=_location_name(world, route.to_location_id),
+            ),
+            target_type="route",
+            target_id=route.route_id,
+            location_id=route.from_location_id,
+            record_id=route.record_id,
+        )
+        for route in routes
+    ]
+
+
+def _occupation_follow_up_actions(world: "World", occupations: List[CurrentOccupationView]) -> List[FollowUpActionView]:
+    return [
+        FollowUpActionView(
+            key="inspect_occupation",
+            label=tr(
+                "dashboard_follow_up_inspect_occupation",
+                location=_location_name(world, occupation.location_id),
+            ),
+            target_type="location",
+            target_id=occupation.location_id,
+            location_id=occupation.location_id,
+            record_id=occupation.record_id,
+        )
+        for occupation in occupations
+    ]
+
+
+def _war_follow_up_actions(wars: List[ActiveWarView]) -> List[FollowUpActionView]:
+    return [
+        FollowUpActionView(
+            key="review_active_war",
+            label=tr("dashboard_follow_up_review_active_war", text=war.text),
+            target_type="war",
+            target_id=war.record_id,
+            location_id=war.location_ids[0] if war.location_ids else "",
+            record_id=war.record_id,
+        )
+        for war in wars
+    ]
+
+
+def _rumor_follow_up_actions(rumors: List[RumorSummaryView]) -> List[FollowUpActionView]:
+    return [
+        FollowUpActionView(
+            key="review_rumor",
+            label=tr("dashboard_follow_up_review_rumor", text=rumor.description),
+            target_type="rumor",
+            target_id=rumor.rumor_id,
+            location_id=rumor.source_location_id or "",
+            record_id=rumor.source_event_id or "",
+        )
+        for rumor in rumors
+    ]
+
+
+def _world_change_follow_up_actions(entries: List[WorldChangeEntryView]) -> List[FollowUpActionView]:
+    return [
+        FollowUpActionView(
+            key="review_world_change",
+            label=tr("dashboard_follow_up_review_world_change", text=entry.text),
+            target_type="world_change",
+            target_id=entry.record_id,
+            location_id=entry.location_ids[0] if entry.location_ids else "",
+            record_id=entry.record_id,
+        )
+        for entry in entries
+    ]
+
+
+def _dashboard_follow_up_actions(
+    world: "World",
+    *,
+    watched_characters: List[object],
+    hot_rumors: List[RumorSummaryView],
+    active_wars: List[ActiveWarView],
+    current_occupations: List[CurrentOccupationView],
+    current_route_closures: List[CurrentRouteClosureView],
+    world_change_entries: List[WorldChangeEntryView],
+) -> List[FollowUpActionView]:
+    actions: List[FollowUpActionView] = []
+    action_groups = [
+        _character_follow_up_actions(world, watched_characters),
+        _route_follow_up_actions(world, current_route_closures),
+        _occupation_follow_up_actions(world, current_occupations),
+        _war_follow_up_actions(active_wars),
+        _rumor_follow_up_actions(hot_rumors),
+        _world_change_follow_up_actions(world_change_entries),
+    ]
+    for group in action_groups:
+        for action in group:
+            _append_follow_up_action(actions, action)
+    return actions[:5]
+
+
+def _dashboard_watched_characters(world: "World", *, limit: int) -> List[object]:
+    return [
+        character
+        for character in getattr(world, "characters", [])
+        if character.favorite or character.spotlighted or character.playable
+    ][:limit]
+
+
+def _dashboard_dangerous_locations(world: "World", *, limit: int) -> List[str]:
+    return [
+        tr(
+            "dashboard_location_status",
+            location=location.canonical_name,
+            danger=location.danger,
+            rumor=location.rumor_heat,
+        )
+        for location in sorted(
+            getattr(world, "grid", {}).values(),
+            key=lambda item: (-item.danger, -item.rumor_heat, item.canonical_name.lower()),
+        )[:limit]
+    ]
+
+
 def build_monthly_report_card_view(world: "World", year: int, month: int) -> MonthlyReportCardView:
     records = _records_for_month(world, year, month)
     record_calendar_key = next(
@@ -478,33 +648,26 @@ def build_world_dashboard_view(
 
     alive_count = sum(1 for character in getattr(world, "characters", []) if character.alive)
     deceased_count = sum(1 for character in getattr(world, "characters", []) if not character.alive)
-    watched_actors = [
-        _format_dashboard_actor(world, character)
-        for character in getattr(world, "characters", [])
-        if character.favorite or character.spotlighted or character.playable
-    ][:5]
-    dangerous_locations = [
-        tr(
-            "dashboard_location_status",
-            location=location.canonical_name,
-            danger=location.danger,
-            rumor=location.rumor_heat,
-        )
-        for location in sorted(
-            getattr(world, "grid", {}).values(),
-            key=lambda item: (-item.danger, -item.rumor_heat, item.canonical_name.lower()),
-        )[:5]
-    ]
-    hot_rumors = [
-        render_rumor_brief(rumor)
-        for rumor in _dashboard_hot_rumors(world, limit=5)
-    ]
+    watched_characters = _dashboard_watched_characters(world, limit=5)
+    watched_actors = [_format_dashboard_actor(world, character) for character in watched_characters]
+    dangerous_locations = _dashboard_dangerous_locations(world, limit=5)
+    hot_rumor_views = _dashboard_hot_rumors(world, limit=5)
+    hot_rumors = [render_rumor_brief(rumor) for rumor in hot_rumor_views]
     month_label = _dashboard_month_label(world, current_month)
     world_changes, world_change_entries = _world_change_views(world, records, year=getattr(world, "year", 0))
     active_wars = _active_war_views(world, records)
     current_occupations = _current_occupation_views(world, records)
     current_route_closures = _current_route_closure_views(world, records)
     era_status = _era_status_view(records)
+    follow_up_actions = _dashboard_follow_up_actions(
+        world,
+        watched_characters=watched_characters,
+        hot_rumors=hot_rumor_views,
+        active_wars=active_wars,
+        current_occupations=current_occupations,
+        current_route_closures=current_route_closures,
+        world_change_entries=world_change_entries,
+    )
 
     return WorldDashboardView(
         world_name=getattr(world, "name", ""),
@@ -525,6 +688,7 @@ def build_world_dashboard_view(
         current_route_closures=current_route_closures,
         era_status=era_status,
         world_change_entries=world_change_entries,
+        follow_up_actions=follow_up_actions,
     )
 
 

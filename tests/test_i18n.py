@@ -127,9 +127,13 @@ class TestI18n:
         set_locale("ja")
         assert tr("dashboard_menu") == "世界ダッシュボード"
         assert "Aethoria" in tr("dashboard_title", world="Aethoria")
+        assert tr("dashboard_follow_up") == "次の確認"
+        assert "Mira" in tr("dashboard_follow_up_inspect_character", actor="Mira", location="Aethoria")
         set_locale("en")
         assert tr("dashboard_menu") == "World dashboard"
         assert "Aethoria" in tr("dashboard_title", world="Aethoria")
+        assert tr("dashboard_follow_up") == "Follow up"
+        assert "Mira" in tr("dashboard_follow_up_inspect_character", actor="Mira", location="Aethoria")
 
     @pytest.mark.parametrize("locale", ["en", "ja"])
     @pytest.mark.parametrize(

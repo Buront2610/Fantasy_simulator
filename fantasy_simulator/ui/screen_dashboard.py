@@ -63,6 +63,12 @@ def _render_world_dashboard(view: WorldDashboardView, ctx: UIContext) -> None:
             for item in view.world_change_entries[:5]
         ]
         _render_section(tr("dashboard_recent_world_changes"), lines, ctx=ctx)
+    if view.follow_up_actions:
+        _render_section(
+            tr("dashboard_follow_up"),
+            [item.label for item in view.follow_up_actions],
+            ctx=ctx,
+        )
 
 
 def _render_section(title: str, lines: list[str], ctx: UIContext) -> None:

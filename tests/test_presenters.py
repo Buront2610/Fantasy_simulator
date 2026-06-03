@@ -10,6 +10,7 @@ from fantasy_simulator.ui.view_models import (
     build_world_dashboard_view,
     build_yearly_report_card_view,
 )
+from fantasy_simulator.character import Character
 from fantasy_simulator.rumor import Rumor
 from fantasy_simulator.world import CalendarChangeRecord, World
 from fantasy_simulator.events import WorldEventRecord
@@ -552,6 +553,35 @@ def test_world_dashboard_surfaces_recent_world_change_entries():
         "War: " in line and "Stormwatch Wardens declared war on Silverbrook Merchant League." in line
         for line in output.lines
     )
+
+
+def test_world_dashboard_builds_follow_up_actions_from_observer_attention():
+    set_locale("en")
+    world = World()
+    hero = Character("Mira", 24, "Female", "Human", "Ranger", location_id="loc_aethoria_capital")
+    hero.favorite = True
+    world.add_character(hero)
+    route = world.routes[0]
+    blocked = world.apply_route_blocked_change(route.route_id, True, year=world.year, month=2)
+    world.rumors.append(
+        Rumor(
+            id="rumor_follow",
+            description="Travelers whisper that the capital road is dangerous.",
+            reliability="plausible",
+            source_location_id="loc_aethoria_capital",
+            spread_level=5,
+        )
+    )
+
+    dashboard = build_world_dashboard_view(world, current_month=2)
+
+    assert blocked is not None
+    identities = [(item.key, item.target_type, item.target_id) for item in dashboard.follow_up_actions]
+    assert ("inspect_character", "character", hero.char_id) in identities
+    assert ("inspect_route_closure", "route", route.route_id) in identities
+    assert ("review_rumor", "rumor", "rumor_follow") in identities
+    assert dashboard.follow_up_actions[0].label == "Inspect Mira at Aethoria Capital."
+    assert any(item.record_id == blocked.record_id for item in dashboard.follow_up_actions)
 
 
 def test_monthly_report_card_renders_world_change_category_display_labels():
