@@ -450,6 +450,8 @@ TEXT_JA: Dict[str, str] = {
     'report_location_thread_line': (
         '    {location}: {count}件の出来事、世界変化 {world_changes}件 | {headline}'
     ),
+    'report_section_watched_threads': '注目人物ごとの流れ',
+    'report_watched_thread_line': '    {actor}: {count}件の出来事 | {headline}',
     'report_total_events': '  イベント総数: {count}',
     'report_deaths_this_year': '  この年の死者数: {count}',
     'report_section_rumors': '▶ 噂',

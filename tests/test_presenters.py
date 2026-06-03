@@ -432,6 +432,61 @@ def test_monthly_report_card_clusters_location_threads_from_records():
     assert any(expected in line for line in lines)
 
 
+def test_monthly_report_card_clusters_watched_actor_threads_from_records():
+    set_locale("en")
+    world = World()
+    watched = Character("Mira", 24, "Female", "Human", "Ranger", location_id="loc_aethoria_capital")
+    watched.favorite = True
+    unwatched = Character("Orven", 31, "Male", "Human", "Scholar", location_id="loc_aethoria_capital")
+    world.add_character(watched)
+    world.add_character(unwatched)
+    world.record_event(
+        WorldEventRecord(
+            record_id="mira_minor",
+            kind="meeting",
+            year=world.year,
+            month=3,
+            day=1,
+            primary_actor_id=watched.char_id,
+            severity=1,
+            description="Mira met a border scout.",
+        )
+    )
+    world.record_event(
+        WorldEventRecord(
+            record_id="mira_battle",
+            kind="battle",
+            year=world.year,
+            month=3,
+            day=2,
+            primary_actor_id=watched.char_id,
+            severity=5,
+            description="Mira held the pass.",
+        )
+    )
+    world.record_event(
+        WorldEventRecord(
+            record_id="orven_note",
+            kind="meeting",
+            year=world.year,
+            month=3,
+            day=3,
+            primary_actor_id=unwatched.char_id,
+            severity=5,
+            description="Orven wrote a private note.",
+        )
+    )
+
+    card = build_monthly_report_card_view(world, world.year, 3)
+    lines = ReportPresenter.render_monthly_card(card)
+
+    assert [(thread.actor_name, thread.event_count) for thread in card.watched_threads] == [("Mira", 2)]
+    assert card.watched_threads[0].headline == "Mira held the pass."
+    assert any("Watched threads" in line for line in lines)
+    assert any("Mira: 2 event(s) | Mira held the pass." in line for line in lines)
+    assert all(thread.actor_name != "Orven" for thread in card.watched_threads)
+
+
 def test_world_dashboard_major_events_are_severity_first():
     set_locale("en")
     world = World()

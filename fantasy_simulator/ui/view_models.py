@@ -44,6 +44,7 @@ __all__ = [
     "NotificationItemView",
     "ReportHeadlineView",
     "ReportLocationThreadView",
+    "ReportWatchedThreadView",
     "RumorSummaryView",
     "WorldChangeEntryView",
     "WorldChangeSummaryView",
@@ -169,12 +170,21 @@ class ReportLocationThreadView:
 
 
 @dataclass
+class ReportWatchedThreadView:
+    actor_id: str
+    actor_name: str
+    event_count: int
+    headline: str = ""
+
+
+@dataclass
 class MonthlyReportCardView:
     year: int
     month: int
     month_label: str = ""
     headline_events: List[ReportHeadlineView] = field(default_factory=list)
     location_threads: List[ReportLocationThreadView] = field(default_factory=list)
+    watched_threads: List[ReportWatchedThreadView] = field(default_factory=list)
     highlighted_characters: List[str] = field(default_factory=list)
     highlighted_locations: List[str] = field(default_factory=list)
     completed_adventures: List[str] = field(default_factory=list)
@@ -190,6 +200,7 @@ class YearlyReportCardView:
     total_events: int = 0
     headline_events: List[ReportHeadlineView] = field(default_factory=list)
     location_threads: List[ReportLocationThreadView] = field(default_factory=list)
+    watched_threads: List[ReportWatchedThreadView] = field(default_factory=list)
     highlighted_locations: List[str] = field(default_factory=list)
     world_changes: List[WorldChangeSummaryView] = field(default_factory=list)
     world_change_entries: List[WorldChangeEntryView] = field(default_factory=list)
@@ -382,6 +393,71 @@ def _location_thread_views(
             view.location_id,
         )
     )
+    return views[: max(0, limit)]
+
+
+def _actor_ids_for_record(record: "WorldEventRecord") -> List[str]:
+    actor_ids: List[str] = []
+
+    def add_actor_id(value: object) -> None:
+        if isinstance(value, str) and value and value not in actor_ids:
+            actor_ids.append(value)
+
+    add_actor_id(record.primary_actor_id)
+    for actor_id in record.secondary_actor_ids:
+        add_actor_id(actor_id)
+    render_actor_ids = record.render_params.get("actor_ids", [])
+    if isinstance(render_actor_ids, list):
+        for actor_id in render_actor_ids:
+            add_actor_id(actor_id)
+    return actor_ids
+
+
+def _watched_character_lookup(world: "World") -> Dict[str, object]:
+    return {
+        character.char_id: character
+        for character in getattr(world, "characters", [])
+        if character.favorite or character.spotlighted or character.playable
+    }
+
+
+def _watched_thread_views(
+    world: "World",
+    records: List["WorldEventRecord"],
+    *,
+    limit: int,
+) -> List[ReportWatchedThreadView]:
+    watched_characters = _watched_character_lookup(world)
+    grouped: Dict[str, List["WorldEventRecord"]] = {}
+    for record in records:
+        for actor_id in _actor_ids_for_record(record):
+            if actor_id in watched_characters:
+                grouped.setdefault(actor_id, []).append(record)
+
+    views: List[ReportWatchedThreadView] = []
+    for actor_id, actor_records in grouped.items():
+        ranked_records = sorted(
+            actor_records,
+            key=lambda record: (
+                record.severity,
+                record.year,
+                record.month,
+                record.day,
+                record.absolute_day,
+                record.record_id,
+            ),
+            reverse=True,
+        )
+        character = watched_characters[actor_id]
+        views.append(
+            ReportWatchedThreadView(
+                actor_id=actor_id,
+                actor_name=getattr(character, "name", actor_id),
+                event_count=len(actor_records),
+                headline=_render_view_event(ranked_records[0], world) if ranked_records else "",
+            )
+        )
+    views.sort(key=lambda view: (-view.event_count, view.actor_name.lower(), view.actor_id))
     return views[: max(0, limit)]
 
 
@@ -705,6 +781,7 @@ def build_monthly_report_card_view(world: "World", year: int, month: int) -> Mon
         month_label=month_label,
         headline_events=_headline_event_views(world, records, limit=3),
         location_threads=_location_thread_views(world, records, limit=3),
+        watched_threads=_watched_thread_views(world, records, limit=3),
         highlighted_characters=highlights,
         highlighted_locations=location_highlights,
         completed_adventures=completed_adventures[:3],
@@ -736,6 +813,7 @@ def build_yearly_report_card_view(world: "World", year: int) -> YearlyReportCard
         total_events=len(records),
         headline_events=_headline_event_views(world, records, limit=5),
         location_threads=_location_thread_views(world, records, limit=5),
+        watched_threads=_watched_thread_views(world, records, limit=5),
         highlighted_locations=highlighted_locations,
         world_changes=world_changes,
         world_change_entries=world_change_entries,

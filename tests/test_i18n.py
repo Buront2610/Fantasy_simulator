@@ -136,6 +136,7 @@ class TestI18n:
             world_changes=1,
             headline="変化あり",
         )
+        assert "Mira" in tr("report_watched_thread_line", actor="Mira", count=2, headline="変化あり")
         set_locale("en")
         assert tr("report_section_headlines") == "Headlines"
         assert tr("report_headline_category_world_change") == "World change"
@@ -145,6 +146,9 @@ class TestI18n:
             count=2,
             world_changes=1,
             headline="Changed",
+        )
+        assert tr("report_watched_thread_line", actor="Mira", count=2, headline="Changed") == (
+            "    Mira: 2 event(s) | Changed"
         )
 
     def test_dashboard_templates_render(self):

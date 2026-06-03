@@ -171,6 +171,17 @@ class ReportPresenter:
             )
         if card.highlighted_characters:
             lines.append(tr("monthly_report_card_characters", names=", ".join(card.highlighted_characters)))
+        if card.watched_threads:
+            lines.append(f"  {tr('report_section_watched_threads')}:")
+            lines.extend(
+                tr(
+                    "report_watched_thread_line",
+                    actor=thread.actor_name,
+                    count=thread.event_count,
+                    headline=thread.headline,
+                )
+                for thread in card.watched_threads
+            )
         if card.highlighted_locations:
             lines.append(tr("monthly_report_card_locations", names=", ".join(card.highlighted_locations)))
         if card.location_threads:
@@ -212,6 +223,17 @@ class ReportPresenter:
             lines.extend(
                 f"    {tr(f'report_headline_category_{headline.category}')}: {headline.text}"
                 for headline in card.headline_events
+            )
+        if card.watched_threads:
+            lines.append(f"  {tr('report_section_watched_threads')}:")
+            lines.extend(
+                tr(
+                    "report_watched_thread_line",
+                    actor=thread.actor_name,
+                    count=thread.event_count,
+                    headline=thread.headline,
+                )
+                for thread in card.watched_threads
             )
         if card.highlighted_locations:
             lines.append(tr("monthly_report_card_locations", names=", ".join(card.highlighted_locations)))

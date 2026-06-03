@@ -456,6 +456,8 @@ TEXT_EN: Dict[str, str] = {
     'report_location_thread_line': (
         '    {location}: {count} event(s), {world_changes} world change(s) | {headline}'
     ),
+    'report_section_watched_threads': 'Watched threads',
+    'report_watched_thread_line': '    {actor}: {count} event(s) | {headline}',
     'report_total_events': '  Total events: {count}',
     'report_deaths_this_year': '  Deaths this year: {count}',
     'report_section_rumors': '▶ Rumors',
