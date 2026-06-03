@@ -681,6 +681,12 @@ TEXT_EN: Dict[str, str] = {
     'auto_pause_recommendation_review_party_returned': "Review {actor}'s returned party",
     'auto_pause_recommendation_review_world_dashboard': 'Review the world dashboard',
     'auto_pause_recommendation_review_recent_events': 'Review recent events and reports',
+    'auto_pause_action_target_route': 'route: {target}',
+    'auto_pause_action_target_location': 'location: {target}',
+    'auto_pause_action_target_terrain_cell': 'terrain: {target}',
+    'auto_pause_action_target_world': 'world: {target}',
+    'auto_pause_action_target_era': 'era: {target}',
+    'auto_pause_action_target_civilization': 'civilization: {target}',
     # PR-G: terrain / route / site labels
     'terrain_biome_ocean': 'Ocean',
     'terrain_biome_coast': 'Coast',

@@ -351,11 +351,21 @@ class TestAutoAdvanceScreen(unittest.TestCase):
         from fantasy_simulator.ui.render_backend import PrintRenderBackend
 
         set_locale("en")
+        route = SimpleNamespace(
+            route_id="route_capital_thornwood",
+            from_site_id="loc_aethoria_capital",
+            to_site_id="loc_thornwood",
+        )
         sim = SimpleNamespace(
             world=SimpleNamespace(
                 characters=[SimpleNamespace(alive=True)],
                 months_per_year=12,
                 year=1000,
+                routes=[route],
+                location_name=lambda location_id: {
+                    "loc_aethoria_capital": "Aethoria Capital",
+                    "loc_thornwood": "Thornwood",
+                }.get(location_id, location_id),
             ),
             get_pending_adventure_choices=lambda: [],
             advance_until_pause=lambda max_years: {
@@ -373,6 +383,8 @@ class TestAutoAdvanceScreen(unittest.TestCase):
                     {
                         "key": "review_world_dashboard",
                         "location": "Aethoria Capital",
+                        "target_type": "route",
+                        "target_id": "route_capital_thornwood",
                     }
                 ],
             },
@@ -397,7 +409,7 @@ class TestAutoAdvanceScreen(unittest.TestCase):
         self.assertIn("Cause context: Aethoria Capital", text)
         self.assertNotIn("Cause context:  @ Aethoria Capital", text)
         self.assertIn("A world change requires attention at Aethoria Capital.", text)
-        self.assertIn("Review the world dashboard", text)
+        self.assertIn("Review the world dashboard (route: Aethoria Capital - Thornwood)", text)
 
 
 class TestWorldDashboardScreen(unittest.TestCase):

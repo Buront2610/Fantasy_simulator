@@ -671,6 +671,12 @@ TEXT_JA: Dict[str, str] = {
     'auto_pause_recommendation_review_party_returned': '{actor} の帰還したパーティを確認',
     'auto_pause_recommendation_review_world_dashboard': '世界ダッシュボードを確認',
     'auto_pause_recommendation_review_recent_events': '最近の出来事と報告を確認',
+    'auto_pause_action_target_route': '経路: {target}',
+    'auto_pause_action_target_location': '地点: {target}',
+    'auto_pause_action_target_terrain_cell': '地形: {target}',
+    'auto_pause_action_target_world': '世界: {target}',
+    'auto_pause_action_target_era': '時代: {target}',
+    'auto_pause_action_target_civilization': '文明: {target}',
     # PR-G: terrain / route / site labels
     'terrain_biome_ocean': '海洋',
     'terrain_biome_coast': '海岸',

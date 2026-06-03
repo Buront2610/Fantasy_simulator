@@ -103,6 +103,7 @@ class TestI18n:
         assert "Mira" in tr("auto_pause_recommendation_inspect_character", actor="Mira", location="Capital")
         assert "Capital" in tr("auto_pause_subreason_world_change_notification", actor="", location="Capital")
         assert tr("auto_pause_recommendation_review_world_dashboard", actor="", location="Capital")
+        assert tr("auto_pause_action_target_route", target="North Road") == "経路: North Road"
         set_locale("en")
         assert tr("auto_pause_subreasons") == "Why this matters:"
         assert tr("auto_pause_recommendations") == "Recommended checks:"
@@ -112,6 +113,7 @@ class TestI18n:
         assert "Mira" in tr("auto_pause_recommendation_inspect_character", actor="Mira", location="Capital")
         assert "Capital" in tr("auto_pause_subreason_world_change_notification", actor="", location="Capital")
         assert tr("auto_pause_recommendation_review_world_dashboard", actor="", location="Capital")
+        assert tr("auto_pause_action_target_route", target="North Road") == "route: North Road"
 
     def test_rumor_board_templates_render(self):
         set_locale("ja")

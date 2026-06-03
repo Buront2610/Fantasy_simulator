@@ -74,6 +74,32 @@ def _format_auto_pause_context(pause_context: dict[str, Any]) -> str:
     return ""
 
 
+def _route_target_label(world: Any, route_id: str) -> str:
+    for route in getattr(world, "routes", []):
+        if getattr(route, "route_id", "") != route_id:
+            continue
+        from_id = getattr(route, "from_site_id", "")
+        to_id = getattr(route, "to_site_id", "")
+        if hasattr(world, "location_name") and from_id and to_id:
+            return f"{world.location_name(from_id)} - {world.location_name(to_id)}"
+        return route_id
+    return route_id
+
+
+def _format_auto_pause_action_target(world: Any, action: dict[str, Any]) -> str:
+    target_type = action.get("target_type", "")
+    target_id = action.get("target_id", "")
+    if not target_type or not target_id:
+        return ""
+    if target_type == "location" and hasattr(world, "location_name"):
+        target = world.location_name(target_id)
+    elif target_type == "route":
+        target = _route_target_label(world, target_id)
+    else:
+        target = str(target_id)
+    return tr(f"auto_pause_action_target_{target_type}", target=target)
+
+
 def _advance_auto(sim: Simulator, ctx: UIContext | None = None) -> None:
     """Run simulation until auto-pause triggers (design doc section 4.4)."""
     ctx = _default_ctx(ctx)
@@ -126,6 +152,8 @@ def _advance_auto(sim: Simulator, ctx: UIContext | None = None) -> None:
             action_key = item.get("key", "review_recent_events")
             actor = item.get("character", "-") or "-"
             location = item.get("location", "-") or "-"
+            target_text = _format_auto_pause_action_target(sim.world, item)
+            suffix = f" ({target_text})" if target_text else ""
             out.print_dim(
-                f"    - {tr(f'auto_pause_recommendation_{action_key}', actor=actor, location=location)}"
+                f"    - {tr(f'auto_pause_recommendation_{action_key}', actor=actor, location=location)}{suffix}"
             )
