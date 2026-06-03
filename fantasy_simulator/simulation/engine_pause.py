@@ -34,6 +34,10 @@ def _pause_recommendations_for_reason_context(reason: str, context: Dict[str, st
         "character": character,
         "location_id": location_id,
         "location": location,
+        "record_id": context.get("record_id", ""),
+        "event_kind": context.get("event_kind", ""),
+        "target_type": context.get("target_type", ""),
+        "target_id": context.get("target_id", ""),
     }
     if reason.startswith("dying") or reason == "condition_worsened_favorite":
         actions = [{"key": "inspect_character", **base}]
@@ -58,6 +62,10 @@ def _pause_subreasons_for_reason_context(reason: str, context: Dict[str, str]) -
         "character": context.get("character", ""),
         "location_id": context.get("location_id", ""),
         "location": context.get("location", ""),
+        "record_id": context.get("record_id", ""),
+        "event_kind": context.get("event_kind", ""),
+        "target_type": context.get("target_type", ""),
+        "target_id": context.get("target_id", ""),
     }
     if reason.startswith("dying"):
         return [{"key": "actor_in_danger", **payload}]
@@ -281,6 +289,26 @@ class EnginePauseMixin:
                 return record
         return None
 
+    def _world_change_target_context(self, record) -> Dict[str, str]:
+        for impact in getattr(record, "impacts", []):
+            target_type = str(impact.get("target_type", "")).strip()
+            target_id = str(impact.get("target_id", "")).strip()
+            if target_type and target_id:
+                return {"target_type": target_type, "target_id": target_id}
+
+        target_fields = (
+            ("route", "route_id"),
+            ("location", "location_id"),
+            ("terrain_cell", "terrain_cell_id"),
+            ("era", "new_era_key"),
+            ("civilization", "new_phase"),
+        )
+        for target_type, field_name in target_fields:
+            target_id = str(record.render_params.get(field_name, "")).strip()
+            if target_id:
+                return {"target_type": target_type, "target_id": target_id}
+        return {"target_type": "", "target_id": ""}
+
     def _pause_context_for_world_change(self, record) -> Dict[str, str]:
         location_ids = location_ids_for_record(record)
         location_id = location_ids[0] if location_ids else ""
@@ -292,6 +320,7 @@ class EnginePauseMixin:
             "location": location,
             "record_id": record.record_id,
             "event_kind": record.kind,
+            **self._world_change_target_context(record),
         }
 
     def _pause_context_for_reason(self, reason: str) -> Dict[str, str]:
@@ -318,6 +347,9 @@ class EnginePauseMixin:
                 item.get("key", ""),
                 item.get("character_id", item.get("character", "")),
                 item.get("location_id", item.get("location", "")),
+                item.get("record_id", ""),
+                item.get("target_type", ""),
+                item.get("target_id", ""),
             )
             if key in seen:
                 continue
