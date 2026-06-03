@@ -173,6 +173,18 @@ class ReportPresenter:
             lines.append(tr("monthly_report_card_characters", names=", ".join(card.highlighted_characters)))
         if card.highlighted_locations:
             lines.append(tr("monthly_report_card_locations", names=", ".join(card.highlighted_locations)))
+        if card.location_threads:
+            lines.append(f"  {tr('report_section_location_threads')}:")
+            lines.extend(
+                tr(
+                    "report_location_thread_line",
+                    location=thread.location_name,
+                    count=thread.event_count,
+                    world_changes=thread.world_change_count,
+                    headline=thread.headline,
+                )
+                for thread in card.location_threads
+            )
         if card.completed_adventures:
             lines.append(tr("monthly_report_card_adventures", items=" | ".join(card.completed_adventures)))
         if card.new_memory_items:
@@ -203,6 +215,18 @@ class ReportPresenter:
             )
         if card.highlighted_locations:
             lines.append(tr("monthly_report_card_locations", names=", ".join(card.highlighted_locations)))
+        if card.location_threads:
+            lines.append(f"  {tr('report_section_location_threads')}:")
+            lines.extend(
+                tr(
+                    "report_location_thread_line",
+                    location=thread.location_name,
+                    count=thread.event_count,
+                    world_changes=thread.world_change_count,
+                    headline=thread.headline,
+                )
+                for thread in card.location_threads
+            )
         if card.world_changes:
             summary = ", ".join(
                 f"{tr(f'world_change_category_{change.category}')}: {change.count}"

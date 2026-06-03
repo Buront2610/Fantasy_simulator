@@ -446,6 +446,10 @@ TEXT_JA: Dict[str, str] = {
     'report_headline_category_life': '人生',
     'report_headline_category_conflict': '争い',
     'report_headline_category_event': '出来事',
+    'report_section_location_threads': '地点ごとの流れ',
+    'report_location_thread_line': (
+        '    {location}: {count}件の出来事、世界変化 {world_changes}件 | {headline}'
+    ),
     'report_total_events': '  イベント総数: {count}',
     'report_deaths_this_year': '  この年の死者数: {count}',
     'report_section_rumors': '▶ 噂',

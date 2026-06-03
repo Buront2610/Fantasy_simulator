@@ -129,9 +129,23 @@ class TestI18n:
         set_locale("ja")
         assert tr("report_section_headlines") == "見出し"
         assert tr("report_headline_category_world_change") == "世界変化"
+        assert "Aethoria" in tr(
+            "report_location_thread_line",
+            location="Aethoria",
+            count=2,
+            world_changes=1,
+            headline="変化あり",
+        )
         set_locale("en")
         assert tr("report_section_headlines") == "Headlines"
         assert tr("report_headline_category_world_change") == "World change"
+        assert "2 event(s)" in tr(
+            "report_location_thread_line",
+            location="Aethoria",
+            count=2,
+            world_changes=1,
+            headline="Changed",
+        )
 
     def test_dashboard_templates_render(self):
         set_locale("ja")

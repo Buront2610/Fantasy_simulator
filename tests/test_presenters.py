@@ -389,6 +389,49 @@ def test_monthly_report_card_surfaces_edited_headlines_before_raw_sections():
     assert any("Conflict: A severe battle shook the capital." in line for line in lines)
 
 
+def test_monthly_report_card_clusters_location_threads_from_records():
+    set_locale("en")
+    world = World()
+    route = world.routes[0]
+    blocked = world.apply_route_blocked_change(route.route_id, True, year=world.year, month=3, day=1)
+    world.record_event(
+        WorldEventRecord(
+            record_id="capital_meeting",
+            kind="meeting",
+            year=world.year,
+            month=3,
+            day=2,
+            location_id=route.from_site_id,
+            severity=2,
+            description="A local council reviewed the damage.",
+        )
+    )
+    world.record_event(
+        WorldEventRecord(
+            record_id="thornwood_skirmish",
+            kind="battle",
+            year=world.year,
+            month=3,
+            day=3,
+            location_id=route.to_site_id,
+            severity=5,
+            description="A route-end skirmish escalated.",
+        )
+    )
+
+    card = build_monthly_report_card_view(world, world.year, 3)
+    lines = ReportPresenter.render_monthly_card(card)
+
+    assert blocked is not None
+    assert card.location_threads[0].location_id == route.from_site_id
+    assert card.location_threads[0].event_count == 2
+    assert card.location_threads[0].world_change_count == 1
+    assert "was blocked" in card.location_threads[0].headline
+    assert any("Location threads" in line for line in lines)
+    expected = f"{world.location_name(route.from_site_id)}: 2 event(s), 1 world change(s)"
+    assert any(expected in line for line in lines)
+
+
 def test_world_dashboard_major_events_are_severity_first():
     set_locale("en")
     world = World()

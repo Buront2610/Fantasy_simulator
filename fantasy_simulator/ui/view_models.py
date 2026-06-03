@@ -43,6 +43,7 @@ __all__ = [
     "MonthlyReportCardView",
     "NotificationItemView",
     "ReportHeadlineView",
+    "ReportLocationThreadView",
     "RumorSummaryView",
     "WorldChangeEntryView",
     "WorldChangeSummaryView",
@@ -159,11 +160,21 @@ class ReportHeadlineView:
 
 
 @dataclass
+class ReportLocationThreadView:
+    location_id: str
+    location_name: str
+    event_count: int
+    world_change_count: int
+    headline: str = ""
+
+
+@dataclass
 class MonthlyReportCardView:
     year: int
     month: int
     month_label: str = ""
     headline_events: List[ReportHeadlineView] = field(default_factory=list)
+    location_threads: List[ReportLocationThreadView] = field(default_factory=list)
     highlighted_characters: List[str] = field(default_factory=list)
     highlighted_locations: List[str] = field(default_factory=list)
     completed_adventures: List[str] = field(default_factory=list)
@@ -178,6 +189,7 @@ class YearlyReportCardView:
     year: int
     total_events: int = 0
     headline_events: List[ReportHeadlineView] = field(default_factory=list)
+    location_threads: List[ReportLocationThreadView] = field(default_factory=list)
     highlighted_locations: List[str] = field(default_factory=list)
     world_changes: List[WorldChangeSummaryView] = field(default_factory=list)
     world_change_entries: List[WorldChangeEntryView] = field(default_factory=list)
@@ -325,6 +337,52 @@ def _headline_event_views(
         )
         for record in ranked_records[: max(0, limit)]
     ]
+
+
+def _location_thread_views(
+    world: "World",
+    records: List["WorldEventRecord"],
+    *,
+    limit: int,
+) -> List[ReportLocationThreadView]:
+    grouped: Dict[str, List["WorldEventRecord"]] = {}
+    for record in records:
+        for location_id in location_ids_for_record(record):
+            grouped.setdefault(location_id, []).append(record)
+
+    views: List[ReportLocationThreadView] = []
+    for location_id, location_records in grouped.items():
+        ranked_records = sorted(
+            location_records,
+            key=lambda record: (
+                "world_change" in getattr(record, "tags", []),
+                record.severity,
+                record.year,
+                record.month,
+                record.day,
+                record.absolute_day,
+                record.record_id,
+            ),
+            reverse=True,
+        )
+        views.append(
+            ReportLocationThreadView(
+                location_id=location_id,
+                location_name=_location_name(world, location_id),
+                event_count=len(location_records),
+                world_change_count=sum(1 for record in location_records if "world_change" in record.tags),
+                headline=_render_view_event(ranked_records[0], world) if ranked_records else "",
+            )
+        )
+    views.sort(
+        key=lambda view: (
+            -view.world_change_count,
+            -view.event_count,
+            view.location_name.lower(),
+            view.location_id,
+        )
+    )
+    return views[: max(0, limit)]
 
 
 def _active_war_views(world: "World", records: List["WorldEventRecord"]) -> List[ActiveWarView]:
@@ -646,6 +704,7 @@ def build_monthly_report_card_view(world: "World", year: int, month: int) -> Mon
         month=month,
         month_label=month_label,
         headline_events=_headline_event_views(world, records, limit=3),
+        location_threads=_location_thread_views(world, records, limit=3),
         highlighted_characters=highlights,
         highlighted_locations=location_highlights,
         completed_adventures=completed_adventures[:3],
@@ -676,6 +735,7 @@ def build_yearly_report_card_view(world: "World", year: int) -> YearlyReportCard
         year=year,
         total_events=len(records),
         headline_events=_headline_event_views(world, records, limit=5),
+        location_threads=_location_thread_views(world, records, limit=5),
         highlighted_locations=highlighted_locations,
         world_changes=world_changes,
         world_change_entries=world_change_entries,

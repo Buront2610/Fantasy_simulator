@@ -452,6 +452,10 @@ TEXT_EN: Dict[str, str] = {
     'report_headline_category_life': 'Life',
     'report_headline_category_conflict': 'Conflict',
     'report_headline_category_event': 'Event',
+    'report_section_location_threads': 'Location threads',
+    'report_location_thread_line': (
+        '    {location}: {count} event(s), {world_changes} world change(s) | {headline}'
+    ),
     'report_total_events': '  Total events: {count}',
     'report_deaths_this_year': '  Deaths this year: {count}',
     'report_section_rumors': '▶ Rumors',
