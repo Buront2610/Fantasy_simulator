@@ -315,6 +315,54 @@ def test_monthly_report_card_surfaces_hot_rumors():
     assert any("Something happened at the capital." in line for line in lines)
 
 
+def test_monthly_report_card_clusters_rumor_threads_by_source_event():
+    set_locale("en")
+    world = World()
+    world.record_event(
+        WorldEventRecord(
+            record_id="evt_road",
+            kind="route_blocked",
+            year=world.year,
+            month=3,
+            day=1,
+            location_id="loc_aethoria_capital",
+            description="The capital road failed.",
+        )
+    )
+    world.rumors.extend([
+        Rumor(
+            id="rumor_low",
+            description="Travelers say the road is unsafe.",
+            reliability="doubtful",
+            spread_level=4,
+            source_location_id="loc_aethoria_capital",
+            source_event_id="evt_road",
+            year_created=world.year,
+            month_created=3,
+        ),
+        Rumor(
+            id="rumor_hot",
+            description="Merchants insist the capital road collapsed.",
+            reliability="plausible",
+            spread_level=8,
+            source_location_id="loc_aethoria_capital",
+            source_event_id="evt_road",
+            year_created=world.year,
+            month_created=3,
+        ),
+    ])
+
+    card = build_monthly_report_card_view(world, world.year, 3)
+    lines = ReportPresenter.render_monthly_card(card)
+
+    assert [(thread.source_event_id, thread.rumor_count) for thread in card.rumor_threads] == [("evt_road", 2)]
+    assert card.rumor_threads[0].source_event_text == "The capital road failed."
+    assert card.rumor_threads[0].headline == "Merchants insist the capital road collapsed."
+    assert card.rumor_threads[0].source_location_name == "Aethoria Capital"
+    assert any("Rumor threads" in line for line in lines)
+    assert any("evt_road: 2 rumor(s)" in line and "plausible" in line for line in lines)
+
+
 def test_monthly_report_card_surfaces_world_change_projection_summary():
     set_locale("en")
     world = World()
@@ -813,3 +861,54 @@ def test_yearly_report_card_surfaces_world_change_projection_details():
         "War:" in line and "Stormwatch Wardens declared war on Silverbrook Merchant League." in line
         for line in lines
     )
+
+
+def test_yearly_report_card_surfaces_rumor_threads_from_active_and_archive():
+    set_locale("en")
+    world = World()
+    world.record_event(
+        WorldEventRecord(
+            record_id="evt_archive",
+            kind="discovery",
+            year=world.year,
+            month=4,
+            day=3,
+            location_id="loc_thornwood_forest",
+            description="A hidden shrine was found.",
+        )
+    )
+    world.rumors.append(
+        Rumor(
+            id="rumor_active",
+            description="Pilgrims are searching the old road.",
+            reliability="plausible",
+            spread_level=5,
+            source_location_id="loc_aethoria_capital",
+            source_event_id="evt_active",
+            year_created=world.year,
+            month_created=5,
+        )
+    )
+    world.rumor_archive.append(
+        Rumor(
+            id="rumor_archive",
+            description="Foresters whisper about a hidden shrine.",
+            reliability="certain",
+            spread_level=9,
+            source_location_id="loc_thornwood_forest",
+            source_event_id="evt_archive",
+            year_created=world.year,
+            month_created=4,
+        )
+    )
+
+    card = build_yearly_report_card_view(world, world.year)
+    lines = ReportPresenter.render_yearly_card(card)
+
+    assert [(thread.source_event_id, thread.rumor_count) for thread in card.rumor_threads] == [
+        ("evt_archive", 1),
+        ("evt_active", 1),
+    ]
+    assert card.rumor_threads[0].source_event_text == "A hidden shrine was found."
+    assert any("Rumor threads" in line for line in lines)
+    assert any("evt_archive: 1 rumor(s)" in line and "certain" in line for line in lines)

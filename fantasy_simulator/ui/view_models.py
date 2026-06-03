@@ -44,6 +44,7 @@ __all__ = [
     "NotificationItemView",
     "ReportHeadlineView",
     "ReportLocationThreadView",
+    "ReportRumorThreadView",
     "ReportWatchedThreadView",
     "ReportWorldChangeThreadView",
     "RumorSummaryView",
@@ -187,6 +188,17 @@ class ReportWorldChangeThreadView:
 
 
 @dataclass
+class ReportRumorThreadView:
+    source_event_id: str
+    source_event_text: str
+    rumor_count: int
+    source_location_name: str
+    reliability: str
+    spread_level: int
+    headline: str = ""
+
+
+@dataclass
 class MonthlyReportCardView:
     year: int
     month: int
@@ -195,6 +207,7 @@ class MonthlyReportCardView:
     location_threads: List[ReportLocationThreadView] = field(default_factory=list)
     watched_threads: List[ReportWatchedThreadView] = field(default_factory=list)
     world_change_threads: List[ReportWorldChangeThreadView] = field(default_factory=list)
+    rumor_threads: List[ReportRumorThreadView] = field(default_factory=list)
     highlighted_characters: List[str] = field(default_factory=list)
     highlighted_locations: List[str] = field(default_factory=list)
     completed_adventures: List[str] = field(default_factory=list)
@@ -212,6 +225,7 @@ class YearlyReportCardView:
     location_threads: List[ReportLocationThreadView] = field(default_factory=list)
     watched_threads: List[ReportWatchedThreadView] = field(default_factory=list)
     world_change_threads: List[ReportWorldChangeThreadView] = field(default_factory=list)
+    rumor_threads: List[ReportRumorThreadView] = field(default_factory=list)
     highlighted_locations: List[str] = field(default_factory=list)
     world_changes: List[WorldChangeSummaryView] = field(default_factory=list)
     world_change_entries: List[WorldChangeEntryView] = field(default_factory=list)
@@ -353,6 +367,64 @@ def _world_change_thread_views(
             )
         )
     views.sort(key=lambda view: (-view.count, view.category))
+    return views[: max(0, limit)]
+
+
+def _rumor_thread_views(
+    world: "World",
+    records: List["WorldEventRecord"],
+    *,
+    year: int,
+    month: int | None = None,
+    limit: int,
+) -> List[ReportRumorThreadView]:
+    rumors = list(getattr(world, "rumors", [])) + list(getattr(world, "rumor_archive", []))
+    period_rumors = [
+        rumor
+        for rumor in rumors
+        if getattr(rumor, "year_created", 0) == year
+        and (month is None or getattr(rumor, "month_created", 0) == month)
+    ]
+    grouped: Dict[str, List[object]] = {}
+    for rumor in period_rumors:
+        source_event_id = str(getattr(rumor, "source_event_id", "") or getattr(rumor, "id", ""))
+        if source_event_id:
+            grouped.setdefault(source_event_id, []).append(rumor)
+
+    records_by_id = {record.record_id: record for record in records}
+    views: List[ReportRumorThreadView] = []
+    for source_event_id, source_rumors in grouped.items():
+        ranked_rumors = sorted(
+            source_rumors,
+            key=lambda rumor: (
+                getattr(rumor, "spread_level", 0),
+                -getattr(rumor, "age_in_months", 0),
+                getattr(rumor, "month_created", 0),
+                getattr(rumor, "id", ""),
+            ),
+            reverse=True,
+        )
+        headline_rumor = ranked_rumors[0]
+        source_record = records_by_id.get(source_event_id)
+        source_location_id = str(getattr(headline_rumor, "source_location_id", "") or "")
+        views.append(
+            ReportRumorThreadView(
+                source_event_id=getattr(headline_rumor, "source_event_id", None) or "",
+                source_event_text=_render_view_event(source_record, world) if source_record is not None else "",
+                rumor_count=len(source_rumors),
+                source_location_name=_location_name(world, source_location_id) if source_location_id else "",
+                reliability=str(getattr(headline_rumor, "reliability", "plausible")),
+                spread_level=int(getattr(headline_rumor, "spread_level", 0)),
+                headline=str(getattr(headline_rumor, "description", "")),
+            )
+        )
+    views.sort(
+        key=lambda view: (
+            -view.rumor_count,
+            -view.spread_level,
+            view.source_event_id or view.headline,
+        )
+    )
     return views[: max(0, limit)]
 
 
@@ -833,6 +905,7 @@ def build_monthly_report_card_view(world: "World", year: int, month: int) -> Mon
         location_threads=_location_thread_views(world, records, limit=3),
         watched_threads=_watched_thread_views(world, records, limit=3),
         world_change_threads=_world_change_thread_views(world, world_change_entries, limit=3),
+        rumor_threads=_rumor_thread_views(world, records, year=year, month=month, limit=3),
         highlighted_characters=highlights,
         highlighted_locations=location_highlights,
         completed_adventures=completed_adventures[:3],
@@ -866,6 +939,7 @@ def build_yearly_report_card_view(world: "World", year: int) -> YearlyReportCard
         location_threads=_location_thread_views(world, records, limit=5),
         watched_threads=_watched_thread_views(world, records, limit=5),
         world_change_threads=_world_change_thread_views(world, world_change_entries, limit=5),
+        rumor_threads=_rumor_thread_views(world, records, year=year, limit=5),
         highlighted_locations=highlighted_locations,
         world_changes=world_changes,
         world_change_entries=world_change_entries,

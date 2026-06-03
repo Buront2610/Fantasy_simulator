@@ -461,6 +461,11 @@ TEXT_EN: Dict[str, str] = {
     'report_section_world_change_threads': 'World-change threads',
     'report_world_change_thread_line': '    {category}: {count} change(s), {locations} | {headline}',
     'report_thread_no_locations': 'worldwide',
+    'report_section_rumor_threads': 'Rumor threads',
+    'report_rumor_thread_line': (
+        '    {source_event}: {count} rumor(s), {location}, {reliability}, spread {spread}/10 | {headline}'
+    ),
+    'report_rumor_no_source_event': 'unlinked source',
     'report_total_events': '  Total events: {count}',
     'report_deaths_this_year': '  Deaths this year: {count}',
     'report_section_rumors': '▶ Rumors',

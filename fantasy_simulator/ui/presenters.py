@@ -163,124 +163,123 @@ class ReportPresenter:
     @staticmethod
     def render_monthly_card(card: MonthlyReportCardView) -> List[str]:
         lines = [tr("monthly_report_card_header", year=card.year, month=card.month_label or card.month)]
-        if card.headline_events:
-            lines.append(f"  {tr('report_section_headlines')}:")
-            lines.extend(
-                f"    {tr(f'report_headline_category_{headline.category}')}: {headline.text}"
-                for headline in card.headline_events
-            )
+        ReportPresenter._append_headlines(lines, card.headline_events)
         if card.highlighted_characters:
             lines.append(tr("monthly_report_card_characters", names=", ".join(card.highlighted_characters)))
-        if card.watched_threads:
-            lines.append(f"  {tr('report_section_watched_threads')}:")
-            lines.extend(
-                tr(
-                    "report_watched_thread_line",
-                    actor=thread.actor_name,
-                    count=thread.event_count,
-                    headline=thread.headline,
-                )
-                for thread in card.watched_threads
-            )
+        ReportPresenter._append_watched_threads(lines, card.watched_threads)
         if card.highlighted_locations:
             lines.append(tr("monthly_report_card_locations", names=", ".join(card.highlighted_locations)))
-        if card.location_threads:
-            lines.append(f"  {tr('report_section_location_threads')}:")
-            lines.extend(
-                tr(
-                    "report_location_thread_line",
-                    location=thread.location_name,
-                    count=thread.event_count,
-                    world_changes=thread.world_change_count,
-                    headline=thread.headline,
-                )
-                for thread in card.location_threads
-            )
+        ReportPresenter._append_location_threads(lines, card.location_threads)
         if card.completed_adventures:
             lines.append(tr("monthly_report_card_adventures", items=" | ".join(card.completed_adventures)))
         if card.new_memory_items:
             lines.append(tr("monthly_report_card_memory", items=" | ".join(card.new_memory_items)))
         if card.hot_rumors:
             lines.append(f"  {tr('report_section_rumors')}: {' | '.join(card.hot_rumors)}")
-        if card.world_change_threads:
-            lines.append(f"  {tr('report_section_world_change_threads')}:")
-            lines.extend(
-                tr(
-                    "report_world_change_thread_line",
-                    category=tr(f"world_change_category_{thread.category}"),
-                    count=thread.count,
-                    locations=", ".join(thread.location_names) or tr("report_thread_no_locations"),
-                    headline=thread.headline,
-                )
-                for thread in card.world_change_threads
-            )
-        if card.world_changes:
-            summary = ", ".join(
-                f"{tr(f'world_change_category_{change.category}')}: {change.count}"
-                for change in card.world_changes
-            )
-            lines.append(f"  {tr('report_section_world')}: {summary}")
-            lines.extend(
-                f"    {tr(f'world_change_category_{entry.category}')}: {entry.text}"
-                for entry in card.world_change_entries[:3]
-            )
+        ReportPresenter._append_rumor_threads(lines, card.rumor_threads)
+        ReportPresenter._append_world_change_threads(lines, card.world_change_threads)
+        ReportPresenter._append_world_changes(lines, card.world_changes, card.world_change_entries, limit=3)
         return lines
 
     @staticmethod
     def render_yearly_card(card: YearlyReportCardView) -> List[str]:
         lines = [tr("yearly_report_card_header", year=card.year)]
         lines.append(tr("yearly_report_card_total_events", count=card.total_events))
-        if card.headline_events:
-            lines.append(f"  {tr('report_section_headlines')}:")
-            lines.extend(
-                f"    {tr(f'report_headline_category_{headline.category}')}: {headline.text}"
-                for headline in card.headline_events
-            )
-        if card.watched_threads:
-            lines.append(f"  {tr('report_section_watched_threads')}:")
-            lines.extend(
-                tr(
-                    "report_watched_thread_line",
-                    actor=thread.actor_name,
-                    count=thread.event_count,
-                    headline=thread.headline,
-                )
-                for thread in card.watched_threads
-            )
+        ReportPresenter._append_headlines(lines, card.headline_events)
+        ReportPresenter._append_watched_threads(lines, card.watched_threads)
         if card.highlighted_locations:
             lines.append(tr("monthly_report_card_locations", names=", ".join(card.highlighted_locations)))
-        if card.location_threads:
-            lines.append(f"  {tr('report_section_location_threads')}:")
-            lines.extend(
-                tr(
-                    "report_location_thread_line",
-                    location=thread.location_name,
-                    count=thread.event_count,
-                    world_changes=thread.world_change_count,
-                    headline=thread.headline,
-                )
-                for thread in card.location_threads
-            )
-        if card.world_change_threads:
-            lines.append(f"  {tr('report_section_world_change_threads')}:")
-            lines.extend(
-                tr(
-                    "report_world_change_thread_line",
-                    category=tr(f"world_change_category_{thread.category}"),
-                    count=thread.count,
-                    locations=", ".join(thread.location_names) or tr("report_thread_no_locations"),
-                    headline=thread.headline,
-                )
-                for thread in card.world_change_threads
-            )
-        if card.world_changes:
-            summary = ", ".join(
-                f"{tr(f'world_change_category_{change.category}')}: {change.count}"
-                for change in card.world_changes
-            )
-            lines.append(f"  {tr('report_section_world')}: {summary}")
-            lines.extend(
-                f"    {tr(f'world_change_category_{entry.category}')}: {entry.text}"
-                for entry in card.world_change_entries[:5]
-            )
+        ReportPresenter._append_location_threads(lines, card.location_threads)
+        ReportPresenter._append_rumor_threads(lines, card.rumor_threads)
+        ReportPresenter._append_world_change_threads(lines, card.world_change_threads)
+        ReportPresenter._append_world_changes(lines, card.world_changes, card.world_change_entries, limit=5)
         return lines
+
+    @staticmethod
+    def _append_headlines(lines: List[str], headlines: list) -> None:
+        if not headlines:
+            return
+        lines.append(f"  {tr('report_section_headlines')}:")
+        lines.extend(
+            f"    {tr(f'report_headline_category_{headline.category}')}: {headline.text}"
+            for headline in headlines
+        )
+
+    @staticmethod
+    def _append_watched_threads(lines: List[str], threads: list) -> None:
+        if not threads:
+            return
+        lines.append(f"  {tr('report_section_watched_threads')}:")
+        lines.extend(
+            tr(
+                "report_watched_thread_line",
+                actor=thread.actor_name,
+                count=thread.event_count,
+                headline=thread.headline,
+            )
+            for thread in threads
+        )
+
+    @staticmethod
+    def _append_location_threads(lines: List[str], threads: list) -> None:
+        if not threads:
+            return
+        lines.append(f"  {tr('report_section_location_threads')}:")
+        lines.extend(
+            tr(
+                "report_location_thread_line",
+                location=thread.location_name,
+                count=thread.event_count,
+                world_changes=thread.world_change_count,
+                headline=thread.headline,
+            )
+            for thread in threads
+        )
+
+    @staticmethod
+    def _append_rumor_threads(lines: List[str], threads: list) -> None:
+        if not threads:
+            return
+        lines.append(f"  {tr('report_section_rumor_threads')}:")
+        lines.extend(
+            tr(
+                "report_rumor_thread_line",
+                source_event=thread.source_event_id or tr("report_rumor_no_source_event"),
+                count=thread.rumor_count,
+                location=thread.source_location_name or tr("report_thread_no_locations"),
+                reliability=tr(f"rumor_reliability_{thread.reliability}"),
+                spread=thread.spread_level,
+                headline=thread.headline,
+            )
+            for thread in threads
+        )
+
+    @staticmethod
+    def _append_world_change_threads(lines: List[str], threads: list) -> None:
+        if not threads:
+            return
+        lines.append(f"  {tr('report_section_world_change_threads')}:")
+        lines.extend(
+            tr(
+                "report_world_change_thread_line",
+                category=tr(f"world_change_category_{thread.category}"),
+                count=thread.count,
+                locations=", ".join(thread.location_names) or tr("report_thread_no_locations"),
+                headline=thread.headline,
+            )
+            for thread in threads
+        )
+
+    @staticmethod
+    def _append_world_changes(lines: List[str], changes: list, entries: list, *, limit: int) -> None:
+        if not changes:
+            return
+        summary = ", ".join(
+            f"{tr(f'world_change_category_{change.category}')}: {change.count}"
+            for change in changes
+        )
+        lines.append(f"  {tr('report_section_world')}: {summary}")
+        lines.extend(
+            f"    {tr(f'world_change_category_{entry.category}')}: {entry.text}"
+            for entry in entries[:limit]
+        )

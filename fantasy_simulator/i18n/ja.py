@@ -455,6 +455,11 @@ TEXT_JA: Dict[str, str] = {
     'report_section_world_change_threads': '世界変化ごとの流れ',
     'report_world_change_thread_line': '    {category}: {count}件の変化、{locations} | {headline}',
     'report_thread_no_locations': '世界全体',
+    'report_section_rumor_threads': '噂ごとの流れ',
+    'report_rumor_thread_line': (
+        '    {source_event}: {count}件の噂、{location}、{reliability}、拡散 {spread}/10 | {headline}'
+    ),
+    'report_rumor_no_source_event': '元イベントなし',
     'report_total_events': '  イベント総数: {count}',
     'report_deaths_this_year': '  この年の死者数: {count}',
     'report_section_rumors': '▶ 噂',

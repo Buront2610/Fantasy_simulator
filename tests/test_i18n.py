@@ -164,6 +164,15 @@ class TestI18n:
             locations="Aethoria",
             headline="Changed",
         ) == "    Route: 2 change(s), Aethoria | Changed"
+        assert tr(
+            "report_rumor_thread_line",
+            source_event="evt1",
+            count=2,
+            location="Aethoria",
+            reliability="plausible",
+            spread=7,
+            headline="Changed",
+        ) == "    evt1: 2 rumor(s), Aethoria, plausible, spread 7/10 | Changed"
 
     def test_dashboard_templates_render(self):
         set_locale("ja")
