@@ -290,8 +290,14 @@ supports:
 - Treat the TD-1〜TD-4 technical-debt backlog as closed: canonical event-store
   adapters, bundle-owned world seeds, responsibility splits, and guardrail/doc
   sync now have tests around their intended boundaries.
-- PR-J's first formal `SettingBundle` authoring pass is complete; the next
-  mainline milestone is dynamic world-change work (PR-K).
+- PR-J's first formal `SettingBundle` authoring pass is complete. PR-K is the active mainline milestone
+  for dynamic world-change work. K0 guardrail slices
+  for route block/reopen, location rename, occupation/control, terrain-cell
+  mutation, and headless era/civilization projection have started, but this
+  does not mean the full PR-K behavior is complete.
+- Finish PR-K by closing the remaining K0 characterization/golden-master gaps,
+  continuing the typed-ID ratchet, documenting save/persistence policy gaps,
+  and wiring user-visible world-change integration through reports and views.
 - Treat worldgen PoC work as parallel technical validation, not the next
   blocking mainline milestone.
 
