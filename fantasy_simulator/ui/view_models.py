@@ -42,6 +42,7 @@ __all__ = [
     "LocationObservationView",
     "MonthlyReportCardView",
     "NotificationItemView",
+    "ReportHeadlineView",
     "RumorSummaryView",
     "WorldChangeEntryView",
     "WorldChangeSummaryView",
@@ -148,10 +149,21 @@ class FollowUpActionView:
 
 
 @dataclass
+class ReportHeadlineView:
+    record_id: str
+    category: str
+    text: str
+    year: int = 0
+    month: int = 0
+    day: int = 0
+
+
+@dataclass
 class MonthlyReportCardView:
     year: int
     month: int
     month_label: str = ""
+    headline_events: List[ReportHeadlineView] = field(default_factory=list)
     highlighted_characters: List[str] = field(default_factory=list)
     highlighted_locations: List[str] = field(default_factory=list)
     completed_adventures: List[str] = field(default_factory=list)
@@ -165,6 +177,7 @@ class MonthlyReportCardView:
 class YearlyReportCardView:
     year: int
     total_events: int = 0
+    headline_events: List[ReportHeadlineView] = field(default_factory=list)
     highlighted_locations: List[str] = field(default_factory=list)
     world_changes: List[WorldChangeSummaryView] = field(default_factory=list)
     world_change_entries: List[WorldChangeEntryView] = field(default_factory=list)
@@ -268,6 +281,50 @@ def _world_change_views(
             )
         )
     return summaries, entries
+
+
+def _headline_category(record: "WorldEventRecord") -> str:
+    if "world_change" in getattr(record, "tags", []):
+        return "world_change"
+    if record.kind.startswith("adventure_"):
+        return "adventure"
+    if record.kind in {"death", "birth", "marriage"}:
+        return "life"
+    if record.kind in {"battle", "duel"}:
+        return "conflict"
+    return "event"
+
+
+def _headline_event_views(
+    world: "World",
+    records: List["WorldEventRecord"],
+    *,
+    limit: int,
+) -> List[ReportHeadlineView]:
+    ranked_records = sorted(
+        records,
+        key=lambda record: (
+            "world_change" in getattr(record, "tags", []),
+            record.severity,
+            record.year,
+            record.month,
+            record.day,
+            record.absolute_day,
+            record.record_id,
+        ),
+        reverse=True,
+    )
+    return [
+        ReportHeadlineView(
+            record_id=record.record_id,
+            category=_headline_category(record),
+            text=_render_view_event(record, world),
+            year=record.year,
+            month=record.month,
+            day=record.day,
+        )
+        for record in ranked_records[: max(0, limit)]
+    ]
 
 
 def _active_war_views(world: "World", records: List["WorldEventRecord"]) -> List[ActiveWarView]:
@@ -588,6 +645,7 @@ def build_monthly_report_card_view(world: "World", year: int, month: int) -> Mon
         year=year,
         month=month,
         month_label=month_label,
+        headline_events=_headline_event_views(world, records, limit=3),
         highlighted_characters=highlights,
         highlighted_locations=location_highlights,
         completed_adventures=completed_adventures[:3],
@@ -617,6 +675,7 @@ def build_yearly_report_card_view(world: "World", year: int) -> YearlyReportCard
     return YearlyReportCardView(
         year=year,
         total_events=len(records),
+        headline_events=_headline_event_views(world, records, limit=5),
         highlighted_locations=highlighted_locations,
         world_changes=world_changes,
         world_change_entries=world_change_entries,

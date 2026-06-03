@@ -125,6 +125,14 @@ class TestI18n:
         assert "evt1" in tr("rumor_board_meta", location="Aethoria", age=2, spread=4, event_id="evt1")
         assert "Aethoria" in tr("rumor_board_detail_source", location="Aethoria", age=2, spread=4)
 
+    def test_report_headline_templates_render(self):
+        set_locale("ja")
+        assert tr("report_section_headlines") == "見出し"
+        assert tr("report_headline_category_world_change") == "世界変化"
+        set_locale("en")
+        assert tr("report_section_headlines") == "Headlines"
+        assert tr("report_headline_category_world_change") == "World change"
+
     def test_dashboard_templates_render(self):
         set_locale("ja")
         assert tr("dashboard_menu") == "世界ダッシュボード"

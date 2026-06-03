@@ -346,6 +346,49 @@ def test_monthly_report_card_surfaces_world_change_projection_summary():
     assert any("Occupation: Aethoria Capital changed hands." in line for line in lines)
 
 
+def test_monthly_report_card_surfaces_edited_headlines_before_raw_sections():
+    set_locale("en")
+    world = World()
+    world.record_event(
+        WorldEventRecord(
+            record_id="minor",
+            kind="meeting",
+            year=world.year,
+            month=3,
+            day=1,
+            severity=1,
+            description="A quiet council met.",
+        )
+    )
+    route = world.routes[0]
+    blocked = world.apply_route_blocked_change(route.route_id, True, year=world.year, month=3, day=2)
+    world.record_event(
+        WorldEventRecord(
+            record_id="severe",
+            kind="battle",
+            year=world.year,
+            month=3,
+            day=3,
+            severity=5,
+            description="A severe battle shook the capital.",
+        )
+    )
+
+    card = build_monthly_report_card_view(world, world.year, 3)
+    lines = ReportPresenter.render_monthly_card(card)
+
+    assert blocked is not None
+    assert [(item.category, item.record_id) for item in card.headline_events[:2]] == [
+        ("world_change", blocked.record_id),
+        ("conflict", "severe"),
+    ]
+    headline_index = lines.index("  Headlines:")
+    world_news_index = next(index for index, line in enumerate(lines) if "World News" in line)
+    assert headline_index < world_news_index
+    assert any("World change: " in line and "was blocked." in line for line in lines)
+    assert any("Conflict: A severe battle shook the capital." in line for line in lines)
+
+
 def test_world_dashboard_major_events_are_severity_first():
     set_locale("en")
     world = World()
@@ -630,8 +673,10 @@ def test_yearly_report_card_surfaces_world_change_projection_details():
         ("route", 1),
         ("war", 1),
     ]
+    assert [item.category for item in card.headline_events[:2]] == ["world_change", "world_change"]
     assert [item.category for item in card.world_change_entries] == ["route", "war"]
     assert any("Yearly highlights" in line for line in lines)
+    assert any("Headlines" in line for line in lines)
     assert any("World News" in line and "Route: 1" in line and "War: 1" in line for line in lines)
     assert any(
         "War:" in line and "Stormwatch Wardens declared war on Silverbrook Merchant League." in line

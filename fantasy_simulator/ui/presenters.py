@@ -163,6 +163,12 @@ class ReportPresenter:
     @staticmethod
     def render_monthly_card(card: MonthlyReportCardView) -> List[str]:
         lines = [tr("monthly_report_card_header", year=card.year, month=card.month_label or card.month)]
+        if card.headline_events:
+            lines.append(f"  {tr('report_section_headlines')}:")
+            lines.extend(
+                f"    {tr(f'report_headline_category_{headline.category}')}: {headline.text}"
+                for headline in card.headline_events
+            )
         if card.highlighted_characters:
             lines.append(tr("monthly_report_card_characters", names=", ".join(card.highlighted_characters)))
         if card.highlighted_locations:
@@ -189,6 +195,12 @@ class ReportPresenter:
     def render_yearly_card(card: YearlyReportCardView) -> List[str]:
         lines = [tr("yearly_report_card_header", year=card.year)]
         lines.append(tr("yearly_report_card_total_events", count=card.total_events))
+        if card.headline_events:
+            lines.append(f"  {tr('report_section_headlines')}:")
+            lines.extend(
+                f"    {tr(f'report_headline_category_{headline.category}')}: {headline.text}"
+                for headline in card.headline_events
+            )
         if card.highlighted_locations:
             lines.append(tr("monthly_report_card_locations", names=", ".join(card.highlighted_locations)))
         if card.world_changes:
