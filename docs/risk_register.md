@@ -123,7 +123,9 @@ work and its serialization guardrails.
   Impact: agents make incompatible changes because the source of truth is
   unclear.
   Guardrail: `tests/test_doc_freshness.py` checks this contract and risk
-  register for key precedence terms.
+  register for key precedence terms. README, implementation, and review context
+  docs now distinguish active PR-K mainline work from already-started K0 guardrail/contract slices;
+  future PR-K slices must keep that wording current.
 - Hydration precedence changes without regression tests.
   Impact: unchanged save schemas still load differently because canonical
   records, legacy adapters, or derived caches are reconciled in a new order.

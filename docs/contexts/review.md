@@ -15,19 +15,18 @@
 - Does it introduce a layer dependency that the structural tests should forbid?
 - Does it modify roadmap or guardrail docs without keeping them aligned?
 - Does it treat PR-K K0 slices as unstarted, complete, or persistable without evidence/ADR?
+- Does PR-K wording keep active mainline status separate from started K0 slices?
+- For world-change work, does the slice still follow the local K0 checklist in
+  `docs/pr_k_prerequisite_design.md`?
 - Is verification proportional to the scope of the change?
 - If it blocks completion, what is the smallest follow-up subagent that should handle it?
 
 ## Useful Baselines
 
-- `docs/implementation_plan.md`
-- `docs/architecture.md`
-- `tests/test_architecture_constraints.py`
-- `tests/test_doc_freshness.py`
-- `tests/test_harness_scenarios.py`
+- `docs/implementation_plan.md`, `docs/architecture.md`, `tests/test_architecture_constraints.py`, `tests/test_doc_freshness.py`
+
 ## Review Output Shape
 
-- Findings first, ordered by severity
-- File references for each finding
-- Smallest follow-up implementation/research subagent when a blocker remains
-- Residual risk if there are no findings
+- Findings first, ordered by severity, with file references.
+- Smallest follow-up implementation/research subagent when a blocker remains.
+- Residual risk if there are no findings.

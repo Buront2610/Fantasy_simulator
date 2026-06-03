@@ -48,6 +48,7 @@ Requirements:
 - Optional UI extras:
   - `rich` (thin Rich render shell)
   - `prompt_toolkit` (input assistance backend)
+  - `wcwidth` (wide-character display width handling)
 
 Install development dependencies:
 
@@ -293,7 +294,8 @@ supports:
   active mainline milestone: K0 guardrail slices for route/rename/occupation/
   terrain/era projection have started, and the remaining work is to finish K0
   characterization, typed-ID ratchet, persistence policy gaps, and
-  user-visible world-change integration.
+  user-visible world-change integration. This does not mean the full PR-K
+  behavior is complete.
 - Treat the technical-review stream as PR-K support work: Python-version ADR,
   architecture override ledger metadata, and the v8 serializer/hydrator split
   reduce risk without changing the save JSON shape prematurely. The canonical
