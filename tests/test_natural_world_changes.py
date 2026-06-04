@@ -20,7 +20,7 @@ from fantasy_simulator.simulation.world_change_driver import (
 )
 from fantasy_simulator.simulator import Simulator
 from fantasy_simulator.ui.map_renderer import build_map_info
-from fantasy_simulator.ui.view_models import build_world_dashboard_view
+from fantasy_simulator.ui.view_models import build_monthly_report_card_view, build_world_dashboard_view
 from fantasy_simulator.world import World
 
 
@@ -75,6 +75,15 @@ def test_natural_route_world_change_is_visible_in_reports_and_map() -> None:
     ]
     assert from_cell.recent_world_change_count == 1
     assert to_cell.recent_world_change_count == 1
+    assert len(sim.world.rumors) == 1
+    assert sim.world.rumors[0].tracked is True
+    assert sim.world.rumors[0].source_event_id == record.record_id
+    assert sim.world.rumors[0].related_location_ids == [from_location_id, to_location_id]
+
+    card = build_monthly_report_card_view(sim.world, record.year, record.month)
+    assert [(thread.source_event_id, thread.rumor_count) for thread in card.rumor_threads] == [
+        (record.record_id, 1)
+    ]
 
 
 def test_natural_terrain_world_change_is_location_linked_and_reported() -> None:

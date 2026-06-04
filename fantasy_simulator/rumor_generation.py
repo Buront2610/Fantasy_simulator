@@ -305,6 +305,48 @@ def generate_rumor_from_event(
     )
 
 
+def generate_tracked_rumor_from_world_change(
+    record: "WorldEventRecord",
+    *,
+    world: "World",
+) -> Optional[Rumor]:
+    """Build a deterministic tracked rumor hook for a canonical world-change record."""
+    if "world_change" not in record.tags:
+        return None
+
+    location_ids = location_ids_for_record(record)
+    source_location_id = location_ids[0] if location_ids else None
+    reliability = "certain" if record.severity >= 4 else "plausible"
+    audience_key = _audience_key_for_rumor(record, source_location_id)
+    bias_tags = _bias_tags_from_event(record, audience_key, reliability)
+    if "tracked" not in bias_tags:
+        bias_tags.append("tracked")
+
+    return Rumor(
+        id=f"rum_wc_{record.record_id[:12]}",
+        category=_category_from_event_kind(record.kind),
+        source_location_id=source_location_id,
+        target_subject=record.primary_actor_id or "",
+        reliability=reliability,
+        spread_level=min(10, max(3, record.severity + 3)),
+        age_in_months=0,
+        content_tags=_content_tags_from_event(record),
+        description=render_event_record(record, world=world),
+        source_event_id=record.record_id,
+        year_created=record.year,
+        month_created=record.month,
+        created_absolute_day=record.absolute_day,
+        created_calendar_key=record.calendar_key,
+        audience_key=audience_key,
+        bias_tags=bias_tags,
+        distortion_level=_distortion_level_for_reliability(reliability),
+        tracked=True,
+        related_location_ids=location_ids,
+        related_event_ids=_related_event_ids_from_event(record),
+        related_faction_ids=_related_faction_ids_from_event(record),
+    )
+
+
 def generate_rumors_for_period(
     world: "World",
     year: int,

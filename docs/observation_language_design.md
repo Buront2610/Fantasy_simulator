@@ -697,9 +697,9 @@ python -m fantasy_simulator.content preview-roots bundle.json --language highlan
 
 作業:
 
-- route blockが近傍locationのdanger/traffic/rumor heatへ影響する。
-- occupationがrumor/report hookを生む。
-- terrain mutationをdetail/map/reportに出す。
+- route blockが近傍locationのdanger/traffic/rumor heatへ影響し、自然発生時は tracked rumor と report rumor thread を即時生成する。
+- occupationがrumor/report hookを生む。初期 hook は natural world-change driver の canonical record から tracked rumor を生成する形で共通化済み。
+- terrain mutationをdetail/map/reportに出す。location-linked terrain change も同じ tracked rumor hook を通る。
 - 新規save fieldはcontract文書なしに追加しない。
 
 ### LG-1: etymology DTO / read model

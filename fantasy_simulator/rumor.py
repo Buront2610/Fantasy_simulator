@@ -23,6 +23,7 @@ from .rumor_generation import (
     _determine_reliability,
     generate_rumor_from_event,
     generate_rumors_for_period,
+    generate_tracked_rumor_from_world_change,
 )
 from .rumor_lifecycle import age_rumors, trim_rumors
 from .rumor_models import Rumor
@@ -43,5 +44,6 @@ __all__ = [
     "age_rumors",
     "generate_rumor_from_event",
     "generate_rumors_for_period",
+    "generate_tracked_rumor_from_world_change",
     "trim_rumors",
 ]

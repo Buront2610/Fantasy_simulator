@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..observation import build_war_map_projection
+from ..rumor import generate_tracked_rumor_from_world_change
 from ..terrain import BIOME_TYPES
 from ..world_change.state_machines import CIVILIZATION_PHASES
 
@@ -62,6 +63,22 @@ def _affected_location_ids(world: Any, rng: Any) -> tuple[str, ...]:
     return tuple(sorted((first, second)))
 
 
+def _record_and_track_world_change(world: Any, record: Any | None) -> Any | None:
+    if record is None:
+        return None
+    existing_source_event_ids = {getattr(rumor, "source_event_id", None) for rumor in getattr(world, "rumors", [])}
+    existing_source_event_ids.update(
+        getattr(rumor, "source_event_id", None)
+        for rumor in getattr(world, "rumor_archive", [])
+    )
+    if getattr(record, "record_id", None) in existing_source_event_ids:
+        return record
+    rumor = generate_tracked_rumor_from_world_change(record, world=world)
+    if rumor is not None:
+        world.rumors.append(rumor)
+    return record
+
+
 def _location_name_exists(world: Any, name: str) -> bool:
     try:
         return world.get_location_by_name(name) is not None
@@ -116,13 +133,16 @@ def generate_war_world_change(world: Any, *, month: int, day: int, rng: Any) -> 
     projection = build_war_map_projection(event_records=getattr(world, "event_records", []))
     if projection.active_wars and rng.random() < 0.55:
         war = rng.choice(list(projection.active_wars))
-        return world.apply_war_ended(
-            war.aggressor_faction_id,
-            war.target_faction_id,
-            location_ids=war.location_ids,
-            month=month,
-            day=day,
-            cause_key="natural_war_resolution",
+        return _record_and_track_world_change(
+            world,
+            world.apply_war_ended(
+                war.aggressor_faction_id,
+                war.target_faction_id,
+                location_ids=war.location_ids,
+                month=month,
+                day=day,
+                cause_key="natural_war_resolution",
+            ),
         )
 
     faction_ids = _authored_faction_ids(world)
@@ -134,22 +154,28 @@ def generate_war_world_change(world: Any, *, month: int, day: int, rng: Any) -> 
         if not projection.active_wars:
             return None
         war = rng.choice(list(projection.active_wars))
-        return world.apply_war_ended(
-            war.aggressor_faction_id,
-            war.target_faction_id,
-            location_ids=war.location_ids,
-            month=month,
-            day=day,
-            cause_key="natural_war_resolution",
+        return _record_and_track_world_change(
+            world,
+            world.apply_war_ended(
+                war.aggressor_faction_id,
+                war.target_faction_id,
+                location_ids=war.location_ids,
+                month=month,
+                day=day,
+                cause_key="natural_war_resolution",
+            ),
         )
     aggressor, target = rng.choice(available_pairs)
-    return world.apply_war_declaration(
-        aggressor,
-        target,
-        location_ids=_affected_location_ids(world, rng),
-        month=month,
-        day=day,
-        cause_key="natural_faction_conflict",
+    return _record_and_track_world_change(
+        world,
+        world.apply_war_declaration(
+            aggressor,
+            target,
+            location_ids=_affected_location_ids(world, rng),
+            month=month,
+            day=day,
+            cause_key="natural_faction_conflict",
+        ),
     )
 
 
@@ -173,11 +199,14 @@ def generate_occupation_world_change(world: Any, *, month: int, day: int, rng: A
     faction_id = rng.choice(candidates)
     if location.controlling_faction_id == faction_id:
         faction_id = candidates[1] if faction_id == candidates[0] else candidates[0]
-    return world.apply_controlling_faction_change(
-        location_id,
-        faction_id,
-        month=month,
-        day=day,
+    return _record_and_track_world_change(
+        world,
+        world.apply_controlling_faction_change(
+            location_id,
+            faction_id,
+            month=month,
+            day=day,
+        ),
     )
 
 
@@ -205,11 +234,14 @@ def generate_rename_world_change(world: Any, *, month: int, day: int, rng: Any) 
         if new_name is None:
             candidates = [candidate for candidate in candidates if candidate is not location]
             continue
-        return world.apply_location_rename_change(
-            location.id,
-            new_name,
-            month=month,
-            day=day,
+        return _record_and_track_world_change(
+            world,
+            world.apply_location_rename_change(
+                location.id,
+                new_name,
+                month=month,
+                day=day,
+            ),
         )
     return None
 
@@ -232,16 +264,19 @@ def generate_terrain_world_change(world: Any, *, month: int, day: int, rng: Any)
     cell = terrain_map.get(location.x, location.y)
     if cell is None:
         return None
-    return world.apply_terrain_cell_change(
-        cell.x,
-        cell.y,
-        biome=_next_biome(cell.biome, rng),
-        moisture=_bounded_delta(cell.moisture, delta=rng.choice((-18, -12, 12, 18))),
-        temperature=_bounded_delta(cell.temperature, delta=rng.choice((-10, -6, 6, 10))),
-        location_id=location.id,
-        month=month,
-        day=day,
-        reason_key="natural_environment_shift",
+    return _record_and_track_world_change(
+        world,
+        world.apply_terrain_cell_change(
+            cell.x,
+            cell.y,
+            biome=_next_biome(cell.biome, rng),
+            moisture=_bounded_delta(cell.moisture, delta=rng.choice((-18, -12, 12, 18))),
+            temperature=_bounded_delta(cell.temperature, delta=rng.choice((-10, -6, 6, 10))),
+            location_id=location.id,
+            month=month,
+            day=day,
+            reason_key="natural_environment_shift",
+        ),
     )
 
 
@@ -252,17 +287,20 @@ def generate_civilization_world_change(world: Any, *, month: int, day: int, rng:
     if not phases:
         return None
     phase = rng.choice(sorted(phases))
-    return world.apply_civilization_phase_drift(
-        phase,
-        score_deltas={
-            "prosperity": rng.choice((-4, -2, 2, 4)),
-            "safety": rng.choice((-6, -3, 3, 6)),
-            "traffic": rng.choice((-4, -2, 2, 4)),
-            "mood": rng.choice((-5, -2, 2, 5)),
-        },
-        month=month,
-        day=day,
-        reason_key="natural_civilization_drift",
+    return _record_and_track_world_change(
+        world,
+        world.apply_civilization_phase_drift(
+            phase,
+            score_deltas={
+                "prosperity": rng.choice((-4, -2, 2, 4)),
+                "safety": rng.choice((-6, -3, 3, 6)),
+                "traffic": rng.choice((-4, -2, 2, 4)),
+                "mood": rng.choice((-5, -2, 2, 5)),
+            },
+            month=month,
+            day=day,
+            reason_key="natural_civilization_drift",
+        ),
     )
 
 
@@ -273,13 +311,16 @@ def generate_era_world_change(world: Any, *, month: int, day: int, rng: Any) -> 
     if not candidates:
         return None
     new_era_key = rng.choice(sorted(candidates))
-    return world.apply_era_shift(
-        new_era_key,
-        new_civilization_phase="new_era",
-        authored_era_keys={runtime.era_key, new_era_key},
-        month=month,
-        day=day,
-        cause_key="natural_era_turning",
+    return _record_and_track_world_change(
+        world,
+        world.apply_era_shift(
+            new_era_key,
+            new_civilization_phase="new_era",
+            authored_era_keys={runtime.era_key, new_era_key},
+            month=month,
+            day=day,
+            cause_key="natural_era_turning",
+        ),
     )
 
 
@@ -293,11 +334,17 @@ def generate_route_world_change(world: Any, *, month: int, day: int, rng: Any) -
     open_routes = [route for route in routes if not route.blocked]
     if blocked_routes and (not open_routes or rng.random() < 0.35):
         route = rng.choice(blocked_routes)
-        return world.apply_route_blocked_change(route.route_id, False, month=month, day=day)
+        return _record_and_track_world_change(
+            world,
+            world.apply_route_blocked_change(route.route_id, False, month=month, day=day),
+        )
     if not open_routes:
         return None
     route = rng.choice(open_routes)
-    return world.apply_route_blocked_change(route.route_id, True, month=month, day=day)
+    return _record_and_track_world_change(
+        world,
+        world.apply_route_blocked_change(route.route_id, True, month=month, day=day),
+    )
 
 
 def generate_world_change(world: Any, *, month: int, day: int, rng: Any) -> Any | None:
