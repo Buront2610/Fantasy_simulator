@@ -75,6 +75,17 @@ def append_region_routes(
         )
 
 
+def append_region_local_cues(lines: List[str], visible_cells: List[MapCellInfo]) -> None:
+    cue_cells = [cell for cell in visible_cells if cell.local_feature_labels]
+    if not cue_cells:
+        return
+    lines.append(f"  {tr('map_region_local_cues')}:")
+    for cell in cue_cells:
+        lines.append(
+            f"    {cell.canonical_name}: {', '.join(cell.local_feature_labels)}"
+        )
+
+
 def append_region_landmarks(
     lines: List[str],
     visible_cells: List[MapCellInfo],

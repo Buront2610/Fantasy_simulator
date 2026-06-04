@@ -12,6 +12,7 @@ from ..observation import build_world_change_report_projection
 if TYPE_CHECKING:
     from ..terrain import AtlasLayout, Site
     from ..world import World
+    from ..world_location_state import LocationState
 
 
 @dataclass
@@ -55,6 +56,8 @@ class MapCellInfo:
     atlas_y: int = -1
     controlling_faction_id: str = ""
     controlling_faction_name: str = ""
+    local_feature_tags: Tuple[str, ...] = ()
+    local_feature_labels: Tuple[str, ...] = ()
 
 
 @dataclass
@@ -191,6 +194,92 @@ def _faction_display_name(world: "World", faction_id: str | None) -> str:
     return faction_id
 
 
+_SUPPORTED_LOCAL_FEATURE_TAGS = (
+    "gate",
+    "market",
+    "notice_board",
+    "river",
+    "accident_site",
+)
+
+
+def _local_feature_tags(world: "World", location_id: str, terrain_biome: str) -> Tuple[str, ...]:
+    values: list[str] = []
+    site_seed_tags = getattr(world, "_site_seed_tags", None)
+    if callable(site_seed_tags):
+        values.extend(str(tag).strip() for tag in site_seed_tags(location_id) if str(tag).strip())
+    if terrain_biome == "river":
+        values.append("river")
+    return tuple(tag for tag in _SUPPORTED_LOCAL_FEATURE_TAGS if tag in values)
+
+
+def _local_feature_labels(feature_tags: Tuple[str, ...]) -> Tuple[str, ...]:
+    from ..i18n import tr
+
+    return tuple(tr(f"map_feature_{tag}") for tag in feature_tags)
+
+
+def _build_cell_info(
+    world: "World",
+    loc: "LocationState",
+    x: int,
+    y: int,
+    is_highlight: bool,
+    site: Optional["Site"],
+    alive_counts_by_location: Dict[str, int],
+    death_site_location_ids: set[str],
+    world_change_counts: Dict[str, int],
+    world_change_categories: Dict[str, List[str]],
+) -> MapCellInfo:
+    terrain_biome, terrain_glyph, terrain_elevation, terrain_moisture, terrain_temperature = _terrain_snapshot(
+        world,
+        x,
+        y,
+    )
+    local_feature_tags = _local_feature_tags(world, loc.id, terrain_biome)
+    return MapCellInfo(
+        location_id=loc.id,
+        canonical_name=loc.canonical_name,
+        region_type=loc.region_type,
+        icon="*" if is_highlight else loc.icon,
+        safety_label=loc.safety_label,
+        danger=loc.danger,
+        traffic_indicator=loc.traffic_indicator,
+        population=alive_counts_by_location.get(loc.id, 0),
+        x=x,
+        y=y,
+        highlighted=is_highlight,
+        prosperity=loc.prosperity,
+        prosperity_label=loc.prosperity_label,
+        mood=loc.mood,
+        mood_label=loc.mood_label,
+        rumor_heat=loc.rumor_heat,
+        road_condition=loc.road_condition,
+        danger_band=_band(loc.danger),
+        traffic_band=_band(loc.traffic),
+        rumor_heat_band=_band(loc.rumor_heat),
+        has_memorial=bool(loc.memorial_ids),
+        has_alias=bool(loc.aliases),
+        recent_death_site=loc.id in death_site_location_ids,
+        recent_world_change_count=world_change_counts.get(loc.id, 0),
+        recent_world_change_categories=tuple(world_change_categories.get(loc.id, [])),
+        terrain_biome=terrain_biome,
+        terrain_glyph=terrain_glyph,
+        terrain_elevation=terrain_elevation,
+        terrain_moisture=terrain_moisture,
+        terrain_temperature=terrain_temperature,
+        has_site=site is not None,
+        site_type=site.site_type if site else loc.region_type,
+        site_importance=site.importance if site else 50,
+        atlas_x=site.atlas_x if site else -1,
+        atlas_y=site.atlas_y if site else -1,
+        controlling_faction_id=loc.controlling_faction_id or "",
+        controlling_faction_name=_faction_display_name(world, loc.controlling_faction_id),
+        local_feature_tags=local_feature_tags,
+        local_feature_labels=_local_feature_labels(local_feature_tags),
+    )
+
+
 def build_map_info(
     world: "World",
     highlight_location: Optional[str] = None,
@@ -224,50 +313,17 @@ def build_map_info(
             highlight_location is not None
             and (loc.id == highlight_location or loc.canonical_name == highlight_location)
         )
-        terrain_biome, terrain_glyph, terrain_elevation, terrain_moisture, terrain_temperature = _terrain_snapshot(
+        site = site_at.get((x, y))
+        info.cells[(x, y)] = _build_cell_info(
             world,
+            loc,
             x,
             y,
-        )
-
-        site = site_at.get((x, y))
-        info.cells[(x, y)] = MapCellInfo(
-            location_id=loc.id,
-            canonical_name=loc.canonical_name,
-            region_type=loc.region_type,
-            icon="*" if is_highlight else loc.icon,
-            safety_label=loc.safety_label,
-            danger=loc.danger,
-            traffic_indicator=loc.traffic_indicator,
-            population=alive_counts_by_location.get(loc.id, 0),
-            x=x,
-            y=y,
-            highlighted=is_highlight,
-            prosperity=loc.prosperity,
-            prosperity_label=loc.prosperity_label,
-            mood=loc.mood,
-            mood_label=loc.mood_label,
-            rumor_heat=loc.rumor_heat,
-            road_condition=loc.road_condition,
-            danger_band=_band(loc.danger),
-            traffic_band=_band(loc.traffic),
-            rumor_heat_band=_band(loc.rumor_heat),
-            has_memorial=bool(loc.memorial_ids),
-            has_alias=bool(loc.aliases),
-            recent_death_site=loc.id in death_site_location_ids,
-            recent_world_change_count=world_change_counts.get(loc.id, 0),
-            recent_world_change_categories=tuple(world_change_categories.get(loc.id, [])),
-            terrain_biome=terrain_biome,
-            terrain_glyph=terrain_glyph,
-            terrain_elevation=terrain_elevation,
-            terrain_moisture=terrain_moisture,
-            terrain_temperature=terrain_temperature,
-            has_site=site is not None,
-            site_type=site.site_type if site else loc.region_type,
-            site_importance=site.importance if site else 50,
-            atlas_x=site.atlas_x if site else -1,
-            atlas_y=site.atlas_y if site else -1,
-            controlling_faction_id=loc.controlling_faction_id or "",
-            controlling_faction_name=_faction_display_name(world, loc.controlling_faction_id),
+            is_highlight,
+            site,
+            alive_counts_by_location,
+            death_site_location_ids,
+            world_change_counts,
+            world_change_categories,
         )
     return info

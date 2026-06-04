@@ -166,6 +166,22 @@ def test_map_views_surface_current_location_control() -> None:
     assert "  | Control: Aethorian Crown Council                 |" in rendered["detail"]
 
 
+def test_map_views_surface_authored_local_cues() -> None:
+    set_locale("en")
+    rendered = render_world_map_views_for_location(
+        World(),
+        "loc_aethoria_capital",
+        include_overview=False,
+    )
+
+    assert "  Local cues:" in rendered["region"]
+    assert "    The Grey Pass: Gate" in rendered["region"]
+    assert "    Silverbrook: Market, River" in rendered["region"]
+    assert "    Aethoria Capital: Gate, Market, Notice board" in rendered["region"]
+    assert "    Sunken Ruins: Accident site" in rendered["region"]
+    assert "  | Local cues: Gate, Market, Notice board           |" in rendered["detail"]
+
+
 def test_midyear_save_load_preserves_map_visible_bundle(tmp_path) -> None:
     set_locale("en")
     sim = Simulator(build_seeded_world(7), events_per_year=4, adventure_steps_per_year=2, seed=99)

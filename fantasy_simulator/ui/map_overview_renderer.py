@@ -18,6 +18,7 @@ from .map_region_sections import (
     append_nearby_sites,
     append_region_focus,
     append_region_landmarks,
+    append_region_local_cues,
     append_region_routes,
 )
 from .map_route_helpers import center_region_routes, center_route_connections
@@ -81,6 +82,7 @@ def render_region_map(
     append_region_focus(lines, standout_lines)
     append_nearby_sites(lines, visible_cells, center_location_id, connected_open_ids, connected_blocked_ids)
     append_region_routes(lines, region_routes, cells_by_id)
+    append_region_local_cues(lines, visible_cells)
     append_region_landmarks(lines, visible_cells, memorials, aliases, traces, endonyms)
 
     return "\n".join(lines)

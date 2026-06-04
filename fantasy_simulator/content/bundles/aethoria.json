@@ -382,6 +382,9 @@
         "description": "A treacherous alpine pass haunted by wind spirits.",
         "region_type": "mountain",
         "language_key": "khazic",
+        "tags": [
+          "gate"
+        ],
         "x": 1,
         "y": 0
       },
@@ -442,6 +445,10 @@
         "native_name": "Silvermere",
         "x": 2,
         "y": 1,
+        "tags": [
+          "market",
+          "river"
+        ],
         "controlling_faction_id": "silverbrook_merchant_league"
       },
       {
@@ -492,7 +499,10 @@
         "controlling_faction_id": "aethorian_crown_council",
         "tags": [
           "capital",
-          "default_resident"
+          "default_resident",
+          "gate",
+          "market",
+          "notice_board"
         ]
       },
       {
@@ -502,6 +512,9 @@
         "region_type": "dungeon",
         "language_key": "proto_quenic",
         "native_name": "Sairiel",
+        "tags": [
+          "accident_site"
+        ],
         "x": 3,
         "y": 2
       },
@@ -529,6 +542,10 @@
         "description": "A well-worn junction where merchants rest and rumours spread.",
         "region_type": "plains",
         "language_key": "aethic_common",
+        "tags": [
+          "market",
+          "notice_board"
+        ],
         "x": 1,
         "y": 3
       },
@@ -560,6 +577,10 @@
         "native_name": "Dawnwick",
         "x": 4,
         "y": 3,
+        "tags": [
+          "market",
+          "notice_board"
+        ],
         "controlling_faction_id": "dawnport_harbor_council"
       },
       {
@@ -596,6 +617,9 @@
         "description": "A massive crater from the Cataclysm, still faintly glowing.",
         "region_type": "dungeon",
         "language_key": "proto_quenic",
+        "tags": [
+          "accident_site"
+        ],
         "x": 3,
         "y": 4
       },

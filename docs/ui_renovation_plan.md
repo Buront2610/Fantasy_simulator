@@ -224,7 +224,8 @@ map renderer は最低でも次のモードを持つ。
 - [ ] 地域図で導線、峠、河川、門、市場、掲示板、墓碑、事故地点、封鎖道、痕跡を判断可能な形で読めるようにする
   - [x]  PR-G2 で region 基盤は導入済み
   - [x]  PR-H1 で summary / closure / danger / rumor / world memory の読解性を強化済み
-  - [ ]  門 / 市場 / 掲示板 / 河川などの richer local semantics の拡張
+  - [x]  門 / 市場 / 掲示板 / 河川 / 事故地点を site seed tags と terrain biome から region/detail に表示する first pass
+  - [ ]  墓碑 / 封鎖道 / 先行パーティの痕跡を局所手がかりとしてさらに統合する
 - [x] 地点詳細図で局所 AA / 準AA と最近の痕跡を接続する
 - [x] world サイズが固定 5×5 でなくても描画できるようにする
 - [x] `wide` / `compact` / `minimal` 表示モードを導入する

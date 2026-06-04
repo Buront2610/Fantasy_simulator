@@ -563,7 +563,14 @@ def test_default_aethoria_bundle_has_minimal_phase_i_slots():
     )
     assert "capital" in capital_seed.tags
     assert "default_resident" in capital_seed.tags
+    assert {"gate", "market", "notice_board"}.issubset(set(capital_seed.tags))
     assert capital_seed.controlling_faction_id == "aethorian_crown_council"
+    tags_by_site_id = {
+        seed.location_id: set(seed.tags)
+        for seed in bundle.world_definition.site_seeds
+    }
+    assert {"market", "river"}.issubset(tags_by_site_id["loc_silverbrook"])
+    assert "accident_site" in tags_by_site_id["loc_sunken_ruins"]
     controllers_by_site_id = {
         seed.location_id: seed.controlling_faction_id
         for seed in bundle.world_definition.site_seeds

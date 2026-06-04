@@ -26,6 +26,7 @@ def _append_state_lines(lines: List[str], cell: MapCellInfo, width: int) -> None
     mood_label = tr("map_detail_mood")
     rumor_label = tr("map_detail_rumor_heat")
     control_label = tr("map_detail_control")
+    cues_label = tr("map_detail_local_cues")
 
     lines.append(f"  |{_fit(f' {safety_label}: {cell.safety_label}', width)}|")
     lines.append(f"  |{_fit(f' {danger_label}: {cell.danger:>3} ({_band_label(cell.danger_band)})', width)}|")
@@ -35,6 +36,9 @@ def _append_state_lines(lines: List[str], cell: MapCellInfo, width: int) -> None
     lines.append(f"  |{_fit(f' {pop_label}: {cell.population}', width)}|")
     if cell.controlling_faction_name:
         lines.append(f"  |{_fit(f' {control_label}: {cell.controlling_faction_name}', width)}|")
+    if cell.local_feature_labels:
+        cues = ", ".join(cell.local_feature_labels)
+        lines.append(f"  |{_fit(f' {cues_label}: {cues}', width)}|")
     lines.append(f"  |{_fit(f' {prosperity_label}: {cell.prosperity_label} ({cell.prosperity})', width)}|")
     lines.append(f"  |{_fit(f' {mood_label}: {cell.mood_label} ({cell.mood})', width)}|")
     lines.append(f"  |{_fit(f' {rumor_label}: {cell.rumor_heat} ({_band_label(cell.rumor_heat_band)})', width)}|")
