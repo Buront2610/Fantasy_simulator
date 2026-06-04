@@ -789,6 +789,7 @@ TEXT_EN: Dict[str, str] = {
     'map_detail_local_cues': 'Local cues',
     'map_detail_markers': 'Markers',
     'map_detail_aa_title': 'Local site sketch',
+    'map_detail_route_sketch': 'Local route sketch',
     'map_detail_aa_legend': 'Sketch cues',
     'map_detail_followup_prompt': 'Location follow-up',
     'map_detail_followup_location_history': 'Open location history',

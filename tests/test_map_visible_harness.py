@@ -113,7 +113,7 @@ def _assert_seeded_map_visible_bundle(bundle: dict[str, list[str]]) -> None:
     assert any("Native name: Branthethal" in line for line in bundle["region"])
     assert any("Native name: Branthethal" in line for line in bundle["region"])
 
-    assert bundle["detail"][:18] == [
+    assert bundle["detail"][:30] == [
         "  | V The Verdant Vale (village)                     |",
         "  | Local site sketch                                |",
         "  |         _       _          B                     |",
@@ -122,6 +122,18 @@ def _assert_seeded_map_visible_bundle(bundle: dict[str, list[str]]) -> None:
         "  |   |   o     |   ..    |====                      |",
         "  |   |____   __|__   ____|                          |",
         "  |        |_|     |_|                               |",
+        "  | Local route sketch                               |",
+        "  |  +-------------------------------+               |",
+        "  |  |                               |               |",
+        "  |  |           C                   |               |",
+        "  |  |            \\             /--D |               |",
+        "  |  |             -\\    /------     |               |",
+        "  |  |            ---@---            |               |",
+        "  |  |     ------/                   |               |",
+        "  |  | o--/                          |               |",
+        "  |  |                               |               |",
+        "  |  |                               |               |",
+        "  |  +-------------------------------+               |",
         "  | Sketch cues: !=High danger                       |",
         "  | Terrain: plains (,)                              |",
         "  | Elev:128 Moist:128 Temp:128                      |",
@@ -145,7 +157,7 @@ def _assert_memory_heavy_bundle(bundle: dict[str, list[str]]) -> None:
     assert "      Recent: Lysara passed through at dawn" in bundle["region"]
     assert "    The Verdant Vale: Memory: Memorial, Trace" in bundle["region"]
 
-    assert bundle["detail"][:19] == [
+    assert bundle["detail"][:31] == [
         "  | V The Verdant Vale (village)                     |",
         "  | Local site sketch                                |",
         "  |         _       _          B                     |",
@@ -154,6 +166,18 @@ def _assert_memory_heavy_bundle(bundle: dict[str, list[str]]) -> None:
         "  |   |   o     |   ..    |====                      |",
         "  |   |____   __|__   ____|                          |",
         "  |        |_|     |_|                               |",
+        "  | Local route sketch                               |",
+        "  |  +-------------------------------+               |",
+        "  |  |                               |               |",
+        "  |  |           C                   |               |",
+        "  |  |            \\             /--D |               |",
+        "  |  |             -\\    /------     |               |",
+        "  |  |            ---@---            |               |",
+        "  |  |     ------/                   |               |",
+        "  |  | o--/                          |               |",
+        "  |  |                               |               |",
+        "  |  |                               |               |",
+        "  |  +-------------------------------+               |",
         "  | Sketch cues: M=Memorial                          |",
         "  | Terrain: plains (,)                              |",
         "  | Elev:128 Moist:128 Temp:128                      |",
@@ -219,8 +243,13 @@ def test_location_detail_uses_larger_city_site_sketch() -> None:
 
     detail = rendered["detail"]
     assert "  | Local site sketch                                |" in detail
-    assert "  |         ____||____        ________               |" in detail
-    assert "  |    ____/  []  [] \\______/ [] []  \\               |" in detail
+    assert "  |        ____||____        ________                |" in detail
+    assert "  |   ____/ []  []  \\______/ [] []  \\____            |" in detail
+    assert "  |        |  G |===== main road =====| G |          |" in detail
+    assert "  |        /      market square       \\              |" in detail
+    assert "  | Local route sketch                               |" in detail
+    assert "  |  |            \\             /--D |               |" in detail
+    assert "  |  |            ---@---            |               |" in detail
     assert "  | Sketch cues: G=Gate / $=Market / B=Notice board  |" in detail
 
 

@@ -779,6 +779,7 @@ TEXT_JA: Dict[str, str] = {
     'map_detail_local_cues': '局所手がかり',
     'map_detail_markers': 'マーカー',
     'map_detail_aa_title': '局所地点スケッチ',
+    'map_detail_route_sketch': '局所道路スケッチ',
     'map_detail_aa_legend': 'スケッチ手がかり',
     'map_detail_followup_prompt': '地点フォローアップ',
     'map_detail_followup_location_history': '地点の歴史を開く',

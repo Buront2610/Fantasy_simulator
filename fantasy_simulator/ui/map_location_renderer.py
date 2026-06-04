@@ -5,7 +5,8 @@ from __future__ import annotations
 from typing import List, Optional
 
 from ..i18n import tr, tr_term
-from .map_view_models import LocalMapCue, MapCellInfo, MapRenderInfo
+from .atlas_canvas import _ROUTE_LINE, _bresenham
+from .map_view_models import LocalMapCue, MapCellInfo, MapRenderInfo, RouteRenderInfo
 from .ui_helpers import fit_display_width
 
 
@@ -18,6 +19,9 @@ def _band_label(band: str) -> str:
 
 
 _LOCAL_CUE_CATEGORY_ORDER = ("site", "terrain", "memory", "route")
+_DETAIL_ROUTE_SKETCH_WIDTH = 31
+_DETAIL_ROUTE_SKETCH_HEIGHT = 9
+_DETAIL_ROUTE_CENTER = (15, 4)
 
 
 def _format_local_cue_groups(cues: List[LocalMapCue]) -> str:
@@ -35,13 +39,15 @@ def _format_local_cue_groups(cues: List[LocalMapCue]) -> str:
 def _site_ascii_lines(cell: MapCellInfo) -> List[str]:
     if cell.region_type == "city":
         return [
-            "        ____||____        ________",
-            "   ____/  []  [] \\______/ [] []  \\",
-            "  |  []  []  []   |  $  []    [] |",
-            "  |  []      []   |      o       |",
-            "  |_____    ______|_____    ______|",
-            "        |  |            |  |",
-            "        |__|____________|__|",
+            "       ____||____        ________       ",
+            "  ____/ []  []  \\______/ [] []  \\____  ",
+            " | []  []  []    |  $  []   []   []  | ",
+            " |      ____      |____     ____      | ",
+            " | []  | [] |  o  | [] |   | [] |  []| ",
+            " |_____|____|_____|____|___|____|____| ",
+            "       |  G |===== main road =====| G | ",
+            "  _____|____|_____________________|___|_",
+            "       /      market square       \\    ",
         ]
     if cell.region_type == "village":
         return [
@@ -107,11 +113,113 @@ def _local_symbol_line(cell: MapCellInfo, width: int) -> List[str]:
     return [f"  |{_fit(legend, width)}|"]
 
 
-def _append_site_ascii(lines: List[str], cell: MapCellInfo, width: int, border: str) -> None:
+def _connected_detail_routes(info: MapRenderInfo, cell: MapCellInfo) -> list[tuple[RouteRenderInfo, MapCellInfo]]:
+    cells_by_id = {candidate.location_id: candidate for candidate in info.cells.values()}
+    connected: list[tuple[RouteRenderInfo, MapCellInfo]] = []
+    for route in info.routes:
+        if route.from_site_id == cell.location_id:
+            other = cells_by_id.get(route.to_site_id)
+        elif route.to_site_id == cell.location_id:
+            other = cells_by_id.get(route.from_site_id)
+        else:
+            other = None
+        if other is not None:
+            connected.append((route, other))
+    return connected
+
+
+def _detail_route_endpoint(cell: MapCellInfo, other: MapCellInfo, route_index: int) -> tuple[int, int]:
+    center_x, center_y = _DETAIL_ROUTE_CENTER
+    dx = other.x - cell.x
+    dy = other.y - cell.y
+    scale = max(abs(dx), abs(dy), 1)
+    target_x = center_x + round((dx / scale) * ((_DETAIL_ROUTE_SKETCH_WIDTH - 3) / 2))
+    target_y = center_y + round((dy / scale) * ((_DETAIL_ROUTE_SKETCH_HEIGHT - 3) / 2))
+    fan_offset = -1 if route_index % 2 == 0 else 1
+    if dx == 0 and dy != 0:
+        target_x += fan_offset * 4
+    elif dy == 0 and dx != 0:
+        target_y += fan_offset * 2
+    target_x = max(1, min(_DETAIL_ROUTE_SKETCH_WIDTH - 2, target_x))
+    target_y = max(1, min(_DETAIL_ROUTE_SKETCH_HEIGHT - 2, target_y))
+    if (target_x, target_y) == _DETAIL_ROUTE_CENTER:
+        target_x = min(_DETAIL_ROUTE_SKETCH_WIDTH - 2, target_x + 1)
+    return target_x, target_y
+
+
+def _detail_route_char(route_type: str, blocked: bool, ddx: int, ddy: int) -> str:
+    chars = _ROUTE_LINE.get(route_type, ("-", "|", "/", "\\"))
+    if blocked:
+        chars = ("x", "x", "x", "x")
+    if ddy == 0:
+        return chars[0]
+    if ddx == 0:
+        return chars[1]
+    if (ddx > 0) != (ddy > 0):
+        return chars[2]
+    return chars[3]
+
+
+def _detail_route_marker(cell: MapCellInfo) -> str:
+    if cell.site_type == "city" or cell.region_type == "city":
+        return "C"
+    if cell.site_type == "dungeon" or cell.region_type == "dungeon":
+        return "D"
+    if cell.region_type == "mountain":
+        return "^"
+    if cell.region_type == "forest":
+        return "T"
+    return "o"
+
+
+def _detail_route_sketch_lines(info: MapRenderInfo, cell: MapCellInfo) -> list[str]:
+    connected = _connected_detail_routes(info, cell)
+    if not connected:
+        return []
+
+    canvas: list[list[str]] = [
+        [" " for _ in range(_DETAIL_ROUTE_SKETCH_WIDTH)]
+        for _ in range(_DETAIL_ROUTE_SKETCH_HEIGHT)
+    ]
+    center_x, center_y = _DETAIL_ROUTE_CENTER
+    canvas[center_y][center_x] = "@"
+    for route_index, (route, other) in enumerate(connected[:8]):
+        target = _detail_route_endpoint(cell, other, route_index)
+        path = _bresenham(center_x, center_y, target[0], target[1])
+        for index, (px, py) in enumerate(path[1:], start=1):
+            if not (0 <= px < _DETAIL_ROUTE_SKETCH_WIDTH and 0 <= py < _DETAIL_ROUTE_SKETCH_HEIGHT):
+                continue
+            if (px, py) == target:
+                canvas[py][px] = "x" if getattr(route, "blocked", False) else _detail_route_marker(other)
+                continue
+            prev_x, prev_y = path[index - 1]
+            canvas[py][px] = _detail_route_char(
+                getattr(route, "route_type", "road"),
+                getattr(route, "blocked", False),
+                px - prev_x,
+                py - prev_y,
+            )
+    return ["".join(row).rstrip().ljust(_DETAIL_ROUTE_SKETCH_WIDTH) for row in canvas]
+
+
+def _append_detail_route_sketch(lines: List[str], info: MapRenderInfo, cell: MapCellInfo, width: int) -> None:
+    sketch = _detail_route_sketch_lines(info, cell)
+    if not sketch:
+        return
+    title = f" {tr('map_detail_route_sketch')}"
+    lines.append(f"  |{_fit(title, width)}|")
+    lines.append(f"  |{_fit('  +' + '-' * _DETAIL_ROUTE_SKETCH_WIDTH + '+', width)}|")
+    for row in sketch:
+        lines.append(f"  |{_fit(f'  |{row}|', width)}|")
+    lines.append(f"  |{_fit('  +' + '-' * _DETAIL_ROUTE_SKETCH_WIDTH + '+', width)}|")
+
+
+def _append_site_ascii(lines: List[str], info: MapRenderInfo, cell: MapCellInfo, width: int, border: str) -> None:
     title = f" {tr('map_detail_aa_title')}"
     lines.append(f"  |{_fit(title, width)}|")
     for art_line in _site_ascii_lines(cell):
         lines.append(f"  |{_fit(f' {art_line}', width)}|")
+    _append_detail_route_sketch(lines, info, cell, width)
     lines.extend(_local_symbol_line(cell, width))
     lines.append(border)
 
@@ -235,7 +343,7 @@ def render_location_detail(
     title = f" {cell.icon} {cell.canonical_name} ({tr_term(cell.region_type)})"
     lines.append(f"  |{_fit(title, width)}|")
     lines.append(border)
-    _append_site_ascii(lines, cell, width, border)
+    _append_site_ascii(lines, info, cell, width, border)
 
     terrain_label = tr("map_terrain")
     biome_name = tr_term(cell.terrain_biome)
