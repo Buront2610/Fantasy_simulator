@@ -6,11 +6,11 @@ Use this file when the task is primarily about changing code.
 
 - `docs/implementation_plan.md` is the roadmap source of truth.
 - `docs/architecture.md` is the current guardrail summary.
-- PR-K is the active mainline milestone, but K0 guardrail/contract slices for
-  route block/reopen, location rename, occupation/control, terrain-cell
-  mutation, headless era/civilization projection, characterization, typed-ID
-  ratchet, save policy, and user-visible world-change integration are complete
-  for K0.
+- PR-K is complete. Preserve its route block/reopen, location rename,
+  occupation/control, war open/close, terrain-cell mutation, era/civilization,
+  natural generation, SettingBundle rule/baseline, typed-ID, save policy, and
+  user-visible world-change guardrails while the active mainline moves to map
+  screen improvement.
 - `World.event_records` is canonical; `event_log` and `history` are compatibility layers.
 - Preserve save/load compatibility unless the task explicitly authorizes format changes.
 - Prefer small, test-backed edits over broad refactors.

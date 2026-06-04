@@ -75,20 +75,21 @@ def test_readme_and_plan_agree_on_next_step() -> None:
     assert "TD-1〜TD-4 の負債解消は完了済み" in PLAN_TEXT
     assert "次に着手すべき実装は **TD-1〜TD-4 の負債解消**" not in PLAN_TEXT
     assert "PR-J's first formal `SettingBundle` authoring pass is complete" in README_TEXT
-    assert "PR-K is the\n  active mainline milestone" in README_TEXT
-    assert "現在進めるべき実装は **PR-K: 動的世界変化**" in PLAN_TEXT
-    assert "K0 guardrail slices は completed" in PLAN_TEXT
-    assert "PR-K behavior fully implemented を意味しない" in PLAN_TEXT
+    assert "PR-K's\n  dynamic world-change mainline is complete" in README_TEXT
+    assert "The next mainline focus is map-screen improvement" in README_TEXT
+    assert "現在進めるべき実装は **マップ画面改善**" in PLAN_TEXT
+    assert "PR-K は完了済み" in PLAN_TEXT
+    assert "map-screen improvement as active mainline" in RISK_REGISTER_TEXT
+    assert "PR-K behavior fully implemented を意味しない" not in PLAN_TEXT
     assert "PR-J: 世界観設定整理と初期 Setting Bundle 構築 ← **次はここ**" not in PLAN_TEXT
 
 
 def test_ui_plan_does_not_conflict_with_implementation_plan_next_step() -> None:
     assert "~~PR-J: 世界観設定整理と初期 Setting Bundle 構築~~ ✅" in PLAN_TEXT
     assert (
-        "PR-K: 動的世界変化（war / renaming / terrain mutation / era shift / civilization drift） "
-        "← **active mainline**"
+        "~~PR-K: 動的世界変化（war / renaming / terrain mutation / era shift / civilization drift）~~ ✅"
     ) in PLAN_TEXT
-    assert "次段は PR-K で動的世界変化へ入る" in UI_PLAN_TEXT
+    assert "マップ画面改善 ← **active mainline**" in PLAN_TEXT
     assert "次段は TD-1〜TD-4" not in UI_PLAN_TEXT
     assert "PR-H2、PR-I、TD-1〜TD-4 の負債解消、PR-J の世界観 authoring は完了" in UI_PLAN_TEXT
 
@@ -169,8 +170,8 @@ def test_risk_register_tracks_serialization_conflict_risks() -> None:
     assert "language_evolution_history" in RISK_REGISTER_TEXT
     assert "Route visibility adapter coverage" in RISK_REGISTER_TEXT
     assert "endpoint IDs" in RISK_REGISTER_TEXT
-    assert "active PR-K mainline" in RISK_REGISTER_TEXT
-    assert "K0 guardrail/contract slices" in RISK_REGISTER_TEXT
+    assert "completed PR-K mainline" in RISK_REGISTER_TEXT
+    assert "map-screen improvement" in RISK_REGISTER_TEXT
     assert "Locale-aware rendering coverage remains partial" in RISK_REGISTER_TEXT
     assert "strict event rendering" in RISK_REGISTER_TEXT
     assert "CURRENT_VERSION` stays unchanged" in RISK_REGISTER_TEXT

@@ -14,8 +14,8 @@
 - Does it bypass i18n rules for user-facing text?
 - Does it introduce a layer dependency that the structural tests should forbid?
 - Does it modify roadmap or guardrail docs without keeping them aligned?
-- Does it treat completed PR-K K0 guardrail slices as unstarted, full PR-K complete, or persistable without evidence/ADR?
-- Does PR-K wording keep active mainline status separate from completed K0 slices?
+- Does it treat completed PR-K guardrails as unstarted or bypass their evidence/ADR boundaries?
+- Does roadmap wording keep PR-K complete while identifying map-screen improvement as the active mainline?
 - For world-change work, does the slice still follow the local K0 checklist in
   `docs/pr_k_prerequisite_design.md`?
 - Is verification proportional to the scope of the change?

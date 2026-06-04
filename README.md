@@ -290,11 +290,15 @@ supports:
 - Treat the TD-1〜TD-4 technical-debt backlog as closed: canonical event-store
   adapters, bundle-owned world seeds, responsibility splits, and guardrail/doc
   sync now have tests around their intended boundaries.
-- PR-J's first formal `SettingBundle` authoring pass is complete. PR-K is the
-  active mainline milestone: K0 guardrails for route/rename/occupation/
-  terrain/era projection, characterization/golden masters, typed-ID ratchet,
-  save policy, and user-visible world-change integration are complete for K0.
-  This does not mean the full PR-K behavior is complete.
+- PR-J's first formal `SettingBundle` authoring pass is complete. PR-K's
+  dynamic world-change mainline is complete: route/rename/occupation,
+  war open/close, terrain mutation, era shift, civilization drift,
+  characterization/golden masters, typed-ID ratchet, save policy, natural
+  generation, SettingBundle rule/baseline inputs, and user-visible
+  world-change integration all have guardrail coverage.
+- The next mainline focus is map-screen improvement: make the existing
+  atlas/region/detail views better expose route state, current control,
+  world-change traces, and local decision cues without changing save shape.
 - Treat the technical-review stream as PR-K support work: Python-version ADR,
   architecture override ledger metadata, and the v8 serializer/hydrator split
   reduce risk without changing the save JSON shape prematurely. The canonical

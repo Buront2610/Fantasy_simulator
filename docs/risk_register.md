@@ -92,14 +92,13 @@ work and its serialization guardrails.
 
 ## Remaining Risks
 
-- PR-K active-mainline status drifts in docs.
-  Impact: agents may either treat completed K0 guardrail slices as unstarted or
-  claim full PR-K behavior is complete before broader dynamic-world behavior is
-  implemented beyond K0.
+- Completed PR-K mainline status drifts in docs.
+  Impact: agents may treat completed PR-K guardrails as unstarted, keep working
+  the old active milestone, or skip the new map-screen improvement focus.
   Guardrail: `docs/implementation_plan.md` and README must describe PR-K as
-  active mainline with completed K0 guardrail slices; completion claims need
-  state-machine, canonical-record, projection/view-model, UI/report, and test
-  evidence.
+  complete and map-screen improvement as active mainline; PR-K completion
+  claims need state-machine, canonical-record, projection/view-model,
+  UI/report, and test evidence.
 - Canonical event records drift from legacy adapters.
   Impact: reports, summaries, and UI event logs disagree after load.
   Guardrail: `world.event_records` remains canonical; current-schema conflict
@@ -135,8 +134,9 @@ work and its serialization guardrails.
   unclear.
   Guardrail: `tests/test_doc_freshness.py` checks this contract and risk
   register for key precedence terms. README, implementation, and review context
-  docs now distinguish active PR-K mainline work from completed K0 guardrail/contract slices;
-  future PR-K slices must keep that wording current.
+  docs now distinguish completed PR-K mainline work from the active
+  map-screen improvement focus; future map/UI slices must keep that wording
+  current.
 - Hydration precedence changes without regression tests.
   Impact: unchanged save schemas still load differently because canonical
   records, legacy adapters, or derived caches are reconciled in a new order.
