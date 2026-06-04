@@ -294,10 +294,10 @@ Remaining K0 phases should continue in this order:
 | K0-2 | architecture boundaries, event contracts, legacy-read policy, invariants. |
 | K0-3 | seeded characterization and report/map golden masters. |
 | K0-4 | typed ID ratchet for location, route, faction, event, era, culture. Completed for K0; command boundaries now share nominal-ID normalization helpers before domain events become canonical records, and culture/faction authoring inspection keys use shared slug-ID normalization while preserving legacy display-name storage. |
-| K0-5 | minimal route block/reopen slice through command, reducer, projection. Started; currently blocked routes now reach the observer dashboard from route-status projections. |
-| K0-6 | location rename slice and rename history invariants. Started. |
-| K0-6b | location occupation/control slice and war-map projection. Started; current occupation/control state now reaches the observer dashboard from canonical records. |
-| K0-6c | headless era/civilization transition core and timeline projection. Started, not persisted as runtime fields. |
+| K0-5 | minimal route block/reopen slice through command, reducer, projection. Completed for K0; currently blocked routes reach the observer dashboard from route-status projections and are covered by report/map/save contracts. |
+| K0-6 | location rename slice and rename history invariants. Completed for K0; natural and explicit renames update stable identity, aliases, history projections, report/map surfaces, and save/load state. |
+| K0-6b | location occupation/control slice and war-map projection. Completed for K0; current occupation/control state reaches the observer dashboard from canonical records and round-trips through save/load without durable war runtime fields. |
+| K0-6c | headless era/civilization transition core and timeline projection. Completed for K0; era/civilization records project through reports/dashboard/golden contracts and remain non-durable world-level runtime fields under the v8 save policy. |
 | K0-7 | save/migration policy for PR-K dynamic fields. Completed for K0: v8 terrain policy is set, stale experimental era runtime snapshot fields are discarded during hydration, canonical era/civilization records win conflicts, and snapshot-only era runtime fields remain unknown until a future durable schema policy exists. |
 
 K0 era/civilization vocabulary is deliberately fixed in code for now. Later
