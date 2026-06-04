@@ -56,7 +56,28 @@ def test_pr_k_id_exports_are_stable() -> None:
         "EventRecordId",
         "EraKey",
         "CultureId",
+        "normalize_required_id",
+        "normalize_optional_id",
+        "normalize_id_sequence",
+        "terrain_cell_id_for_coords",
     ]
+
+
+def test_pr_k_id_normalization_helpers_trim_and_preserve_nominal_types() -> None:
+    assert ids.normalize_required_id(" loc_a ", field_name="location_id", id_type=LocationId) == "loc_a"
+    assert ids.normalize_optional_id(" evt_1 ", id_type=EventRecordId) == "evt_1"
+    assert ids.normalize_optional_id("   ", id_type=EventRecordId) is None
+    assert ids.normalize_id_sequence(
+        [" loc_a ", LocationId("loc_a"), "loc_b"],
+        field_name="location_ids",
+        id_type=LocationId,
+    ) == (LocationId("loc_a"), LocationId("loc_b"))
+    assert ids.terrain_cell_id_for_coords(2, 3) == TerrainCellId("terrain:2:3")
+
+
+def test_pr_k_required_id_normalization_rejects_blank_values() -> None:
+    with pytest.raises(ValueError, match="location_id must not be blank"):
+        ids.normalize_required_id("   ", field_name="location_id", id_type=LocationId)
 
 
 def test_route_command_boundary_normalizes_typed_route_id_before_recording() -> None:

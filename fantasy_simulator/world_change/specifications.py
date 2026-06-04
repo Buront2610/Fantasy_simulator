@@ -2,9 +2,20 @@
 
 from __future__ import annotations
 
-from typing import Callable, Container, Iterable, Mapping, MutableMapping, Protocol, TypeVar
+from typing import Container, Iterable, Mapping, MutableMapping, Protocol
 
-from fantasy_simulator.ids import EraKey, EventRecordId, FactionId, LocationId, RouteId, TerrainCellId
+from fantasy_simulator.ids import (
+    EraKey,
+    EventRecordId,
+    FactionId,
+    LocationId,
+    RouteId,
+    TerrainCellId,
+    normalize_id_sequence,
+    normalize_optional_id,
+    normalize_required_id,
+    terrain_cell_id_for_coords,
+)
 
 from .commands import (
     DeclareWarCommand,
@@ -58,29 +69,6 @@ class SupportsEraRuntimeState(Protocol):
     era_key: str
     civilization_phase: str
     world_scores: MutableMapping[str, int]
-
-
-TId = TypeVar("TId")
-
-
-def normalize_required_id(value: object, *, field_name: str, id_type: Callable[[str], TId]) -> TId:
-    """Normalize a required typed ID at a PR-K command boundary."""
-    normalized = str(value).strip()
-    if not normalized:
-        raise ValueError(f"{field_name} must not be blank")
-    return id_type(normalized)
-
-
-def normalize_optional_id(
-    value: object | None,
-    *,
-    id_type: Callable[[str], TId],
-) -> TId | None:
-    """Normalize an optional typed ID, treating blank values as absent."""
-    if value is None:
-        return None
-    normalized = str(value).strip()
-    return id_type(normalized) if normalized else None
 
 
 def route_by_id(routes: Iterable[SupportsRouteStatus], *, route_id: RouteId) -> SupportsRouteStatus:
@@ -159,12 +147,14 @@ def validate_declare_war_command(
             raise ValueError(f"unknown faction id: {faction_id}")
 
     normalized_locations: list[LocationId] = []
-    for location_id in command.location_ids:
-        normalized = normalize_required_id(location_id, field_name="location_ids", id_type=LocationId)
+    for normalized in normalize_id_sequence(
+        command.location_ids,
+        field_name="location_ids",
+        id_type=LocationId,
+    ):
         if str(normalized) not in location_ids:
             raise ValueError(f"unknown location id: {normalized}")
-        if normalized not in normalized_locations:
-            normalized_locations.append(normalized)
+        normalized_locations.append(normalized)
     return aggressor, target, tuple(normalized_locations)
 
 
@@ -220,7 +210,7 @@ def _terrain_coord(value: int, *, field_name: str) -> int:
 
 
 def _terrain_cell_id_for_coords(x: int, y: int) -> TerrainCellId:
-    return TerrainCellId(f"terrain:{x}:{y}")
+    return terrain_cell_id_for_coords(x, y)
 
 
 def normalize_terrain_cell_id(value: object | None, *, x: int, y: int) -> TerrainCellId:
