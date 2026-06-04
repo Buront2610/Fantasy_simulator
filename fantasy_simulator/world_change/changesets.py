@@ -73,6 +73,7 @@ from .specifications import (
     validate_shift_era_command,
 )
 from .state_machines import (
+    EraRuntimeRules,
     transition_civilization_phase,
     transition_era_shift,
     transition_location_name,
@@ -496,6 +497,7 @@ def build_era_shift_change_set(
     *,
     era_runtime: SupportsEraRuntimeState,
     authored_era_keys: Iterable[str],
+    era_rules: EraRuntimeRules | None = None,
     describe: DescriptionBuilder,
 ) -> WorldChangeSet | None:
     """Build an era-shift ChangeSet, or ``None`` for an idempotent no-op."""
@@ -503,12 +505,15 @@ def build_era_shift_change_set(
         command,
         era_runtime=era_runtime,
         authored_era_keys=authored_era_keys,
+        era_rules=era_rules,
     )
+    civilization_phases = None if era_rules is None else era_rules.civilization_phases
     transition = transition_era_shift(
         old_era_key=era_runtime.era_key,
         requested_era_key=requested_era_key,
         old_civilization_phase=era_runtime.civilization_phase,
         requested_civilization_phase=requested_phase,
+        civilization_phases=civilization_phases,
     )
     if transition is None:
         return None
@@ -551,19 +556,34 @@ def build_civilization_phase_drift_change_set(
     command: DriftCivilizationPhaseCommand,
     *,
     era_runtime: SupportsEraRuntimeState,
+    era_rules: EraRuntimeRules | None = None,
     describe: DescriptionBuilder,
 ) -> WorldChangeSet | None:
     """Build a civilization-phase drift ChangeSet, or ``None`` for an idempotent no-op."""
-    requested_phase = validate_drift_civilization_phase_command(command, era_runtime=era_runtime)
-    phase_transition = transition_civilization_phase(era_runtime.civilization_phase, requested_phase)
+    requested_phase = validate_drift_civilization_phase_command(
+        command,
+        era_runtime=era_runtime,
+        era_rules=era_rules,
+    )
+    civilization_phases = None if era_rules is None else era_rules.civilization_phases
+    phase_transition = transition_civilization_phase(
+        era_runtime.civilization_phase,
+        requested_phase,
+        civilization_phases=civilization_phases,
+    )
+    score_keys = None if era_rules is None else era_rules.world_score_keys
     score_updates = tuple(
         _score_update_from_transition(transition)
-        for transition in transition_world_scores(era_runtime.world_scores, command.score_deltas)
+        for transition in transition_world_scores(
+            era_runtime.world_scores,
+            command.score_deltas,
+            score_keys=score_keys,
+        )
     )
     if phase_transition is None and not score_updates:
         return None
 
-    old_phase = validate_civilization_phase(era_runtime.civilization_phase)
+    old_phase = validate_civilization_phase(era_runtime.civilization_phase, phases=civilization_phases)
     new_phase = requested_phase if phase_transition is None else phase_transition.new_phase
     event = CivilizationPhaseDrifted(
         era_key=EraKey(str(era_runtime.era_key).strip()),

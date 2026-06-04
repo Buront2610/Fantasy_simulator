@@ -301,9 +301,12 @@ K0 phases completed in this order:
 | K0-6c | headless era/civilization transition core and timeline projection. Completed for K0; era/civilization records project through reports/dashboard/golden contracts and remain non-durable world-level runtime fields under the v8 save policy. |
 | K0-7 | save/migration policy for PR-K dynamic fields. Completed for K0: v8 terrain policy is set, stale experimental era runtime snapshot fields are discarded during hydration, canonical era/civilization records win conflicts, and snapshot-only era runtime fields remain unknown until a future durable schema policy exists. |
 
-K0 era/civilization vocabulary is deliberately fixed in code for now. Later
-bundle-authored rules should introduce a `WorldRuleSet`/`EraRuntimeRules` style
-input before expanding phases or world-score keys.
+K0 era/civilization vocabulary started as fixed code vocabulary. Current PR-K
+mainline now has a non-durable `EraRuntimeRules` input and SettingBundle
+`civilization_phases` / `world_score_keys` authoring fields, so manual and
+natural era/civilization changes share the same rule vocabulary without changing
+save schema v8. Later slices can expand authored phase semantics or score
+effects on top of this rule input.
 
 Fitness functions should eventually guard:
 

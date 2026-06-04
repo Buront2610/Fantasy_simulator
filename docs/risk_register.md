@@ -143,10 +143,12 @@ work and its serialization guardrails.
   Impact: agents may persist world-level era/civilization fields prematurely,
   creating a schema conflict with the K0 guardrail.
   Guardrail: keep era/civilization projections headless and driven by
-  canonical records until a later save policy declares durable runtime fields;
-  stale `world.era_key`, `world.civilization_phase`, `world.world_scores`, and
-  `world.era_runtime` snapshot data are discarded during hydration and must not
-  override `world.event_records`.
+  canonical records until a later save policy declares durable runtime fields.
+  SettingBundle may author non-durable `civilization_phases` and
+  `world_score_keys` rule vocabulary, but stale `world.era_key`,
+  `world.civilization_phase`, `world.world_scores`, and `world.era_runtime`
+  snapshot data are discarded during hydration and must not override
+  `world.event_records`.
   Policy: `docs/adr/0003-era-civilization-runtime-persistence.md`.
 
 ## Current Status

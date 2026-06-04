@@ -198,6 +198,8 @@ def test_world_definition_round_trip():
         era="Second Dawn",
         cultures=["Skyfolk"],
         factions=["Wardens"],
+        civilization_phases=["dawn", "storm", "renewal"],
+        world_score_keys=["omens", "cohesion"],
         languages=[
             LanguageDefinition(
                 language_key="proto",
@@ -247,6 +249,19 @@ def test_world_definition_round_trip():
     assert restored == world_def
 
 
+def test_world_definition_defaults_era_runtime_rules_for_legacy_payloads():
+    restored = WorldDefinition.from_dict(
+        {
+            "world_key": "legacy",
+            "display_name": "Legacy Realm",
+            "lore_text": "Legacy lore",
+        }
+    )
+
+    assert restored.civilization_phases == ["stable", "crisis", "transition", "new_era", "aftermath"]
+    assert restored.world_score_keys == ["prosperity", "safety", "traffic", "mood"]
+
+
 def test_setting_bundle_round_trip():
     bundle = SettingBundle(
         schema_version=2,
@@ -260,6 +275,31 @@ def test_setting_bundle_round_trip():
     restored = SettingBundle.from_dict(bundle.to_dict())
 
     assert restored == bundle
+
+
+def test_world_era_runtime_uses_setting_bundle_rule_vocabulary():
+    world = World()
+    bundle = world.setting_bundle
+    bundle.world_definition.civilization_phases = ["dawn", "storm", "renewal"]
+    bundle.world_definition.world_score_keys = ["omens", "cohesion"]
+    world.apply_setting_bundle(bundle)
+
+    runtime = world._world_era_runtime()
+    assert runtime.civilization_phase == "dawn"
+    assert runtime.world_scores == {"omens": 50, "cohesion": 50}
+
+    record = world.apply_civilization_phase_drift(
+        "storm",
+        score_deltas={"omens": 7},
+        month=2,
+        day=3,
+    )
+
+    assert record is not None
+    assert record.render_params["new_civilization_phase"] == "storm"
+    assert record.render_params["score_changes"] == [
+        {"score_key": "omens", "old_value": 50, "new_value": 57, "delta": 7},
+    ]
 
 
 def test_world_definition_exposes_typed_culture_and_faction_inspection_entries():
@@ -1262,6 +1302,35 @@ def test_bundle_validation_rejects_blank_cultures_and_factions() -> None:
         assert "blank faction names" in str(exc)
     else:
         raise AssertionError("Expected blank factions to fail fast")
+
+
+def test_bundle_validation_rejects_invalid_era_runtime_rule_lists() -> None:
+    payload = {
+        "schema_version": 1,
+        "world_definition": {
+            "world_key": "rules",
+            "display_name": "Rules",
+            "lore_text": "Rules lore",
+            "civilization_phases": ["dawn", "dawn"],
+            "world_score_keys": ["omens"],
+        },
+    }
+
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "duplicate civilization_phases" in str(exc)
+    else:
+        raise AssertionError("Expected duplicate civilization phases to fail fast")
+
+    payload["world_definition"]["civilization_phases"] = ["dawn"]
+    payload["world_definition"]["world_score_keys"] = ["  "]
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "blank world_score_keys" in str(exc)
+    else:
+        raise AssertionError("Expected blank world score keys to fail fast")
 
 
 def test_bundle_validation_rejects_blank_glossary_terms() -> None:

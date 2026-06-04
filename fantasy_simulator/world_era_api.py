@@ -14,6 +14,7 @@ from .world_change import (
     build_civilization_phase_drift_change_set,
     build_era_shift_change_set,
 )
+from .world_change.state_machines import DEFAULT_ERA_RUNTIME_RULES, EraRuntimeRules
 
 if TYPE_CHECKING:
     from .world_location_state import LocationState
@@ -32,6 +33,10 @@ class _TransientEraRuntime:
             "mood": 50,
         }
     )
+
+
+def _default_world_scores(score_keys: Iterable[str]) -> Dict[str, int]:
+    return {str(score_key): 50 for score_key in score_keys}
 
 
 def _setting_entry_key(name: str) -> str:
@@ -64,6 +69,26 @@ class WorldEraMixin:
         era_name = getattr(world_definition, "era", "")
         return _setting_entry_key(era_name) if isinstance(era_name, str) and era_name.strip() else "age_of_embers"
 
+    def _era_runtime_rules(self) -> EraRuntimeRules:
+        bundle = getattr(self, "_setting_bundle", None)
+        world_definition = getattr(bundle, "world_definition", None)
+        if world_definition is None:
+            return DEFAULT_ERA_RUNTIME_RULES
+        phases = tuple(
+            str(phase).strip()
+            for phase in getattr(world_definition, "civilization_phases", ())
+            if str(phase).strip()
+        )
+        score_keys = tuple(
+            str(score_key).strip()
+            for score_key in getattr(world_definition, "world_score_keys", ())
+            if str(score_key).strip()
+        )
+        return EraRuntimeRules(
+            civilization_phases=phases or DEFAULT_ERA_RUNTIME_RULES.civilization_phases,
+            world_score_keys=score_keys or DEFAULT_ERA_RUNTIME_RULES.world_score_keys,
+        )
+
     def _world_era_runtime(self) -> _TransientEraRuntime:
         runtime = getattr(self, "_era_runtime", None)
         if isinstance(runtime, _TransientEraRuntime):
@@ -71,9 +96,11 @@ class WorldEraMixin:
         from .observation import build_era_timeline_projection
 
         projection = build_era_timeline_projection(event_records=self.event_records)
+        era_rules = self._era_runtime_rules()
         runtime = _TransientEraRuntime(
             era_key=projection.current_era_id or self._current_era_key_from_setting_bundle(),
-            civilization_phase=projection.current_civilization_phase or "stable",
+            civilization_phase=projection.current_civilization_phase or era_rules.civilization_phases[0],
+            world_scores=_default_world_scores(era_rules.world_score_keys),
         )
         self._era_runtime = runtime
         return runtime
@@ -93,6 +120,7 @@ class WorldEraMixin:
     ) -> WorldEventRecord | None:
         """Shift the transient era runtime and record a canonical world-change event."""
         runtime = self._world_era_runtime()
+        era_rules = self._era_runtime_rules()
         known_era_keys = (
             {runtime.era_key, new_era_key}
             if authored_era_keys is None
@@ -120,6 +148,7 @@ class WorldEraMixin:
             command,
             era_runtime=runtime,
             authored_era_keys=known_era_keys,
+            era_rules=era_rules,
             describe=_describe,
         )
         if change_set is None:
@@ -156,6 +185,7 @@ class WorldEraMixin:
     ) -> WorldEventRecord | None:
         """Drift transient civilization phase/scores and record a canonical world-change event."""
         runtime = self._world_era_runtime()
+        era_rules = self._era_runtime_rules()
         command = DriftCivilizationPhaseCommand(
             new_phase=new_phase,
             score_deltas={} if score_deltas is None else dict(score_deltas),
@@ -177,6 +207,7 @@ class WorldEraMixin:
         change_set = build_civilization_phase_drift_change_set(
             command,
             era_runtime=runtime,
+            era_rules=era_rules,
             describe=_describe,
         )
         if change_set is None:

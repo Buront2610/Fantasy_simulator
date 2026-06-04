@@ -134,6 +134,8 @@ def validate_world_change_event_contract(record: WorldEventRecord) -> None:
     if contract.requires_impact and not impact_attributes:
         raise ValueError(f"{record.kind} must include at least one impact")
     unknown_impacts = impact_attributes - contract.allowed_impact_attributes
+    if record.kind == "civilization_phase_drifted":
+        unknown_impacts -= _world_score_attributes_from_record(record)
     if unknown_impacts:
         raise ValueError(f"{record.kind} has unknown impact attributes: {sorted(unknown_impacts)}")
     missing_impacts = contract.required_impact_attributes - impact_attributes
@@ -141,6 +143,17 @@ def validate_world_change_event_contract(record: WorldEventRecord) -> None:
         raise ValueError(f"{record.kind} missing impact attributes: {sorted(missing_impacts)}")
     if record.kind == "terrain_cell_mutated":
         _validate_terrain_changed_attributes(record, impacts)
+
+
+def _world_score_attributes_from_record(record: WorldEventRecord) -> set[str]:
+    score_changes = record.render_params.get("score_changes", [])
+    if not isinstance(score_changes, list):
+        return set()
+    attributes: set[str] = set()
+    for change in score_changes:
+        if isinstance(change, dict) and isinstance(change.get("score_key"), str):
+            attributes.add(change["score_key"])
+    return attributes
 
 
 def _validate_location_tags(record: WorldEventRecord, contract: WorldChangeEventContract) -> None:

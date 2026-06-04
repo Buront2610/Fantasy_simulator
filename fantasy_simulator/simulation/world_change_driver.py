@@ -7,7 +7,6 @@ from typing import Any
 from ..observation import build_war_map_projection
 from ..rumor import generate_tracked_rumor_from_world_change
 from ..terrain import BIOME_TYPES
-from ..world_change.state_machines import CIVILIZATION_PHASES
 
 NATURAL_ERA_KEYS = (
     "age_of_reckoning",
@@ -283,20 +282,26 @@ def generate_terrain_world_change(world: Any, *, month: int, day: int, rng: Any)
 def generate_civilization_world_change(world: Any, *, month: int, day: int, rng: Any) -> Any | None:
     """Generate one civilization-phase drift, if it would change the current phase."""
     runtime = world._world_era_runtime()
-    phases = [phase for phase in CIVILIZATION_PHASES if phase != runtime.civilization_phase]
+    era_rules = world._era_runtime_rules()
+    phases = [phase for phase in era_rules.civilization_phases if phase != runtime.civilization_phase]
     if not phases:
         return None
     phase = rng.choice(sorted(phases))
+    delta_options = {
+        "prosperity": (-4, -2, 2, 4),
+        "safety": (-6, -3, 3, 6),
+        "traffic": (-4, -2, 2, 4),
+        "mood": (-5, -2, 2, 5),
+    }
+    score_deltas = {
+        score_key: rng.choice(delta_options.get(score_key, (-3, -1, 1, 3)))
+        for score_key in era_rules.world_score_keys
+    }
     return _record_and_track_world_change(
         world,
         world.apply_civilization_phase_drift(
             phase,
-            score_deltas={
-                "prosperity": rng.choice((-4, -2, 2, 4)),
-                "safety": rng.choice((-6, -3, 3, 6)),
-                "traffic": rng.choice((-4, -2, 2, 4)),
-                "mood": rng.choice((-5, -2, 2, 5)),
-            },
+            score_deltas=score_deltas,
             month=month,
             day=day,
             reason_key="natural_civilization_drift",
@@ -311,11 +316,13 @@ def generate_era_world_change(world: Any, *, month: int, day: int, rng: Any) -> 
     if not candidates:
         return None
     new_era_key = rng.choice(sorted(candidates))
+    era_rules = world._era_runtime_rules()
+    new_phase = "new_era" if "new_era" in era_rules.civilization_phases else era_rules.civilization_phases[0]
     return _record_and_track_world_change(
         world,
         world.apply_era_shift(
             new_era_key,
-            new_civilization_phase="new_era",
+            new_civilization_phase=new_phase,
             authored_era_keys={runtime.era_key, new_era_key},
             month=month,
             day=day,

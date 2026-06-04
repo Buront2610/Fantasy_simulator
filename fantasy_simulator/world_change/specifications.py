@@ -27,7 +27,7 @@ from .commands import (
     ShiftEraCommand,
     MutateTerrainCellCommand,
 )
-from .state_machines import CivilizationPhase, validate_civilization_phase
+from .state_machines import EraRuntimeRules, CivilizationPhase, validate_civilization_phase
 
 
 class SupportsRouteStatus(Protocol):
@@ -280,6 +280,7 @@ def validate_shift_era_command(
     *,
     era_runtime: SupportsEraRuntimeState,
     authored_era_keys: Iterable[str],
+    era_rules: EraRuntimeRules | None = None,
 ) -> tuple[str, CivilizationPhase]:
     """Validate that an era shift references known authored era definitions."""
     known_eras = _known_era_keys(authored_era_keys)
@@ -291,17 +292,23 @@ def validate_shift_era_command(
         raise ValueError(f"runtime era references unknown era definition: {current_era_key}")
     if str(requested_era_key) not in known_eras:
         raise ValueError(f"new era references unknown era definition: {requested_era_key}")
-    validate_civilization_phase(era_runtime.civilization_phase)
-    return str(requested_era_key), validate_civilization_phase(command.new_civilization_phase)
+    civilization_phases = None if era_rules is None else era_rules.civilization_phases
+    validate_civilization_phase(era_runtime.civilization_phase, phases=civilization_phases)
+    return str(requested_era_key), validate_civilization_phase(
+        command.new_civilization_phase,
+        phases=civilization_phases,
+    )
 
 
 def validate_drift_civilization_phase_command(
     command: DriftCivilizationPhaseCommand,
     *,
     era_runtime: SupportsEraRuntimeState,
+    era_rules: EraRuntimeRules | None = None,
 ) -> CivilizationPhase:
     """Validate that a civilization drift command can be evaluated against runtime state."""
     if not str(era_runtime.era_key).strip():
         raise ValueError("runtime era must not be blank")
-    validate_civilization_phase(era_runtime.civilization_phase)
-    return validate_civilization_phase(command.new_phase)
+    civilization_phases = None if era_rules is None else era_rules.civilization_phases
+    validate_civilization_phase(era_runtime.civilization_phase, phases=civilization_phases)
+    return validate_civilization_phase(command.new_phase, phases=civilization_phases)

@@ -35,6 +35,10 @@ from .setting_bundle_schema_language import (
 )
 
 
+DEFAULT_CIVILIZATION_PHASES = ["stable", "crisis", "transition", "new_era", "aftermath"]
+DEFAULT_WORLD_SCORE_KEYS = ["prosperity", "safety", "traffic", "mood"]
+
+
 @dataclass
 class WorldDefinition:
     """Static lore metadata for a world setting bundle."""
@@ -45,6 +49,8 @@ class WorldDefinition:
     era: str = ""
     cultures: List[str] = field(default_factory=list)
     factions: List[str] = field(default_factory=list)
+    civilization_phases: List[str] = field(default_factory=lambda: list(DEFAULT_CIVILIZATION_PHASES))
+    world_score_keys: List[str] = field(default_factory=lambda: list(DEFAULT_WORLD_SCORE_KEYS))
     glossary: List[GlossaryEntryDefinition] = field(default_factory=list)
     calendar: CalendarDefinition = field(default_factory=lambda: default_calendar_definition())
     races: List[RaceDefinition] = field(default_factory=list)
@@ -135,6 +141,8 @@ class WorldDefinition:
             "era": self.era,
             "cultures": list(self.cultures),
             "factions": list(self.factions),
+            "civilization_phases": list(self.civilization_phases),
+            "world_score_keys": list(self.world_score_keys),
             "glossary": [entry.to_dict() for entry in self.glossary],
             "calendar": self.calendar.to_dict(),
             "races": [race.to_dict() for race in self.races],
@@ -172,6 +180,14 @@ class WorldDefinition:
             era=data.get("era", ""),
             cultures=string_list_payload(data.get("cultures", []), field_name="cultures"),
             factions=string_list_payload(data.get("factions", []), field_name="factions"),
+            civilization_phases=string_list_payload(
+                data.get("civilization_phases", list(DEFAULT_CIVILIZATION_PHASES)),
+                field_name="civilization_phases",
+            ),
+            world_score_keys=string_list_payload(
+                data.get("world_score_keys", list(DEFAULT_WORLD_SCORE_KEYS)),
+                field_name="world_score_keys",
+            ),
             glossary=[
                 GlossaryEntryDefinition.from_dict(item)
                 for item in data.get("glossary", [])

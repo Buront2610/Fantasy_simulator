@@ -90,6 +90,22 @@ def validate_bundle_unique_names(world: WorldDefinition, *, source: str) -> None
             f"Setting bundle {source} contains duplicate language community keys: {', '.join(duplicate_community_keys)}"
         )
 
+    _validate_named_rule_list(world.civilization_phases, source=source, field_name="civilization_phases")
+    _validate_named_rule_list(world.world_score_keys, source=source, field_name="world_score_keys")
+
+
+def _validate_named_rule_list(values: List[str], *, source: str, field_name: str) -> None:
+    if not values:
+        raise ValueError(f"Setting bundle {source} must define world_definition.{field_name}")
+    blank_values = [value for value in values if not value.strip()]
+    if blank_values:
+        raise ValueError(f"Setting bundle {source} contains blank {field_name}")
+    duplicate_names = duplicate_values(values)
+    if duplicate_names:
+        raise ValueError(
+            f"Setting bundle {source} contains duplicate {field_name}: {', '.join(duplicate_names)}"
+        )
+
 
 def validate_site_seeds(world: WorldDefinition, *, source: str) -> tuple[List[str], set[str]]:
     site_ids = [seed.location_id for seed in world.site_seeds]
