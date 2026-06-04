@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Dict, List, Optional, Set, Tuple, TYPE_CHECKING
 
 from ..content.setting_bundle_inspection import setting_entry_key
 from ..narrative.constants import EVENT_KINDS_FATAL
@@ -200,16 +200,39 @@ _SUPPORTED_LOCAL_FEATURE_TAGS = (
     "notice_board",
     "river",
     "accident_site",
+    "memorial",
+    "trace",
+    "blocked_route",
 )
 
 
-def _local_feature_tags(world: "World", location_id: str, terrain_biome: str) -> Tuple[str, ...]:
+def _blocked_route_site_ids(world: "World") -> Set[str]:
+    site_ids: Set[str] = set()
+    for route in world.routes:
+        if getattr(route, "blocked", False):
+            site_ids.add(route.from_site_id)
+            site_ids.add(route.to_site_id)
+    return site_ids
+
+
+def _local_feature_tags(
+    world: "World",
+    loc: "LocationState",
+    terrain_biome: str,
+    blocked_route_site_ids: Set[str],
+) -> Tuple[str, ...]:
     values: list[str] = []
     site_seed_tags = getattr(world, "_site_seed_tags", None)
     if callable(site_seed_tags):
-        values.extend(str(tag).strip() for tag in site_seed_tags(location_id) if str(tag).strip())
+        values.extend(str(tag).strip() for tag in site_seed_tags(loc.id) if str(tag).strip())
     if terrain_biome == "river":
         values.append("river")
+    if loc.memorial_ids:
+        values.append("memorial")
+    if loc.live_traces:
+        values.append("trace")
+    if loc.id in blocked_route_site_ids:
+        values.append("blocked_route")
     return tuple(tag for tag in _SUPPORTED_LOCAL_FEATURE_TAGS if tag in values)
 
 
@@ -230,13 +253,14 @@ def _build_cell_info(
     death_site_location_ids: set[str],
     world_change_counts: Dict[str, int],
     world_change_categories: Dict[str, List[str]],
+    blocked_route_site_ids: Set[str],
 ) -> MapCellInfo:
     terrain_biome, terrain_glyph, terrain_elevation, terrain_moisture, terrain_temperature = _terrain_snapshot(
         world,
         x,
         y,
     )
-    local_feature_tags = _local_feature_tags(world, loc.id, terrain_biome)
+    local_feature_tags = _local_feature_tags(world, loc, terrain_biome, blocked_route_site_ids)
     return MapCellInfo(
         location_id=loc.id,
         canonical_name=loc.canonical_name,
@@ -307,6 +331,7 @@ def build_map_info(
     _copy_terrain_cells(info, world)
     _copy_routes(info, world)
     alive_counts_by_location = _alive_counts_by_location(world)
+    blocked_route_site_ids = _blocked_route_site_ids(world)
 
     for (x, y), loc in world.grid.items():
         is_highlight = (
@@ -325,5 +350,6 @@ def build_map_info(
             death_site_location_ids,
             world_change_counts,
             world_change_categories,
+            blocked_route_site_ids,
         )
     return info

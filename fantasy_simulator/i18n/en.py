@@ -805,6 +805,9 @@ TEXT_EN: Dict[str, str] = {
     'map_feature_notice_board': 'Notice board',
     'map_feature_river': 'River',
     'map_feature_accident_site': 'Accident site',
+    'map_feature_memorial': 'Memorial',
+    'map_feature_trace': 'Trace',
+    'map_feature_blocked_route': 'Blocked route',
     # PR-G2+: atlas mode / direct selection / region landmarks
     'atlas_site_list': 'Sites on atlas',
     'map_nav_select': 'Jump to site (direct selection)',

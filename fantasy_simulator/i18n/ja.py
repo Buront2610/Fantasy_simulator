@@ -795,6 +795,9 @@ TEXT_JA: Dict[str, str] = {
     'map_feature_notice_board': '掲示板',
     'map_feature_river': '河川',
     'map_feature_accident_site': '事故地点',
+    'map_feature_memorial': '墓碑',
+    'map_feature_trace': '痕跡',
+    'map_feature_blocked_route': '封鎖道',
     # PR-G2+: アトラスモード / 直接選択 / 地域ランドマーク
     'atlas_site_list': 'アトラス上の地点',
     'map_nav_select': '地点へジャンプ（直接選択）',

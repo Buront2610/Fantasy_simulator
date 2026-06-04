@@ -126,8 +126,9 @@ def _assert_memory_heavy_bundle(bundle: dict[str, list[str]]) -> None:
     assert "      Also known as: The Lantern Vale" in bundle["region"]
     assert "      Memorial: [Year 1001] Here rests Aldric." in bundle["region"]
     assert "      Recent: Lysara passed through at dawn" in bundle["region"]
+    assert "    The Verdant Vale: Memorial, Trace" in bundle["region"]
 
-    assert bundle["detail"][:10] == [
+    assert bundle["detail"][:11] == [
         "  | V The Verdant Vale (village)                     |",
         "  | Terrain: plains (,)                              |",
         "  | Elev:128 Moist:128 Temp:128                      |",
@@ -135,6 +136,7 @@ def _assert_memory_heavy_bundle(bundle: dict[str, list[str]]) -> None:
         "  | Danger:  30 (low)                                |",
         "  | Traffic: + (medium)                              |",
         "  | Pop: 0                                           |",
+        "  | Local cues: Memorial, Trace                      |",
         "  | Prosperity: stable (50)                          |",
         "  | Mood: calm (55)                                  |",
         "  | Rumor heat: 20 (low)                             |",
@@ -180,6 +182,43 @@ def test_map_views_surface_authored_local_cues() -> None:
     assert "    Aethoria Capital: Gate, Market, Notice board" in rendered["region"]
     assert "    Sunken Ruins: Accident site" in rendered["region"]
     assert "  | Local cues: Gate, Market, Notice board           |" in rendered["detail"]
+
+
+def test_map_views_surface_runtime_local_cues() -> None:
+    set_locale("en")
+    world = World()
+    route = next(
+        route for route in world.routes
+        if route.from_site_id == "loc_aethoria_capital" or route.to_site_id == "loc_aethoria_capital"
+    )
+    world.apply_route_blocked_change(route.route_id, True, month=2, day=3)
+    world.add_memorial(
+        "mem_runtime",
+        "char_1",
+        "Aldric",
+        "loc_aethoria_capital",
+        world.year,
+        "death",
+        "Here rests Aldric.",
+    )
+    world.add_live_trace(
+        "loc_aethoria_capital",
+        world.year,
+        "Lysara",
+        "Lysara passed through at dawn",
+    )
+
+    rendered = render_world_map_views_for_location(
+        world,
+        "loc_aethoria_capital",
+        include_overview=False,
+    )
+
+    assert (
+        "    Aethoria Capital: Gate, Market, Notice board, Memorial, Trace, Blocked route"
+        in rendered["region"]
+    )
+    assert "  | Local cues: Gate, Market, Notice board, Memori...|" in rendered["detail"]
 
 
 def test_midyear_save_load_preserves_map_visible_bundle(tmp_path) -> None:

@@ -221,11 +221,12 @@ map renderer は最低でも次のモードを持つ。
 > 注: region map の読解性強化は後続の PR-H1 で補強済み
 - [x] `terrain + site overlay` を扱える world-scale map renderer を導入する
 - [x] ワールド全体図で海岸線、山脈、森林帯、平野、主要 route、world memory を表示できるようにする
-- [ ] 地域図で導線、峠、河川、門、市場、掲示板、墓碑、事故地点、封鎖道、痕跡を判断可能な形で読めるようにする
+- [x] 地域図で導線、峠、河川、門、市場、掲示板、墓碑、事故地点、封鎖道、痕跡を判断可能な形で読めるようにする first pass
   - [x]  PR-G2 で region 基盤は導入済み
   - [x]  PR-H1 で summary / closure / danger / rumor / world memory の読解性を強化済み
   - [x]  門 / 市場 / 掲示板 / 河川 / 事故地点を site seed tags と terrain biome から region/detail に表示する first pass
-  - [ ]  墓碑 / 封鎖道 / 先行パーティの痕跡を局所手がかりとしてさらに統合する
+  - [x]  墓碑 / 封鎖道 / live trace を runtime state から region/detail の局所手がかりへ統合する first pass
+  - [ ]  局所手がかりを将来の Textual / Rich 表示でフィルタ・強調できる形へ拡張する
 - [x] 地点詳細図で局所 AA / 準AA と最近の痕跡を接続する
 - [x] world サイズが固定 5×5 でなくても描画できるようにする
 - [x] `wide` / `compact` / `minimal` 表示モードを導入する
