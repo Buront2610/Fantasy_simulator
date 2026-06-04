@@ -628,6 +628,13 @@ TEXT_EN: Dict[str, str] = {
     # Location detail view UI labels
     'location_detail_header': 'LOCATION DETAIL - {name}',
     'location_endonym_label': 'Native name',
+    'location_etymology_label': 'Name origin',
+    'location_etymology_prefix': '{surface_name} < {language_name}',
+    'location_etymology_authored': '{prefix}; authored native name for {canonical_name}',
+    'location_etymology_generated': '{prefix}{pattern}{components}',
+    'location_etymology_pattern': '; pattern={pattern}',
+    'location_etymology_components': '; {components}',
+    'location_etymology_component': '{role}={surface}',
     'location_aliases_label': 'Known as',
     'location_live_traces_label': 'Recent visitors',
     'location_memorials_label': 'Memorials',

@@ -710,10 +710,11 @@ python -m fantasy_simulator.content preview-roots bundle.json --language highlan
 
 作業:
 
-- `ToponymComponent` と `ToponymEtymology` DTOを追加。
-- 可能な範囲で既存language dataからgenerated endonymのetymology previewを作る。
-- canonical/generated/alias namesを含むlocation-name projectionを追加。
-- location detailに短いetymology lineを出す。
+- `ToponymComponent` と `ToponymEtymology` DTOを追加済み。
+- 既存language dataからgenerated endonymのstem/suffix/pattern traceを取り、etymology previewを作る。
+- authored native nameは生成traceではなく、著者設定の現地名としてread modelに出す。
+- location observation/detailに短いetymology lineを出す。
+- 永続化は追加しない。persistent historyはLG-4へ残す。
 
 ### LG-2: semantic roots
 

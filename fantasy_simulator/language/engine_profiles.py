@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from typing import Dict, List
 
 from ..content.setting_bundle import LanguageDefinition, NamingRulesDefinition
+from .lexicon import LanguageLexiconGenerator
+from .naming import LanguageNameGenerator, ToponymGenerationTrace
 
 
 @dataclass(frozen=True)
@@ -23,6 +25,8 @@ class LanguageEngineProfileMixin:
     _language_index: Dict[str, LanguageDefinition]
     _profile_cache: Dict[str, GeneratedLanguageProfile]
     _toponym_cache: Dict[tuple[str, str, str], str]
+    _lexicon_generator: LanguageLexiconGenerator
+    _name_generator: LanguageNameGenerator
 
     def describe_language_lineage(self, language_key: str) -> List[str]:
         return list(self.profile(language_key).lineage)
@@ -66,6 +70,20 @@ class LanguageEngineProfileMixin:
         )
         self._toponym_cache[cache_key] = name
         return name
+
+    def trace_toponym(
+        self,
+        language_key: str,
+        *,
+        seed_key: str,
+        region_type: str = "",
+    ) -> ToponymGenerationTrace:
+        return self._name_generator.trace_toponym(
+            language_key,
+            seed_key=seed_key,
+            region_type=region_type,
+            lexicon=self.profile(language_key).lexicon,
+        )
 
     def _build_lexicon(self, language: LanguageDefinition) -> List[str]:
         parent_lexicon = self.profile(language.parent_key).lexicon if language.parent_key else ()

@@ -7,6 +7,7 @@ from typing import List, TYPE_CHECKING
 
 from .event_rendering import render_event_record
 from .i18n import tr, tr_term
+from .location_names import ToponymEtymology, build_toponym_etymology, render_toponym_etymology_line
 
 if TYPE_CHECKING:
     from .world import World
@@ -38,6 +39,7 @@ class LocationObservationView:
     location_name: str
     region_type: str
     generated_endonym: str = ""
+    name_etymology: ToponymEtymology | None = None
     aliases: List[str] = field(default_factory=list)
     memorials: List[str] = field(default_factory=list)
     traces: List[str] = field(default_factory=list)
@@ -150,6 +152,7 @@ def build_location_observation_view(
         location_name=location.canonical_name,
         region_type=tr_term(location.region_type),
         generated_endonym=location.generated_endonym,
+        name_etymology=build_toponym_etymology(world, location.id),
         aliases=list(location.aliases),
         memorials=memorials,
         traces=traces,
@@ -170,6 +173,10 @@ def render_location_observation_sections(view: LocationObservationView) -> List[
     lines: List[str] = []
     if view.generated_endonym:
         lines.append(f"  {tr('location_endonym_label')}: {view.generated_endonym}")
+        lines.append("")
+
+    if view.name_etymology is not None:
+        lines.append(f"  {tr('location_etymology_label')}: {render_toponym_etymology_line(view.name_etymology)}")
         lines.append("")
 
     lines.append(f"  {tr('location_aliases_label')}:")
@@ -221,6 +228,10 @@ def render_query_location_observation_sections(view: LocationObservationView) ->
     lines: List[str] = []
     if view.generated_endonym:
         lines.append(f"  {tr('location_endonym_label')}: {view.generated_endonym}")
+        lines.append("")
+
+    if view.name_etymology is not None:
+        lines.append(f"  {tr('location_etymology_label')}: {render_toponym_etymology_line(view.name_etymology)}")
         lines.append("")
 
     if view.resident_names:

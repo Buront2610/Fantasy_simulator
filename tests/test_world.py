@@ -19,6 +19,11 @@ from fantasy_simulator.content.setting_bundle import (
 from fantasy_simulator.i18n import set_locale
 from fantasy_simulator.language.schema import SoundChangeRuleDefinition
 from fantasy_simulator.language.state import LanguageEvolutionRecord
+from fantasy_simulator.location_names import build_toponym_etymology, render_toponym_etymology_line
+from fantasy_simulator.location_observation import (
+    build_location_observation_view,
+    render_location_observation_sections,
+)
 from fantasy_simulator.rumor import Rumor
 from fantasy_simulator.terrain import RouteEdge
 from fantasy_simulator.world import LocationState, MemorialRecord, World
@@ -576,6 +581,103 @@ class TestWorld:
         )
 
         assert world.location_endonym("loc_custom") == "Torum"
+
+    def test_location_name_etymology_traces_generated_endonym_parts(self):
+        set_locale("en")
+        world = World(name="Custom")
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="loc_custom",
+                        name="Custom",
+                        description="Custom site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                        language_key="custom_lang",
+                    ),
+                ],
+                languages=[
+                    LanguageDefinition(
+                        language_key="custom_lang",
+                        display_name="Custom Lang",
+                        name_stems=["per"],
+                        toponym_stems=["tor"],
+                        toponym_suffixes=["um"],
+                        toponym_patterns=["RY"],
+                    )
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+
+        etymology = build_toponym_etymology(world, "loc_custom")
+
+        assert etymology is not None
+        assert etymology.surface_name == "Torum"
+        assert etymology.language_key == "custom_lang"
+        assert etymology.source == "generated_endonym"
+        assert etymology.pattern == "RY"
+        assert [(component.role, component.surface) for component in etymology.components] == [
+            ("stem", "tor"),
+            ("suffix", "um"),
+            ("region", "city"),
+        ]
+        assert render_toponym_etymology_line(etymology) == (
+            "Torum < Custom Lang; pattern=RY; stem=tor, suffix=um, region=city"
+        )
+
+    def test_location_observation_surfaces_name_etymology_line(self):
+        set_locale("en")
+        world = World()
+
+        view = build_location_observation_view(world, "loc_thornwood")
+        lines = render_location_observation_sections(view)
+
+        assert view.name_etymology is not None
+        assert view.name_etymology.surface_name == world.location_endonym("loc_thornwood")
+        assert any(line.startswith("  Name origin:") for line in lines)
+
+    def test_authored_native_name_etymology_does_not_claim_generated_parts(self):
+        set_locale("en")
+        world = World(name="Custom")
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="loc_native",
+                        name="Native",
+                        description="Custom site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                        language_key="custom_lang",
+                        native_name="Darun",
+                    ),
+                ],
+                languages=[LanguageDefinition(language_key="custom_lang", display_name="Custom Lang")],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+
+        etymology = build_toponym_etymology(world, "loc_native")
+
+        assert etymology is not None
+        assert etymology.surface_name == "Darun"
+        assert etymology.source == "authored_native_name"
+        assert etymology.pattern == ""
+        assert render_toponym_etymology_line(etymology) == (
+            "Darun < Custom Lang; authored native name for Native"
+        )
 
     def test_blank_native_name_does_not_mask_generated_or_absent_endonym(self):
         world = World(name="Custom")

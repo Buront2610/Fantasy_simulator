@@ -618,6 +618,13 @@ TEXT_JA: Dict[str, str] = {
     # 地点詳細ビューの UI ラベル
     'location_detail_header': '地点詳細 - {name}',
     'location_endonym_label': '現地名',
+    'location_etymology_label': '地名由来',
+    'location_etymology_prefix': '{surface_name} < {language_name}',
+    'location_etymology_authored': '{prefix}; {canonical_name} の著者設定現地名',
+    'location_etymology_generated': '{prefix}{pattern}{components}',
+    'location_etymology_pattern': '; pattern={pattern}',
+    'location_etymology_components': '; {components}',
+    'location_etymology_component': '{role}={surface}',
     'location_aliases_label': '別称',
     'location_live_traces_label': '最近の訪問者',
     'location_memorials_label': '記念碑',
