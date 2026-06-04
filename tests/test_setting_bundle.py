@@ -9,6 +9,7 @@ from fantasy_simulator.content.setting_bundle import (
     CalendarDefinition,
     CalendarMonthDefinition,
     DEFAULT_AETHORIA_BUNDLE_PATH,
+    FactionRelationshipDefinition,
     GlossaryEntryDefinition,
     JobDefinition,
     LanguageCommunityDefinition,
@@ -38,6 +39,7 @@ def test_setting_bundle_facade_supports_public_from_import_contract():
         "CalendarDefinition",
         "CalendarMonthDefinition",
         "DEFAULT_AETHORIA_BUNDLE_PATH",
+        "FactionRelationshipDefinition",
         "GlossaryEntryDefinition",
         "JobDefinition",
         "LanguageCommunityDefinition",
@@ -66,7 +68,8 @@ def test_setting_bundle_facade_supports_public_from_import_contract():
     exec(
         "from fantasy_simulator.content.setting_bundle import ("
         "CalendarDefinition, CalendarMonthDefinition, DEFAULT_AETHORIA_BUNDLE_PATH, "
-        "GlossaryEntryDefinition, JobDefinition, LanguageCommunityDefinition, LanguageDefinition, "
+        "FactionRelationshipDefinition, GlossaryEntryDefinition, JobDefinition, "
+        "LanguageCommunityDefinition, LanguageDefinition, "
         "LanguageFamilyDefinition, LanguageRootRealization, NamingRulesDefinition, "
         "RaceDefinition, RouteSeedDefinition, SemanticRootDefinition, SettingBundle, "
         "SettingBundleAuthoringSummary, SettingEntryInspection, SiteSeedDefinition, WorldDefinition, "
@@ -89,6 +92,7 @@ def test_setting_bundle_facade_supports_public_from_import_contract():
     assert namespace["CalendarDefinition"] is schema.CalendarDefinition
     assert namespace["SettingBundle"] is schema.SettingBundle
     assert namespace["WorldDefinition"] is schema.WorldDefinition
+    assert namespace["FactionRelationshipDefinition"] is schema.FactionRelationshipDefinition
     assert namespace["LanguageFamilyDefinition"] is schema.LanguageFamilyDefinition
     assert namespace["SemanticRootDefinition"] is schema.SemanticRootDefinition
     assert namespace["LanguageRootRealization"] is schema.LanguageRootRealization
@@ -200,6 +204,15 @@ def test_world_definition_round_trip():
         factions=["Wardens"],
         civilization_phases=["dawn", "storm", "renewal"],
         world_score_keys=["omens", "cohesion"],
+        faction_relationships=[
+            FactionRelationshipDefinition(
+                faction_a_id="skyfolk",
+                faction_b_id="wardens",
+                status="tense",
+                location_ids=["loc_sky"],
+                description="The Skyfolk test the Wardens' border.",
+            )
+        ],
         languages=[
             LanguageDefinition(
                 language_key="proto",
@@ -260,6 +273,7 @@ def test_world_definition_defaults_era_runtime_rules_for_legacy_payloads():
 
     assert restored.civilization_phases == ["stable", "crisis", "transition", "new_era", "aftermath"]
     assert restored.world_score_keys == ["prosperity", "safety", "traffic", "mood"]
+    assert restored.faction_relationships == []
 
 
 def test_setting_bundle_round_trip():
@@ -513,6 +527,13 @@ def test_default_aethoria_bundle_has_minimal_phase_i_slots():
     assert bundle.world_definition.era == "Age of Embers"
     assert bundle.world_definition.culture_entries()
     assert bundle.world_definition.faction_entries()
+    assert {
+        (relationship.faction_a_id, relationship.faction_b_id, relationship.status)
+        for relationship in bundle.world_definition.faction_relationships
+    } >= {
+        ("stormwatch_wardens", "silverbrook_merchant_league", "tense"),
+        ("aethorian_crown_council", "hearthglow_healers_guild", "allied"),
+    }
     assert bundle.world_definition.races
     assert bundle.world_definition.jobs
     assert bundle.world_definition.site_seeds
@@ -1331,6 +1352,56 @@ def test_bundle_validation_rejects_invalid_era_runtime_rule_lists() -> None:
         assert "blank world_score_keys" in str(exc)
     else:
         raise AssertionError("Expected blank world score keys to fail fast")
+
+
+def test_bundle_validation_rejects_invalid_faction_relationships() -> None:
+    payload = {
+        "schema_version": 1,
+        "world_definition": {
+            "world_key": "politics",
+            "display_name": "Politics",
+            "lore_text": "Politics lore",
+            "factions": ["Wardens", "Dawn Court"],
+            "site_seeds": [
+                {
+                    "location_id": "loc_gate",
+                    "name": "Gate",
+                    "description": "A border gate.",
+                    "region_type": "city",
+                    "x": 1,
+                    "y": 1,
+                }
+            ],
+            "faction_relationships": [
+                {
+                    "faction_a_id": "wardens",
+                    "faction_b_id": "dawn_court",
+                    "status": "war",
+                    "location_ids": ["loc_gate"],
+                }
+            ],
+        },
+    }
+
+    bundle = bundle_from_dict_validated(payload, source="test bundle")
+    assert bundle.world_definition.faction_relationships[0].status == "war"
+
+    payload["world_definition"]["faction_relationships"][0]["status"] = "feuding"
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "unknown faction relationship status" in str(exc)
+    else:
+        raise AssertionError("Expected unknown faction relationship status to fail fast")
+
+    payload["world_definition"]["faction_relationships"][0]["status"] = "war"
+    payload["world_definition"]["faction_relationships"][0]["location_ids"] = ["loc_missing"]
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "unknown site ids" in str(exc)
+    else:
+        raise AssertionError("Expected unknown relationship site id to fail fast")
 
 
 def test_bundle_validation_rejects_blank_glossary_terms() -> None:

@@ -668,6 +668,7 @@ TEXT_EN: Dict[str, str] = {
     'dashboard_route_closure_line': 'The route from {from_location} to {to_location} is blocked.',
     'dashboard_current_occupations': 'Current occupations',
     'dashboard_active_wars': 'Active wars',
+    'dashboard_authored_active_war': '{aggressor_faction_id} and {target_faction_id} are already at war.',
     'dashboard_world_changes': 'World changes',
     'dashboard_recent_world_changes': 'Recent world changes',
     'dashboard_follow_up': 'Follow up',

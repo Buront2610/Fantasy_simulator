@@ -12,6 +12,7 @@ from .setting_bundle_validation_language import (
 from .setting_bundle_validation_world import (
     validate_bundle_identity,
     validate_bundle_unique_names,
+    validate_faction_relationships,
     validate_naming_rules,
     validate_route_seeds,
     validate_rule_overrides,
@@ -25,6 +26,7 @@ def validate_setting_bundle(bundle: SettingBundle, *, source: str) -> None:
     validate_bundle_unique_names(world, source=source)
     site_ids, canonical_ids = validate_site_seeds(world, source=source)
     validate_route_seeds(world, canonical_ids, source=source)
+    validate_faction_relationships(world, canonical_ids, source=source)
     validate_naming_rules(world, source=source)
     language_index = validate_languages(world, source=source)
     validate_language_families(world, language_index, site_ids, source=source)

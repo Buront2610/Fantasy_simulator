@@ -584,12 +584,21 @@ def _watched_thread_views(
 
 
 def _active_war_views(world: "World", records: List["WorldEventRecord"]) -> List[ActiveWarView]:
-    projection = build_war_map_projection(event_records=records)
+    projection = build_war_map_projection(
+        event_records=records,
+        faction_relationships=_faction_relationships(world),
+    )
     records_by_id = {record.record_id: record for record in records}
     views: List[ActiveWarView] = []
     for entry in projection.active_wars:
         record = records_by_id.get(entry.record_id)
         text = entry.description if record is None else _render_view_event(record, world)
+        if record is None and entry.summary_key == "dashboard_authored_active_war":
+            text = tr(
+                entry.summary_key,
+                aggressor_faction_id=entry.aggressor_faction_id,
+                target_faction_id=entry.target_faction_id,
+            )
         views.append(
             ActiveWarView(
                 record_id=entry.record_id,
@@ -603,6 +612,13 @@ def _active_war_views(world: "World", records: List["WorldEventRecord"]) -> List
             )
         )
     return views
+
+
+def _faction_relationships(world: "World") -> List[object]:
+    bundle = getattr(world, "_setting_bundle", None)
+    world_definition = getattr(bundle, "world_definition", None)
+    relationships = getattr(world_definition, "faction_relationships", ())
+    return list(relationships)
 
 
 def _current_occupation_views(world: "World", records: List["WorldEventRecord"]) -> List[CurrentOccupationView]:

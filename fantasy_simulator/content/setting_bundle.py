@@ -17,6 +17,7 @@ from .setting_bundle_loader import (
 from .setting_bundle_schema import (
     CalendarDefinition,
     CalendarMonthDefinition,
+    FactionRelationshipDefinition,
     GlossaryEntryDefinition,
     JobDefinition,
     LanguageCommunityDefinition,
@@ -39,6 +40,7 @@ from .setting_bundle_schema import (
 __all__ = [
     "CalendarDefinition",
     "CalendarMonthDefinition",
+    "FactionRelationshipDefinition",
     "DEFAULT_AETHORIA_BUNDLE_PATH",
     "GlossaryEntryDefinition",
     "JobDefinition",

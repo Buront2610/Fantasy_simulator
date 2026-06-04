@@ -113,7 +113,8 @@ work and its serialization guardrails.
   that look different from equivalent loaded legacy strings.
   Guardrail: command builders normalize typed IDs before domain events become
   canonical records, including `cause_event_id` and optional terrain-linked
-  `location_id`.
+  `location_id`; authored initial faction relationships use normalized faction
+  inspection keys and known site ids before they can seed war projections.
 - Locale-aware rendering coverage remains partial for future legacy simulation events.
   Impact: newly-added ordinary event families may display their stored
   compatibility description after load if they skip `summary_key` and

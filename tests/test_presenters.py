@@ -14,7 +14,11 @@ from fantasy_simulator.character import Character
 from fantasy_simulator.rumor import Rumor
 from fantasy_simulator.world import CalendarChangeRecord, World
 from fantasy_simulator.events import WorldEventRecord
-from fantasy_simulator.content.setting_bundle import CalendarDefinition, CalendarMonthDefinition
+from fantasy_simulator.content.setting_bundle import (
+    CalendarDefinition,
+    CalendarMonthDefinition,
+    FactionRelationshipDefinition,
+)
 
 
 class CaptureOutput:
@@ -693,6 +697,30 @@ def test_world_dashboard_surfaces_active_wars_until_war_ends():
     dashboard = build_world_dashboard_view(world, current_month=3)
 
     assert dashboard.active_wars == []
+
+
+def test_world_dashboard_surfaces_authored_initial_wars():
+    set_locale("en")
+    world = World()
+    bundle = world.setting_bundle
+    bundle.world_definition.faction_relationships = [
+        FactionRelationshipDefinition(
+            faction_a_id="stormwatch_wardens",
+            faction_b_id="silverbrook_merchant_league",
+            status="war",
+            location_ids=["loc_aethoria_capital"],
+        )
+    ]
+    world.apply_setting_bundle(bundle)
+
+    dashboard = build_world_dashboard_view(world, current_month=1)
+
+    assert [item.record_id for item in dashboard.active_wars] == [
+        "bundle:faction_relationship:silverbrook_merchant_league:stormwatch_wardens"
+    ]
+    assert [item.text for item in dashboard.active_wars] == [
+        "stormwatch_wardens and silverbrook_merchant_league are already at war."
+    ]
 
 
 def test_world_dashboard_surfaces_current_era_and_civilization_phase():

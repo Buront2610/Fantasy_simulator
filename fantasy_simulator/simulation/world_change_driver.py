@@ -52,6 +52,14 @@ def _authored_faction_ids(world: Any) -> list[str]:
     return sorted(faction_ids)
 
 
+def _authored_faction_relationships(world: Any) -> list[Any]:
+    bundle = getattr(world, "_setting_bundle", None)
+    if bundle is None:
+        bundle = getattr(world, "setting_bundle", None)
+    world_definition = getattr(bundle, "world_definition", None)
+    return list(getattr(world_definition, "faction_relationships", ()))
+
+
 def _affected_location_ids(world: Any, rng: Any) -> tuple[str, ...]:
     location_ids = sorted(getattr(world, "location_ids", []))
     if len(location_ids) <= 2:
@@ -129,7 +137,10 @@ def _faction_pairs(faction_ids: list[str]) -> list[tuple[str, str]]:
 
 def generate_war_world_change(world: Any, *, month: int, day: int, rng: Any) -> Any | None:
     """Generate one natural war declaration or war ending from canonical war history."""
-    projection = build_war_map_projection(event_records=getattr(world, "event_records", []))
+    projection = build_war_map_projection(
+        event_records=getattr(world, "event_records", []),
+        faction_relationships=_authored_faction_relationships(world),
+    )
     if projection.active_wars and rng.random() < 0.55:
         war = rng.choice(list(projection.active_wars))
         return _record_and_track_world_change(
@@ -180,7 +191,10 @@ def generate_war_world_change(world: Any, *, month: int, day: int, rng: Any) -> 
 
 def generate_occupation_world_change(world: Any, *, month: int, day: int, rng: Any) -> Any | None:
     """Generate one natural location-control shift from active faction-war history."""
-    projection = build_war_map_projection(event_records=getattr(world, "event_records", []))
+    projection = build_war_map_projection(
+        event_records=getattr(world, "event_records", []),
+        faction_relationships=_authored_faction_relationships(world),
+    )
     if not projection.active_wars:
         return None
 

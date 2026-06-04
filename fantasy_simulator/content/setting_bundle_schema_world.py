@@ -40,6 +40,38 @@ DEFAULT_WORLD_SCORE_KEYS = ["prosperity", "safety", "traffic", "mood"]
 
 
 @dataclass
+class FactionRelationshipDefinition:
+    """Authored initial relationship between two setting factions."""
+
+    faction_a_id: str
+    faction_b_id: str
+    status: str = "neutral"
+    location_ids: List[str] = field(default_factory=list)
+    description: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "faction_a_id": self.faction_a_id,
+            "faction_b_id": self.faction_b_id,
+            "status": self.status,
+            "location_ids": list(self.location_ids),
+        }
+        if self.description:
+            payload["description"] = self.description
+        return payload
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "FactionRelationshipDefinition":
+        return cls(
+            faction_a_id=str(data["faction_a_id"]),
+            faction_b_id=str(data["faction_b_id"]),
+            status=str(data.get("status", "neutral")),
+            location_ids=string_list_payload(data.get("location_ids", []), field_name="location_ids"),
+            description=str(data.get("description", "")),
+        )
+
+
+@dataclass
 class WorldDefinition:
     """Static lore metadata for a world setting bundle."""
 
@@ -51,6 +83,7 @@ class WorldDefinition:
     factions: List[str] = field(default_factory=list)
     civilization_phases: List[str] = field(default_factory=lambda: list(DEFAULT_CIVILIZATION_PHASES))
     world_score_keys: List[str] = field(default_factory=lambda: list(DEFAULT_WORLD_SCORE_KEYS))
+    faction_relationships: List[FactionRelationshipDefinition] = field(default_factory=list)
     glossary: List[GlossaryEntryDefinition] = field(default_factory=list)
     calendar: CalendarDefinition = field(default_factory=lambda: default_calendar_definition())
     races: List[RaceDefinition] = field(default_factory=list)
@@ -143,6 +176,10 @@ class WorldDefinition:
             "factions": list(self.factions),
             "civilization_phases": list(self.civilization_phases),
             "world_score_keys": list(self.world_score_keys),
+            "faction_relationships": [
+                relationship.to_dict()
+                for relationship in self.faction_relationships
+            ],
             "glossary": [entry.to_dict() for entry in self.glossary],
             "calendar": self.calendar.to_dict(),
             "races": [race.to_dict() for race in self.races],
@@ -188,6 +225,10 @@ class WorldDefinition:
                 data.get("world_score_keys", list(DEFAULT_WORLD_SCORE_KEYS)),
                 field_name="world_score_keys",
             ),
+            faction_relationships=[
+                FactionRelationshipDefinition.from_dict(item)
+                for item in data.get("faction_relationships", [])
+            ],
             glossary=[
                 GlossaryEntryDefinition.from_dict(item)
                 for item in data.get("glossary", [])

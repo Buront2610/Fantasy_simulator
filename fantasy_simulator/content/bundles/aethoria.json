@@ -28,6 +28,38 @@
       "Dawnport Harbor Council",
       "Coral Cove Conclave"
     ],
+    "faction_relationships": [
+      {
+        "faction_a_id": "stormwatch_wardens",
+        "faction_b_id": "silverbrook_merchant_league",
+        "status": "tense",
+        "location_ids": [
+          "loc_stormwatch_keep",
+          "loc_silverbrook"
+        ],
+        "description": "Stormwatch patrol authority and Silverbrook trade rights remain in uneasy tension."
+      },
+      {
+        "faction_a_id": "aethorian_crown_council",
+        "faction_b_id": "hearthglow_healers_guild",
+        "status": "allied",
+        "location_ids": [
+          "loc_aethoria_capital",
+          "loc_hearthglow_town"
+        ],
+        "description": "The Crown Council protects Hearthglow charters in exchange for healing support."
+      },
+      {
+        "faction_a_id": "dawnport_harbor_council",
+        "faction_b_id": "coral_cove_conclave",
+        "status": "neutral",
+        "location_ids": [
+          "loc_dawnport",
+          "loc_coral_cove"
+        ],
+        "description": "Dawnport captains and Coral Cove sea-mages keep a cautious maritime accord."
+      }
+    ],
     "glossary": [
       {
         "term": "Age of Embers",

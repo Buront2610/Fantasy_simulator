@@ -6,6 +6,7 @@ from fantasy_simulator.observation import (
     build_route_status_projection,
     build_war_map_projection,
 )
+from fantasy_simulator.content.setting_bundle import FactionRelationshipDefinition
 from fantasy_simulator.persistence.save_load import load_simulation, save_simulation
 from fantasy_simulator.reports import generate_yearly_report
 from fantasy_simulator.simulation.world_change_driver import (
@@ -234,6 +235,37 @@ def test_natural_occupation_world_change_uses_active_war_and_roundtrips(tmp_path
     assert restored is not None
     restored_projection = build_war_map_projection(event_records=restored.world.event_records)
     assert [entry.record_id for entry in restored_projection.current_occupations] == [occupied.record_id]
+
+
+def test_natural_occupation_world_change_uses_authored_initial_war() -> None:
+    world = World()
+    bundle = world.setting_bundle
+    bundle.world_definition.faction_relationships = [
+        FactionRelationshipDefinition(
+            faction_a_id="stormwatch_wardens",
+            faction_b_id="silverbrook_merchant_league",
+            status="war",
+            location_ids=["loc_silverbrook"],
+        )
+    ]
+    world.apply_setting_bundle(bundle)
+    rng = FirstChoiceRng()
+
+    occupied = generate_occupation_world_change(world, month=3, day=4, rng=rng)
+
+    assert occupied is not None
+    projection = build_war_map_projection(
+        event_records=world.event_records,
+        faction_relationships=world.setting_bundle.world_definition.faction_relationships,
+    )
+    dashboard = build_world_dashboard_view(world, current_month=3)
+
+    assert occupied.kind == "location_faction_changed"
+    assert occupied.render_params["location_id"] == "loc_silverbrook"
+    assert projection.active_wars[0].record_id.startswith("bundle:faction_relationship:")
+    assert projection.current_occupations[0].record_id == occupied.record_id
+    assert dashboard.active_wars[0].record_id.startswith("bundle:faction_relationship:")
+    assert dashboard.current_occupations[0].record_id == occupied.record_id
 
 
 def test_natural_rename_world_change_updates_history_report_map_and_save(tmp_path) -> None:

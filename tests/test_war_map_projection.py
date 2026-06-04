@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fantasy_simulator.event_models import WorldEventRecord
+from fantasy_simulator.content.setting_bundle import FactionRelationshipDefinition
 from fantasy_simulator.i18n import get_locale, set_locale
 from fantasy_simulator.observation import build_war_map_projection
 from fantasy_simulator.persistence.save_load import load_simulation, save_simulation
@@ -68,6 +69,43 @@ def test_war_map_projection_reads_war_and_occupation_records_without_world_runti
         ("loc_silverbrook", "unoccupied"),
     ]
     assert projection.current_occupations == ()
+
+
+def test_war_map_projection_reads_authored_initial_wars_and_event_endings() -> None:
+    relationship = FactionRelationshipDefinition(
+        faction_a_id="wardens",
+        faction_b_id="dawn_court",
+        status="war",
+        location_ids=["loc_gate"],
+    )
+
+    projection = build_war_map_projection(event_records=[], faction_relationships=[relationship])
+
+    assert projection.active_wars[0].record_id == "bundle:faction_relationship:dawn_court:wardens"
+    assert projection.active_wars[0].faction_ids == ("dawn_court", "wardens")
+    assert projection.active_wars[0].location_ids == ("loc_gate",)
+    assert projection.affected_location_ids == ("loc_gate",)
+    assert projection.faction_ids == ("dawn_court", "wardens")
+
+    ended = WorldEventRecord(
+        record_id="rec_end",
+        kind="war_ended",
+        year=13,
+        month=3,
+        day=4,
+        description="War ended.",
+        render_params={
+            "aggressor_faction_id": "dawn_court",
+            "target_faction_id": "wardens",
+            "belligerent_faction_ids": ["dawn_court", "wardens"],
+            "location_ids": ["loc_gate"],
+        },
+    )
+
+    projection = build_war_map_projection(event_records=[ended], faction_relationships=[relationship])
+
+    assert projection.active_wars == ()
+    assert projection.events[0].record_id == "rec_end"
 
 
 def test_war_map_projection_derives_occupation_from_location_impact() -> None:

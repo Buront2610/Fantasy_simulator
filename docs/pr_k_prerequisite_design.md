@@ -36,8 +36,9 @@ The following premises already exist in current `main` and must remain true:
 - `docs/risk_register.md` records the route endpoint/location tag contract and
   remaining serialization risks.
 - `SettingBundle` / `WorldDefinition` have authoring places for era, culture,
-  faction, language, sites, and routes. Detailed political history and conflict
-  state are still PR-K work.
+  faction, language, sites, routes, non-durable era runtime rule vocabulary,
+  and initial faction relationships. Broader political history remains additive
+  PR-K work.
 
 These points should be cited as prerequisites and guardrails, not restated as
 new PR-K behavior.
@@ -307,6 +308,12 @@ mainline now has a non-durable `EraRuntimeRules` input and SettingBundle
 natural era/civilization changes share the same rule vocabulary without changing
 save schema v8. Later slices can expand authored phase semantics or score
 effects on top of this rule input.
+
+Initial faction relationships are also authored in SettingBundle as static
+world-definition data. `status = "war"` relationships seed war-map projections,
+dashboard active-war state, and natural occupation/war resolution without
+creating synthetic canonical records; later `war_declared` / `war_ended`
+records still remain the canonical history for runtime changes.
 
 Fitness functions should eventually guard:
 

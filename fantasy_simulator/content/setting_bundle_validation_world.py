@@ -15,6 +15,9 @@ from .setting_bundle_schema import (
 from .setting_bundle_validation_common import duplicate_values, validate_named_entries
 
 
+FACTION_RELATIONSHIP_STATUSES = {"allied", "neutral", "tense", "war"}
+
+
 def validate_bundle_identity(bundle: SettingBundle, world: WorldDefinition, *, source: str) -> None:
     if bundle.schema_version < 1:
         raise ValueError(f"Setting bundle {source} has invalid schema_version: {bundle.schema_version}")
@@ -169,6 +172,39 @@ def validate_route_seeds(world: WorldDefinition, canonical_ids: set[str], *, sou
             )
         if route.distance < 1:
             raise ValueError(f"Setting bundle {source} route {route.route_id} must have distance >= 1")
+
+
+def validate_faction_relationships(world: WorldDefinition, canonical_ids: set[str], *, source: str) -> None:
+    known_faction_ids = {str(faction_entry_key(name)) for name in world.factions}
+    seen_pairs: set[tuple[str, str]] = set()
+    for relationship in world.faction_relationships:
+        faction_a_id = relationship.faction_a_id.strip()
+        faction_b_id = relationship.faction_b_id.strip()
+        if not faction_a_id or not faction_b_id:
+            raise ValueError(f"Setting bundle {source} contains blank faction relationship ids")
+        if faction_a_id == faction_b_id:
+            raise ValueError(f"Setting bundle {source} contains self faction relationship: {faction_a_id}")
+        if faction_a_id not in known_faction_ids or faction_b_id not in known_faction_ids:
+            raise ValueError(f"Setting bundle {source} faction_relationships reference unknown factions")
+        first, second = sorted((faction_a_id, faction_b_id))
+        pair = (first, second)
+        if pair in seen_pairs:
+            raise ValueError(f"Setting bundle {source} contains duplicate faction_relationships: {pair[0]}->{pair[1]}")
+        seen_pairs.add(pair)
+
+        status = relationship.status.strip()
+        if status not in FACTION_RELATIONSHIP_STATUSES:
+            raise ValueError(f"Setting bundle {source} contains unknown faction relationship status: {status}")
+        unknown_locations = [
+            location_id
+            for location_id in relationship.location_ids
+            if location_id not in canonical_ids
+        ]
+        if unknown_locations:
+            raise ValueError(
+                f"Setting bundle {source} faction_relationships reference unknown site ids: "
+                f"{', '.join(unknown_locations)}"
+            )
 
 
 def validate_naming_rules(world: WorldDefinition, *, source: str) -> None:

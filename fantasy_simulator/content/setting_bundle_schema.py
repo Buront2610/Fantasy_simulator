@@ -31,12 +31,13 @@ from .setting_bundle_schema_language import (
     LanguageRootRealization,
     SemanticRootDefinition,
 )
-from .setting_bundle_schema_world import SettingBundle, WorldDefinition
+from .setting_bundle_schema_world import FactionRelationshipDefinition, SettingBundle, WorldDefinition
 
 __all__ = [
     "CalendarDefinition",
     "CalendarMonthDefinition",
     "GlossaryEntryDefinition",
+    "FactionRelationshipDefinition",
     "JobDefinition",
     "LanguageCommunityDefinition",
     "LanguageDefinition",
