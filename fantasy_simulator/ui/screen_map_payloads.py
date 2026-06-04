@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..i18n import tr
+from ..location_names import build_toponym_etymology, render_toponym_etymology_line
 from ..world import World
 from .presenters import RumorPresenter
 from .view_models import build_location_observation_view
@@ -40,12 +41,14 @@ def _build_region_memory_payloads(
 def _build_detail_memory_payload(
     world: World,
     loc: Any,
-) -> tuple[list[str] | None, list[str] | None, list[str] | None, str | None]:
+) -> tuple[list[str] | None, list[str] | None, list[str] | None, str | None, str | None]:
     """Return renderer-ready world memory payloads for a location detail panel."""
     memorials: list[str] | None = None
     aliases = list(loc.aliases) or None
     live_traces: list[str] | None = None
     generated_endonym = loc.generated_endonym or None
+    etymology = build_toponym_etymology(world, loc.id)
+    name_etymology_line = render_toponym_etymology_line(etymology) if etymology is not None else None
 
     if loc.memorial_ids:
         memorials = [
@@ -57,7 +60,7 @@ def _build_detail_memory_payload(
     if recent_traces:
         live_traces = [trace.get("text", "") for trace in recent_traces] or None
 
-    return memorials, aliases, live_traces, generated_endonym
+    return memorials, aliases, live_traces, generated_endonym, name_etymology_line
 
 
 def _build_detail_observation_payload(
@@ -101,7 +104,7 @@ def _render_location_detail_for_location(
     """Render a location detail panel using the same enrichment path as the interactive UI."""
     from .map_renderer import render_location_detail
 
-    memorials, aliases, live_traces, generated_endonym = _build_detail_memory_payload(world, loc)
+    memorials, aliases, live_traces, generated_endonym, name_etymology_line = _build_detail_memory_payload(world, loc)
     connected_routes = None
     recent_events = None
     rumor_lines = None
@@ -114,6 +117,7 @@ def _render_location_detail_for_location(
         aliases=aliases,
         live_traces=live_traces,
         generated_endonym=generated_endonym,
+        name_etymology_line=name_etymology_line,
         connected_routes=connected_routes,
         recent_events=recent_events,
         rumor_lines=rumor_lines,

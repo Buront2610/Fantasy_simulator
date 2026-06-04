@@ -320,15 +320,6 @@
         "removal_condition": "Remove when fantasy_simulator/ui/atlas_masks.py::_paint_terrain fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
-        "target": "fantasy_simulator/ui/map_location_renderer.py::render_location_detail",
-        "reason": "CLI detail renderer composes several optional panels; should move to view models over time.",
-        "max_cyclomatic_complexity": 27,
-        "max_cognitive_complexity": 33,
-        "max_function_lines": 125,
-        "owner": "architecture-maintainers",
-        "removal_condition": "Remove when fantasy_simulator/ui/map_location_renderer.py::render_location_detail fits the default complexity budgets or is split behind a narrower compatibility adapter."
-      },
-      {
         "target": "fantasy_simulator/ui/map_region_grid.py::build_region_route_layer",
         "reason": "Route overlay builder has shape and visibility branches; split after map snapshot coverage.",
         "max_cyclomatic_complexity": 22,

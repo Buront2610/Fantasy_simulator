@@ -715,6 +715,7 @@ python -m fantasy_simulator.content preview-roots bundle.json --language highlan
 - 既存language dataからgenerated endonymのstem/suffix/pattern traceを取り、etymology previewを作る。
 - authored native nameは生成traceではなく、著者設定の現地名としてread modelに出す。
 - location observation/detailに短いetymology lineを出す。
+  - map location detail でも `Name origin` / `地名由来` を表示し、地図から地名由来へ直接たどれるようにした。
 - 永続化は追加しない。persistent historyはLG-4へ残す。
 
 ### LG-2: semantic roots

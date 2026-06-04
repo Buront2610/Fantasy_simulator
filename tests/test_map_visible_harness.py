@@ -224,6 +224,18 @@ def test_location_detail_uses_larger_city_site_sketch() -> None:
     assert "  | Sketch cues: G=Gate / $=Market / B=Notice board  |" in detail
 
 
+def test_location_detail_surfaces_name_etymology_preview() -> None:
+    set_locale("en")
+    rendered = render_world_map_views_for_location(
+        World(),
+        "loc_thornwood",
+        include_overview=False,
+    )
+
+    assert "  | Native name: Thelbryn                            |" in rendered["detail"]
+    assert "  | Name origin: Thelbryn < Sindral; authored nati...|" in rendered["detail"]
+
+
 def test_map_views_surface_runtime_local_cues() -> None:
     set_locale("en")
     world = World()

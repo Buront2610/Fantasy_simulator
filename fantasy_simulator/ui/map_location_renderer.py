@@ -143,6 +143,70 @@ def _append_state_lines(lines: List[str], cell: MapCellInfo, width: int) -> None
     lines.append(f"  |{_fit(f' {rumor_label}: {cell.rumor_heat} ({_band_label(cell.rumor_heat_band)})', width)}|")
 
 
+def _append_overlay_markers(lines: List[str], cell: MapCellInfo, width: int, border: str) -> None:
+    overlay_items: List[str] = []
+    if cell.has_memorial:
+        overlay_items.append(tr("map_legend_memorial"))
+    if cell.has_alias:
+        overlay_items.append(tr("map_legend_alias"))
+    if cell.recent_death_site:
+        overlay_items.append(tr("map_legend_recent_death"))
+    if overlay_items:
+        markers_label = tr("map_detail_markers")
+        overlay_line = ", ".join(overlay_items)
+        lines.append(f"  |{_fit(f' {markers_label}: {overlay_line}', width)}|")
+        lines.append(border)
+
+
+def _append_name_lines(
+    lines: List[str],
+    width: int,
+    *,
+    generated_endonym: Optional[str],
+    name_etymology_line: Optional[str],
+    aliases: Optional[List[str]],
+) -> None:
+    if generated_endonym:
+        endonym_label = tr("location_endonym_label")
+        lines.append(f"  |{_fit(f' {endonym_label}: {generated_endonym}', width)}|")
+    if name_etymology_line:
+        etymology_label = tr("location_etymology_label")
+        lines.append(f"  |{_fit(f' {etymology_label}: {name_etymology_line}', width)}|")
+    if aliases:
+        aliases_label = tr("location_aliases_label")
+        aliases_line = ", ".join(aliases)
+        lines.append(f"  |{_fit(f' {aliases_label}: {aliases_line}', width)}|")
+
+
+def _append_labeled_list(lines: List[str], width: int, label: str, items: List[str], *, bullet: str = "") -> None:
+    lines.append(f"  |{_fit(f' {label}:', width)}|")
+    for item in items[:5]:
+        prefix = f"   {bullet}" if bullet else "   "
+        lines.append(f"  |{_fit(f'{prefix}{item}', width)}|")
+
+
+def _append_detail_lists(
+    lines: List[str],
+    width: int,
+    *,
+    memorials: Optional[List[str]],
+    live_traces: Optional[List[str]],
+    connected_routes: Optional[List[str]],
+    recent_events: Optional[List[str]],
+    rumor_lines: Optional[List[str]],
+) -> None:
+    if memorials:
+        _append_labeled_list(lines, width, tr("location_memorials_label"), memorials)
+    if live_traces:
+        _append_labeled_list(lines, width, tr("location_live_traces_label"), live_traces, bullet="- ")
+    if connected_routes:
+        _append_labeled_list(lines, width, tr("map_region_routes"), connected_routes, bullet="- ")
+    if recent_events:
+        _append_labeled_list(lines, width, tr("location_recent_events_label"), recent_events, bullet="- ")
+    if rumor_lines:
+        _append_labeled_list(lines, width, tr("rumor_section_title"), rumor_lines, bullet="- ")
+
+
 def render_location_detail(
     info: MapRenderInfo,
     location_id: str,
@@ -150,6 +214,7 @@ def render_location_detail(
     aliases: Optional[List[str]] = None,
     live_traces: Optional[List[str]] = None,
     generated_endonym: Optional[str] = None,
+    name_etymology_line: Optional[str] = None,
     recent_events: Optional[List[str]] = None,
     rumor_lines: Optional[List[str]] = None,
     connected_routes: Optional[List[str]] = None,
@@ -189,60 +254,27 @@ def render_location_detail(
     _append_state_lines(lines, cell, width)
     lines.append(border)
 
-    overlay_items: List[str] = []
-    if cell.has_memorial:
-        overlay_items.append(tr("map_legend_memorial"))
-    if cell.has_alias:
-        overlay_items.append(tr("map_legend_alias"))
-    if cell.recent_death_site:
-        overlay_items.append(tr("map_legend_recent_death"))
-    if overlay_items:
-        overlay_line = ", ".join(overlay_items)
-        markers_label = tr("map_detail_markers")
-        lines.append(f"  |{_fit(f' {markers_label}: {overlay_line}', width)}|")
-        lines.append(border)
-
-    if generated_endonym:
-        endonym_label = tr("location_endonym_label")
-        lines.append(f"  |{_fit(f' {endonym_label}: {generated_endonym}', width)}|")
-
-    if aliases:
-        aliases_label = tr("location_aliases_label")
-        aliases_str = ", ".join(aliases)
-        lines.append(f"  |{_fit(f' {aliases_label}: {aliases_str}', width)}|")
-
-    if memorials:
-        mem_label = tr("location_memorials_label")
-        lines.append(f"  |{_fit(f' {mem_label}:', width)}|")
-        for mem in memorials[:5]:
-            lines.append(f"  |{_fit(f'   {mem}', width)}|")
-
-    if live_traces:
-        traces_label = tr("location_live_traces_label")
-        lines.append(f"  |{_fit(f' {traces_label}:', width)}|")
-        for trace in live_traces[:5]:
-            lines.append(f"  |{_fit(f'   - {trace}', width)}|")
-
-    if connected_routes:
-        routes_label = tr("map_region_routes")
-        lines.append(f"  |{_fit(f' {routes_label}:', width)}|")
-        for route in connected_routes[:5]:
-            lines.append(f"  |{_fit(f'   - {route}', width)}|")
-
-    if recent_events:
-        events_label = tr("location_recent_events_label")
-        lines.append(f"  |{_fit(f' {events_label}:', width)}|")
-        for event in recent_events[:5]:
-            lines.append(f"  |{_fit(f'   - {event}', width)}|")
-
-    if rumor_lines:
-        rumors_label = tr("rumor_section_title")
-        lines.append(f"  |{_fit(f' {rumors_label}:', width)}|")
-        for rumor in rumor_lines[:5]:
-            lines.append(f"  |{_fit(f'   - {rumor}', width)}|")
+    _append_overlay_markers(lines, cell, width, border)
+    _append_name_lines(
+        lines,
+        width,
+        generated_endonym=generated_endonym,
+        name_etymology_line=name_etymology_line,
+        aliases=aliases,
+    )
+    _append_detail_lists(
+        lines,
+        width,
+        memorials=memorials,
+        live_traces=live_traces,
+        connected_routes=connected_routes,
+        recent_events=recent_events,
+        rumor_lines=rumor_lines,
+    )
 
     if (
         generated_endonym
+        or name_etymology_line
         or aliases
         or memorials
         or live_traces
