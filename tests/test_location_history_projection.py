@@ -149,6 +149,6 @@ def test_location_history_projection_includes_control_history() -> None:
     assert second is not None
     assert [entry.record_id for entry in projection.control_history] == [first.record_id, second.record_id]
     assert [(entry.old_faction_id, entry.new_faction_id) for entry in projection.control_history] == [
-        (None, "stormwatch_wardens"),
+        ("aethorian_crown_council", "stormwatch_wardens"),
         ("stormwatch_wardens", None),
     ]

@@ -37,8 +37,8 @@ The following premises already exist in current `main` and must remain true:
   remaining serialization risks.
 - `SettingBundle` / `WorldDefinition` have authoring places for era, culture,
   faction, language, sites, routes, non-durable era runtime rule vocabulary,
-  and initial faction relationships. Broader political history remains additive
-  PR-K work.
+  initial faction relationships, and initial site controlling factions.
+  Broader political history remains additive PR-K work.
 
 These points should be cited as prerequisites and guardrails, not restated as
 new PR-K behavior.
@@ -314,6 +314,14 @@ world-definition data. `status = "war"` relationships seed war-map projections,
 dashboard active-war state, and natural occupation/war resolution without
 creating synthetic canonical records; later `war_declared` / `war_ended`
 records still remain the canonical history for runtime changes.
+
+Site seeds can also author `controlling_faction_id` as the initial runtime
+baseline for `LocationState.controlling_faction_id`. These controllers validate
+against normalized authored faction inspection keys and hydrate new worlds
+without creating synthetic canonical occupation records. Later
+`location_faction_changed` records still remain the canonical history for
+runtime control changes, and existing runtime snapshots continue to win when a
+world is loaded or refreshed.
 
 Fitness functions should eventually guard:
 

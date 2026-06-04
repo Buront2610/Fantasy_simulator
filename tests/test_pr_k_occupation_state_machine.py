@@ -198,7 +198,7 @@ def test_world_occupation_record_follows_pr_k_event_contract() -> None:
     assert record.location_id == "loc_aethoria_capital"
     assert record.summary_key == "events.location_faction_changed.summary"
     assert record.render_params["location_id"] == "loc_aethoria_capital"
-    assert record.render_params["old_faction_id"] is None
+    assert record.render_params["old_faction_id"] == "aethorian_crown_council"
     assert record.render_params["new_faction_id"] == "stormwatch_wardens"
     assert "location:loc_aethoria_capital" in record.tags
     assert record.impacts[0]["attribute"] == "controlling_faction_id"
@@ -246,7 +246,7 @@ def test_world_occupation_change_applies_location_state_pressure_and_map_visibil
         min(100, before_released[3] + 8),
     )
     assert location.live_traces[-2]["text"].startswith(
-        "Aethoria Capital changed controlling faction from none to Stormwatch Wardens."
+        "Aethoria Capital changed controlling faction from Aethorian Crown Council to Stormwatch Wardens."
     )
     assert location.live_traces[-1]["text"].startswith(
         "Aethoria Capital changed controlling faction from Stormwatch Wardens to none."
@@ -273,7 +273,7 @@ def test_world_occupation_change_rejects_unknown_faction_by_default() -> None:
     else:
         raise AssertionError("Expected strict faction validation to reject unknown ids")
 
-    assert world.get_location_by_id("loc_aethoria_capital").controlling_faction_id is None
+    assert world.get_location_by_id("loc_aethoria_capital").controlling_faction_id == "aethorian_crown_council"
     assert world.event_records == []
 
 

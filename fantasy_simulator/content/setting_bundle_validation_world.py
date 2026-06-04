@@ -142,7 +142,23 @@ def validate_site_seeds(world: WorldDefinition, *, source: str) -> tuple[List[st
     if any(seed.x < 0 or seed.y < 0 for seed in world.site_seeds):
         raise ValueError(f"Setting bundle {source} contains negative site seed coordinates")
 
+    _validate_site_seed_controllers(world, source=source)
+
     return site_ids, canonical_ids
+
+
+def _validate_site_seed_controllers(world: WorldDefinition, *, source: str) -> None:
+    known_faction_ids = {str(faction_entry_key(name)) for name in world.factions}
+    unknown_controllers = [
+        seed.controlling_faction_id
+        for seed in world.site_seeds
+        if seed.controlling_faction_id.strip() and seed.controlling_faction_id not in known_faction_ids
+    ]
+    if unknown_controllers:
+        raise ValueError(
+            f"Setting bundle {source} site_seeds reference unknown controlling factions: "
+            f"{', '.join(unknown_controllers)}"
+        )
 
 
 def validate_route_seeds(world: WorldDefinition, canonical_ids: set[str], *, source: str) -> None:

@@ -122,8 +122,17 @@ def test_setting_bundle_public_json_round_trip_uses_facade_exports():
             ),
             races=[RaceDefinition("Human", "Adaptable people.", {"charisma": 1})],
             jobs=[JobDefinition("Scout", "Roadwise watcher.", ["Perception"])],
+            factions=["Gate Wardens"],
             site_seeds=[
-                SiteSeedDefinition("loc_gate", "Gate", "A border gate.", "plains", 0, 0),
+                SiteSeedDefinition(
+                    "loc_gate",
+                    "Gate",
+                    "A border gate.",
+                    "plains",
+                    0,
+                    0,
+                    controlling_faction_id="gate_wardens",
+                ),
                 SiteSeedDefinition("loc_keep", "Keep", "A hill keep.", "hills", 1, 0),
             ],
             route_seeds=[
@@ -554,6 +563,24 @@ def test_default_aethoria_bundle_has_minimal_phase_i_slots():
     )
     assert "capital" in capital_seed.tags
     assert "default_resident" in capital_seed.tags
+    assert capital_seed.controlling_faction_id == "aethorian_crown_council"
+    controllers_by_site_id = {
+        seed.location_id: seed.controlling_faction_id
+        for seed in bundle.world_definition.site_seeds
+        if seed.controlling_faction_id
+    }
+    assert controllers_by_site_id.items() >= {
+        "loc_aethoria_capital": "aethorian_crown_council",
+        "loc_silverbrook": "silverbrook_merchant_league",
+        "loc_stormwatch_keep": "stormwatch_wardens",
+    }.items()
+
+
+def test_default_aethoria_world_seeds_initial_location_control():
+    world = World()
+
+    assert world.get_location_by_id("loc_aethoria_capital").controlling_faction_id == "aethorian_crown_council"
+    assert world.get_location_by_id("loc_silverbrook").controlling_faction_id == "silverbrook_merchant_league"
 
 
 def test_aethoria_bundle_has_expected_authored_native_names():
@@ -1215,6 +1242,37 @@ def test_bundle_validation_rejects_negative_site_coordinates() -> None:
         assert "negative site seed coordinates" in str(exc)
     else:
         raise AssertionError("Expected negative coordinates to fail fast")
+
+
+def test_bundle_validation_rejects_unknown_site_controlling_faction() -> None:
+    payload = {
+        "schema_version": 1,
+        "world_definition": {
+            "world_key": "bad_controller",
+            "display_name": "Bad Controller",
+            "lore_text": "Malformed",
+            "factions": ["Known Wardens"],
+            "site_seeds": [
+                {
+                    "location_id": "loc_bad",
+                    "name": "Bad",
+                    "description": "",
+                    "region_type": "city",
+                    "x": 0,
+                    "y": 0,
+                    "controlling_faction_id": "missing_faction",
+                }
+            ],
+        },
+    }
+
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "unknown controlling factions" in str(exc)
+        assert "missing_faction" in str(exc)
+    else:
+        raise AssertionError("Expected unknown site controlling faction to fail fast")
 
 
 def test_bundle_from_dict_rejects_string_cultures_and_factions() -> None:

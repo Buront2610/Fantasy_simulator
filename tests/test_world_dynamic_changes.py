@@ -56,7 +56,7 @@ def test_rename_location_survives_reports_and_save_load_views():
 def test_set_location_controlling_faction_returns_previous_value():
     world = World()
 
-    assert world.set_location_controlling_faction("loc_aethoria_capital", "wardens") is None
+    assert world.set_location_controlling_faction("loc_aethoria_capital", "wardens") == "aethorian_crown_council"
     assert world.set_location_controlling_faction("loc_aethoria_capital", "dawn_court") == "wardens"
     assert world.get_location_by_id("loc_aethoria_capital").controlling_faction_id == "dawn_court"
 
@@ -318,7 +318,7 @@ def test_world_change_record_created_in_en_renders_event_log_and_report_in_ja():
 
     set_locale("ja")
     try:
-        expected = "Aethoria Capital の支配勢力が なし から Stormwatch Wardens に変わった。"
+        expected = "Aethoria Capital の支配勢力が Aethorian Crown Council から Stormwatch Wardens に変わった。"
         report = generate_monthly_report(world, record.year, record.month)
 
         assert render_event_record(record, world=world) == expected
@@ -389,7 +389,7 @@ def test_apply_controlling_faction_change_rolls_back_when_recording_fails(monkey
     else:
         raise AssertionError("Expected record failure to roll back faction change")
 
-    assert location.controlling_faction_id is None
+    assert location.controlling_faction_id == "aethorian_crown_council"
     assert world.event_records == []
 
 

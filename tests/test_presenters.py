@@ -764,7 +764,7 @@ def test_world_dashboard_surfaces_current_occupations_until_release():
     assert dashboard.current_occupations[0].location_id == "loc_aethoria_capital"
     assert dashboard.current_occupations[0].controlling_faction_id == "stormwatch_wardens"
     assert dashboard.current_occupations[0].text == (
-        "Aethoria Capital changed controlling faction from none to Stormwatch Wardens."
+        "Aethoria Capital changed controlling faction from Aethorian Crown Council to Stormwatch Wardens."
     )
 
     world.apply_controlling_faction_change(

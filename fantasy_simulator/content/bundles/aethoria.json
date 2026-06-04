@@ -411,7 +411,8 @@
         "region_type": "mountain",
         "language_key": "aethic_common",
         "x": 4,
-        "y": 0
+        "y": 0,
+        "controlling_faction_id": "stormwatch_wardens"
       },
       {
         "location_id": "loc_thornwood",
@@ -440,7 +441,8 @@
         "language_key": "aethic_common",
         "native_name": "Silvermere",
         "x": 2,
-        "y": 1
+        "y": 1,
+        "controlling_faction_id": "silverbrook_merchant_league"
       },
       {
         "location_id": "loc_goblin_warrens",
@@ -487,6 +489,7 @@
         "native_name": "Aethorstead",
         "x": 2,
         "y": 2,
+        "controlling_faction_id": "aethorian_crown_council",
         "tags": [
           "capital",
           "default_resident"
@@ -536,7 +539,8 @@
         "region_type": "city",
         "language_key": "aethic_common",
         "x": 2,
-        "y": 3
+        "y": 3,
+        "controlling_faction_id": "hearthglow_healers_guild"
       },
       {
         "location_id": "loc_mirefen_swamp",
@@ -555,7 +559,8 @@
         "language_key": "aethic_common",
         "native_name": "Dawnwick",
         "x": 4,
-        "y": 3
+        "y": 3,
+        "controlling_faction_id": "dawnport_harbor_council"
       },
       {
         "location_id": "loc_sunbaked_plains",
@@ -602,7 +607,8 @@
         "language_key": "quenic",
         "native_name": "Celdhel",
         "x": 4,
-        "y": 4
+        "y": 4,
+        "controlling_faction_id": "coral_cove_conclave"
       }
     ],
     "route_seeds": [

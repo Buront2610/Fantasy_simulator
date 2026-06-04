@@ -132,7 +132,7 @@ def test_save_load_roundtrip_preserves_world_change_runtime_state_and_canonical_
     assert rename_records[0].record_id in restored_location.recent_event_ids
     control_records = [record for record in rename_records if record.kind == "location_faction_changed"]
     assert [record.render_params["old_faction_id"] for record in control_records] == [
-        None,
+        "aethorian_crown_council",
         "stormwatch_wardens",
         None,
     ]
@@ -599,7 +599,7 @@ def test_world_change_noops_do_not_mutate_runtime_state_or_append_canonical_reco
     assert route.blocked is False
     assert location.canonical_name == "Aethoria Capital"
     assert location.aliases == []
-    assert location.controlling_faction_id is None
+    assert location.controlling_faction_id == "aethorian_crown_council"
     assert terrain_cell.to_dict() == terrain_cell_payload
     assert world.event_records == []
     assert {
@@ -836,7 +836,7 @@ def test_world_change_control_recording_failure_rolls_back_runtime_state(monkeyp
     with pytest.raises(ValueError, match="recording failed"):
         world.apply_controlling_faction_change(location.id, "stormwatch_wardens")
 
-    assert location.controlling_faction_id is None
+    assert location.controlling_faction_id == "aethorian_crown_council"
     assert world.event_records == []
     assert world.get_events_by_location(location.id) == []
 

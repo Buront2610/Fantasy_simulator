@@ -134,6 +134,7 @@ class SiteSeedDefinition:
     tags: List[str] = field(default_factory=list)
     language_key: str = ""
     native_name: str = ""
+    controlling_faction_id: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -146,6 +147,7 @@ class SiteSeedDefinition:
             "tags": list(self.tags),
             "language_key": self.language_key,
             "native_name": self.native_name,
+            "controlling_faction_id": self.controlling_faction_id,
         }
 
     def as_world_data_entry(self) -> tuple[str, str, str, str, int, int]:
@@ -174,6 +176,7 @@ class SiteSeedDefinition:
             tags=string_list_payload(data.get("tags", []), field_name="tags"),
             language_key=str(data.get("language_key", "")),
             native_name=str(data.get("native_name", "")),
+            controlling_faction_id=str(data.get("controlling_faction_id", "")),
         )
 
 
