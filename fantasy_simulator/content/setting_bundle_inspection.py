@@ -3,12 +3,24 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List
+
+from fantasy_simulator.ids import CultureId, FactionId, normalize_slug_id
 
 
 def setting_entry_key(name: str) -> str:
     """Return a stable inspection key for lightweight named setting entries."""
-    return name.strip().lower().replace(" ", "_").replace("-", "_").replace("'", "")
+    return str(normalize_slug_id(name, field_name="setting entry", id_type=str))
+
+
+def culture_entry_key(name: str) -> CultureId:
+    """Return the nominal culture inspection key for an authored culture name."""
+    return normalize_slug_id(name, field_name="culture", id_type=CultureId)
+
+
+def faction_entry_key(name: str) -> FactionId:
+    """Return the nominal faction inspection key for an authored faction name."""
+    return normalize_slug_id(name, field_name="faction", id_type=FactionId)
 
 
 @dataclass(frozen=True)
@@ -55,10 +67,17 @@ class SettingBundleAuthoringSummary:
 
 
 def named_setting_entries(entry_type: str, names: List[str]) -> List[SettingEntryInspection]:
+    key_resolver: Callable[[str], object]
+    if entry_type == "culture":
+        key_resolver = culture_entry_key
+    elif entry_type == "faction":
+        key_resolver = faction_entry_key
+    else:
+        key_resolver = setting_entry_key
     return [
         SettingEntryInspection(
             entry_type=entry_type,
-            key=setting_entry_key(name),
+            key=str(key_resolver(name)),
             display_name=name,
         )
         for name in names

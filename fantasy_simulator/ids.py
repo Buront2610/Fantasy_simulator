@@ -49,6 +49,15 @@ def normalize_id_sequence(
     return tuple(normalized_values)
 
 
+def normalize_slug_id(value: object, *, field_name: str, id_type: Callable[[str], TId]) -> TId:
+    """Normalize a display/authored name into a stable lowercase slug ID."""
+    normalized = str(normalize_required_id(value, field_name=field_name, id_type=str))
+    slug = normalized.lower().replace(" ", "_").replace("-", "_").replace("'", "")
+    if not slug:
+        raise ValueError(f"{field_name} must not produce a blank ID")
+    return id_type(slug)
+
+
 def terrain_cell_id_for_coords(x: int, y: int) -> TerrainCellId:
     """Return the canonical terrain-cell ID for grid coordinates."""
     return TerrainCellId(f"terrain:{x}:{y}")
@@ -66,5 +75,6 @@ __all__ = [
     "normalize_required_id",
     "normalize_optional_id",
     "normalize_id_sequence",
+    "normalize_slug_id",
     "terrain_cell_id_for_coords",
 ]

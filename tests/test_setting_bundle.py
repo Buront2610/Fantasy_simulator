@@ -267,13 +267,13 @@ def test_world_definition_exposes_typed_culture_and_faction_inspection_entries()
         world_key="custom",
         display_name="Custom Realm",
         lore_text="Custom lore",
-        cultures=["Skyfolk", "River Clans"],
+        cultures=["Skyfolk", " River Clans "],
         factions=["Wardens", "Dawn-Court"],
     )
 
     assert world_def.culture_entries() == [
         SettingEntryInspection("culture", "skyfolk", "Skyfolk"),
-        SettingEntryInspection("culture", "river_clans", "River Clans"),
+        SettingEntryInspection("culture", "river_clans", " River Clans "),
     ]
     assert world_def.faction_entries() == [
         SettingEntryInspection("faction", "wardens", "Wardens"),

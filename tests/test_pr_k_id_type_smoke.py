@@ -59,6 +59,7 @@ def test_pr_k_id_exports_are_stable() -> None:
         "normalize_required_id",
         "normalize_optional_id",
         "normalize_id_sequence",
+        "normalize_slug_id",
         "terrain_cell_id_for_coords",
     ]
 
@@ -72,6 +73,9 @@ def test_pr_k_id_normalization_helpers_trim_and_preserve_nominal_types() -> None
         field_name="location_ids",
         id_type=LocationId,
     ) == (LocationId("loc_a"), LocationId("loc_b"))
+    assert ids.normalize_slug_id(" River-Clan's Keep ", field_name="culture", id_type=CultureId) == (
+        CultureId("river_clans_keep")
+    )
     assert ids.terrain_cell_id_for_coords(2, 3) == TerrainCellId("terrain:2:3")
 
 

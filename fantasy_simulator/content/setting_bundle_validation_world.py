@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import List
 
-from .setting_bundle_inspection import setting_entry_key as _setting_entry_key
+from .setting_bundle_inspection import culture_entry_key, faction_entry_key
 from .setting_bundle_schema import (
     SettingBundle,
     WorldDefinition,
@@ -32,14 +32,14 @@ def validate_bundle_unique_names(world: WorldDefinition, *, source: str) -> None
         source=source,
         entry_label="culture",
         key_label="culture inspection keys",
-        key_resolver=_setting_entry_key,
+        key_resolver=lambda value: str(culture_entry_key(value)),
     )
     validate_named_entries(
         world.factions,
         source=source,
         entry_label="faction",
         key_label="faction inspection keys",
-        key_resolver=_setting_entry_key,
+        key_resolver=lambda value: str(faction_entry_key(value)),
     )
 
     blank_glossary_terms = [entry.term for entry in world.glossary if not entry.term.strip()]
