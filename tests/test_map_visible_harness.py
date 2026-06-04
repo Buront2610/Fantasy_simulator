@@ -101,12 +101,28 @@ def _assert_seeded_map_visible_bundle(bundle: dict[str, list[str]]) -> None:
         "    3|DDHMD|",
         "    4|SS@OC|",
     ]
+    assert bundle["region"][5:11] == [
+        "  Route sketch:",
+        "    |o---o---C---D---o|",
+        "    |^   |   |   |   ||",
+        "    |o^^^o---C---D---C|",
+        "    |^   |   |   |   ||",
+        "    |o---o---@---D---C|",
+    ]
     assert "  Landmarks & World Memory:" in bundle["region"]
     assert any("Native name: Branthethal" in line for line in bundle["region"])
     assert any("Native name: Branthethal" in line for line in bundle["region"])
 
-    assert bundle["detail"][:10] == [
+    assert bundle["detail"][:18] == [
         "  | V The Verdant Vale (village)                     |",
+        "  | Local site sketch                                |",
+        "  |         _       _          B                     |",
+        "  |    ____/ \\__ __/ \\____    []                     |",
+        "  |   | []  []  |  []  [] |                          |",
+        "  |   |   o     |   ..    |====                      |",
+        "  |   |____   __|__   ____|                          |",
+        "  |        |_|     |_|                               |",
+        "  | Sketch cues: !=High danger                       |",
         "  | Terrain: plains (,)                              |",
         "  | Elev:128 Moist:128 Temp:128                      |",
         "  | Safety: tense                                    |",
@@ -129,8 +145,16 @@ def _assert_memory_heavy_bundle(bundle: dict[str, list[str]]) -> None:
     assert "      Recent: Lysara passed through at dawn" in bundle["region"]
     assert "    The Verdant Vale: Memory: Memorial, Trace" in bundle["region"]
 
-    assert bundle["detail"][:11] == [
+    assert bundle["detail"][:19] == [
         "  | V The Verdant Vale (village)                     |",
+        "  | Local site sketch                                |",
+        "  |         _       _          B                     |",
+        "  |    ____/ \\__ __/ \\____    []                     |",
+        "  |   | []  []  |  []  [] |                          |",
+        "  |   |   o     |   ..    |====                      |",
+        "  |   |____   __|__   ____|                          |",
+        "  |        |_|     |_|                               |",
+        "  | Sketch cues: M=Memorial                          |",
         "  | Terrain: plains (,)                              |",
         "  | Elev:128 Moist:128 Temp:128                      |",
         "  | Safety: tense                                    |",
@@ -183,6 +207,21 @@ def test_map_views_surface_authored_local_cues() -> None:
     assert "    Aethoria Capital: Site: Gate, Market, Notice board" in rendered["region"]
     assert "    Sunken Ruins: Memory: Accident site" in rendered["region"]
     assert "  | Local cues: Site: Gate, Market, Notice board     |" in rendered["detail"]
+
+
+def test_location_detail_uses_larger_city_site_sketch() -> None:
+    set_locale("en")
+    rendered = render_world_map_views_for_location(
+        World(),
+        "loc_aethoria_capital",
+        include_overview=False,
+    )
+
+    detail = rendered["detail"]
+    assert "  | Local site sketch                                |" in detail
+    assert "  |         ____||____        ________               |" in detail
+    assert "  |    ____/  []  [] \\______/ [] []  \\               |" in detail
+    assert "  | Sketch cues: G=Gate / $=Market / B=Notice board  |" in detail
 
 
 def test_map_views_surface_runtime_local_cues() -> None:

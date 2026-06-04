@@ -9,6 +9,7 @@ from .map_overlays import _overlay_suffix
 from .map_region_focus import region_focus_lines
 from .map_region_grid import (
     append_region_grid,
+    append_region_route_sketch,
     build_region_route_layer,
     find_region_center_cell,
     region_bounds,
@@ -58,6 +59,7 @@ def render_region_map(
     bounds = region_bounds(info, center_cell, radius)
     route_layer = build_region_route_layer(info, bounds)
     append_region_grid(lines, info, center_location_id, bounds, route_layer)
+    append_region_route_sketch(lines, info, center_location_id, bounds)
 
     connected_open_ids, connected_blocked_ids = center_route_connections(info.routes, center_location_id)
     region_routes = center_region_routes(info.routes, center_location_id)
