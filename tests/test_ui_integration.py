@@ -57,6 +57,84 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         headings = [c for c in out.calls if c[0] == "print_heading"]
         self.assertTrue(len(headings) >= 1, "No headings printed")
 
+    def test_yearly_report_defaults_to_card_without_legacy_text(self) -> None:
+        from types import SimpleNamespace
+        from fantasy_simulator.ui.screens import _show_yearly_report
+
+        world = World()
+        sim = SimpleNamespace(
+            world=world,
+            get_latest_completed_report_year=lambda: world.year,
+            get_yearly_report=lambda year: f"RAW YEARLY REPORT {year}",
+        )
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(menu_keys=["back"])
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_yearly_report(sim, ctx=ctx)
+
+        self.assertIn("Yearly highlights", out.text)
+        self.assertIn("Report view", out.text)
+        self.assertNotIn("RAW YEARLY REPORT", out.text)
+
+    def test_yearly_report_can_show_legacy_detail_on_demand(self) -> None:
+        from types import SimpleNamespace
+        from fantasy_simulator.ui.screens import _show_yearly_report
+
+        world = World()
+        sim = SimpleNamespace(
+            world=world,
+            get_latest_completed_report_year=lambda: world.year,
+            get_yearly_report=lambda year: f"RAW YEARLY REPORT {year}",
+        )
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(menu_keys=["details"])
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_yearly_report(sim, ctx=ctx)
+
+        self.assertIn("Yearly highlights", out.text)
+        self.assertIn("RAW YEARLY REPORT", out.text)
+
+    def test_monthly_report_defaults_to_card_without_legacy_text(self) -> None:
+        from types import SimpleNamespace
+        from fantasy_simulator.ui.screens import _show_monthly_report
+
+        world = World()
+        sim = SimpleNamespace(
+            world=world,
+            get_latest_completed_report_year=lambda: world.year,
+            get_monthly_report=lambda year, month: f"RAW MONTHLY REPORT {year}-{month}",
+        )
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(answers=["1"], menu_keys=["back"])
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_monthly_report(sim, ctx=ctx)
+
+        self.assertIn("Monthly highlights", out.text)
+        self.assertIn("Report view", out.text)
+        self.assertNotIn("RAW MONTHLY REPORT", out.text)
+
+    def test_monthly_report_can_show_legacy_detail_on_demand(self) -> None:
+        from types import SimpleNamespace
+        from fantasy_simulator.ui.screens import _show_monthly_report
+
+        world = World()
+        sim = SimpleNamespace(
+            world=world,
+            get_latest_completed_report_year=lambda: world.year,
+            get_monthly_report=lambda year, month: f"RAW MONTHLY REPORT {year}-{month}",
+        )
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(answers=["1"], menu_keys=["details"])
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_monthly_report(sim, ctx=ctx)
+
+        self.assertIn("Monthly highlights", out.text)
+        self.assertIn("RAW MONTHLY REPORT", out.text)
+
     def test_world_map_goes_through_render_backend(self) -> None:
         """Selecting 'world_map' renders via backend, not print()."""
         from fantasy_simulator.ui.screens import _show_results, _build_default_world

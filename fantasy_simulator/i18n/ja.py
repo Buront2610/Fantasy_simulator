@@ -683,6 +683,8 @@ TEXT_JA: Dict[str, str] = {
     'monthly_report_card_memory': '  新しい記憶: {items}',
     'yearly_report_card_header': '年間ハイライト（{year}年）',
     'yearly_report_card_total_events': '  記録イベント数: {count}',
+    'report_followup_prompt': 'レポート表示',
+    'report_show_detailed_text': '詳細テキストレポートを表示',
     'world_change_category_route': '経路',
     'world_change_category_location': '地点',
     'world_change_category_occupation': '支配',

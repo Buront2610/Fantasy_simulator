@@ -27,7 +27,7 @@ def _month_season_hint(world: World, year: int) -> str:
 
 
 def _show_monthly_report(sim: Simulator, ctx: UIContext | None = None) -> None:
-    """Show a monthly report for the latest completed year."""
+    """Show a monthly report card for the latest completed year."""
     ctx = _default_ctx(ctx)
     out = ctx.out
 
@@ -48,13 +48,22 @@ def _show_monthly_report(sim: Simulator, ctx: UIContext | None = None) -> None:
     card = build_monthly_report_card_view(sim.world, year, month)
     for line in ReportPresenter.render_monthly_card(card):
         out.print_line(f"  {line}")
-    out.print_line()
-    out.print_line(sim.get_monthly_report(year, month))
+
+    action = ctx.choose_key(
+        tr("report_followup_prompt"),
+        [
+            ("details", tr("report_show_detailed_text")),
+            ("back", tr("back_to_main")),
+        ],
+    )
+    if action == "details":
+        out.print_line()
+        out.print_line(sim.get_monthly_report(year, month))
     ctx.inp.pause()
 
 
 def _show_yearly_report(sim: Simulator, ctx: UIContext | None = None) -> None:
-    """Show a yearly report with a compact canonical-record card first."""
+    """Show a yearly report card, with detailed text available on demand."""
     ctx = _default_ctx(ctx)
     out = ctx.out
 
@@ -63,8 +72,17 @@ def _show_yearly_report(sim: Simulator, ctx: UIContext | None = None) -> None:
     card = build_yearly_report_card_view(sim.world, year)
     for line in ReportPresenter.render_yearly_card(card):
         out.print_line(f"  {line}")
-    out.print_line()
-    out.print_line(sim.get_yearly_report(year))
+
+    action = ctx.choose_key(
+        tr("report_followup_prompt"),
+        [
+            ("details", tr("report_show_detailed_text")),
+            ("back", tr("back_to_main")),
+        ],
+    )
+    if action == "details":
+        out.print_line()
+        out.print_line(sim.get_yearly_report(year))
     ctx.inp.pause()
 
 

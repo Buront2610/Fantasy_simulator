@@ -232,7 +232,7 @@ map renderer は最低でも次のモードを持つ。
 - [x] world サイズが固定 5×5 でなくても描画できるようにする
 - [x] `wide` / `compact` / `minimal` 表示モードを導入する
 - [x] `WorldEventRecord` から月報カード用 view model を生成する
-- [ ] 年次・月次レポートをカード形式で全面統一する
+- [x] 年次・月次レポートをカード主体の表示へ統一し、旧詳細テキストはオンデマンド表示へ分離する
 
 ### Phase 2.5：worldgen PoC 表示支援（並行任意）
 - [x] seed 固定 terrain preview を ASCII で出力できるようにする（TD-1〜TD-4）

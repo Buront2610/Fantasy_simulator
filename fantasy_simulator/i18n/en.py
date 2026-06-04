@@ -693,6 +693,8 @@ TEXT_EN: Dict[str, str] = {
     'monthly_report_card_memory': '  New memories: {items}',
     'yearly_report_card_header': 'Yearly highlights ({year})',
     'yearly_report_card_total_events': '  Recorded events: {count}',
+    'report_followup_prompt': 'Report view',
+    'report_show_detailed_text': 'Show detailed text report',
     'world_change_category_route': 'Route',
     'world_change_category_location': 'Location',
     'world_change_category_occupation': 'Occupation',
