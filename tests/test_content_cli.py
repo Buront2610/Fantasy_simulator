@@ -22,7 +22,18 @@ def test_content_inspect_json_reports_authoring_summary(capsys) -> None:
     data = json.loads(capsys.readouterr().out)
     assert data["site_count"] > 0
     assert data["language_count"] > 0
+    assert data["faction_relationship_count"] > 0
+    assert "tense" in data["faction_relationship_status_counts"]
     assert "language_keys" in data
+
+
+def test_content_inspect_text_reports_faction_relationships(capsys) -> None:
+    exit_code = main(["inspect", str(DEFAULT_AETHORIA_BUNDLE_PATH)])
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert "faction relationships:" in output
+    assert "faction relationship statuses:" in output
 
 
 def test_content_preview_map_and_names_are_nonempty(capsys) -> None:

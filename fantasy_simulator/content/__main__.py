@@ -42,6 +42,13 @@ def _cmd_inspect(args: argparse.Namespace) -> int:
     print(f"language root realizations: {summary.language_root_realization_count}")
     print(f"cultures: {summary.culture_count}")
     print(f"factions: {summary.faction_count}")
+    print(f"faction relationships: {summary.faction_relationship_count}")
+    if summary.faction_relationship_status_counts:
+        counts = ", ".join(
+            f"{status}={count}"
+            for status, count in summary.faction_relationship_status_counts.items()
+        )
+        print(f"faction relationship statuses: {counts}")
     if summary.site_ids_without_language_key:
         print("missing site language keys: " + ", ".join(summary.site_ids_without_language_key))
     if summary.site_ids_without_language_community:

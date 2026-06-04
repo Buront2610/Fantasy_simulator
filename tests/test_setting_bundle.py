@@ -366,6 +366,10 @@ def test_setting_bundle_authoring_summary_includes_culture_and_faction_keys():
             lore_text="Custom lore",
             cultures=["Skyfolk", "River Clans"],
             factions=["Wardens", "Dawn-Court"],
+            faction_relationships=[
+                FactionRelationshipDefinition("wardens", "dawn_court", status="war"),
+                FactionRelationshipDefinition("wardens", "river_clans", status="tense"),
+            ],
         ),
     )
 
@@ -373,8 +377,10 @@ def test_setting_bundle_authoring_summary_includes_culture_and_faction_keys():
 
     assert summary.culture_count == 2
     assert summary.faction_count == 2
+    assert summary.faction_relationship_count == 2
     assert summary.culture_keys == ["river_clans", "skyfolk"]
     assert summary.faction_keys == ["dawn_court", "wardens"]
+    assert summary.faction_relationship_status_counts == {"tense": 1, "war": 1}
 
 
 def test_setting_bundle_authoring_summary_includes_glossary_keys():
@@ -1618,10 +1624,12 @@ def test_bundle_authoring_summary_exposes_region_route_and_language_breakdowns()
     assert "loc_aethoria_capital" in summary.resident_site_ids
     assert summary.culture_count == len(bundle.world_definition.cultures)
     assert summary.faction_count == len(bundle.world_definition.factions)
+    assert summary.faction_relationship_count == len(bundle.world_definition.faction_relationships)
     assert summary.glossary_count == len(bundle.world_definition.glossary)
     assert summary.language_family_count == len(bundle.world_definition.language_families)
     assert "aethic_heartlanders" in summary.culture_keys
     assert "aethorian_crown_council" in summary.faction_keys
+    assert summary.faction_relationship_status_counts["tense"] >= 1
     assert "arcane_cataclysm" in summary.glossary_keys
     assert "ley_lines" in summary.glossary_keys
     assert summary.site_counts_by_region_type["city"] >= 1

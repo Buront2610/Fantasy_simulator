@@ -43,6 +43,7 @@ class SettingBundleAuthoringSummary:
     language_count: int
     culture_count: int = 0
     faction_count: int = 0
+    faction_relationship_count: int = 0
     glossary_count: int = 0
     language_family_count: int = 0
     language_community_count: int = 0
@@ -52,6 +53,7 @@ class SettingBundleAuthoringSummary:
     capital_site_ids: List[str] = field(default_factory=list)
     culture_keys: List[str] = field(default_factory=list)
     faction_keys: List[str] = field(default_factory=list)
+    faction_relationship_status_counts: Dict[str, int] = field(default_factory=dict)
     glossary_keys: List[str] = field(default_factory=list)
     site_counts_by_region_type: Dict[str, int] = field(default_factory=dict)
     route_counts_by_type: Dict[str, int] = field(default_factory=dict)
@@ -122,6 +124,10 @@ def root_realization_coverage_by_language(
     return dict(sorted(counts.items()))
 
 
+def faction_relationship_status_counts(relationships: List[Any]) -> Dict[str, int]:
+    return counts_by_attr(relationships, "status")
+
+
 def language_keys_without_family(languages: List[Any], language_families: List[Any]) -> List[str]:
     family_keys = {family.family_key for family in language_families}
     return sorted(
@@ -177,6 +183,7 @@ def build_setting_bundle_authoring_summary(bundle: Any) -> SettingBundleAuthorin
         language_count=len(world.languages),
         culture_count=len(world.cultures),
         faction_count=len(world.factions),
+        faction_relationship_count=len(world.faction_relationships),
         glossary_count=len(world.glossary),
         language_family_count=len(world.language_families),
         language_community_count=len(world.language_communities),
@@ -186,6 +193,7 @@ def build_setting_bundle_authoring_summary(bundle: Any) -> SettingBundleAuthorin
         capital_site_ids=world.capital_site_ids(),
         culture_keys=sorted(entry.key for entry in world.culture_entries()),
         faction_keys=sorted(entry.key for entry in world.faction_entries()),
+        faction_relationship_status_counts=faction_relationship_status_counts(world.faction_relationships),
         glossary_keys=sorted(entry.key for entry in world.glossary_entries()),
         site_counts_by_region_type=world.site_counts_by_region_type(),
         route_counts_by_type=world.route_counts_by_type(),
