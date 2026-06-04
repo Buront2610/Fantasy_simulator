@@ -669,6 +669,12 @@ class TestRumorBoardScreen(unittest.TestCase):
                 source_event_id="evt_road",
                 age_in_months=1,
                 spread_level=7,
+                audience_key="local",
+                bias_tags=["local", "route"],
+                distortion_level=1,
+                tracked=True,
+                related_event_ids=["evt_road", "evt_cause"],
+                related_faction_ids=["stormwatch_wardens"],
             )
         )
         sim = Simulator(world, events_per_year=0, seed=1)
@@ -695,6 +701,11 @@ class TestRumorBoardScreen(unittest.TestCase):
         self.assertIn("RUMOR DETAIL", text)
         self.assertIn("Source event", text)
         self.assertIn("A road incident was recorded.", text)
+        self.assertIn("audience: local", text)
+        self.assertIn("tracked: yes", text)
+        self.assertIn("Related IDs", text)
+        self.assertIn("evt_cause", text)
+        self.assertIn("stormwatch_wardens", text)
         self.assertIn("Related location", text)
         self.assertIn("Recent events", text)
 

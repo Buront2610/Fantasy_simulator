@@ -11,6 +11,7 @@ from .i18n import tr
 from .narrative.constants import EVENT_KINDS_FATAL
 from .rumor_constants import DISCLOSURE, MIN_SEVERITY_FOR_RUMOR, RUMOR_BASE_CHANCE
 from .rumor_models import Rumor
+from .world_event_index import location_ids_for_record
 
 if TYPE_CHECKING:
     from .event_models import WorldEventRecord
@@ -74,6 +75,62 @@ def _content_tags_from_event(record: "WorldEventRecord") -> List[str]:
     if record.kind in ("discovery", "adventure_discovery"):
         tags.append("treasure")
     return tags
+
+
+def _audience_key_for_rumor(record: "WorldEventRecord", listener_location_id: Optional[str]) -> str:
+    if listener_location_id and listener_location_id == record.location_id:
+        return "local"
+    if listener_location_id:
+        return "distant"
+    return "general"
+
+
+def _bias_tags_from_event(record: "WorldEventRecord", audience_key: str, reliability: str) -> List[str]:
+    tags = [audience_key]
+    if "world_change" in record.tags:
+        tags.append("world_change")
+    if reliability in {"doubtful", "false"}:
+        tags.append("distorted")
+    if record.visibility != "public":
+        tags.append("limited_visibility")
+    return tags
+
+
+def _distortion_level_for_reliability(reliability: str) -> int:
+    levels = {
+        "certain": 0,
+        "plausible": 1,
+        "doubtful": 2,
+        "false": 3,
+    }
+    return levels.get(reliability, 1)
+
+
+def _related_event_ids_from_event(record: "WorldEventRecord") -> List[str]:
+    event_ids = [record.record_id]
+    cause_event_id = record.render_params.get("cause_event_id")
+    if isinstance(cause_event_id, str) and cause_event_id and cause_event_id not in event_ids:
+        event_ids.append(cause_event_id)
+    return event_ids
+
+
+def _related_faction_ids_from_event(record: "WorldEventRecord") -> List[str]:
+    faction_ids: List[str] = []
+
+    def add_faction_id(value: object) -> None:
+        if isinstance(value, str) and value and value not in faction_ids:
+            faction_ids.append(value)
+
+    for tag in record.tags:
+        if tag.startswith("faction:"):
+            add_faction_id(tag[len("faction:"):])
+    for key in ("faction_id", "old_faction_id", "new_faction_id", "aggressor_faction_id", "target_faction_id"):
+        add_faction_id(record.render_params.get(key))
+    belligerents = record.render_params.get("belligerent_faction_ids")
+    if isinstance(belligerents, list):
+        for faction_id in belligerents:
+            add_faction_id(faction_id)
+    return faction_ids
 
 
 def _generate_misinformation(
@@ -210,6 +267,7 @@ def generate_rumor_from_event(
     reliability = _determine_reliability(
         record.severity, same_location, months_elapsed, rng=rng,
     )
+    audience_key = _audience_key_for_rumor(record, listener_location_id)
 
     if world is not None:
         description = _build_rumor_description(record, reliability, world, rng=rng)
@@ -238,6 +296,12 @@ def generate_rumor_from_event(
         created_calendar_key=(
             period_calendar.calendar_key if period_calendar is not None else record.calendar_key
         ),
+        audience_key=audience_key,
+        bias_tags=_bias_tags_from_event(record, audience_key, reliability),
+        distortion_level=_distortion_level_for_reliability(reliability),
+        related_location_ids=location_ids_for_record(record),
+        related_event_ids=_related_event_ids_from_event(record),
+        related_faction_ids=_related_faction_ids_from_event(record),
     )
 
 

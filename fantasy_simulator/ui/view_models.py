@@ -1036,6 +1036,7 @@ def _dashboard_hot_rumors(world: "World", *, limit: int) -> List[RumorSummaryVie
 
     rumors.sort(
         key=lambda rumor: (
+            not rumor.tracked,
             -rumor.spread_level,
             -source_rumor_heat(rumor),
             rumor.age_in_months,

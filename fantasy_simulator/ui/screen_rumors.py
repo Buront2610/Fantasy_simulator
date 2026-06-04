@@ -94,6 +94,17 @@ def _show_rumor_detail(sim: Simulator, rumor: RumorSummaryView, ctx: UIContext) 
         spread=rumor.spread_level,
     )
     out.print_dim(f"  {source_meta}")
+    if rumor.audience_key or rumor.bias_tags or rumor.distortion_level or rumor.tracked:
+        out.print_dim(
+            "  "
+            + tr(
+                "rumor_board_detail_tracking",
+                audience=rumor.audience_key or "-",
+                bias=", ".join(rumor.bias_tags) or "-",
+                distortion=rumor.distortion_level,
+                tracked=tr("rumor_tracked_yes") if rumor.tracked else tr("rumor_tracked_no"),
+            )
+        )
     if rumor.source_event_id:
         record = sim.world.get_event_by_id(rumor.source_event_id)
         if record is None:
@@ -109,4 +120,11 @@ def _show_rumor_detail(sim: Simulator, rumor: RumorSummaryView, ctx: UIContext) 
         out.print_line()
         out.print_highlighted(f"  {tr('rumor_board_related_location')}")
         out.print_line(sim.get_location_observation(rumor.source_location_id))
+    if rumor.related_event_ids or rumor.related_faction_ids:
+        out.print_line()
+        out.print_highlighted(f"  {tr('rumor_board_related_ids')}")
+        if rumor.related_event_ids:
+            out.print_dim(f"    {tr('rumor_board_related_events')}: {', '.join(rumor.related_event_ids)}")
+        if rumor.related_faction_ids:
+            out.print_dim(f"    {tr('rumor_board_related_factions')}: {', '.join(rumor.related_faction_ids)}")
     ctx.inp.pause()

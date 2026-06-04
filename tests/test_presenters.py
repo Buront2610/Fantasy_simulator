@@ -637,6 +637,35 @@ def test_world_dashboard_hot_rumors_are_spread_and_heat_first():
     assert dashboard.hot_rumors[0].startswith("Widespread forest rumor.")
 
 
+def test_world_dashboard_prioritizes_tracked_rumors():
+    set_locale("en")
+    world = World()
+    world.rumors.append(
+        Rumor(
+            id="rumor_hot",
+            description="Widespread forest rumor.",
+            reliability="plausible",
+            source_location_id="loc_thornwood",
+            spread_level=8,
+        )
+    )
+    world.rumors.append(
+        Rumor(
+            id="rumor_tracked",
+            description="Quiet tracked rumor.",
+            reliability="doubtful",
+            source_location_id="loc_aethoria_capital",
+            spread_level=1,
+            tracked=True,
+        )
+    )
+
+    dashboard = build_world_dashboard_view(world, current_month=1)
+
+    assert dashboard.hot_rumors[0].startswith("Quiet tracked rumor.")
+    assert "[tracked]" in dashboard.hot_rumors[0]
+
+
 def test_world_dashboard_surfaces_active_wars_until_war_ends():
     set_locale("en")
     world = World()

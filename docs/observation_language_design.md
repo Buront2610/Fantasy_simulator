@@ -684,10 +684,10 @@ python -m fantasy_simulator.content preview-roots bundle.json --language highlan
 
 作業:
 
-- tracking stateを追加。
-- optional audience/bias fieldsを追加。
-- canonical recordから複数rumor phrasingを生成。
-- related location/event/faction IDsを露出。
+- tracking stateを追加。`Rumor.tracked` が保存互換で round-trip し、dashboard の hot rumors で優先される。
+- optional audience/bias fieldsを追加。`audience_key`、`bias_tags`、`distortion_level` を canonical record 起点で生成し、rumor board detail に露出する。
+- canonical recordから複数rumor phrasingを生成。初期 slice では正規 record 由来の tracking metadata を先に固定し、複数 phrasing / audience 別文体は後続で広げる。
+- related location/event/faction IDsを露出。`related_location_ids`、`related_event_ids`、`related_faction_ids` を rumor summary/detail から参照できる。
 
 ### WK-1: world change ripple hooks
 

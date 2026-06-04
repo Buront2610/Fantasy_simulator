@@ -120,10 +120,25 @@ class TestI18n:
         assert tr("rumor_board_menu") == "噂一覧"
         assert "Aethoria" in tr("rumor_board_meta", location="Aethoria", age=2, spread=4, event_id="evt1")
         assert "Aethoria" in tr("rumor_board_detail_source", location="Aethoria", age=2, spread=4)
+        assert "local" in tr(
+            "rumor_board_detail_tracking",
+            audience="local",
+            bias="local",
+            distortion=1,
+            tracked=tr("rumor_tracked_yes"),
+        )
         set_locale("en")
         assert tr("rumor_board_menu") == "Rumor board"
         assert "evt1" in tr("rumor_board_meta", location="Aethoria", age=2, spread=4, event_id="evt1")
         assert "Aethoria" in tr("rumor_board_detail_source", location="Aethoria", age=2, spread=4)
+        assert tr("rumor_tracked_marker") == "[tracked]"
+        assert "tracked: yes" in tr(
+            "rumor_board_detail_tracking",
+            audience="local",
+            bias="local",
+            distortion=1,
+            tracked=tr("rumor_tracked_yes"),
+        )
 
     def test_report_headline_templates_render(self):
         set_locale("ja")
