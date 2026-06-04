@@ -47,6 +47,12 @@ def test_content_preview_map_and_names_are_nonempty(capsys) -> None:
     assert "aethic_common:" in roots_output
     assert "Blackgap [black, gap]" in roots_output
 
+    assert main(["preview-language-atlas", str(DEFAULT_AETHORIA_BUNDLE_PATH)]) == 0
+    atlas_output = capsys.readouterr().out
+    assert "language families:" in atlas_output
+    assert "aethic_family:" in atlas_output
+    assert "aethic_common" in atlas_output
+
 
 def test_content_preview_map_legend_lists_site_details(capsys) -> None:
     exit_code = main(["preview-map", str(DEFAULT_AETHORIA_BUNDLE_PATH), "--legend"])

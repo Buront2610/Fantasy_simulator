@@ -13,6 +13,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Iterable, Sequence
 
+from .language_families import language_atlas_lines
 from .semantic_roots import build_semantic_root_preview, semantic_root_coverage_lines
 from .setting_bundle import build_setting_bundle_authoring_summary, load_setting_bundle
 
@@ -36,6 +37,7 @@ def _cmd_inspect(args: argparse.Namespace) -> int:
     print(f"sites: {summary.site_count}")
     print(f"routes: {summary.route_count}")
     print(f"languages: {summary.language_count}")
+    print(f"language families: {summary.language_family_count}")
     print(f"semantic roots: {summary.semantic_root_count}")
     print(f"language root realizations: {summary.language_root_realization_count}")
     print(f"cultures: {summary.culture_count}")
@@ -100,6 +102,13 @@ def _cmd_preview_roots(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_preview_language_atlas(args: argparse.Namespace) -> int:
+    world = _load(args.bundle).world_definition
+    for line in language_atlas_lines(world):
+        print(line)
+    return 0
+
+
 def _cmd_diff(args: argparse.Namespace) -> int:
     old = build_setting_bundle_authoring_summary(_load(args.old_bundle))
     new = build_setting_bundle_authoring_summary(_load(args.new_bundle))
@@ -150,6 +159,10 @@ def build_parser() -> argparse.ArgumentParser:
     preview_roots.add_argument("--language", default="")
     preview_roots.add_argument("--roots", default="")
     preview_roots.set_defaults(func=_cmd_preview_roots)
+
+    preview_language_atlas = subparsers.add_parser("preview-language-atlas")
+    preview_language_atlas.add_argument("bundle")
+    preview_language_atlas.set_defaults(func=_cmd_preview_language_atlas)
 
     diff = subparsers.add_parser("diff")
     diff.add_argument("old_bundle")

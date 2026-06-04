@@ -27,6 +27,7 @@ from .setting_bundle_schema_core import (
 from .setting_bundle_schema_language import (
     LanguageCommunityDefinition,
     LanguageDefinition,
+    LanguageFamilyDefinition,
     LanguageRootRealization,
     SemanticRootDefinition,
 )
@@ -39,6 +40,7 @@ __all__ = [
     "JobDefinition",
     "LanguageCommunityDefinition",
     "LanguageDefinition",
+    "LanguageFamilyDefinition",
     "LanguageRootRealization",
     "NamingRulesDefinition",
     "RaceDefinition",

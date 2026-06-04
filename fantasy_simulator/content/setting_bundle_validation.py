@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from .setting_bundle_schema import SettingBundle
 from .setting_bundle_validation_language import (
+    validate_language_families,
     validate_language_communities,
     validate_languages,
     validate_site_language_references,
@@ -26,6 +27,7 @@ def validate_setting_bundle(bundle: SettingBundle, *, source: str) -> None:
     validate_route_seeds(world, canonical_ids, source=source)
     validate_naming_rules(world, source=source)
     language_index = validate_languages(world, source=source)
+    validate_language_families(world, language_index, site_ids, source=source)
     validate_language_communities(world, language_index, site_ids, source=source)
     validate_site_language_references(world, language_index, source=source)
     validate_rule_overrides(world, source=source)

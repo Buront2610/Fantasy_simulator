@@ -32,6 +32,7 @@ class SettingBundleAuthoringSummary:
     culture_count: int = 0
     faction_count: int = 0
     glossary_count: int = 0
+    language_family_count: int = 0
     language_community_count: int = 0
     semantic_root_count: int = 0
     language_root_realization_count: int = 0
@@ -43,8 +44,10 @@ class SettingBundleAuthoringSummary:
     site_counts_by_region_type: Dict[str, int] = field(default_factory=dict)
     route_counts_by_type: Dict[str, int] = field(default_factory=dict)
     language_keys: List[str] = field(default_factory=list)
+    language_family_keys: List[str] = field(default_factory=list)
     community_keys_by_region: Dict[str, List[str]] = field(default_factory=dict)
     root_realization_coverage_by_language: Dict[str, int] = field(default_factory=dict)
+    language_keys_without_family: List[str] = field(default_factory=list)
     sites_with_native_names: List[str] = field(default_factory=list)
     site_ids_without_language_key: List[str] = field(default_factory=list)
     site_ids_without_language_community: List[str] = field(default_factory=list)
@@ -100,6 +103,15 @@ def root_realization_coverage_by_language(
     return dict(sorted(counts.items()))
 
 
+def language_keys_without_family(languages: List[Any], language_families: List[Any]) -> List[str]:
+    family_keys = {family.family_key for family in language_families}
+    return sorted(
+        language.language_key
+        for language in languages
+        if not language.family_key.strip() or language.family_key not in family_keys
+    )
+
+
 def site_ids_without_language_key(site_seeds: List[Any]) -> List[str]:
     return sorted(
         seed.location_id
@@ -147,6 +159,7 @@ def build_setting_bundle_authoring_summary(bundle: Any) -> SettingBundleAuthorin
         culture_count=len(world.cultures),
         faction_count=len(world.factions),
         glossary_count=len(world.glossary),
+        language_family_count=len(world.language_families),
         language_community_count=len(world.language_communities),
         semantic_root_count=len(world.semantic_roots),
         language_root_realization_count=len(world.language_root_realizations),
@@ -158,6 +171,7 @@ def build_setting_bundle_authoring_summary(bundle: Any) -> SettingBundleAuthorin
         site_counts_by_region_type=world.site_counts_by_region_type(),
         route_counts_by_type=world.route_counts_by_type(),
         language_keys=sorted(language.language_key for language in world.languages),
+        language_family_keys=sorted(family.family_key for family in world.language_families),
         community_keys_by_region=world.community_keys_by_region(),
         root_realization_coverage_by_language=root_realization_coverage_by_language(
             world.languages,
@@ -165,6 +179,10 @@ def build_setting_bundle_authoring_summary(bundle: Any) -> SettingBundleAuthorin
         ),
         sites_with_native_names=sorted(
             seed.location_id for seed in world.site_seeds if seed.native_name.strip()
+        ),
+        language_keys_without_family=language_keys_without_family(
+            world.languages,
+            world.language_families,
         ),
         site_ids_without_language_key=world.site_ids_without_language_key(),
         site_ids_without_language_community=world.site_ids_without_language_community(),

@@ -758,6 +758,7 @@
       {
         "language_key": "elder_speech",
         "display_name": "Elder Speech",
+        "family_key": "elder_speech_family",
         "seed_syllables": ["al", "dor", "el", "gal", "ith", "mir", "sil", "thal"],
         "consonants": ["d", "l", "m", "n", "r", "s", "th", "v"],
         "vowels": ["a", "e", "i", "o", "ae", "ia"],
@@ -781,6 +782,7 @@
         "language_key": "proto_quenic",
         "display_name": "Proto Quenic",
         "parent_key": "elder_speech",
+        "family_key": "quenic_family",
         "seed_syllables": ["quel", "nor", "sai"],
         "sound_shifts": {
           "th": "s",
@@ -810,6 +812,7 @@
         "language_key": "quenic",
         "display_name": "Quenic",
         "parent_key": "proto_quenic",
+        "family_key": "quenic_family",
         "seed_syllables": ["lume", "nare", "sere"],
         "sound_shifts": {
           "nd": "n",
@@ -849,6 +852,7 @@
         "language_key": "sindral",
         "display_name": "Sindral",
         "parent_key": "proto_quenic",
+        "family_key": "quenic_family",
         "seed_syllables": ["bran", "thel", "gwyn"],
         "consonants": ["b", "d", "f", "g", "l", "m", "n", "r", "s", "th", "w"],
         "liquid_consonants": ["l", "r"],
@@ -882,6 +886,7 @@
       {
         "language_key": "proto_aethic",
         "display_name": "Proto Aethic",
+        "family_key": "aethic_family",
         "seed_syllables": ["bar", "cal", "dor", "fen", "mar", "tor", "wyn"],
         "consonants": ["b", "c", "d", "f", "g", "h", "l", "m", "n", "r", "s", "t", "w"],
         "vowels": ["a", "e", "i", "o", "u", "ea"],
@@ -905,6 +910,7 @@
         "language_key": "aethic_common",
         "display_name": "Aethic Common",
         "parent_key": "proto_aethic",
+        "family_key": "aethic_family",
         "seed_syllables": ["ash", "bryn", "vale"],
         "sound_shifts": {
           "ea": "e",
@@ -933,6 +939,7 @@
       {
         "language_key": "khazic",
         "display_name": "Khazic",
+        "family_key": "khazic_family",
         "seed_syllables": ["bar", "dur", "grim", "kaz", "thor", "zul"],
         "consonants": ["b", "d", "g", "k", "m", "r", "th", "z"],
         "vowels": ["a", "i", "o", "u"],
@@ -965,6 +972,7 @@
       {
         "language_key": "orcish_steppe",
         "display_name": "Orcish Steppe Tongue",
+        "family_key": "orcish_steppe_family",
         "seed_syllables": ["gor", "krag", "mok", "ur", "zug"],
         "consonants": ["g", "k", "m", "r", "t", "z"],
         "vowels": ["a", "o", "u"],
@@ -992,6 +1000,48 @@
         ],
         "lexicon_size": 22,
         "evolution_interval_years": 70
+      }
+    ],
+    "language_families": [
+      {
+        "family_key": "elder_speech_family",
+        "display_name": "Elder Speech Layer",
+        "proto_language_key": "elder_speech",
+        "origin_region_ids": ["loc_skyveil_monastery"],
+        "cultural_tags": ["ancient", "arcane"],
+        "semantic_domain_tags": ["ritual", "ruin", "star"]
+      },
+      {
+        "family_key": "quenic_family",
+        "display_name": "Quenic Family",
+        "proto_language_key": "proto_quenic",
+        "origin_region_ids": ["loc_dragonbone_ridge", "loc_elderroot_forest"],
+        "cultural_tags": ["court", "elven", "dragonborn"],
+        "semantic_domain_tags": ["forest", "court", "sea"]
+      },
+      {
+        "family_key": "aethic_family",
+        "display_name": "Aethic Family",
+        "proto_language_key": "proto_aethic",
+        "origin_region_ids": ["loc_aethoria_capital", "loc_dusty_crossroads"],
+        "cultural_tags": ["heartlands", "frontier"],
+        "semantic_domain_tags": ["road", "market", "settlement"]
+      },
+      {
+        "family_key": "khazic_family",
+        "display_name": "Khazic Family",
+        "proto_language_key": "khazic",
+        "origin_region_ids": ["loc_frostpeak_summit", "loc_ironvein_mine"],
+        "cultural_tags": ["dwarven", "mountain"],
+        "semantic_domain_tags": ["stone", "craft", "pass"]
+      },
+      {
+        "family_key": "orcish_steppe_family",
+        "display_name": "Orcish Steppe Family",
+        "proto_language_key": "orcish_steppe",
+        "origin_region_ids": ["loc_sunbaked_plains", "loc_sandstone_outpost"],
+        "cultural_tags": ["steppe", "clan"],
+        "semantic_domain_tags": ["plain", "war", "border"]
       }
     ],
     "language_communities": [

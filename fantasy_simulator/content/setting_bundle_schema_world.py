@@ -29,6 +29,7 @@ from .setting_bundle_schema_core import (
 from .setting_bundle_schema_language import (
     LanguageCommunityDefinition,
     LanguageDefinition,
+    LanguageFamilyDefinition,
     LanguageRootRealization,
     SemanticRootDefinition,
 )
@@ -52,6 +53,7 @@ class WorldDefinition:
     route_seeds: List[RouteSeedDefinition] = field(default_factory=list)
     naming_rules: NamingRulesDefinition = field(default_factory=NamingRulesDefinition)
     languages: List[LanguageDefinition] = field(default_factory=list)
+    language_families: List[LanguageFamilyDefinition] = field(default_factory=list)
     language_communities: List[LanguageCommunityDefinition] = field(default_factory=list)
     semantic_roots: List[SemanticRootDefinition] = field(default_factory=list)
     language_root_realizations: List[LanguageRootRealization] = field(default_factory=list)
@@ -141,6 +143,7 @@ class WorldDefinition:
             "route_seeds": [seed.to_dict() for seed in self.route_seeds],
             "naming_rules": self.naming_rules.to_dict(),
             "languages": [language.to_dict() for language in self.languages],
+            "language_families": [family.to_dict() for family in self.language_families],
             "language_communities": [community.to_dict() for community in self.language_communities],
             "semantic_roots": [root.to_dict() for root in self.semantic_roots],
             "language_root_realizations": [
@@ -194,6 +197,10 @@ class WorldDefinition:
             languages=[
                 LanguageDefinition.from_dict(item)
                 for item in data.get("languages", [])
+            ],
+            language_families=[
+                LanguageFamilyDefinition.from_dict(item)
+                for item in data.get("language_families", [])
             ],
             language_communities=[
                 LanguageCommunityDefinition.from_dict(item)

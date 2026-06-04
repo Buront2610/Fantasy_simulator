@@ -19,6 +19,7 @@ class LanguageDefinition:
     language_key: str
     display_name: str
     parent_key: str = ""
+    family_key: str = ""
     seed_syllables: List[str] = field(default_factory=list)
     consonants: List[str] = field(default_factory=list)
     vowels: List[str] = field(default_factory=list)
@@ -51,6 +52,7 @@ class LanguageDefinition:
             "language_key": self.language_key,
             "display_name": self.display_name,
             "parent_key": self.parent_key,
+            "family_key": self.family_key,
             "seed_syllables": list(self.seed_syllables),
             "consonants": list(self.consonants),
             "vowels": list(self.vowels),
@@ -90,6 +92,7 @@ class LanguageDefinition:
             language_key=data["language_key"],
             display_name=data.get("display_name", data["language_key"]),
             parent_key=data.get("parent_key", ""),
+            family_key=data.get("family_key", ""),
             seed_syllables=string_list_payload(data.get("seed_syllables", []), field_name="seed_syllables"),
             consonants=string_list_payload(data.get("consonants", []), field_name="consonants"),
             vowels=string_list_payload(data.get("vowels", []), field_name="vowels"),
@@ -188,6 +191,48 @@ class LanguageCommunityDefinition:
             regions=string_list_payload(data.get("regions", []), field_name="regions"),
             priority=int(data.get("priority", 0)),
             is_lingua_franca=bool(data.get("is_lingua_franca", False)),
+        )
+
+
+@dataclass(frozen=True)
+class LanguageFamilyDefinition:
+    """Authoring/UI grouping for related languages without replacing parent_key lineage."""
+
+    family_key: str
+    display_name: str
+    proto_language_key: str = ""
+    origin_region_ids: List[str] = field(default_factory=list)
+    cultural_tags: List[str] = field(default_factory=list)
+    phonology_profile_key: str = ""
+    naming_profile_key: str = ""
+    semantic_domain_tags: List[str] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "family_key": self.family_key,
+            "display_name": self.display_name,
+            "proto_language_key": self.proto_language_key,
+            "origin_region_ids": list(self.origin_region_ids),
+            "cultural_tags": list(self.cultural_tags),
+            "phonology_profile_key": self.phonology_profile_key,
+            "naming_profile_key": self.naming_profile_key,
+            "semantic_domain_tags": list(self.semantic_domain_tags),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "LanguageFamilyDefinition":
+        return cls(
+            family_key=data["family_key"],
+            display_name=data.get("display_name", data["family_key"]),
+            proto_language_key=data.get("proto_language_key", ""),
+            origin_region_ids=string_list_payload(data.get("origin_region_ids", []), field_name="origin_region_ids"),
+            cultural_tags=string_list_payload(data.get("cultural_tags", []), field_name="cultural_tags"),
+            phonology_profile_key=data.get("phonology_profile_key", ""),
+            naming_profile_key=data.get("naming_profile_key", ""),
+            semantic_domain_tags=string_list_payload(
+                data.get("semantic_domain_tags", []),
+                field_name="semantic_domain_tags",
+            ),
         )
 
 

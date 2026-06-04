@@ -740,10 +740,11 @@ python -m fantasy_simulator.content preview-roots bundle.json --language highlan
 
 作業:
 
-- `LanguageFamilyDefinition` を `SettingBundle` に追加。
-- `parent_key` を壊さず、languageをfamilyへ紐づける。
-- language atlas view modelを追加。
-- authoring coverage checkを追加。
+- `LanguageFamilyDefinition` を `SettingBundle` に追加済み。
+- `parent_key` を壊さず、`LanguageDefinition.family_key` でlanguageをfamilyへ紐づける。
+- language atlas view modelと `preview-language-atlas` を追加済み。
+- authoring coverage checkとして family未設定/未知family参照を検出する。
+- persistent location name historyやfamily別生成ルールはLG-4以降へ残す。
 
 ### LG-4: persistent location name history
 

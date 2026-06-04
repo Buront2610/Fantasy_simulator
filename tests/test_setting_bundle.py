@@ -13,6 +13,7 @@ from fantasy_simulator.content.setting_bundle import (
     JobDefinition,
     LanguageCommunityDefinition,
     LanguageDefinition,
+    LanguageFamilyDefinition,
     LanguageRootRealization,
     NamingRulesDefinition,
     RaceDefinition,
@@ -41,6 +42,7 @@ def test_setting_bundle_facade_supports_public_from_import_contract():
         "JobDefinition",
         "LanguageCommunityDefinition",
         "LanguageDefinition",
+        "LanguageFamilyDefinition",
         "LanguageRootRealization",
         "NamingRulesDefinition",
         "RaceDefinition",
@@ -65,8 +67,8 @@ def test_setting_bundle_facade_supports_public_from_import_contract():
         "from fantasy_simulator.content.setting_bundle import ("
         "CalendarDefinition, CalendarMonthDefinition, DEFAULT_AETHORIA_BUNDLE_PATH, "
         "GlossaryEntryDefinition, JobDefinition, LanguageCommunityDefinition, LanguageDefinition, "
-        "LanguageRootRealization, NamingRulesDefinition, RaceDefinition, RouteSeedDefinition, "
-        "SemanticRootDefinition, SettingBundle, "
+        "LanguageFamilyDefinition, LanguageRootRealization, NamingRulesDefinition, "
+        "RaceDefinition, RouteSeedDefinition, SemanticRootDefinition, SettingBundle, "
         "SettingBundleAuthoringSummary, SettingEntryInspection, SiteSeedDefinition, WorldDefinition, "
         "build_setting_bundle_authoring_summary, bundle_from_dict_validated, default_aethoria_bundle, "
         "default_calendar_definition, legacy_location_id_alias, load_setting_bundle, "
@@ -87,6 +89,7 @@ def test_setting_bundle_facade_supports_public_from_import_contract():
     assert namespace["CalendarDefinition"] is schema.CalendarDefinition
     assert namespace["SettingBundle"] is schema.SettingBundle
     assert namespace["WorldDefinition"] is schema.WorldDefinition
+    assert namespace["LanguageFamilyDefinition"] is schema.LanguageFamilyDefinition
     assert namespace["SemanticRootDefinition"] is schema.SemanticRootDefinition
     assert namespace["LanguageRootRealization"] is schema.LanguageRootRealization
     assert namespace["SettingEntryInspection"] is inspection.SettingEntryInspection
@@ -97,6 +100,7 @@ def test_setting_bundle_facade_supports_public_from_import_contract():
     assert schema.CalendarDefinition is calendar_schema.CalendarDefinition
     assert schema.RaceDefinition is core_schema.RaceDefinition
     assert schema.LanguageDefinition is language_schema.LanguageDefinition
+    assert schema.LanguageFamilyDefinition is language_schema.LanguageFamilyDefinition
     assert schema.WorldDefinition is world_schema.WorldDefinition
 
 
@@ -198,14 +202,23 @@ def test_world_definition_round_trip():
             LanguageDefinition(
                 language_key="proto",
                 display_name="Proto",
+                family_key="sky_family",
                 seed_syllables=["ar", "bel"],
             ),
             LanguageDefinition(
                 language_key="child",
                 display_name="Child",
                 parent_key="proto",
+                family_key="sky_family",
                 sound_shifts={"b": "v"},
             ),
+        ],
+        language_families=[
+            LanguageFamilyDefinition(
+                family_key="sky_family",
+                display_name="Sky Family",
+                proto_language_key="proto",
+            )
         ],
         language_communities=[
             LanguageCommunityDefinition(
@@ -1466,6 +1479,7 @@ def test_bundle_authoring_summary_exposes_region_route_and_language_breakdowns()
     assert summary.culture_count == len(bundle.world_definition.cultures)
     assert summary.faction_count == len(bundle.world_definition.factions)
     assert summary.glossary_count == len(bundle.world_definition.glossary)
+    assert summary.language_family_count == len(bundle.world_definition.language_families)
     assert "aethic_heartlanders" in summary.culture_keys
     assert "aethorian_crown_council" in summary.faction_keys
     assert "arcane_cataclysm" in summary.glossary_keys
@@ -1473,6 +1487,8 @@ def test_bundle_authoring_summary_exposes_region_route_and_language_breakdowns()
     assert summary.site_counts_by_region_type["city"] >= 1
     assert summary.route_counts_by_type["road"] >= 1
     assert "aethic_common" in summary.language_keys
+    assert "aethic_family" in summary.language_family_keys
+    assert summary.language_keys_without_family == []
     assert summary.semantic_root_count >= 9
     assert summary.language_root_realization_count >= 45
     assert summary.root_realization_coverage_by_language["aethic_common"] >= 9
@@ -1579,6 +1595,31 @@ def test_bundle_validation_rejects_unknown_language_root_realization_reference()
         assert "unknown semantic root" in str(exc)
     else:
         raise AssertionError("Expected unknown semantic root realization to fail fast")
+
+
+def test_bundle_validation_rejects_unknown_language_family_reference() -> None:
+    payload = {
+        "schema_version": 1,
+        "world_definition": {
+            "world_key": "bad_language_family",
+            "display_name": "Bad Language Family",
+            "lore_text": "Malformed",
+            "languages": [
+                {
+                    "language_key": "root",
+                    "display_name": "Root",
+                    "family_key": "missing_family",
+                },
+            ],
+        },
+    }
+
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "unknown language family" in str(exc)
+    else:
+        raise AssertionError("Expected unknown language family reference to fail fast")
 
 
 def test_bundle_validation_rejects_non_positive_route_distance() -> None:
