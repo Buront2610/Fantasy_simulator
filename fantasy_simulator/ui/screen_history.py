@@ -109,8 +109,14 @@ def _show_single_story(sim: Simulator, ctx: UIContext | None = None) -> None:
     if idx is None:
         return
     character = world.characters[idx]
-    out.print_line()
-    out.print_line(sim.get_character_story(character.char_id))
+    _show_character_story(sim, character.char_id, ctx=ctx)
+
+
+def _show_character_story(sim: Simulator, character_id: str, ctx: UIContext | None = None) -> None:
+    """Show one already-selected character story."""
+    ctx = _default_ctx(ctx)
+    ctx.out.print_line()
+    ctx.out.print_line(sim.get_character_story(character_id))
     ctx.inp.pause()
 
 

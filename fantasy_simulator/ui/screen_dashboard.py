@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from ..i18n import tr
 from ..simulator import Simulator
+from .screen_history import _show_character_story
+from .screen_map_navigation import _show_detail_for_location
 from .ui_context import UIContext, _default_ctx
-from .view_models import WorldDashboardView, build_world_dashboard_view
+from .view_models import FollowUpActionView, WorldDashboardView, build_world_dashboard_view
 
 
 def _show_world_dashboard(sim: Simulator, ctx: UIContext | None = None) -> None:
@@ -17,7 +19,7 @@ def _show_world_dashboard(sim: Simulator, ctx: UIContext | None = None) -> None:
         pending_choice_count=len(sim.get_pending_adventure_choices()),
     )
     _render_world_dashboard(view, ctx=ctx)
-    ctx.inp.pause()
+    _handle_dashboard_follow_up(sim, view, ctx)
 
 
 def _render_world_dashboard(view: WorldDashboardView, ctx: UIContext) -> None:
@@ -69,6 +71,38 @@ def _render_world_dashboard(view: WorldDashboardView, ctx: UIContext) -> None:
             [item.label for item in view.follow_up_actions],
             ctx=ctx,
         )
+
+
+def _handle_dashboard_follow_up(sim: Simulator, view: WorldDashboardView, ctx: UIContext) -> None:
+    if not view.follow_up_actions:
+        ctx.inp.pause()
+        return
+    action_key = ctx.choose_key(
+        tr("dashboard_follow_up_prompt"),
+        [(str(index), item.label) for index, item in enumerate(view.follow_up_actions, 1)]
+        + [("back", tr("back_to_main"))],
+    )
+    if action_key == "back":
+        return
+    _open_dashboard_follow_up(sim, view.follow_up_actions[int(action_key) - 1], ctx)
+
+
+def _open_dashboard_follow_up(sim: Simulator, action: FollowUpActionView, ctx: UIContext) -> None:
+    world = sim.world
+    if action.target_type == "character":
+        character = world.get_character_by_id(action.target_id)
+        if character is not None:
+            _show_character_story(sim, character.char_id, ctx=ctx)
+            return
+    if action.location_id:
+        from .map_renderer import build_map_info
+
+        loc = world.get_location_by_id(action.location_id)
+        if loc is not None:
+            _show_detail_for_location(world, build_map_info(world), loc, ctx=ctx)
+            return
+    ctx.out.print_dim(f"  {tr('dashboard_follow_up_unavailable')}")
+    ctx.inp.pause()
 
 
 def _render_section(title: str, lines: list[str], ctx: UIContext) -> None:

@@ -675,6 +675,8 @@ TEXT_JA: Dict[str, str] = {
     'dashboard_follow_up_review_active_war': '戦争を確認: {text}',
     'dashboard_follow_up_review_rumor': '噂を確認: {text}',
     'dashboard_follow_up_review_world_change': '世界変化を確認: {text}',
+    'dashboard_follow_up_prompt': '次の確認を開く',
+    'dashboard_follow_up_unavailable': 'この確認対象は現在利用できません。',
     'report_location_activity': '{count}件の出来事',
     'monthly_report_card_header': '月間ハイライト（{year}年{month}月）',
     'monthly_report_card_characters': '  注目人物: {names}',

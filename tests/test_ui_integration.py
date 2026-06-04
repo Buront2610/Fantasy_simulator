@@ -186,6 +186,46 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         # the separator/heading calls prove the route goes through backends)
         self.assertTrue(len(out.calls) > 3, "Too few backend calls captured")
 
+    def test_world_dashboard_follow_up_opens_character_story(self) -> None:
+        from fantasy_simulator.simulator import Simulator
+        from fantasy_simulator.ui.screens import _show_results
+
+        world = World()
+        hero = Character("Mira", 24, "Female", "Human", "Ranger", location_id="loc_aethoria_capital")
+        hero.favorite = True
+        hero.history.append("Year 1000: Watched the capital gate.")
+        world.add_character(hero)
+        sim = Simulator(world, events_per_year=0, seed=1)
+
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(menu_keys=["world_dashboard", "1", "back_to_main"])
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_results(sim, ctx=ctx)
+
+        self.assertIn("Open follow-up", out.text)
+        self.assertIn("Mira", out.text)
+        self.assertIn("Watched the capital gate.", out.text)
+
+    def test_world_dashboard_follow_up_opens_location_map_detail(self) -> None:
+        from fantasy_simulator.simulator import Simulator
+        from fantasy_simulator.ui.screens import _show_results
+
+        world = World()
+        route = world.routes[0]
+        world.apply_route_blocked_change(route.route_id, True, month=2)
+        sim = Simulator(world, events_per_year=0, seed=1)
+
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(menu_keys=["world_dashboard", "1", "back", "back_to_main"])
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_results(sim, ctx=ctx)
+
+        self.assertIn("Open follow-up", out.text)
+        self.assertIn("Location follow-up", out.text)
+        self.assertIn("Local site sketch", out.text)
+
     def test_world_map_auto_mode_uses_minimal_on_narrow_terminal(self) -> None:
         from fantasy_simulator.ui.screens import _show_results, _build_default_world
 

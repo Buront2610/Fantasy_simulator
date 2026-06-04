@@ -660,6 +660,7 @@ python -m fantasy_simulator.content preview-roots bundle.json --language highlan
 
 - primary reason、supplemental reasons、recommendationsをまとめて表示。
 - feasibleなrecommendationをmenu actionへ接続。
+  - first passとして dashboard follow-up から character story と location map detail へ直接遷移できるようにした。
 - dashboardにrecent world-changeとrumor contextを追加。
 - 既存test doublesでfocused UI testsを追加。
 

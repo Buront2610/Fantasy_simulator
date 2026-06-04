@@ -685,6 +685,8 @@ TEXT_EN: Dict[str, str] = {
     'dashboard_follow_up_review_active_war': 'Review war: {text}',
     'dashboard_follow_up_review_rumor': 'Review rumor: {text}',
     'dashboard_follow_up_review_world_change': 'Review world change: {text}',
+    'dashboard_follow_up_prompt': 'Open follow-up',
+    'dashboard_follow_up_unavailable': 'That follow-up target is no longer available.',
     'report_location_activity': '{count} event(s)',
     'monthly_report_card_header': 'Monthly highlights ({year}-{month})',
     'monthly_report_card_characters': '  Notable people: {names}',
