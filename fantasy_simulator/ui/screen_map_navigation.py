@@ -170,7 +170,7 @@ def _print_map_legend(ctx: UIContext) -> None:
     out.print_error(f"    !  {tr('map_legend_danger_high')}")
     out.print_warning(f"    $  {tr('map_legend_traffic_high')}")
     out.print_highlighted(f"    ?  {tr('map_legend_rumor_high')}")
-    out.print_dim(f"    m  {tr('map_legend_memorial')} / a  {tr('map_legend_alias')}")
+    out.print_dim(f"    m  {tr('map_legend_memorial')} / a  {tr('map_legend_alias')} / c  {tr('map_legend_control')}")
     out.print_dim(f"  {tr('map_nav_keys_hint')}")
     out.print_line()
 

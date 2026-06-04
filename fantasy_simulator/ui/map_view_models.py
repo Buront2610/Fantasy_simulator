@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 
+from ..content.setting_bundle_inspection import setting_entry_key
 from ..narrative.constants import EVENT_KINDS_FATAL
 from ..observation import build_world_change_report_projection
 
@@ -52,6 +53,8 @@ class MapCellInfo:
     site_importance: int = 50
     atlas_x: int = -1
     atlas_y: int = -1
+    controlling_faction_id: str = ""
+    controlling_faction_name: str = ""
 
 
 @dataclass
@@ -173,6 +176,21 @@ def _alive_counts_by_location(world: "World") -> Dict[str, int]:
     return counts
 
 
+def _faction_display_name(world: "World", faction_id: str | None) -> str:
+    if not faction_id:
+        return ""
+    bundle = getattr(world, "_setting_bundle", None) or getattr(world, "setting_bundle", None)
+    world_definition = getattr(bundle, "world_definition", None)
+    faction_entries = getattr(world_definition, "faction_entries", None)
+    if callable(faction_entries):
+        faction_key = setting_entry_key(faction_id)
+        for entry in faction_entries():
+            display_name = getattr(entry, "display_name", "")
+            if faction_id == display_name or faction_key == getattr(entry, "key", ""):
+                return display_name
+    return faction_id
+
+
 def build_map_info(
     world: "World",
     highlight_location: Optional[str] = None,
@@ -249,5 +267,7 @@ def build_map_info(
             site_importance=site.importance if site else 50,
             atlas_x=site.atlas_x if site else -1,
             atlas_y=site.atlas_y if site else -1,
+            controlling_faction_id=loc.controlling_faction_id or "",
+            controlling_faction_name=_faction_display_name(world, loc.controlling_faction_id),
         )
     return info

@@ -17,6 +17,29 @@ def _band_label(band: str) -> str:
     return tr(f"map_band_{band}")
 
 
+def _append_state_lines(lines: List[str], cell: MapCellInfo, width: int) -> None:
+    safety_label = tr("map_safety")
+    danger_label = tr("map_danger")
+    traffic_label = tr("map_traffic")
+    pop_label = tr("map_population")
+    prosperity_label = tr("map_detail_prosperity")
+    mood_label = tr("map_detail_mood")
+    rumor_label = tr("map_detail_rumor_heat")
+    control_label = tr("map_detail_control")
+
+    lines.append(f"  |{_fit(f' {safety_label}: {cell.safety_label}', width)}|")
+    lines.append(f"  |{_fit(f' {danger_label}: {cell.danger:>3} ({_band_label(cell.danger_band)})', width)}|")
+    lines.append(
+        f"  |{_fit(f' {traffic_label}: {cell.traffic_indicator} ({_band_label(cell.traffic_band)})', width)}|"
+    )
+    lines.append(f"  |{_fit(f' {pop_label}: {cell.population}', width)}|")
+    if cell.controlling_faction_name:
+        lines.append(f"  |{_fit(f' {control_label}: {cell.controlling_faction_name}', width)}|")
+    lines.append(f"  |{_fit(f' {prosperity_label}: {cell.prosperity_label} ({cell.prosperity})', width)}|")
+    lines.append(f"  |{_fit(f' {mood_label}: {cell.mood_label} ({cell.mood})', width)}|")
+    lines.append(f"  |{_fit(f' {rumor_label}: {cell.rumor_heat} ({_band_label(cell.rumor_heat_band)})', width)}|")
+
+
 def render_location_detail(
     info: MapRenderInfo,
     location_id: str,
@@ -59,23 +82,7 @@ def render_location_detail(
     lines.append(f"  |{_fit(elev_line, width)}|")
     lines.append(border)
 
-    safety_label = tr("map_safety")
-    danger_label = tr("map_danger")
-    traffic_label = tr("map_traffic")
-    pop_label = tr("map_population")
-    prosperity_label = tr("map_detail_prosperity")
-    mood_label = tr("map_detail_mood")
-    rumor_label = tr("map_detail_rumor_heat")
-
-    lines.append(f"  |{_fit(f' {safety_label}: {cell.safety_label}', width)}|")
-    lines.append(f"  |{_fit(f' {danger_label}: {cell.danger:>3} ({_band_label(cell.danger_band)})', width)}|")
-    lines.append(
-        f"  |{_fit(f' {traffic_label}: {cell.traffic_indicator} ({_band_label(cell.traffic_band)})', width)}|"
-    )
-    lines.append(f"  |{_fit(f' {pop_label}: {cell.population}', width)}|")
-    lines.append(f"  |{_fit(f' {prosperity_label}: {cell.prosperity_label} ({cell.prosperity})', width)}|")
-    lines.append(f"  |{_fit(f' {mood_label}: {cell.mood_label} ({cell.mood})', width)}|")
-    lines.append(f"  |{_fit(f' {rumor_label}: {cell.rumor_heat} ({_band_label(cell.rumor_heat_band)})', width)}|")
+    _append_state_lines(lines, cell, width)
     lines.append(border)
 
     overlay_items: List[str] = []

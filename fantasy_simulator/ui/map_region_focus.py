@@ -156,6 +156,35 @@ def _pick_landmark_target(
     )
 
 
+def _append_control_focus(standout_lines: List[str], center_cell: MapCellInfo) -> None:
+    if not center_cell.controlling_faction_name:
+        return
+    standout_lines.append(
+        tr(
+            "map_region_focus_control",
+            location=center_cell.canonical_name,
+            faction=center_cell.controlling_faction_name,
+        )
+    )
+
+
+def _append_world_change_focus(standout_lines: List[str], world_change_target: Optional[MapCellInfo]) -> None:
+    if world_change_target is None:
+        return
+    category = (
+        world_change_target.recent_world_change_categories[0]
+        if world_change_target.recent_world_change_categories
+        else "world_change"
+    )
+    standout_lines.append(
+        tr(
+            "map_region_focus_world_change",
+            location=world_change_target.canonical_name,
+            category=tr(f"world_change_category_{category}"),
+        )
+    )
+
+
 def region_focus_lines(
     visible_cells: List[MapCellInfo],
     center_cell: MapCellInfo,
@@ -208,20 +237,8 @@ def region_focus_lines(
     if rumor_target is not None:
         standout_lines.append(tr("map_region_focus_rumor", location=rumor_target.canonical_name))
 
-    world_change_target = _pick_world_change_target(visible_cells, center_cell)
-    if world_change_target is not None:
-        category = (
-            world_change_target.recent_world_change_categories[0]
-            if world_change_target.recent_world_change_categories
-            else "world_change"
-        )
-        standout_lines.append(
-            tr(
-                "map_region_focus_world_change",
-                location=world_change_target.canonical_name,
-                category=tr(f"world_change_category_{category}"),
-            )
-        )
+    _append_world_change_focus(standout_lines, _pick_world_change_target(visible_cells, center_cell))
+    _append_control_focus(standout_lines, center_cell)
 
     landmark_target = _pick_landmark_target(
         visible_cells,
