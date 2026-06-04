@@ -15,6 +15,25 @@ from .world_persistence_terrain import (
 from .world_topology_state import restore_serialized_topology
 
 
+_UNSUPPORTED_ERA_RUNTIME_FIELDS = frozenset({
+    "era_key",
+    "civilization_phase",
+    "world_scores",
+    "era_runtime",
+})
+
+
+def _discard_unsupported_era_runtime_fields(data: Dict[str, Any]) -> None:
+    """Drop experimental PR-K era runtime snapshots before hydration.
+
+    In schema v8, canonical event records are the only durable source for
+    era/civilization projections. These fields may appear in experimental
+    payloads, but must not become observable runtime state.
+    """
+    for field_name in _UNSUPPORTED_ERA_RUNTIME_FIELDS:
+        data.pop(field_name, None)
+
+
 def _serialized_location_id_aliases(world: Any, serialized_grid: list[Any]) -> Dict[str, str]:
     """Map serialized location ids to active bundle ids when names still match."""
     aliases: Dict[str, str] = {}
@@ -221,6 +240,7 @@ def hydrate_world_state(
     clone_calendar: Callable[[Any], Any],
 ) -> Any:
     """Hydrate a world instance from serialized state."""
+    _discard_unsupported_era_runtime_fields(data)
     serialized_grid = list(data.get("grid", []))
     bundle_backed_structure = _hydrate_world_bundle_and_grid(world, data, serialized_grid)
     _hydrate_event_records(world, data, world_event_record_cls)

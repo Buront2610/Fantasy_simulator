@@ -82,6 +82,13 @@ work and its serialization guardrails.
   current without rebuilding the full mutation-sensitive event signature on
   every write; location/actor/year/month/kind indexes remain read-side derived
   state and rebuild through `EventHistoryIndex.ensure_current()` when queried.
+- Era runtime snapshot conflict policy.
+  Status: completed for the v8 K0 save/load policy.
+  Evidence: new saves omit world-level era/civilization runtime fields; the
+  hydrator explicitly discards stale `world.era_key`,
+  `world.civilization_phase`, `world.world_scores`, and `world.era_runtime`
+  fields; focused save/load tests prove canonical `event_records` win
+  conflicts and snapshot-only era runtime fields remain unobserved.
 
 ## Remaining Risks
 
@@ -138,7 +145,8 @@ work and its serialization guardrails.
   Guardrail: keep era/civilization projections headless and driven by
   canonical records until a later save policy declares durable runtime fields;
   stale `world.era_key`, `world.civilization_phase`, `world.world_scores`, and
-  `world.era_runtime` snapshot data must not override `world.event_records`.
+  `world.era_runtime` snapshot data are discarded during hydration and must not
+  override `world.event_records`.
   Policy: `docs/adr/0003-era-civilization-runtime-persistence.md`.
 
 ## Current Status
@@ -152,7 +160,8 @@ work and its serialization guardrails.
   lands. Terrain mutation uses the v8-compatible sparse-overlay policy
   documented in the serialization contract, with complete `terrain_map`
   snapshots retained as fallback, while era/civilization runtime fields remain
-  pre-persistence. Route block/reopen, location rename, war declarations, era
+  pre-persistence and are explicitly discarded if stale snapshot fields appear
+  in a payload. Route block/reopen, location rename, war declarations, era
   shifts, and civilization drift now have save/load projection/report contracts
   that rely on canonical records rather than durable runtime fields, while
   their derived local pressure is preserved through ordinary saved location

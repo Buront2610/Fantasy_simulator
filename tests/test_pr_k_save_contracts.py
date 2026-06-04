@@ -353,6 +353,87 @@ def test_save_load_roundtrip_preserves_era_civilization_projection_without_runti
     ]
 
 
+def test_load_discards_conflicting_era_runtime_snapshot_when_canonical_records_exist(tmp_path) -> None:
+    world = World()
+    era_record = world.apply_era_shift(
+        "age_of_reckoning",
+        authored_era_keys={"age_of_embers", "age_of_reckoning"},
+        year=1002,
+        month=1,
+    )
+    drift_record = world.apply_civilization_phase_drift(
+        "crisis",
+        score_deltas={"safety": -10},
+        year=1002,
+        month=2,
+    )
+    path = tmp_path / "pr-k-conflicting-era-runtime.json"
+    assert save_simulation(Simulator(world, seed=0), str(path)) is True
+    with open(path, "r", encoding="utf-8") as handle:
+        payload = json.load(handle)
+    payload["world"].update({
+        "era_key": "stale_age",
+        "civilization_phase": "stable",
+        "world_scores": {"safety": 99},
+        "era_runtime": {
+            "era_key": "snapshot_age",
+            "civilization_phase": "golden_age",
+            "world_scores": {"prosperity": 100},
+        },
+    })
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle)
+
+    restored = load_simulation(str(path))
+
+    assert restored is not None
+    assert not hasattr(restored.world, "era_key")
+    assert not hasattr(restored.world, "civilization_phase")
+    assert not hasattr(restored.world, "world_scores")
+    assert not hasattr(restored.world, "era_runtime")
+    assert not hasattr(restored.world, "_era_runtime")
+    projection = build_era_timeline_projection(event_records=restored.world.event_records)
+    assert [entry.record_id for entry in projection.entries] == [
+        era_record.record_id,
+        drift_record.record_id,
+    ]
+    assert projection.current_era_id == "age_of_reckoning"
+    assert projection.current_civilization_phase == "crisis"
+
+
+def test_load_ignores_era_runtime_snapshot_without_canonical_records(tmp_path) -> None:
+    path = tmp_path / "pr-k-era-runtime-without-records.json"
+    assert save_simulation(Simulator(World(), seed=0), str(path)) is True
+    with open(path, "r", encoding="utf-8") as handle:
+        payload = json.load(handle)
+    payload["world"]["event_records"] = []
+    payload["world"].update({
+        "era_key": "stale_age",
+        "civilization_phase": "golden_age",
+        "world_scores": {"safety": 99},
+        "era_runtime": {
+            "era_key": "snapshot_age",
+            "civilization_phase": "golden_age",
+            "world_scores": {"prosperity": 100},
+        },
+    })
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle)
+
+    restored = load_simulation(str(path))
+
+    assert restored is not None
+    assert not hasattr(restored.world, "era_key")
+    assert not hasattr(restored.world, "civilization_phase")
+    assert not hasattr(restored.world, "world_scores")
+    assert not hasattr(restored.world, "era_runtime")
+    assert not hasattr(restored.world, "_era_runtime")
+    projection = build_era_timeline_projection(event_records=restored.world.event_records)
+    assert projection.entries == ()
+    assert projection.current_era_id is None
+    assert projection.current_civilization_phase is None
+
+
 def test_save_load_full_terrain_snapshot_wins_over_sparse_event_replay(tmp_path) -> None:
     world = World()
     assert world.terrain_map is not None

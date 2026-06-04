@@ -298,7 +298,7 @@ Remaining K0 phases should continue in this order:
 | K0-6 | location rename slice and rename history invariants. Started. |
 | K0-6b | location occupation/control slice and war-map projection. Started; current occupation/control state now reaches the observer dashboard from canonical records. |
 | K0-6c | headless era/civilization transition core and timeline projection. Started, not persisted as runtime fields. |
-| K0-7 | save/migration policy for PR-K dynamic fields. v8 terrain policy set; era runtime pending. |
+| K0-7 | save/migration policy for PR-K dynamic fields. Completed for K0: v8 terrain policy is set, stale experimental era runtime snapshot fields are discarded during hydration, canonical era/civilization records win conflicts, and snapshot-only era runtime fields remain unknown until a future durable schema policy exists. |
 
 K0 era/civilization vocabulary is deliberately fixed in code for now. Later
 bundle-authored rules should introduce a `WorldRuleSet`/`EraRuntimeRules` style
