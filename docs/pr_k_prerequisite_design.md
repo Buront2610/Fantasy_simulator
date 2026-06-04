@@ -257,9 +257,10 @@ they are not a second source of truth.
 
 ## Testing And Fitness Plan
 
-K0-1 records design. Current main has now started the K0 executable guardrail
-slices for route block/reopen, location rename, occupation/control, and
-terrain-cell mutation:
+K0-1 records design. Current main has completed the K0 executable guardrail
+slices for route block/reopen, location rename, occupation/control,
+terrain-cell mutation, headless era/civilization projection, characterization,
+typed-ID ratchet, save policy, and user-visible world-change integration:
 
 - `fantasy_simulator/world_change/` contains the first command, state machine,
   event adapter, ChangeSet, and reducer paths for route block/reopen,
@@ -287,12 +288,12 @@ terrain-cell mutation:
   pre-persistence/headless until its save policy is settled. Same-era phase
   changes are explicit civilization drift commands, not silent era-shift no-ops.
 
-Remaining K0 phases should continue in this order:
+K0 phases completed in this order:
 
 | Phase | Focus |
 |---|---|
-| K0-2 | architecture boundaries, event contracts, legacy-read policy, invariants. |
-| K0-3 | seeded characterization and report/map golden masters. |
+| K0-2 | architecture boundaries, event contracts, legacy-read policy, invariants. Completed for K0; these targets are connected to the standard quality gate and covered by strict gate before PR-K behavior broadens. |
+| K0-3 | seeded characterization and report/map golden masters. Completed for K0; the golden contract pins route block, rename, war, occupation, terrain mutation, era shift, civilization drift, monthly cards, dashboard, report/map projections, and save/load behavior. |
 | K0-4 | typed ID ratchet for location, route, faction, event, era, culture. Completed for K0; command boundaries now share nominal-ID normalization helpers before domain events become canonical records, and culture/faction authoring inspection keys use shared slug-ID normalization while preserving legacy display-name storage. |
 | K0-5 | minimal route block/reopen slice through command, reducer, projection. Completed for K0; currently blocked routes reach the observer dashboard from route-status projections and are covered by report/map/save contracts. |
 | K0-6 | location rename slice and rename history invariants. Completed for K0; natural and explicit renames update stable identity, aliases, history projections, report/map surfaces, and save/load state. |

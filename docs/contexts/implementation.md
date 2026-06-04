@@ -8,7 +8,9 @@ Use this file when the task is primarily about changing code.
 - `docs/architecture.md` is the current guardrail summary.
 - PR-K is the active mainline milestone, but K0 guardrail/contract slices for
   route block/reopen, location rename, occupation/control, terrain-cell
-  mutation, and headless era/civilization projection have already started.
+  mutation, headless era/civilization projection, characterization, typed-ID
+  ratchet, save policy, and user-visible world-change integration are complete
+  for K0.
 - `World.event_records` is canonical; `event_log` and `history` are compatibility layers.
 - Preserve save/load compatibility unless the task explicitly authorizes format changes.
 - Prefer small, test-backed edits over broad refactors.
