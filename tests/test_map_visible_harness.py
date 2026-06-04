@@ -8,6 +8,7 @@ from fantasy_simulator.event_models import WorldEventRecord
 from fantasy_simulator.i18n import get_locale, set_locale
 from fantasy_simulator.persistence.save_load import load_simulation, save_simulation
 from fantasy_simulator.simulator import Simulator
+from fantasy_simulator.ui.map_view_models import build_map_info
 from fantasy_simulator.ui.screens import render_world_map_views_for_location
 from fantasy_simulator.world import World
 from tests.harness_test_utils import build_seeded_world, content_lines
@@ -126,7 +127,7 @@ def _assert_memory_heavy_bundle(bundle: dict[str, list[str]]) -> None:
     assert "      Also known as: The Lantern Vale" in bundle["region"]
     assert "      Memorial: [Year 1001] Here rests Aldric." in bundle["region"]
     assert "      Recent: Lysara passed through at dawn" in bundle["region"]
-    assert "    The Verdant Vale: Memorial, Trace" in bundle["region"]
+    assert "    The Verdant Vale: Memory: Memorial, Trace" in bundle["region"]
 
     assert bundle["detail"][:11] == [
         "  | V The Verdant Vale (village)                     |",
@@ -136,7 +137,7 @@ def _assert_memory_heavy_bundle(bundle: dict[str, list[str]]) -> None:
         "  | Danger:  30 (low)                                |",
         "  | Traffic: + (medium)                              |",
         "  | Pop: 0                                           |",
-        "  | Local cues: Memorial, Trace                      |",
+        "  | Local cues: Memory: Memorial, Trace              |",
         "  | Prosperity: stable (50)                          |",
         "  | Mood: calm (55)                                  |",
         "  | Rumor heat: 20 (low)                             |",
@@ -177,11 +178,11 @@ def test_map_views_surface_authored_local_cues() -> None:
     )
 
     assert "  Local cues:" in rendered["region"]
-    assert "    The Grey Pass: Gate" in rendered["region"]
-    assert "    Silverbrook: Market, River" in rendered["region"]
-    assert "    Aethoria Capital: Gate, Market, Notice board" in rendered["region"]
-    assert "    Sunken Ruins: Accident site" in rendered["region"]
-    assert "  | Local cues: Gate, Market, Notice board           |" in rendered["detail"]
+    assert "    The Grey Pass: Site: Gate" in rendered["region"]
+    assert "    Silverbrook: Site: Market; Terrain: River" in rendered["region"]
+    assert "    Aethoria Capital: Site: Gate, Market, Notice board" in rendered["region"]
+    assert "    Sunken Ruins: Memory: Accident site" in rendered["region"]
+    assert "  | Local cues: Site: Gate, Market, Notice board     |" in rendered["detail"]
 
 
 def test_map_views_surface_runtime_local_cues() -> None:
@@ -215,10 +216,45 @@ def test_map_views_surface_runtime_local_cues() -> None:
     )
 
     assert (
-        "    Aethoria Capital: Gate, Market, Notice board, Memorial, Trace, Blocked route"
+        "    Aethoria Capital: Site: Gate, Market, Notice board; Memory: Memorial, Trace; "
+        "Route: Blocked route"
         in rendered["region"]
     )
-    assert "  | Local cues: Gate, Market, Notice board, Memori...|" in rendered["detail"]
+    assert "  | Local cues: Site: Gate, Market, Notice board; ...|" in rendered["detail"]
+
+
+def test_map_view_model_structures_local_cues_for_filtering() -> None:
+    set_locale("en")
+    world = World()
+    route = next(
+        route for route in world.routes
+        if route.from_site_id == "loc_aethoria_capital" or route.to_site_id == "loc_aethoria_capital"
+    )
+    world.apply_route_blocked_change(route.route_id, True, month=2, day=3)
+    world.add_memorial(
+        "mem_runtime",
+        "char_1",
+        "Aldric",
+        "loc_aethoria_capital",
+        world.year,
+        "death",
+        "Here rests Aldric.",
+    )
+
+    info = build_map_info(world, "loc_aethoria_capital")
+    capital = next(cell for cell in info.cells.values() if cell.location_id == "loc_aethoria_capital")
+
+    assert [
+        (cue.category, cue.tag, cue.label, cue.priority)
+        for cue in capital.local_feature_cues
+    ] == [
+        ("site", "gate", "Gate", 10),
+        ("site", "market", "Market", 20),
+        ("site", "notice_board", "Notice board", 30),
+        ("memory", "memorial", "Memorial", 60),
+        ("memory", "trace", "Trace", 70),
+        ("route", "blocked_route", "Blocked route", 80),
+    ]
 
 
 def test_midyear_save_load_preserves_map_visible_bundle(tmp_path) -> None:

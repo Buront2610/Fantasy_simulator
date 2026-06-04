@@ -808,6 +808,10 @@ TEXT_EN: Dict[str, str] = {
     'map_feature_memorial': 'Memorial',
     'map_feature_trace': 'Trace',
     'map_feature_blocked_route': 'Blocked route',
+    'map_cue_category_site': 'Site',
+    'map_cue_category_terrain': 'Terrain',
+    'map_cue_category_memory': 'Memory',
+    'map_cue_category_route': 'Route',
     # PR-G2+: atlas mode / direct selection / region landmarks
     'atlas_site_list': 'Sites on atlas',
     'map_nav_select': 'Jump to site (direct selection)',

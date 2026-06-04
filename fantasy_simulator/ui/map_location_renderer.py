@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import List, Optional
 
 from ..i18n import tr, tr_term
-from .map_view_models import MapCellInfo, MapRenderInfo
+from .map_view_models import LocalMapCue, MapCellInfo, MapRenderInfo
 from .ui_helpers import fit_display_width
 
 
@@ -15,6 +15,21 @@ def _fit(text: str, width: int) -> str:
 
 def _band_label(band: str) -> str:
     return tr(f"map_band_{band}")
+
+
+_LOCAL_CUE_CATEGORY_ORDER = ("site", "terrain", "memory", "route")
+
+
+def _format_local_cue_groups(cues: List[LocalMapCue]) -> str:
+    groups: dict[str, List[str]] = {category: [] for category in _LOCAL_CUE_CATEGORY_ORDER}
+    for cue in sorted(cues, key=lambda item: item.priority):
+        groups.setdefault(cue.category, []).append(cue.label)
+    parts = []
+    for category in _LOCAL_CUE_CATEGORY_ORDER:
+        labels = groups.get(category, [])
+        if labels:
+            parts.append(f"{tr(f'map_cue_category_{category}')}: {', '.join(labels)}")
+    return "; ".join(parts)
 
 
 def _append_state_lines(lines: List[str], cell: MapCellInfo, width: int) -> None:
@@ -36,8 +51,8 @@ def _append_state_lines(lines: List[str], cell: MapCellInfo, width: int) -> None
     lines.append(f"  |{_fit(f' {pop_label}: {cell.population}', width)}|")
     if cell.controlling_faction_name:
         lines.append(f"  |{_fit(f' {control_label}: {cell.controlling_faction_name}', width)}|")
-    if cell.local_feature_labels:
-        cues = ", ".join(cell.local_feature_labels)
+    if cell.local_feature_cues:
+        cues = _format_local_cue_groups(list(cell.local_feature_cues))
         lines.append(f"  |{_fit(f' {cues_label}: {cues}', width)}|")
     lines.append(f"  |{_fit(f' {prosperity_label}: {cell.prosperity_label} ({cell.prosperity})', width)}|")
     lines.append(f"  |{_fit(f' {mood_label}: {cell.mood_label} ({cell.mood})', width)}|")

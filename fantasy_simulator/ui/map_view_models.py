@@ -16,6 +16,16 @@ if TYPE_CHECKING:
 
 
 @dataclass
+class LocalMapCue:
+    """Structured local map cue for filtering or visual emphasis."""
+
+    tag: str
+    category: str
+    label: str
+    priority: int
+
+
+@dataclass
 class MapCellInfo:
     """Renderer-agnostic snapshot of one map cell."""
 
@@ -58,6 +68,7 @@ class MapCellInfo:
     controlling_faction_name: str = ""
     local_feature_tags: Tuple[str, ...] = ()
     local_feature_labels: Tuple[str, ...] = ()
+    local_feature_cues: Tuple[LocalMapCue, ...] = ()
 
 
 @dataclass
@@ -194,15 +205,15 @@ def _faction_display_name(world: "World", faction_id: str | None) -> str:
     return faction_id
 
 
-_SUPPORTED_LOCAL_FEATURE_TAGS = (
-    "gate",
-    "market",
-    "notice_board",
-    "river",
-    "accident_site",
-    "memorial",
-    "trace",
-    "blocked_route",
+_LOCAL_FEATURE_DEFINITIONS = (
+    ("gate", "site", 10),
+    ("market", "site", 20),
+    ("notice_board", "site", 30),
+    ("river", "terrain", 40),
+    ("accident_site", "memory", 50),
+    ("memorial", "memory", 60),
+    ("trace", "memory", 70),
+    ("blocked_route", "route", 80),
 )
 
 
@@ -233,13 +244,29 @@ def _local_feature_tags(
         values.append("trace")
     if loc.id in blocked_route_site_ids:
         values.append("blocked_route")
-    return tuple(tag for tag in _SUPPORTED_LOCAL_FEATURE_TAGS if tag in values)
+    return tuple(tag for tag, _category, _priority in _LOCAL_FEATURE_DEFINITIONS if tag in values)
 
 
 def _local_feature_labels(feature_tags: Tuple[str, ...]) -> Tuple[str, ...]:
     from ..i18n import tr
 
     return tuple(tr(f"map_feature_{tag}") for tag in feature_tags)
+
+
+def _local_feature_cues(feature_tags: Tuple[str, ...]) -> Tuple[LocalMapCue, ...]:
+    from ..i18n import tr
+
+    tags = set(feature_tags)
+    return tuple(
+        LocalMapCue(
+            tag=tag,
+            category=category,
+            label=tr(f"map_feature_{tag}"),
+            priority=priority,
+        )
+        for tag, category, priority in _LOCAL_FEATURE_DEFINITIONS
+        if tag in tags
+    )
 
 
 def _build_cell_info(
@@ -261,6 +288,7 @@ def _build_cell_info(
         y,
     )
     local_feature_tags = _local_feature_tags(world, loc, terrain_biome, blocked_route_site_ids)
+    local_feature_cues = _local_feature_cues(local_feature_tags)
     return MapCellInfo(
         location_id=loc.id,
         canonical_name=loc.canonical_name,
@@ -301,6 +329,7 @@ def _build_cell_info(
         controlling_faction_name=_faction_display_name(world, loc.controlling_faction_id),
         local_feature_tags=local_feature_tags,
         local_feature_labels=_local_feature_labels(local_feature_tags),
+        local_feature_cues=local_feature_cues,
     )
 
 

@@ -226,7 +226,7 @@ map renderer は最低でも次のモードを持つ。
   - [x]  PR-H1 で summary / closure / danger / rumor / world memory の読解性を強化済み
   - [x]  門 / 市場 / 掲示板 / 河川 / 事故地点を site seed tags と terrain biome から region/detail に表示する first pass
   - [x]  墓碑 / 封鎖道 / live trace を runtime state から region/detail の局所手がかりへ統合する first pass
-  - [ ]  局所手がかりを将来の Textual / Rich 表示でフィルタ・強調できる形へ拡張する
+  - [x]  局所手がかりを category / tag / label / priority を持つ view model cue として構造化し、将来の Textual / Rich 表示でフィルタ・強調できる形へ拡張する
 - [x] 地点詳細図で局所 AA / 準AA と最近の痕跡を接続する
 - [x] world サイズが固定 5×5 でなくても描画できるようにする
 - [x] `wide` / `compact` / `minimal` 表示モードを導入する
