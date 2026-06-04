@@ -724,11 +724,13 @@ python -m fantasy_simulator.content preview-roots bundle.json --language highlan
 
 作業:
 
-- static `SemanticRootDefinition` と `LanguageRootRealization` を追加。
+- static `SemanticRootDefinition` と `LanguageRootRealization` を追加済み。
 - `dark`、`pass`、`river`、`gate`、`ash`、`old`、`sacred`、
-  `market`、`stone` など少数のAethoria rootをseedする。
-- `meaning components -> language roots -> surface` を決定的に生成する。
-- content CLI inspectionを拡張する。
+  `market`、`stone` のAethoria rootをseed済み。
+- `meaning components -> language roots -> surface` を決定的に生成する
+  authoring previewを追加済み。
+- content CLI inspectionと `preview-roots` を拡張済み。
+- 実際のlocation endonym置換や永続etymologyはLG-4へ残す。
 
 ### LG-3: language families
 

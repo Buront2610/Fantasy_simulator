@@ -34,6 +34,19 @@ def test_content_preview_map_and_names_are_nonempty(capsys) -> None:
     names_output = capsys.readouterr().out
     assert "names [" in names_output
 
+    assert main([
+        "preview-roots",
+        str(DEFAULT_AETHORIA_BUNDLE_PATH),
+        "--language",
+        "aethic_common",
+        "--roots",
+        "dark,pass",
+    ]) == 0
+    roots_output = capsys.readouterr().out
+    assert "semantic roots:" in roots_output
+    assert "aethic_common:" in roots_output
+    assert "Blackgap [black, gap]" in roots_output
+
 
 def test_content_preview_map_legend_lists_site_details(capsys) -> None:
     exit_code = main(["preview-map", str(DEFAULT_AETHORIA_BUNDLE_PATH), "--legend"])

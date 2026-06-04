@@ -26,7 +26,12 @@ from .setting_bundle_schema_core import (
     copy_rule_overrides,
     string_list_payload,
 )
-from .setting_bundle_schema_language import LanguageCommunityDefinition, LanguageDefinition
+from .setting_bundle_schema_language import (
+    LanguageCommunityDefinition,
+    LanguageDefinition,
+    LanguageRootRealization,
+    SemanticRootDefinition,
+)
 
 
 @dataclass
@@ -48,6 +53,8 @@ class WorldDefinition:
     naming_rules: NamingRulesDefinition = field(default_factory=NamingRulesDefinition)
     languages: List[LanguageDefinition] = field(default_factory=list)
     language_communities: List[LanguageCommunityDefinition] = field(default_factory=list)
+    semantic_roots: List[SemanticRootDefinition] = field(default_factory=list)
+    language_root_realizations: List[LanguageRootRealization] = field(default_factory=list)
     event_impact_rules: Dict[str, Dict[str, int]] = field(default_factory=dict)
     propagation_rules: Dict[str, Dict[str, Any]] = field(default_factory=dict)
 
@@ -135,6 +142,11 @@ class WorldDefinition:
             "naming_rules": self.naming_rules.to_dict(),
             "languages": [language.to_dict() for language in self.languages],
             "language_communities": [community.to_dict() for community in self.language_communities],
+            "semantic_roots": [root.to_dict() for root in self.semantic_roots],
+            "language_root_realizations": [
+                realization.to_dict()
+                for realization in self.language_root_realizations
+            ],
             "event_impact_rules": {
                 kind: {attr: int(delta) for attr, delta in deltas.items()}
                 for kind, deltas in self.event_impact_rules.items()
@@ -186,6 +198,14 @@ class WorldDefinition:
             language_communities=[
                 LanguageCommunityDefinition.from_dict(item)
                 for item in data.get("language_communities", [])
+            ],
+            semantic_roots=[
+                SemanticRootDefinition.from_dict(item)
+                for item in data.get("semantic_roots", [])
+            ],
+            language_root_realizations=[
+                LanguageRootRealization.from_dict(item)
+                for item in data.get("language_root_realizations", [])
             ],
             event_impact_rules=copy_rule_overrides(
                 data.get("event_impact_rules", {}),

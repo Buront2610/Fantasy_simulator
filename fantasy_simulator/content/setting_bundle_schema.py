@@ -27,6 +27,8 @@ from .setting_bundle_schema_core import (
 from .setting_bundle_schema_language import (
     LanguageCommunityDefinition,
     LanguageDefinition,
+    LanguageRootRealization,
+    SemanticRootDefinition,
 )
 from .setting_bundle_schema_world import SettingBundle, WorldDefinition
 
@@ -37,9 +39,11 @@ __all__ = [
     "JobDefinition",
     "LanguageCommunityDefinition",
     "LanguageDefinition",
+    "LanguageRootRealization",
     "NamingRulesDefinition",
     "RaceDefinition",
     "RouteSeedDefinition",
+    "SemanticRootDefinition",
     "SettingBundle",
     "SiteSeedDefinition",
     "WorldDefinition",

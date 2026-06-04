@@ -189,3 +189,66 @@ class LanguageCommunityDefinition:
             priority=int(data.get("priority", 0)),
             is_lingua_franca=bool(data.get("is_lingua_franca", False)),
         )
+
+
+@dataclass(frozen=True)
+class SemanticRootDefinition:
+    """Shared semantic meaning used by authored or generated toponyms."""
+
+    root_key: str
+    meaning_key: str
+    gloss_en: str
+    gloss_ja: str = ""
+    semantic_tags: List[str] = field(default_factory=list)
+    allowed_roles: List[str] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "root_key": self.root_key,
+            "meaning_key": self.meaning_key,
+            "gloss_en": self.gloss_en,
+            "gloss_ja": self.gloss_ja,
+            "semantic_tags": list(self.semantic_tags),
+            "allowed_roles": list(self.allowed_roles),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SemanticRootDefinition":
+        return cls(
+            root_key=data["root_key"],
+            meaning_key=data.get("meaning_key", data["root_key"]),
+            gloss_en=data.get("gloss_en", data["root_key"]),
+            gloss_ja=data.get("gloss_ja", ""),
+            semantic_tags=string_list_payload(data.get("semantic_tags", []), field_name="semantic_tags"),
+            allowed_roles=string_list_payload(data.get("allowed_roles", []), field_name="allowed_roles"),
+        )
+
+
+@dataclass(frozen=True)
+class LanguageRootRealization:
+    """Language-specific surface form for one shared semantic root."""
+
+    language_key: str
+    root_key: str
+    surface: str
+    archaic_surface: str = ""
+    notes: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "language_key": self.language_key,
+            "root_key": self.root_key,
+            "surface": self.surface,
+            "archaic_surface": self.archaic_surface,
+            "notes": self.notes,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "LanguageRootRealization":
+        return cls(
+            language_key=data["language_key"],
+            root_key=data["root_key"],
+            surface=data["surface"],
+            archaic_surface=data.get("archaic_surface", ""),
+            notes=data.get("notes", ""),
+        )

@@ -13,9 +13,11 @@ from fantasy_simulator.content.setting_bundle import (
     JobDefinition,
     LanguageCommunityDefinition,
     LanguageDefinition,
+    LanguageRootRealization,
     NamingRulesDefinition,
     RaceDefinition,
     RouteSeedDefinition,
+    SemanticRootDefinition,
     SettingBundle,
     SettingEntryInspection,
     SiteSeedDefinition,
@@ -39,9 +41,11 @@ def test_setting_bundle_facade_supports_public_from_import_contract():
         "JobDefinition",
         "LanguageCommunityDefinition",
         "LanguageDefinition",
+        "LanguageRootRealization",
         "NamingRulesDefinition",
         "RaceDefinition",
         "RouteSeedDefinition",
+        "SemanticRootDefinition",
         "SettingBundle",
         "SettingBundleAuthoringSummary",
         "SettingEntryInspection",
@@ -61,7 +65,8 @@ def test_setting_bundle_facade_supports_public_from_import_contract():
         "from fantasy_simulator.content.setting_bundle import ("
         "CalendarDefinition, CalendarMonthDefinition, DEFAULT_AETHORIA_BUNDLE_PATH, "
         "GlossaryEntryDefinition, JobDefinition, LanguageCommunityDefinition, LanguageDefinition, "
-        "NamingRulesDefinition, RaceDefinition, RouteSeedDefinition, SettingBundle, "
+        "LanguageRootRealization, NamingRulesDefinition, RaceDefinition, RouteSeedDefinition, "
+        "SemanticRootDefinition, SettingBundle, "
         "SettingBundleAuthoringSummary, SettingEntryInspection, SiteSeedDefinition, WorldDefinition, "
         "build_setting_bundle_authoring_summary, bundle_from_dict_validated, default_aethoria_bundle, "
         "default_calendar_definition, legacy_location_id_alias, load_setting_bundle, "
@@ -82,6 +87,8 @@ def test_setting_bundle_facade_supports_public_from_import_contract():
     assert namespace["CalendarDefinition"] is schema.CalendarDefinition
     assert namespace["SettingBundle"] is schema.SettingBundle
     assert namespace["WorldDefinition"] is schema.WorldDefinition
+    assert namespace["SemanticRootDefinition"] is schema.SemanticRootDefinition
+    assert namespace["LanguageRootRealization"] is schema.LanguageRootRealization
     assert namespace["SettingEntryInspection"] is inspection.SettingEntryInspection
     assert namespace["build_setting_bundle_authoring_summary"] is inspection.build_setting_bundle_authoring_summary
     assert namespace["bundle_from_dict_validated"] is loader.bundle_from_dict_validated
@@ -208,6 +215,17 @@ def test_world_definition_round_trip():
                 races=["Skyfolk"],
                 priority=5,
             )
+        ],
+        semantic_roots=[
+            SemanticRootDefinition(
+                root_key="dark",
+                meaning_key="dark",
+                gloss_en="dark",
+                allowed_roles=["modifier"],
+            )
+        ],
+        language_root_realizations=[
+            LanguageRootRealization("child", "dark", "kar"),
         ],
     )
 
@@ -1455,6 +1473,9 @@ def test_bundle_authoring_summary_exposes_region_route_and_language_breakdowns()
     assert summary.site_counts_by_region_type["city"] >= 1
     assert summary.route_counts_by_type["road"] >= 1
     assert "aethic_common" in summary.language_keys
+    assert summary.semantic_root_count >= 9
+    assert summary.language_root_realization_count >= 45
+    assert summary.root_realization_coverage_by_language["aethic_common"] >= 9
     assert "loc_thornwood" in summary.community_keys_by_region
     assert summary.language_community_count == len(bundle.world_definition.language_communities)
     assert summary.site_ids_without_language_key == []
@@ -1531,6 +1552,33 @@ def test_bundle_validation_treats_blank_native_name_as_absent() -> None:
     bundle = bundle_from_dict_validated(payload, source="test bundle")
 
     assert bundle.world_definition.site_seeds[0].native_name == "   "
+
+
+def test_bundle_validation_rejects_unknown_language_root_realization_reference() -> None:
+    payload = {
+        "schema_version": 1,
+        "world_definition": {
+            "world_key": "bad_root_realization",
+            "display_name": "Bad Root Realization",
+            "lore_text": "Malformed",
+            "languages": [
+                {"language_key": "root", "display_name": "Root"},
+            ],
+            "semantic_roots": [
+                {"root_key": "dark", "meaning_key": "dark", "gloss_en": "dark"},
+            ],
+            "language_root_realizations": [
+                {"language_key": "root", "root_key": "missing", "surface": "kar"},
+            ],
+        },
+    }
+
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "unknown semantic root" in str(exc)
+    else:
+        raise AssertionError("Expected unknown semantic root realization to fail fast")
 
 
 def test_bundle_validation_rejects_non_positive_route_distance() -> None:

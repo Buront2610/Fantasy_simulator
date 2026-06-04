@@ -1099,6 +1099,127 @@
         "races": ["Dragonborn"],
         "priority": 15
       }
+    ],
+    "semantic_roots": [
+      {
+        "root_key": "dark",
+        "meaning_key": "dark",
+        "gloss_en": "dark",
+        "gloss_ja": "暗い",
+        "semantic_tags": ["shadow", "color"],
+        "allowed_roles": ["modifier"]
+      },
+      {
+        "root_key": "pass",
+        "meaning_key": "pass",
+        "gloss_en": "mountain pass",
+        "gloss_ja": "峠",
+        "semantic_tags": ["route", "mountain"],
+        "allowed_roles": ["head"]
+      },
+      {
+        "root_key": "river",
+        "meaning_key": "river",
+        "gloss_en": "river",
+        "gloss_ja": "川",
+        "semantic_tags": ["water"],
+        "allowed_roles": ["head"]
+      },
+      {
+        "root_key": "gate",
+        "meaning_key": "gate",
+        "gloss_en": "gate",
+        "gloss_ja": "門",
+        "semantic_tags": ["settlement", "border"],
+        "allowed_roles": ["head"]
+      },
+      {
+        "root_key": "ash",
+        "meaning_key": "ash",
+        "gloss_en": "ash",
+        "gloss_ja": "灰",
+        "semantic_tags": ["fire", "ruin"],
+        "allowed_roles": ["modifier", "head"]
+      },
+      {
+        "root_key": "old",
+        "meaning_key": "old",
+        "gloss_en": "old",
+        "gloss_ja": "古い",
+        "semantic_tags": ["time"],
+        "allowed_roles": ["modifier"]
+      },
+      {
+        "root_key": "sacred",
+        "meaning_key": "sacred",
+        "gloss_en": "sacred",
+        "gloss_ja": "聖なる",
+        "semantic_tags": ["religion"],
+        "allowed_roles": ["modifier"]
+      },
+      {
+        "root_key": "market",
+        "meaning_key": "market",
+        "gloss_en": "market",
+        "gloss_ja": "市場",
+        "semantic_tags": ["trade", "settlement"],
+        "allowed_roles": ["head"]
+      },
+      {
+        "root_key": "stone",
+        "meaning_key": "stone",
+        "gloss_en": "stone",
+        "gloss_ja": "石",
+        "semantic_tags": ["earth", "material"],
+        "allowed_roles": ["modifier", "head"]
+      }
+    ],
+    "language_root_realizations": [
+      {"language_key": "aethic_common", "root_key": "dark", "surface": "black"},
+      {"language_key": "aethic_common", "root_key": "pass", "surface": "gap"},
+      {"language_key": "aethic_common", "root_key": "river", "surface": "brook"},
+      {"language_key": "aethic_common", "root_key": "gate", "surface": "gate"},
+      {"language_key": "aethic_common", "root_key": "ash", "surface": "ash"},
+      {"language_key": "aethic_common", "root_key": "old", "surface": "eld"},
+      {"language_key": "aethic_common", "root_key": "sacred", "surface": "saint"},
+      {"language_key": "aethic_common", "root_key": "market", "surface": "wick"},
+      {"language_key": "aethic_common", "root_key": "stone", "surface": "stone"},
+      {"language_key": "sindral", "root_key": "dark", "surface": "du"},
+      {"language_key": "sindral", "root_key": "pass", "surface": "thal"},
+      {"language_key": "sindral", "root_key": "river", "surface": "lin"},
+      {"language_key": "sindral", "root_key": "gate", "surface": "dor"},
+      {"language_key": "sindral", "root_key": "ash", "surface": "ael"},
+      {"language_key": "sindral", "root_key": "old", "surface": "hen"},
+      {"language_key": "sindral", "root_key": "sacred", "surface": "sil"},
+      {"language_key": "sindral", "root_key": "market", "surface": "bryn"},
+      {"language_key": "sindral", "root_key": "stone", "surface": "car"},
+      {"language_key": "khazic", "root_key": "dark", "surface": "grim"},
+      {"language_key": "khazic", "root_key": "pass", "surface": "kar"},
+      {"language_key": "khazic", "root_key": "river", "surface": "dur"},
+      {"language_key": "khazic", "root_key": "gate", "surface": "bar"},
+      {"language_key": "khazic", "root_key": "ash", "surface": "zul"},
+      {"language_key": "khazic", "root_key": "old", "surface": "kaz"},
+      {"language_key": "khazic", "root_key": "sacred", "surface": "thor"},
+      {"language_key": "khazic", "root_key": "market", "surface": "dum"},
+      {"language_key": "khazic", "root_key": "stone", "surface": "gran"},
+      {"language_key": "orcish_steppe", "root_key": "dark", "surface": "mok"},
+      {"language_key": "orcish_steppe", "root_key": "pass", "surface": "gar"},
+      {"language_key": "orcish_steppe", "root_key": "river", "surface": "ur"},
+      {"language_key": "orcish_steppe", "root_key": "gate", "surface": "krag"},
+      {"language_key": "orcish_steppe", "root_key": "ash", "surface": "zug"},
+      {"language_key": "orcish_steppe", "root_key": "old", "surface": "gor"},
+      {"language_key": "orcish_steppe", "root_key": "sacred", "surface": "tur"},
+      {"language_key": "orcish_steppe", "root_key": "market", "surface": "maw"},
+      {"language_key": "orcish_steppe", "root_key": "stone", "surface": "tak"},
+      {"language_key": "quenic", "root_key": "dark", "surface": "dhel"},
+      {"language_key": "quenic", "root_key": "pass", "surface": "nor"},
+      {"language_key": "quenic", "root_key": "river", "surface": "riel"},
+      {"language_key": "quenic", "root_key": "gate", "surface": "var"},
+      {"language_key": "quenic", "root_key": "ash", "surface": "sere"},
+      {"language_key": "quenic", "root_key": "old", "surface": "lume"},
+      {"language_key": "quenic", "root_key": "sacred", "surface": "cel"},
+      {"language_key": "quenic", "root_key": "market", "surface": "nare"},
+      {"language_key": "quenic", "root_key": "stone", "surface": "ril"}
     ]
   }
 }
