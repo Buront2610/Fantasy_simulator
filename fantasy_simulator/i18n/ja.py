@@ -659,6 +659,7 @@ TEXT_JA: Dict[str, str] = {
     'dashboard_current_occupations': '現在の支配',
     'dashboard_active_wars': '進行中の戦争',
     'dashboard_authored_active_war': '{aggressor_faction_id} と {target_faction_id} は開戦状態にある。',
+    'dashboard_initial_site_control': '{location_id} は {controlling_faction_id} の支配下にある。',
     'dashboard_world_changes': '世界変化',
     'dashboard_recent_world_changes': '最近の世界変化',
     'dashboard_follow_up': '次の確認',

@@ -108,6 +108,46 @@ def test_war_map_projection_reads_authored_initial_wars_and_event_endings() -> N
     assert projection.events[0].record_id == "rec_end"
 
 
+def test_war_map_projection_reads_seeded_current_location_control() -> None:
+    world = World()
+
+    projection = build_war_map_projection(
+        event_records=[],
+        current_locations=world.grid.values(),
+    )
+
+    seeded = {
+        entry.location_id: entry
+        for entry in projection.current_occupations
+    }
+    assert seeded["loc_aethoria_capital"].record_id == "state:location_control:loc_aethoria_capital"
+    assert seeded["loc_aethoria_capital"].controlling_faction_id == "aethorian_crown_council"
+    assert seeded["loc_aethoria_capital"].status == "controlled"
+    assert "loc_aethoria_capital" in projection.affected_location_ids
+    assert "aethorian_crown_council" in projection.faction_ids
+
+
+def test_war_map_projection_lets_canonical_records_override_seeded_control() -> None:
+    world = World()
+    released = world.apply_controlling_faction_change("loc_aethoria_capital", None, month=2)
+    occupied = world.apply_controlling_faction_change("loc_silverbrook", "stormwatch_wardens", month=3)
+
+    projection = build_war_map_projection(
+        event_records=world.event_records,
+        current_locations=world.grid.values(),
+    )
+
+    assert released is not None
+    assert occupied is not None
+    current_by_location = {
+        entry.location_id: entry
+        for entry in projection.current_occupations
+    }
+    assert "loc_aethoria_capital" not in current_by_location
+    assert current_by_location["loc_silverbrook"].record_id == occupied.record_id
+    assert current_by_location["loc_silverbrook"].controlling_faction_id == "stormwatch_wardens"
+
+
 def test_war_map_projection_derives_occupation_from_location_impact() -> None:
     record = WorldEventRecord(
         record_id="rec_impact_occupation",

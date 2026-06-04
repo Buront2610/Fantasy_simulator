@@ -321,7 +321,10 @@ against normalized authored faction inspection keys and hydrate new worlds
 without creating synthetic canonical occupation records. Later
 `location_faction_changed` records still remain the canonical history for
 runtime control changes, and existing runtime snapshots continue to win when a
-world is loaded or refreshed.
+world is loaded or refreshed. War/occupation projections can accept current
+location state as an optional baseline input, then let canonical occupation
+records override that seed so releases and later control changes remain
+history-driven.
 
 Fitness functions should eventually guard:
 

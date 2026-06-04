@@ -44,7 +44,7 @@ class WarMapEventEntry:
 
 @dataclass(frozen=True)
 class OccupationEntry:
-    """A location control state transition derived only from event history."""
+    """A location control state transition or seeded current control state."""
 
     record_id: str
     location_id: str
@@ -286,8 +286,9 @@ def build_war_map_projection(
     *,
     event_records: Iterable[WorldEventRecord],
     faction_relationships: Iterable[Any] = (),
+    current_locations: Iterable[Any] = (),
 ) -> WarMapProjection:
-    """Build a war/occupation read model using only canonical event records."""
+    """Build a war/occupation read model from authored baselines and canonical records."""
     events: list[WarMapEventEntry] = []
     occupation_history: list[OccupationEntry] = []
     current_by_location: dict[str, OccupationEntry] = {}
@@ -298,6 +299,12 @@ def build_war_map_projection(
     _seed_authored_war_relationships(
         faction_relationships,
         active_wars_by_pair=active_wars_by_pair,
+        affected_location_ids=affected_location_ids,
+        faction_ids=faction_ids,
+    )
+    _seed_current_location_controls(
+        current_locations,
+        current_by_location=current_by_location,
         affected_location_ids=affected_location_ids,
         faction_ids=faction_ids,
     )
@@ -322,6 +329,47 @@ def build_war_map_projection(
         active_wars=tuple(active_wars_by_pair[pair] for pair in sorted(active_wars_by_pair)),
         affected_location_ids=tuple(affected_location_ids),
         faction_ids=tuple(faction_ids),
+    )
+
+
+def _seed_current_location_controls(
+    current_locations: Iterable[Any],
+    *,
+    current_by_location: dict[str, OccupationEntry],
+    affected_location_ids: list[str],
+    faction_ids: list[str],
+) -> None:
+    for location in current_locations:
+        entry = _current_location_control_entry(location)
+        if entry is None:
+            continue
+        current_by_location[entry.location_id] = entry
+        _append_unique(affected_location_ids, entry.location_id)
+        _append_unique(faction_ids, entry.controlling_faction_id)
+
+
+def _current_location_control_entry(location: Any) -> OccupationEntry | None:
+    location_id = str(getattr(location, "id", "")).strip()
+    faction_id = str(getattr(location, "controlling_faction_id", "") or "").strip()
+    if not location_id or not faction_id:
+        return None
+    record_id = f"state:location_control:{location_id}"
+    description = f"{location_id} is controlled by {faction_id}."
+    return OccupationEntry(
+        record_id=record_id,
+        location_id=location_id,
+        previous_faction_id=None,
+        controlling_faction_id=faction_id,
+        year=0,
+        month=0,
+        day=0,
+        status="controlled",
+        description=description,
+        summary_key="dashboard_initial_site_control",
+        render_params={
+            "location_id": location_id,
+            "controlling_faction_id": faction_id,
+        },
     )
 
 
