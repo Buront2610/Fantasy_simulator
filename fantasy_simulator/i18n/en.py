@@ -785,6 +785,8 @@ TEXT_EN: Dict[str, str] = {
     'map_detail_control': 'Control',
     'map_detail_local_cues': 'Local cues',
     'map_detail_markers': 'Markers',
+    'map_detail_followup_prompt': 'Location follow-up',
+    'map_detail_followup_location_history': 'Open location history',
     'map_detail_elevation': 'Elev',
     'map_detail_moisture': 'Moist',
     'map_detail_temperature': 'Temp',

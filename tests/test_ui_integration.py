@@ -290,6 +290,33 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         self.assertIn("Sites with Memory cues", out.text)
         self.assertIn("Accident site", out.text)
 
+    def test_world_map_detail_can_follow_up_to_location_history(self) -> None:
+        from fantasy_simulator.ui.screens import _show_results, _build_default_world
+
+        world = _build_default_world(num_characters=4, seed=42)
+        world.add_live_trace(
+            "loc_aethoria_capital",
+            1001,
+            "Scout",
+            "A scout marked this gate after sunset.",
+        )
+        from fantasy_simulator.simulator import Simulator
+        sim = Simulator(world, events_per_year=2)
+        sim.advance_years(1)
+
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(
+            answers=["1"],
+            menu_keys=["world_map", "detail", "location_history", "back_to_main", "back_to_main"],
+        )
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_results(sim, ctx=ctx)
+
+        self.assertIn("Location follow-up", out.text)
+        self.assertIn("LOCATION DETAIL - Aethoria Capital", out.text)
+        self.assertIn("A scout marked this gate after sunset.", out.text)
+
     def test_world_map_uses_panel_when_backend_supports_it(self) -> None:
         from fantasy_simulator.ui.screens import _show_results, _build_default_world
 

@@ -9,6 +9,7 @@ from ..i18n import tr, tr_term
 from ..simulator import Simulator
 from ..world import World
 from .screen_input import _get_numeric_choice
+from .screen_history import _show_location_history_for_location
 from .screen_map_payloads import (
     _render_location_detail_for_location,
     _render_region_map_for_location,
@@ -25,7 +26,6 @@ def _show_detail_for_location(
     """Render the detail panel for a single location."""
     ctx = _default_ctx(ctx)
     out = ctx.out
-    inp = ctx.inp
     out.print_line()
     out.print_line(
         _render_location_detail_for_location(
@@ -35,7 +35,15 @@ def _show_detail_for_location(
             include_observation_notes=True,
         )
     )
-    inp.pause()
+    action = ctx.choose_key(
+        tr("map_detail_followup_prompt"),
+        [
+            ("location_history", tr("map_detail_followup_location_history")),
+            ("back", tr("back_to_main")),
+        ],
+    )
+    if action == "location_history":
+        _show_location_history_for_location(world, loc, ctx=ctx)
 
 
 def _visible_locations(world: World, info: Any, center_loc: Any, radius: int = 2) -> list[Any]:

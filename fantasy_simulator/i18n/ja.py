@@ -775,6 +775,8 @@ TEXT_JA: Dict[str, str] = {
     'map_detail_control': '支配',
     'map_detail_local_cues': '局所手がかり',
     'map_detail_markers': 'マーカー',
+    'map_detail_followup_prompt': '地点フォローアップ',
+    'map_detail_followup_location_history': '地点の歴史を開く',
     'map_detail_elevation': '標高',
     'map_detail_moisture': '湿度',
     'map_detail_temperature': '気温',

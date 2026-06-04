@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from ..i18n import tr, tr_term
 from ..simulator import Simulator
 from ..world import World
@@ -135,7 +137,14 @@ def _show_location_history(world: World, ctx: UIContext | None = None) -> None:
     if idx is None:
         return
 
-    loc = locations[idx]
+    _show_location_history_for_location(world, locations[idx], ctx=ctx)
+
+
+def _show_location_history_for_location(world: World, loc: Any, ctx: UIContext | None = None) -> None:
+    """Show live traces, memorials, and aliases for one already-selected location."""
+    ctx = _default_ctx(ctx)
+    out = ctx.out
+
     observation = build_location_observation_view(world, loc.id)
     out.print_line()
     out.print_separator()
