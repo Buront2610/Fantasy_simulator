@@ -191,6 +191,27 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         self.assertIn("Semantic legend", out.text)
         self.assertIn("Keys:", out.text)
 
+    def test_world_map_can_browse_sites_by_local_cue_category(self) -> None:
+        from fantasy_simulator.ui.screens import _show_results, _build_default_world
+
+        world = _build_default_world(num_characters=4, seed=42)
+        from fantasy_simulator.simulator import Simulator
+        sim = Simulator(world, events_per_year=2)
+        sim.advance_years(1)
+
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(
+            answers=["1"],
+            menu_keys=["world_map", "cue", "memory", "back_to_main", "back_to_main"],
+        )
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_results(sim, ctx=ctx)
+
+        self.assertIn("Local cue category", out.text)
+        self.assertIn("Sites with Memory cues", out.text)
+        self.assertIn("Accident site", out.text)
+
     def test_world_map_uses_panel_when_backend_supports_it(self) -> None:
         from fantasy_simulator.ui.screens import _show_results, _build_default_world
 
