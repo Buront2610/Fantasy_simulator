@@ -8,6 +8,7 @@ from fantasy_simulator.event_models import WorldEventRecord
 from fantasy_simulator.i18n import get_locale, set_locale
 from fantasy_simulator.persistence.save_load import load_simulation, save_simulation
 from fantasy_simulator.simulator import Simulator
+from fantasy_simulator.ui.ui_helpers import display_width
 from fantasy_simulator.ui.map_view_models import build_map_info
 from fantasy_simulator.ui.screens import render_world_map_views_for_location
 from fantasy_simulator.world import World
@@ -80,6 +81,21 @@ def _capture_memory_heavy_bundle(locale: str) -> dict[str, list[str]]:
     set_locale(locale)
     sim = Simulator(_build_memory_heavy_world(), events_per_year=0, adventure_steps_per_year=0, seed=99)
     return _memory_heavy_bundle_for_sim(sim)
+
+
+def _capture_rendered_map_views(locale: str) -> dict[str, str]:
+    set_locale(locale)
+    sim = Simulator(build_seeded_world(7), events_per_year=4, adventure_steps_per_year=2, seed=99)
+    sim.advance_months(24)
+    return render_world_map_views_for_location(sim.world, TARGET_LOCATION_ID)
+
+
+def _boxed_detail_widths(detail: str) -> set[int]:
+    return {
+        display_width(line)
+        for line in detail.splitlines()
+        if line.startswith("  |") or line.startswith("  +")
+    }
 
 
 @pytest.fixture(autouse=True)
@@ -203,6 +219,18 @@ def test_seeded_map_visible_bundle_matches_expected_contract() -> None:
 
 def test_memory_heavy_bundle_matches_expected_contract() -> None:
     _assert_memory_heavy_bundle(_capture_memory_heavy_bundle("en"))
+
+
+@pytest.mark.parametrize("locale", ["en", "ja"])
+def test_map_views_keep_display_width_budgets_across_locales(locale: str) -> None:
+    rendered = _capture_rendered_map_views(locale)
+
+    assert {name: max(display_width(line) for line in text.splitlines()) for name, text in rendered.items()} == {
+        "region": 58 if locale == "en" else 57,
+        "detail": 54,
+        "overview": 57 if locale == "en" else 49,
+    }
+    assert _boxed_detail_widths(rendered["detail"]) == {54}
 
 
 def test_map_views_surface_current_location_control() -> None:

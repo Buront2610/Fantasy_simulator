@@ -265,7 +265,8 @@ map renderer は最低でも次のモードを持つ。
 - [x] region map の summary / closure / danger / rumor / world memory の focused テストを追加する
 - [x] region / atlas の一部画面について snapshot-style テストを追加する
 - [x] `compact` / `minimal` 表示について EN / JA の表示幅 budget 検証を追加する
-- [ ] 日本語英語混在時のセンタリング、表幅、AA 罫線が崩れないことを確認する包括的な幅崩れテストを拡張する
+- [x] 日本語英語混在時のセンタリング、表幅、AA 罫線が崩れないことを確認する包括的な幅崩れテストを拡張する
+  - [x] overview / region / detail の EN / JA 表示幅 budget と、地点詳細 AA 罫線幅の一致を snapshot harness で固定する
 - [ ] メインメニュー、ワールドマップ、月報、キャラクター一覧など主要画面全体の文字出力スナップショット比較テストを追加する
 - [ ] `WorldEventRecord` から期待するパネル・レポート・通知カードが生成されることを確認するイベント表示テストを追加する
 - [x] 端末幅に応じて `compact` / `minimal` 表示へ自動的に切り替える統合テストを追加する（PR-H2）
