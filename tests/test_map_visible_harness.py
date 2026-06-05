@@ -117,13 +117,17 @@ def _assert_seeded_map_visible_bundle(bundle: dict[str, list[str]]) -> None:
         "    3|DDHMD|",
         "    4|SS@OC|",
     ]
-    assert bundle["region"][5:11] == [
+    assert bundle["region"][5:15] == [
         "  Route sketch:",
-        "    |o---o---C---D---o|",
-        "    |^   |   |   |   ||",
-        "    |o^^^o---C---D---C|",
-        "    |^   |   |   |   ||",
-        "    |o---o---@---D---C|",
+        "    |            ###            |",
+        "    | o-----o----#C#----D-----o |",
+        "    | ^     |    #=#    |     | |",
+        "    | ^     |    ###    |    ###|",
+        "    | o^^^^^o----#C#----D----#C#|",
+        "    | ^     |    #=#    |    #=#|",
+        "    | ^     |     |     |    ###|",
+        "    | o-----o-----@-----D----#C#|",
+        "    |                        #=#|",
     ]
     assert "  Landmarks & World Memory:" in bundle["region"]
     assert any("Native name: Branthethal" in line for line in bundle["region"])
@@ -279,6 +283,21 @@ def test_location_detail_uses_larger_city_site_sketch() -> None:
     assert "  |  |            \\             /--D |               |" in detail
     assert "  |  |            ---@---            |               |" in detail
     assert "  | Sketch cues: G=Gate / $=Market / B=Notice board  |" in detail
+
+
+def test_region_route_sketch_renders_cities_as_blocks() -> None:
+    set_locale("en")
+    rendered = render_world_map_views_for_location(
+        World(),
+        "loc_the_verdant_vale",
+        include_overview=False,
+    )
+
+    route_sketch = rendered["region"].split("  What stands out here:", maxsplit=1)[0]
+    assert "    | o-----o----#C#----D-----o |" in route_sketch
+    assert "    | o^^^^^o----#C#----D----#C#|" in route_sketch
+    assert "    | o-----o-----@-----D----#C#|" in route_sketch
+    assert "o---o---C---D---C" not in route_sketch
 
 
 def test_location_detail_surfaces_name_etymology_preview() -> None:

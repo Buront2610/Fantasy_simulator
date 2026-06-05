@@ -10,8 +10,8 @@ from .map_view_models import MapCellInfo, MapRenderInfo
 
 
 RegionBounds = Tuple[int, int, int, int]
-_REGION_SKETCH_X_STEP = 4
-_REGION_SKETCH_Y_STEP = 2
+_REGION_SKETCH_X_STEP = 6
+_REGION_SKETCH_Y_STEP = 3
 
 
 def find_region_center_cell(info: MapRenderInfo, center_location_id: str) -> Optional[MapCellInfo]:
@@ -92,8 +92,8 @@ def _region_sketch_site_positions(info: MapRenderInfo, bounds: RegionBounds) -> 
     x_min, _x_max, y_min, _y_max = bounds
     return {
         cell.location_id: (
-            (cell.x - x_min) * _REGION_SKETCH_X_STEP,
-            (cell.y - y_min) * _REGION_SKETCH_Y_STEP,
+            (cell.x - x_min) * _REGION_SKETCH_X_STEP + 1,
+            (cell.y - y_min) * _REGION_SKETCH_Y_STEP + 1,
         )
         for cell in info.cells.values()
         if bounds[0] <= cell.x <= bounds[1] and bounds[2] <= cell.y <= bounds[3]
@@ -128,7 +128,7 @@ def _paint_region_sketch_routes(
     canvas: List[List[str]],
     info: MapRenderInfo,
     site_positions: Dict[str, Tuple[int, int]],
-    protected: Set[Tuple[int, int]],
+    protected_centers: Set[Tuple[int, int]],
 ) -> None:
     height = len(canvas)
     width = len(canvas[0]) if canvas else 0
@@ -139,7 +139,7 @@ def _paint_region_sketch_routes(
             continue
         path = _bresenham(fp[0], fp[1], tp[0], tp[1])
         for index, (px, py) in enumerate(path):
-            if (px, py) in protected or not (0 <= px < width and 0 <= py < height):
+            if (px, py) in protected_centers or not (0 <= px < width and 0 <= py < height):
                 continue
             ddx, ddy = _region_sketch_step_delta(path, index)
             canvas[py][px] = _region_sketch_route_char(route.route_type, route.blocked, ddx, ddy)
@@ -157,6 +157,29 @@ def _region_sketch_site_marker(cell: MapCellInfo, center_location_id: str) -> st
     return "o"
 
 
+def _paint_city_block(
+    canvas: List[List[str]],
+    x: int,
+    y: int,
+    marker: str,
+) -> None:
+    height = len(canvas)
+    width = len(canvas[0]) if canvas else 0
+    rows = (
+        "###",
+        f"#{marker}#",
+        "#=#",
+    )
+    for dy, row in enumerate(rows, start=-1):
+        py = y + dy
+        if not (0 <= py < height):
+            continue
+        for dx, ch in enumerate(row, start=-1):
+            px = x + dx
+            if 0 <= px < width:
+                canvas[py][px] = ch
+
+
 def _paint_region_sketch_sites(
     canvas: List[List[str]],
     info: MapRenderInfo,
@@ -165,8 +188,13 @@ def _paint_region_sketch_sites(
 ) -> None:
     for cell in info.cells.values():
         pos = site_positions.get(cell.location_id)
-        if pos:
-            canvas[pos[1]][pos[0]] = _region_sketch_site_marker(cell, center_location_id)
+        if not pos:
+            continue
+        marker = _region_sketch_site_marker(cell, center_location_id)
+        if cell.site_type == "city" or cell.region_type == "city":
+            _paint_city_block(canvas, pos[0], pos[1], marker)
+        else:
+            canvas[pos[1]][pos[0]] = marker
 
 
 def append_region_route_sketch(
@@ -176,8 +204,8 @@ def append_region_route_sketch(
     bounds: RegionBounds,
 ) -> None:
     x_min, x_max, y_min, y_max = bounds
-    width = (x_max - x_min) * _REGION_SKETCH_X_STEP + 1
-    height = (y_max - y_min) * _REGION_SKETCH_Y_STEP + 1
+    width = (x_max - x_min) * _REGION_SKETCH_X_STEP + 3
+    height = (y_max - y_min) * _REGION_SKETCH_Y_STEP + 3
     if width <= 1 or height <= 1:
         return
 
@@ -186,9 +214,9 @@ def append_region_route_sketch(
         return
 
     canvas: List[List[str]] = [[" " for _ in range(width)] for _ in range(height)]
-    protected: Set[Tuple[int, int]] = set(site_positions.values())
+    protected_centers: Set[Tuple[int, int]] = set(site_positions.values())
 
-    _paint_region_sketch_routes(canvas, info, site_positions, protected)
+    _paint_region_sketch_routes(canvas, info, site_positions, protected_centers)
     _paint_region_sketch_sites(canvas, info, site_positions, center_location_id)
 
     lines.append("")

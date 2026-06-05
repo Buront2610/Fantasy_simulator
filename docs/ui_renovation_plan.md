@@ -234,6 +234,7 @@ map renderer は最低でも次のモードを持つ。
   - [x] 都市スケッチを拡大し、門・市場広場・主要街路が読める局所AAへ更新する
   - [x] 地点詳細に局所 route sketch を追加し、接続路をグリッド盤面とは別の放射状進入路として表示する
   - [x] 地域図に拡大 route sketch を追加し、道路をグリッドセル間の連続線として読めるようにする first pass
+  - [x] 地域図の route sketch で都市を 1 文字 marker ではなく 3×3 の街区として描き、道路が街区外縁へ接続するようにする
 - [x] world サイズが固定 5×5 でなくても描画できるようにする
 - [x] `wide` / `compact` / `minimal` 表示モードを導入する
 - [x] `WorldEventRecord` から月報カード用 view model を生成する
