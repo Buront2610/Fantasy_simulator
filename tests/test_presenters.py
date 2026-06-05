@@ -863,6 +863,39 @@ def test_world_dashboard_builds_follow_up_actions_from_observer_attention():
     assert any(item.record_id == blocked.record_id for item in dashboard.follow_up_actions)
 
 
+def test_canonical_world_change_record_feeds_notification_report_and_dashboard_surfaces():
+    set_locale("en")
+    world = World()
+    route = world.routes[0]
+    blocked = world.apply_route_blocked_change(route.route_id, True, year=world.year, month=3, day=2)
+
+    assert blocked is not None
+    expected_text = (
+        f"The route from {world.location_name(route.from_site_id)} "
+        f"to {world.location_name(route.to_site_id)} was blocked."
+    )
+
+    notifications = build_notification_views([blocked], world)
+    assert [(item.kind, item.location_id, item.text) for item in notifications] == [
+        ("route_blocked", route.from_site_id, expected_text),
+    ]
+
+    card = build_monthly_report_card_view(world, world.year, 3)
+    report_lines = ReportPresenter.render_monthly_card(card)
+    assert any(f"World change: {expected_text}" in line for line in report_lines)
+    assert any("World-change threads" in line for line in report_lines)
+    assert any("Route: 1" in line for line in report_lines)
+
+    dashboard = build_world_dashboard_view(world, current_month=3)
+    output = CaptureOutput()
+    _render_world_dashboard(dashboard, ctx=UIContext(inp=NoopInput(), out=output))
+
+    assert dashboard.current_route_closures[0].record_id == blocked.record_id
+    assert dashboard.world_change_entries[0].record_id == blocked.record_id
+    assert any(f"Route: {expected_text}" in line for line in output.lines)
+    assert any(action.record_id == blocked.record_id for action in dashboard.follow_up_actions)
+
+
 def test_monthly_report_card_renders_world_change_category_display_labels():
     set_locale("en")
     world = World()
