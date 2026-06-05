@@ -267,7 +267,8 @@ map renderer は最低でも次のモードを持つ。
 - [x] `compact` / `minimal` 表示について EN / JA の表示幅 budget 検証を追加する
 - [x] 日本語英語混在時のセンタリング、表幅、AA 罫線が崩れないことを確認する包括的な幅崩れテストを拡張する
   - [x] overview / region / detail の EN / JA 表示幅 budget と、地点詳細 AA 罫線幅の一致を snapshot harness で固定する
-- [ ] メインメニュー、ワールドマップ、月報、キャラクター一覧など主要画面全体の文字出力スナップショット比較テストを追加する
+- [x] メインメニュー、ワールドマップ、月報、キャラクター一覧など主要画面全体の文字出力スナップショット比較テストを追加する
+  - [x] monthly report card / character roster / world map screen の screen-level snapshot-style テストを追加する
 - [x] `WorldEventRecord` から期待するパネル・レポート・通知カードが生成されることを確認するイベント表示テストを追加する
   - [x] canonical route-block record が notification view / monthly report card / dashboard route closure・recent world change・follow-up に到達することを固定する
 - [x] 端末幅に応じて `compact` / `minimal` 表示へ自動的に切り替える統合テストを追加する（PR-H2）
