@@ -779,6 +779,7 @@ TEXT_EN: Dict[str, str] = {
     'map_region_focus_world_change': 'World change: {location} changed recently ({category})',
     'map_region_routes': 'Routes from here',
     'map_region_local_cues': 'Local cues',
+    'map_region_detail_grid': 'Region detail',
     'map_region_route_sketch': 'Route sketch',
     'map_region_not_found': 'Location not found: {location}',
     'map_detail_not_found': 'Location not found: {location}',

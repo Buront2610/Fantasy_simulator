@@ -117,7 +117,17 @@ def _assert_seeded_map_visible_bundle(bundle: dict[str, list[str]]) -> None:
         "    3|DDHMD|",
         "    4|SS@OC|",
     ]
-    assert bundle["region"][5:15] == [
+    assert bundle["region"][5:25] == [
+        "  Region detail:",
+        "    |TTTTT,,,,, ### nn/nn,,,,,|",
+        "    |TToTT,,o,, #C# nnDnn,,o,,|",
+        "    |TTTTT,,,,, #=# nn\\nn,,,,,|",
+        "    |^^^^^,,,,, ### nn/nn ### |",
+        "    |^^o^^,,o,, #C# nnDnn #C# |",
+        "    |^^^^^,,,,, #=# nn\\nn #=# |",
+        "    |,,,,,,,,,,,,,,,nn/nn ### |",
+        "    |,,o,,,,o,,,,@,,nnDnn #C# |",
+        "    |,,,,,,,,,,,,,,,nn\\nn #=# |",
         "  Route sketch:",
         "    |            ###            |",
         "    | o-----o----#C#----D-----o |",
@@ -298,6 +308,22 @@ def test_region_route_sketch_renders_cities_as_blocks() -> None:
     assert "    | o^^^^^o----#C#----D----#C#|" in route_sketch
     assert "    | o-----o-----@-----D----#C#|" in route_sketch
     assert "o---o---C---D---C" not in route_sketch
+
+
+def test_region_detail_grid_renders_terrain_and_city_blocks() -> None:
+    set_locale("en")
+    rendered = render_world_map_views_for_location(
+        World(),
+        "loc_the_verdant_vale",
+        include_overview=False,
+    )
+
+    region_detail = rendered["region"].split("  Route sketch:", maxsplit=1)[0]
+    assert "  Region detail:" in region_detail
+    assert "    |TTTTT,,,,, ### nn/nn,,,,,|" in region_detail
+    assert "    |TToTT,,o,, #C# nnDnn,,o,,|" in region_detail
+    assert "    |,,o,,,,o,,,,@,,nnDnn #C# |" in region_detail
+    assert "    4|SS@OC|" in region_detail
 
 
 def test_location_detail_surfaces_name_etymology_preview() -> None:

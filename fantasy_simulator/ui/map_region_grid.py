@@ -12,6 +12,8 @@ from .map_view_models import MapCellInfo, MapRenderInfo
 RegionBounds = Tuple[int, int, int, int]
 _REGION_SKETCH_X_STEP = 6
 _REGION_SKETCH_Y_STEP = 3
+_REGION_DETAIL_CELL_W = 5
+_REGION_DETAIL_CELL_H = 3
 
 
 def find_region_center_cell(info: MapRenderInfo, center_location_id: str) -> Optional[MapCellInfo]:
@@ -197,6 +199,78 @@ def _paint_region_sketch_sites(
             canvas[pos[1]][pos[0]] = marker
 
 
+def _terrain_detail_tile(info: MapRenderInfo, x: int, y: int) -> List[List[str]]:
+    glyph = " "
+    tcell = info.terrain_cells.get((x, y))
+    if tcell is not None:
+        glyph = tcell.glyph
+    return [[glyph for _ in range(_REGION_DETAIL_CELL_W)] for _ in range(_REGION_DETAIL_CELL_H)]
+
+
+def _paint_detail_city(tile: List[List[str]], marker: str) -> None:
+    rows = (
+        " ### ",
+        f" #{marker}# ",
+        " #=# ",
+    )
+    for y, row in enumerate(rows):
+        tile[y] = list(row)
+
+
+def _paint_detail_site(tile: List[List[str]], cell: MapCellInfo, center_location_id: str) -> None:
+    marker = _region_sketch_site_marker(cell, center_location_id)
+    if cell.site_type == "city" or cell.region_type == "city":
+        _paint_detail_city(tile, marker)
+        return
+    if cell.site_type == "dungeon" or cell.region_type == "dungeon":
+        tile[0][2] = "/"
+        tile[1][2] = marker
+        tile[2][2] = "\\"
+        return
+    tile[1][2] = marker
+
+
+def _paint_detail_route(tile: List[List[str]], route_char: str) -> None:
+    if route_char in ("-", "=", "x"):
+        tile[1][1:4] = [route_char, route_char, route_char]
+    elif route_char in ("|", "H"):
+        for y in range(_REGION_DETAIL_CELL_H):
+            tile[y][2] = route_char
+    else:
+        tile[1][2] = route_char
+
+
+def append_region_detail_grid(
+    lines: List[str],
+    info: MapRenderInfo,
+    center_location_id: str,
+    bounds: RegionBounds,
+    route_layer: Dict[Tuple[int, int], str],
+) -> None:
+    x_min, x_max, y_min, y_max = bounds
+    width = (x_max - x_min + 1) * _REGION_DETAIL_CELL_W
+
+    lines.append("")
+    lines.append(f"  {tr('map_region_detail_grid')}:")
+    lines.append("    +" + "-" * width + "+")
+    for y in range(y_min, y_max + 1):
+        rows = ["" for _ in range(_REGION_DETAIL_CELL_H)]
+        for x in range(x_min, x_max + 1):
+            tile = _terrain_detail_tile(info, x, y)
+            cell = info.cells.get((x, y))
+            if cell is not None:
+                _paint_detail_site(tile, cell, center_location_id)
+            else:
+                route_char = route_layer.get((x - x_min, y - y_min))
+                if route_char is not None:
+                    _paint_detail_route(tile, route_char)
+            for row_index, row in enumerate(tile):
+                rows[row_index] += "".join(row)
+        for row in rows:
+            lines.append("    |" + row + "|")
+    lines.append("    +" + "-" * width + "+")
+
+
 def append_region_route_sketch(
     lines: List[str],
     info: MapRenderInfo,
@@ -257,3 +331,4 @@ def append_region_grid(
         lines.append(f"    {y % 10}|{''.join(row_chars)}|")
 
     lines.append(region_border)
+    append_region_detail_grid(lines, info, center_location_id, bounds, route_layer)

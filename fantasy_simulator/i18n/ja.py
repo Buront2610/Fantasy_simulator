@@ -769,6 +769,7 @@ TEXT_JA: Dict[str, str] = {
     'map_region_focus_world_change': '世界変化: {location} で最近変化があった（{category}）',
     'map_region_routes': 'この地点からの道路',
     'map_region_local_cues': '局所手がかり',
+    'map_region_detail_grid': '地域詳細',
     'map_region_route_sketch': '道のスケッチ',
     'map_region_not_found': '地点が見つかりません: {location}',
     'map_detail_not_found': '地点が見つかりません: {location}',
