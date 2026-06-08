@@ -143,7 +143,7 @@ def _assert_seeded_map_visible_bundle(bundle: dict[str, list[str]]) -> None:
     assert any("Native name: Branthethal" in line for line in bundle["region"])
     assert any("Native name: Branthethal" in line for line in bundle["region"])
 
-    assert bundle["detail"][:30] == [
+    assert bundle["detail"][:32] == [
         "  | V The Verdant Vale (village)                     |",
         "  | Local site sketch                                |",
         "  |         _       _          B                     |",
@@ -166,7 +166,9 @@ def _assert_seeded_map_visible_bundle(bundle: dict[str, list[str]]) -> None:
         "  |  +-------------------------------+               |",
         "  | Sketch cues: !=High danger                       |",
         "  | Terrain: plains (,)                              |",
-        "  | Elev:128 Moist:128 Temp:128                      |",
+        "  | Elev: midland (50%)                              |",
+        "  | Moist: balanced (50%)                            |",
+        "  | Temp: temperate (50%)                            |",
         "  | Safety: tense                                    |",
         "  | Danger:  68 (high)                               |",
         "  | Traffic: ++ (medium)                             |",
@@ -187,7 +189,7 @@ def _assert_memory_heavy_bundle(bundle: dict[str, list[str]]) -> None:
     assert "      Recent: Lysara passed through at dawn" in bundle["region"]
     assert "    The Verdant Vale: Memory: Memorial, Trace" in bundle["region"]
 
-    assert bundle["detail"][:31] == [
+    assert bundle["detail"][:33] == [
         "  | V The Verdant Vale (village)                     |",
         "  | Local site sketch                                |",
         "  |         _       _          B                     |",
@@ -210,7 +212,9 @@ def _assert_memory_heavy_bundle(bundle: dict[str, list[str]]) -> None:
         "  |  +-------------------------------+               |",
         "  | Sketch cues: M=Memorial                          |",
         "  | Terrain: plains (,)                              |",
-        "  | Elev:128 Moist:128 Temp:128                      |",
+        "  | Elev: midland (50%)                              |",
+        "  | Moist: balanced (50%)                            |",
+        "  | Temp: temperate (50%)                            |",
         "  | Safety: tense                                    |",
         "  | Danger:  30 (low)                                |",
         "  | Traffic: + (medium)                              |",
@@ -324,6 +328,22 @@ def test_region_detail_grid_renders_terrain_and_city_blocks() -> None:
     assert "    |TToTT,,o,, #C# nnDnn,,o,,|" in region_detail
     assert "    |,,o,,,,o,,,,@,,nnDnn #C# |" in region_detail
     assert "    4|SS@OC|" in region_detail
+
+
+def test_location_detail_formats_terrain_metrics_as_bands_not_raw_values() -> None:
+    set_locale("ja")
+    detail = render_world_map_views_for_location(
+        World(),
+        "loc_aethoria_capital",
+        include_overview=False,
+    )["detail"]
+
+    assert "  | 標高: 中標高 (50%)" in detail
+    assert "  | 湿度: ほどほど (50%)" in detail
+    assert "  | 気温: 温暖 (50%)" in detail
+    assert "標高:128" not in detail
+    assert "湿度:128" not in detail
+    assert "気温:128" not in detail
 
 
 def test_location_detail_surfaces_name_etymology_preview() -> None:

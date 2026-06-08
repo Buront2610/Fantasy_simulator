@@ -18,6 +18,37 @@ def _band_label(band: str) -> str:
     return tr(f"map_band_{band}")
 
 
+def _terrain_percent(value: int) -> int:
+    return round(max(0, min(255, value)) * 100 / 255)
+
+
+def _terrain_value_band(value: int, low_key: str, middle_key: str, high_key: str) -> str:
+    if value < 86:
+        return tr(low_key)
+    if value < 171:
+        return tr(middle_key)
+    return tr(high_key)
+
+
+def _terrain_metric_line(label_key: str, value: int, low_key: str, middle_key: str, high_key: str) -> str:
+    label = tr(label_key)
+    band = _terrain_value_band(value, low_key, middle_key, high_key)
+    return f" {label}: {band} ({_terrain_percent(value)}%)"
+
+
+def _append_terrain_metric(
+    lines: List[str],
+    width: int,
+    label_key: str,
+    value: int,
+    low_key: str,
+    middle_key: str,
+    high_key: str,
+) -> None:
+    metric = _terrain_metric_line(label_key, value, low_key, middle_key, high_key)
+    lines.append(f"  |{_fit(metric, width)}|")
+
+
 _LOCAL_CUE_CATEGORY_ORDER = ("site", "terrain", "memory", "route")
 _DETAIL_ROUTE_SKETCH_WIDTH = 31
 _DETAIL_ROUTE_SKETCH_HEIGHT = 9
@@ -348,15 +379,33 @@ def render_location_detail(
     terrain_label = tr("map_terrain")
     biome_name = tr_term(cell.terrain_biome)
     lines.append(f"  |{_fit(f' {terrain_label}: {biome_name} ({cell.terrain_glyph})', width)}|")
-    elev_label = tr("map_detail_elevation")
-    moist_label = tr("map_detail_moisture")
-    temp_label = tr("map_detail_temperature")
-    elev_line = (
-        f" {elev_label}:{cell.terrain_elevation}"
-        f" {moist_label}:{cell.terrain_moisture}"
-        f" {temp_label}:{cell.terrain_temperature}"
+    _append_terrain_metric(
+        lines,
+        width,
+        'map_detail_elevation',
+        cell.terrain_elevation,
+        'map_elevation_lowland',
+        'map_elevation_midland',
+        'map_elevation_highland',
     )
-    lines.append(f"  |{_fit(elev_line, width)}|")
+    _append_terrain_metric(
+        lines,
+        width,
+        'map_detail_moisture',
+        cell.terrain_moisture,
+        'map_moisture_dry',
+        'map_moisture_balanced',
+        'map_moisture_wet',
+    )
+    _append_terrain_metric(
+        lines,
+        width,
+        'map_detail_temperature',
+        cell.terrain_temperature,
+        'map_temperature_cold',
+        'map_temperature_temperate',
+        'map_temperature_hot',
+    )
     lines.append(border)
 
     _append_state_lines(lines, cell, width)
