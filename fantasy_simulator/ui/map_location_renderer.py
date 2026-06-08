@@ -255,6 +255,40 @@ def _append_site_ascii(lines: List[str], info: MapRenderInfo, cell: MapCellInfo,
     lines.append(border)
 
 
+def _append_terrain_lines(lines: List[str], cell: MapCellInfo, width: int, border: str) -> None:
+    terrain_label = tr("map_terrain")
+    biome_name = tr_term(cell.terrain_biome)
+    lines.append(f"  |{_fit(f' {terrain_label}: {biome_name} ({cell.terrain_glyph})', width)}|")
+    _append_terrain_metric(
+        lines,
+        width,
+        "map_detail_elevation",
+        cell.terrain_elevation,
+        "map_elevation_lowland",
+        "map_elevation_midland",
+        "map_elevation_highland",
+    )
+    _append_terrain_metric(
+        lines,
+        width,
+        "map_detail_moisture",
+        cell.terrain_moisture,
+        "map_moisture_dry",
+        "map_moisture_balanced",
+        "map_moisture_wet",
+    )
+    _append_terrain_metric(
+        lines,
+        width,
+        "map_detail_temperature",
+        cell.terrain_temperature,
+        "map_temperature_cold",
+        "map_temperature_temperate",
+        "map_temperature_hot",
+    )
+    lines.append(border)
+
+
 def _append_state_lines(lines: List[str], cell: MapCellInfo, width: int) -> None:
     safety_label = tr("map_safety")
     danger_label = tr("map_danger")
@@ -376,37 +410,7 @@ def render_location_detail(
     lines.append(border)
     _append_site_ascii(lines, info, cell, width, border)
 
-    terrain_label = tr("map_terrain")
-    biome_name = tr_term(cell.terrain_biome)
-    lines.append(f"  |{_fit(f' {terrain_label}: {biome_name} ({cell.terrain_glyph})', width)}|")
-    _append_terrain_metric(
-        lines,
-        width,
-        'map_detail_elevation',
-        cell.terrain_elevation,
-        'map_elevation_lowland',
-        'map_elevation_midland',
-        'map_elevation_highland',
-    )
-    _append_terrain_metric(
-        lines,
-        width,
-        'map_detail_moisture',
-        cell.terrain_moisture,
-        'map_moisture_dry',
-        'map_moisture_balanced',
-        'map_moisture_wet',
-    )
-    _append_terrain_metric(
-        lines,
-        width,
-        'map_detail_temperature',
-        cell.terrain_temperature,
-        'map_temperature_cold',
-        'map_temperature_temperate',
-        'map_temperature_hot',
-    )
-    lines.append(border)
+    _append_terrain_lines(lines, cell, width, border)
 
     _append_state_lines(lines, cell, width)
     lines.append(border)
