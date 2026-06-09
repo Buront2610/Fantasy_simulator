@@ -231,13 +231,6 @@
         "removal_condition": "Remove when fantasy_simulator/event_models.py::WorldEventRecord fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
-        "target": "fantasy_simulator/events_activity.py::resolve_journey_event",
-        "reason": "Legacy journey resolver combines event selection and narrative consequences.",
-        "max_function_lines": 89,
-        "owner": "architecture-maintainers",
-        "removal_condition": "Remove when fantasy_simulator/events_activity.py::resolve_journey_event fits the default complexity budgets or is split behind a narrower compatibility adapter."
-      },
-      {
         "target": "fantasy_simulator/events_lifecycle.py::check_dying_resolution",
         "reason": "Lifecycle resolver keeps death-staging compatibility until policy extraction.",
         "max_function_lines": 82,
@@ -342,14 +335,6 @@
         "max_function_lines": 89,
         "owner": "architecture-maintainers",
         "removal_condition": "Remove when fantasy_simulator/ui/screen_results.py::_show_results fits the default complexity budgets or is split behind a narrower compatibility adapter."
-      },
-      {
-        "target": "fantasy_simulator/ui/view_models.py::build_monthly_report_card_view",
-        "reason": "View-model bridge preserves current monthly report card shape.",
-        "max_cyclomatic_complexity": 27,
-        "max_cognitive_complexity": 30,
-        "owner": "architecture-maintainers",
-        "removal_condition": "Remove when fantasy_simulator/ui/view_models.py::build_monthly_report_card_view fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/world_memory_api.py::WorldMemoryMixin",

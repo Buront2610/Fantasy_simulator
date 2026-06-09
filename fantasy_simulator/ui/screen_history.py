@@ -11,11 +11,28 @@ from .presenters import LocationPresenter, ReportPresenter
 from .screen_input import _get_numeric_choice
 from .ui_context import UIContext, _default_ctx
 from .view_models import (
+    FollowUpActionView,
     LocationHistoryView,
     build_location_observation_view,
     build_monthly_report_card_view,
     build_yearly_report_card_view,
 )
+
+
+def _open_report_follow_up(sim: Simulator, action: FollowUpActionView, ctx: UIContext) -> None:
+    world = sim.world
+    if action.target_type == "character":
+        character = world.get_character_by_id(action.target_id)
+        if character is not None:
+            _show_character_story(sim, character.char_id, ctx=ctx)
+            return
+    if action.target_type in {"location", "world_change"} and action.location_id:
+        loc = world.get_location_by_id(action.location_id)
+        if loc is not None:
+            _show_location_history_for_location(world, loc, ctx=ctx)
+            return
+    ctx.out.print_dim(f"  {tr('dashboard_follow_up_unavailable')}")
+    ctx.inp.pause()
 
 
 def _month_season_hint(world: World, year: int) -> str:
@@ -51,16 +68,26 @@ def _show_monthly_report(sim: Simulator, ctx: UIContext | None = None) -> None:
     for line in ReportPresenter.render_monthly_card(card):
         out.print_line(f"  {line}")
 
+    follow_up_options = [
+        (f"followup:{index}", item.label)
+        for index, item in enumerate(card.follow_up_actions, 1)
+    ]
     action = ctx.choose_key(
         tr("report_followup_prompt"),
         [
             ("details", tr("report_show_detailed_text")),
+            *follow_up_options,
             ("back", tr("back_to_main")),
         ],
     )
     if action == "details":
         out.print_line()
         out.print_line(sim.get_monthly_report(year, month))
+    elif action.startswith("followup:"):
+        index = int(action.split(":", 1)[1]) - 1
+        if 0 <= index < len(card.follow_up_actions):
+            _open_report_follow_up(sim, card.follow_up_actions[index], ctx)
+            return
     ctx.inp.pause()
 
 

@@ -185,6 +185,21 @@ TEXT_JA: Dict[str, str] = {
     'training_effort_tireless': '手が痛むまでたゆまず鍛え続け',
     'training_effort_scrolls': '古代の巻物を読み込み',
     'training_effort_limits': '限界を越えるまで己を追い込み',
+    'event_story_battle_old_grudge': '古い遺恨がついに表に出た。',
+    'event_story_battle_public_challenge': '人目のある場での挑発が、刃を抜かせた。',
+    'event_story_battle_route_dispute': '街道の通行を巡る争いが、暴力に変わった。',
+    'event_story_discovery_rumor': '酒場で聞いた噂が、{name} をその場所へ向かわせた。',
+    'event_story_discovery_map': '傷んだ地図が、{name} にわずかな手掛かりを与えた。',
+    'event_story_discovery_omen': '{location} 周辺の奇妙な兆しが、{name} を先へ導いた。',
+    'event_story_journey_request': '{destination} からの依頼が、{name} を旅路へ押し出した。',
+    'event_story_journey_weather': '変わり始めた空模様が、{name} に早い決断を迫った。',
+    'event_story_journey_missing_caravan': '行方不明の隊商の噂が、旅に急を告げていた。',
+    'event_story_meeting_shared_task': '共通の用件が、{name1} と {name2} を向き合わせた。',
+    'event_story_meeting_market_tension': '{location} の混み合う通りでは、互いを避ける余地がなかった。',
+    'event_story_meeting_old_story': '古い話に引かれ、{name1} と {name2} は同じ場所へ来ていた。',
+    'event_story_training_deadline': '迫る試練が、その鍛錬に明確な目的を与えていた。',
+    'event_story_training_rival': '好敵手の噂が、{name} の集中を鋭くした。',
+    'event_story_training_failed_attempt': '直近の失敗が、鍛え直す必要を突きつけていた。',
     'meeting_positive': '{name1} と {name2} は {location} で出会い、素晴らしい相性を見せた。（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）',  # noqa: E501
     'meeting_pleasant': '{name1} と {name2} は {location} で気持ちの良い交流をした。（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）',  # noqa: E501
     'meeting_neutral': '{name1} と {name2} は {location} で軽く会釈を交わした。（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）',  # noqa: E501
@@ -347,10 +362,19 @@ TEXT_JA: Dict[str, str] = {
     'events.generic.summary': '{description}',
     'events.battle.summary': '{actor} は {location} で戦った。',
     'events.battle_result.summary': '{winner} は {loser} に勝利した。{injury}',
+    'events.battle_result.summary.narrative': '{story_hook} {winner} は {loser} に勝利した。{injury}',
     'events.battle_fatal.summary': '{winner} は {loser} に勝利したが、{loser} はその戦いを生き延びられなかった。',
+    'events.battle_fatal.summary.narrative': (
+        '{story_hook} {winner} は {loser} に勝利したが、{loser} はその戦いを生き延びられなかった。'
+    ),
     'events.meeting.summary': '{actor} は {location} で {other} と出会った。',
     'events.meeting_positive.summary': (
         '{name1} と {name2} は {location} で出会い、素晴らしい相性を見せた。'
+        '（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        '平均: {relationship_avg:+d}）'
+    ),
+    'events.meeting_positive.summary.narrative': (
+        '{story_hook} {name1} と {name2} は {location} で素晴らしい相性を見せた。'
         '（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         '平均: {relationship_avg:+d}）'
     ),
@@ -359,8 +383,18 @@ TEXT_JA: Dict[str, str] = {
         '（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         '平均: {relationship_avg:+d}）'
     ),
+    'events.meeting_pleasant.summary.narrative': (
+        '{story_hook} {name1} と {name2} は {location} で気持ちの良い交流をした。'
+        '（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        '平均: {relationship_avg:+d}）'
+    ),
     'events.meeting_neutral.summary': (
         '{name1} と {name2} は {location} で軽く会釈を交わした。'
+        '（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        '平均: {relationship_avg:+d}）'
+    ),
+    'events.meeting_neutral.summary.narrative': (
+        '{story_hook} {name1} と {name2} は {location} で軽く会釈を交わした。'
         '（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         '平均: {relationship_avg:+d}）'
     ),
@@ -369,16 +403,29 @@ TEXT_JA: Dict[str, str] = {
         '（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         '平均: {relationship_avg:+d}）'
     ),
+    'events.meeting_negative.summary.narrative': (
+        '{story_hook} {name1} と {name2} は {location} でぎこちない出会いをした。'
+        '（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        '平均: {relationship_avg:+d}）'
+    ),
     'events.marriage.summary': (
         '{name1}（{race1} {job1}）と {name2}（{race2} {job2}）は {location} で盛大に結婚した。'
     ),
     'events.discovery.summary': '{name} は {location} 近くで {item} を発見した。{extra}',
+    'events.discovery.summary.narrative': '{story_hook} {name} は {location} 近くで {item} を発見した。{extra}',
     'events.skill_training.summary': (
         '{name} は {effort}、{skill} を鍛えた。（Lv {old_level} -> Lv {new_level}）'
+    ),
+    'events.skill_training.summary.narrative': (
+        '{story_hook} {name} は {effort}、{skill} を鍛えた。（Lv {old_level} -> Lv {new_level}）'
     ),
     'events.journey.summary': (
         '{name} は {old_location} から {destination}（{region_type}）へ旅し、{road_event}。'
         '{dungeon_bonus}'
+    ),
+    'events.journey.summary.narrative': (
+        '{story_hook} {name} は {old_location} から {destination}（{region_type}）へ旅し、'
+        '{road_event}。{dungeon_bonus}'
     ),
     'events.journey_no_destination.summary': '{name} は旅に出ようとしたが、行き先が見つからなかった。',
     'events.aging_young.summary': '{name} は {age} 歳になった。若さがまだ彼らを前へ押し出している。',
@@ -687,6 +734,7 @@ TEXT_JA: Dict[str, str] = {
     'yearly_report_card_total_events': '  記録イベント数: {count}',
     'report_followup_prompt': 'レポート表示',
     'report_show_detailed_text': '詳細テキストレポートを表示',
+    'report_followup_inspect_location': '{location} 周辺の出来事を確認。',
     'world_change_category_route': '経路',
     'world_change_category_location': '地点',
     'world_change_category_occupation': '支配',

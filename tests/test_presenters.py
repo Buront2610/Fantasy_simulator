@@ -567,6 +567,10 @@ def test_monthly_report_card_clusters_watched_actor_threads_from_records():
 
     assert [(thread.actor_name, thread.event_count) for thread in card.watched_threads] == [("Mira", 2)]
     assert card.watched_threads[0].headline == "Mira held the pass."
+    assert card.watched_threads[0].location_id == "loc_aethoria_capital"
+    assert card.follow_up_actions[0].target_type == "character"
+    assert card.follow_up_actions[0].target_id == watched.char_id
+    assert card.follow_up_actions[0].location_id == "loc_aethoria_capital"
     assert any("Watched threads" in line for line in lines)
     assert any("Mira: 2 event(s) | Mira held the pass." in line for line in lines)
     assert all(thread.actor_name != "Orven" for thread in card.watched_threads)

@@ -6,6 +6,7 @@ import random
 from typing import TYPE_CHECKING, Any, Dict, List
 
 from .event_models import EventResult, generate_record_id
+from .event_story import prefix_description_with_story_hook
 from .i18n import tr
 
 if TYPE_CHECKING:
@@ -145,6 +146,38 @@ def resolve_marriage_event(
     )
 
 
+def _meeting_relation_tag_updates(
+    char1: "Character",
+    char2: "Character",
+    avg_after: int,
+    rng: Any,
+) -> tuple[List[Dict[str, str]], str | None]:
+    relation_tag_updates: List[Dict[str, str]] = []
+    meeting_source_id = generate_record_id(rng) if avg_after >= 50 or avg_after <= -50 else None
+    if avg_after >= 50:
+        tag = "friend"
+    elif avg_after <= -50:
+        tag = "rival"
+    else:
+        return relation_tag_updates, meeting_source_id
+    char1.add_relation_tag(char2.char_id, tag)
+    char2.add_relation_tag(char1.char_id, tag)
+    return [
+        {"source": char1.char_id, "target": char2.char_id, "tag": tag},
+        {"source": char2.char_id, "target": char1.char_id, "tag": tag},
+    ], meeting_source_id
+
+
+def _meeting_description_key(avg_after: int) -> str:
+    if avg_after > 10:
+        return "meeting_positive"
+    if avg_after > 0:
+        return "meeting_pleasant"
+    if avg_after == 0:
+        return "meeting_neutral"
+    return "meeting_negative"
+
+
 def resolve_meeting_event(
     char1: "Character",
     char2: "Character",
@@ -160,33 +193,8 @@ def resolve_meeting_event(
     rel2_after = char2.get_relationship(char1.char_id)
     avg_after = round((rel1_after + rel2_after) / 2)
 
-    relation_tag_updates: List[Dict[str, str]] = []
-    meeting_source_id = None
-    if avg_after >= 50 or avg_after <= -50:
-        meeting_source_id = generate_record_id(rng)
-    if avg_after >= 50:
-        char1.add_relation_tag(char2.char_id, "friend")
-        char2.add_relation_tag(char1.char_id, "friend")
-        relation_tag_updates = [
-            {"source": char1.char_id, "target": char2.char_id, "tag": "friend"},
-            {"source": char2.char_id, "target": char1.char_id, "tag": "friend"},
-        ]
-    elif avg_after <= -50:
-        char1.add_relation_tag(char2.char_id, "rival")
-        char2.add_relation_tag(char1.char_id, "rival")
-        relation_tag_updates = [
-            {"source": char1.char_id, "target": char2.char_id, "tag": "rival"},
-            {"source": char2.char_id, "target": char1.char_id, "tag": "rival"},
-        ]
-
-    if avg_after > 10:
-        description_key = "meeting_positive"
-    elif avg_after > 0:
-        description_key = "meeting_pleasant"
-    elif avg_after == 0:
-        description_key = "meeting_neutral"
-    else:
-        description_key = "meeting_negative"
+    relation_tag_updates, meeting_source_id = _meeting_relation_tag_updates(char1, char2, avg_after, rng)
+    description_key = _meeting_description_key(avg_after)
     desc = tr(
         description_key,
         name1=char1.name,
@@ -195,6 +203,14 @@ def resolve_meeting_event(
         relationship_a=rel1_after,
         relationship_b=rel2_after,
         relationship_avg=avg_after,
+    )
+    desc, story_hook_key = prefix_description_with_story_hook(
+        "meeting",
+        rng,
+        desc,
+        name1=char1.name,
+        name2=char2.name,
+        location=world.location_name(char1.location_id),
     )
 
     char1.add_history(tr(
@@ -220,6 +236,7 @@ def resolve_meeting_event(
                 "relationship_a": rel1_after,
                 "relationship_b": rel2_after,
                 "relationship_avg": avg_after,
+                "story_hook_key": story_hook_key,
             },
             **({"record_id": meeting_source_id} if meeting_source_id is not None else {}),
         },

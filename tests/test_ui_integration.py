@@ -135,6 +135,45 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         self.assertIn("Monthly highlights", out.text)
         self.assertIn("RAW MONTHLY REPORT", out.text)
 
+    def test_monthly_report_follow_up_opens_character_story(self) -> None:
+        from types import SimpleNamespace
+        from fantasy_simulator.events import WorldEventRecord
+        from fantasy_simulator.ui.screens import _show_monthly_report
+
+        world = World()
+        hero = Character("Mira", 24, "Female", "Human", "Ranger", location_id="loc_aethoria_capital")
+        hero.favorite = True
+        hero.history.append("Year 1000: Held the capital gate.")
+        world.add_character(hero)
+        world.record_event(
+            WorldEventRecord(
+                record_id="mira_gate",
+                kind="battle",
+                year=world.year,
+                month=1,
+                day=3,
+                primary_actor_id=hero.char_id,
+                severity=5,
+                description="Mira held the capital gate.",
+            )
+        )
+        sim = SimpleNamespace(
+            world=world,
+            get_latest_completed_report_year=lambda: world.year,
+            get_monthly_report=lambda year, month: f"RAW MONTHLY REPORT {year}-{month}",
+            get_character_story=lambda character_id: "\n".join(hero.history),
+        )
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(answers=["1"], menu_keys=["followup:1"])
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_monthly_report(sim, ctx=ctx)
+
+        self.assertIn("Watched threads", out.text)
+        self.assertIn("Report view", out.text)
+        self.assertIn("Held the capital gate.", out.text)
+        self.assertNotIn("RAW MONTHLY REPORT", out.text)
+
     def test_world_map_goes_through_render_backend(self) -> None:
         """Selecting 'world_map' renders via backend, not print()."""
         from fantasy_simulator.ui.screens import _show_results, _build_default_world

@@ -399,31 +399,31 @@ def test_romance_commitments_blocked_event_renders_from_metadata_after_cross_loc
 
 
 @pytest.mark.parametrize(
-    ("randint_values", "summary_key", "expected"),
+    ("randint_values", "summary_key", "expected_detail", "expected_avg"),
     [
         (
             [20, 0],
             "events.meeting_positive.summary",
-            "Alice and Bob met in Aethoria Capital and hit it off splendidly. "
-            "(Alice->Bob: +20 / Bob->Alice: +20 / Avg: +20)",
+            "Alice and Bob hit it off splendidly at Aethoria Capital.",
+            "+20",
         ),
         (
             [5, 0],
             "events.meeting_pleasant.summary",
-            "Alice and Bob met in Aethoria Capital and had a pleasant exchange. "
-            "(Alice->Bob: +5 / Bob->Alice: +5 / Avg: +5)",
+            "Alice and Bob had a pleasant exchange at Aethoria Capital.",
+            "+5",
         ),
         (
             [0, 0],
             "events.meeting_neutral.summary",
-            "Alice and Bob met in Aethoria Capital and exchanged a polite nod. "
-            "(Alice->Bob: +0 / Bob->Alice: +0 / Avg: +0)",
+            "Alice and Bob exchanged a polite nod at Aethoria Capital.",
+            "+0",
         ),
         (
             [-5, 0],
             "events.meeting_negative.summary",
-            "Alice and Bob met in Aethoria Capital and had a tense, uncomfortable encounter. "
-            "(Alice->Bob: -5 / Bob->Alice: -5 / Avg: -5)",
+            "Alice and Bob had a tense encounter at Aethoria Capital.",
+            "-5",
         ),
     ],
 )
@@ -431,7 +431,8 @@ def test_meeting_variants_render_from_metadata_after_cross_locale_save_load(
     tmp_path,
     randint_values,
     summary_key,
-    expected,
+    expected_detail,
+    expected_avg,
 ):
     previous_locale = get_locale()
     set_locale("ja")
@@ -444,10 +445,12 @@ def test_meeting_variants_render_from_metadata_after_cross_locale_save_load(
 
         result = EventSystem().event_meeting(char_a, char_b, world, rng=_FixedRng(randint_values=randint_values))
 
-        actual_summary_key, rendered = _save_load_render(result, world, tmp_path, location_id=char_a.location_id)
+        record, rendered = _save_load_record(result, world, tmp_path, location_id=char_a.location_id)
 
-        assert actual_summary_key == summary_key
-        assert rendered == expected
+        assert record.summary_key == summary_key
+        assert record.render_params["story_hook_key"].startswith("event_story_meeting_")
+        assert expected_detail in rendered
+        assert f"Avg: {expected_avg}" in rendered
     finally:
         set_locale(previous_locale)
 
@@ -475,7 +478,8 @@ def test_battle_event_renders_injury_from_metadata_after_cross_locale_save_load(
         assert record.render_params["winner"] == "Alice"
         assert record.render_params["loser"] == "Bob"
         assert record.render_params["loser_injury_status"] == "injured"
-        assert rendered == "Alice defeated Bob. Bob was injured in the fight."
+        assert record.render_params["story_hook_key"].startswith("event_story_battle_")
+        assert rendered.endswith("Alice defeated Bob. Bob was injured in the fight.")
     finally:
         set_locale(previous_locale)
 
@@ -505,6 +509,7 @@ def test_fatal_battle_event_renders_from_metadata_after_cross_locale_save_load(t
         assert record.render_params["winner"] == "Alice"
         assert record.render_params["loser"] == "Bob"
         assert record.render_params["loser_injury_status"] == "dying"
-        assert rendered == "Alice defeated Bob, who did not survive the encounter."
+        assert record.render_params["story_hook_key"].startswith("event_story_battle_")
+        assert rendered.endswith("Alice defeated Bob, who did not survive the encounter.")
     finally:
         set_locale(previous_locale)

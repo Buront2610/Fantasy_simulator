@@ -177,6 +177,7 @@ class ReportWatchedThreadView:
     actor_name: str
     event_count: int
     headline: str = ""
+    location_id: str = ""
 
 
 @dataclass
@@ -215,6 +216,15 @@ class MonthlyReportCardView:
     hot_rumors: List[str] = field(default_factory=list)
     world_changes: List[WorldChangeSummaryView] = field(default_factory=list)
     world_change_entries: List[WorldChangeEntryView] = field(default_factory=list)
+    follow_up_actions: List[FollowUpActionView] = field(default_factory=list)
+
+
+@dataclass
+class _MonthlyReportFacts:
+    character_event_counts: Dict[str, int]
+    location_event_counts: Dict[str, int]
+    completed_adventures: List[str]
+    new_memory_items: List[str]
 
 
 @dataclass
@@ -577,6 +587,7 @@ def _watched_thread_views(
                 actor_name=getattr(character, "name", actor_id),
                 event_count=len(actor_records),
                 headline=_render_view_event(ranked_records[0], world) if ranked_records else "",
+                location_id=getattr(character, "location_id", ""),
             )
         )
     views.sort(key=lambda view: (-view.event_count, view.actor_name.lower(), view.actor_id))
@@ -812,6 +823,45 @@ def _world_change_follow_up_actions(entries: List[WorldChangeEntryView]) -> List
     ]
 
 
+def _monthly_report_follow_up_actions(
+    world: "World",
+    *,
+    watched_threads: List[ReportWatchedThreadView],
+    location_threads: List[ReportLocationThreadView],
+    world_change_entries: List[WorldChangeEntryView],
+) -> List[FollowUpActionView]:
+    actions: List[FollowUpActionView] = []
+    for thread in watched_threads:
+        _append_follow_up_action(
+            actions,
+            FollowUpActionView(
+                key="inspect_report_character",
+                label=tr(
+                    "dashboard_follow_up_inspect_character",
+                    actor=thread.actor_name,
+                    location=_location_name(world, thread.location_id) if thread.location_id else "",
+                ),
+                target_type="character",
+                target_id=thread.actor_id,
+                location_id=thread.location_id,
+            ),
+        )
+    for location_thread in location_threads:
+        _append_follow_up_action(
+            actions,
+            FollowUpActionView(
+                key="inspect_report_location",
+                label=tr("report_followup_inspect_location", location=location_thread.location_name),
+                target_type="location",
+                target_id=location_thread.location_id,
+                location_id=location_thread.location_id,
+            ),
+        )
+    for action in _world_change_follow_up_actions(world_change_entries):
+        _append_follow_up_action(actions, action)
+    return actions[:5]
+
+
 def _dashboard_follow_up_actions(
     world: "World",
     *,
@@ -860,49 +910,66 @@ def _dashboard_dangerous_locations(world: "World", *, limit: int) -> List[str]:
     ]
 
 
+def _monthly_report_facts(world: "World", records: List["WorldEventRecord"]) -> _MonthlyReportFacts:
+    chars: Dict[str, int] = {}
+    locs: Dict[str, int] = {}
+    completed_adventures: List[str] = []
+    new_memory: List[str] = []
+    for record in records:
+        if record.primary_actor_id:
+            chars[record.primary_actor_id] = chars.get(record.primary_actor_id, 0) + 1
+        for location_id in location_ids_for_record(record):
+            locs[location_id] = locs.get(location_id, 0) + 1
+        if record.kind in (
+            "adventure_returned",
+            "adventure_returned_injured",
+            "adventure_retreated",
+            "adventure_death",
+        ):
+            completed_adventures.append(_render_view_event(record, world))
+        if record.kind in ("death", "adventure_death", "adventure_discovery"):
+            new_memory.append(_render_view_event(record, world))
+    return _MonthlyReportFacts(chars, locs, completed_adventures, new_memory)
+
+
+def _monthly_report_highlighted_locations(world: "World", location_counts: Dict[str, int]) -> List[str]:
+    if hasattr(world, "location_name"):
+        return [
+            world.location_name(location_id)
+            for location_id, _ in sorted(location_counts.items(), key=lambda item: -item[1])[:3]
+        ]
+    return [location_id for location_id, _ in sorted(location_counts.items(), key=lambda item: -item[1])[:3]]
+
+
+def _monthly_report_month_label(
+    world: "World",
+    *,
+    year: int,
+    month: int,
+    calendar_key: str,
+) -> str:
+    if not hasattr(world, "month_display_name_for_date"):
+        return str(month)
+    try:
+        return world.month_display_name_for_date(year, month, calendar_key=calendar_key)
+    except TypeError:
+        return world.month_display_name_for_date(year, month)
+
+
 def build_monthly_report_card_view(world: "World", year: int, month: int) -> MonthlyReportCardView:
     records = _records_for_month(world, year, month)
     record_calendar_key = next(
         (record.calendar_key for record in records if getattr(record, "calendar_key", "")),
         "",
     )
-    chars: Dict[str, int] = {}
-    locs: Dict[str, int] = {}
-    completed_adventures: List[str] = []
-    new_memory: List[str] = []
-    for r in records:
-        if r.primary_actor_id:
-            chars[r.primary_actor_id] = chars.get(r.primary_actor_id, 0) + 1
-        for location_id in location_ids_for_record(r):
-            locs[location_id] = locs.get(location_id, 0) + 1
-        if r.kind in (
-            "adventure_returned",
-            "adventure_returned_injured",
-            "adventure_retreated",
-            "adventure_death",
-        ):
-            completed_adventures.append(_render_view_event(r, world))
-        if r.kind in ("death", "adventure_death", "adventure_discovery"):
-            new_memory.append(_render_view_event(r, world))
-
+    facts = _monthly_report_facts(world, records)
     char_lookup = {c.char_id: c.name for c in getattr(world, "characters", [])}
-    highlights = [char_lookup.get(cid, cid) for cid, _ in sorted(chars.items(), key=lambda x: -x[1])[:3]]
-    if hasattr(world, "location_name"):
-        location_highlights = [world.location_name(lid) for lid, _ in sorted(locs.items(), key=lambda x: -x[1])[:3]]
-    else:
-        location_highlights = [lid for lid, _ in sorted(locs.items(), key=lambda x: -x[1])[:3]]
-    if hasattr(world, "month_display_name_for_date"):
-        try:
-            month_label = world.month_display_name_for_date(
-                year,
-                month,
-                calendar_key=record_calendar_key,
-            )
-        except TypeError:
-            month_label = world.month_display_name_for_date(year, month)
-    else:
-        month_label = str(month)
-
+    highlights = [
+        char_lookup.get(cid, cid)
+        for cid, _ in sorted(facts.character_event_counts.items(), key=lambda x: -x[1])[:3]
+    ]
+    location_highlights = _monthly_report_highlighted_locations(world, facts.location_event_counts)
+    month_label = _monthly_report_month_label(world, year=year, month=month, calendar_key=record_calendar_key)
     world_changes, world_change_entries = _world_change_views(world, records, year=year, month=month)
 
     hot_rumors: List[str] = []
@@ -913,22 +980,34 @@ def build_monthly_report_card_view(world: "World", year: int, month: int) -> Mon
             if not rumor.is_expired and rumor.year_created == year and rumor.month_created == month
         ][:2]
 
+    headline_events = _headline_event_views(world, records, limit=3)
+    location_threads = _location_thread_views(world, records, limit=3)
+    watched_threads = _watched_thread_views(world, records, limit=3)
+    world_change_threads = _world_change_thread_views(world, world_change_entries, limit=3)
+    rumor_threads = _rumor_thread_views(world, records, year=year, month=month, limit=3)
+
     return MonthlyReportCardView(
         year=year,
         month=month,
         month_label=month_label,
-        headline_events=_headline_event_views(world, records, limit=3),
-        location_threads=_location_thread_views(world, records, limit=3),
-        watched_threads=_watched_thread_views(world, records, limit=3),
-        world_change_threads=_world_change_thread_views(world, world_change_entries, limit=3),
-        rumor_threads=_rumor_thread_views(world, records, year=year, month=month, limit=3),
+        headline_events=headline_events,
+        location_threads=location_threads,
+        watched_threads=watched_threads,
+        world_change_threads=world_change_threads,
+        rumor_threads=rumor_threads,
         highlighted_characters=highlights,
         highlighted_locations=location_highlights,
-        completed_adventures=completed_adventures[:3],
-        new_memory_items=new_memory[:3],
+        completed_adventures=facts.completed_adventures[:3],
+        new_memory_items=facts.new_memory_items[:3],
         hot_rumors=hot_rumors,
         world_changes=world_changes,
         world_change_entries=world_change_entries,
+        follow_up_actions=_monthly_report_follow_up_actions(
+            world,
+            watched_threads=watched_threads,
+            location_threads=location_threads,
+            world_change_entries=world_change_entries,
+        ),
     )
 
 

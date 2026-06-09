@@ -236,6 +236,8 @@ def _apply_battle_params(record: WorldEventRecord, params: dict[str, Any], *, tr
 
 
 def _apply_ordinary_event_params(record: WorldEventRecord, params: dict[str, Any], *, translate: Translator) -> None:
+    if "story_hook_key" in params and "story_hook" not in params:
+        params["story_hook"] = translate(str(params["story_hook_key"]), **params)
     if "extra_key" in params and "extra" not in params:
         params["extra"] = translate(str(params["extra_key"]))
     if "effort_key" in params and "effort" not in params:
@@ -282,6 +284,16 @@ def _render_params(
     return params
 
 
+def _summary_key_for_record(record: WorldEventRecord, params: dict[str, Any], *, translate: Translator) -> str:
+    story_hook_key = params.get("story_hook_key")
+    if not isinstance(story_hook_key, str) or not story_hook_key:
+        return record.summary_key
+
+    narrative_key = f"{record.summary_key}.narrative"
+    rendered = translate(narrative_key, **params)
+    return record.summary_key if rendered == narrative_key else narrative_key
+
+
 def render_event_record(
     record: WorldEventRecord,
     locale: Optional[str] = None,
@@ -300,19 +312,21 @@ def render_event_record(
 
     resolved_translate = translate or _translator_for_locale(locale)
     try:
-        rendered = resolved_translate(record.summary_key, **_render_params(
+        params = _render_params(
             record,
             world=world,
             translate=resolved_translate,
             locale=locale,
-        ))
+        )
+        summary_key = _summary_key_for_record(record, params, translate=resolved_translate)
+        rendered = resolved_translate(summary_key, **params)
     except (KeyError, IndexError, TypeError, ValueError):
         if strict:
             raise
         return record.description
 
-    if rendered == record.summary_key:
+    if rendered == summary_key:
         if strict:
-            raise KeyError(record.summary_key)
+            raise KeyError(summary_key)
         return record.description
     return rendered

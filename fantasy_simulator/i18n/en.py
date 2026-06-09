@@ -185,6 +185,21 @@ TEXT_EN: Dict[str, str] = {
     'training_effort_tireless': 'practised tirelessly until their hands bled',
     'training_effort_scrolls': 'studied ancient scrolls',
     'training_effort_limits': 'pushed themselves beyond their limits',
+    'event_story_battle_old_grudge': 'An old grudge finally surfaced.',
+    'event_story_battle_public_challenge': 'A public challenge drew witnesses before steel was raised.',
+    'event_story_battle_route_dispute': 'A dispute over passage on the road turned violent.',
+    'event_story_discovery_rumor': 'A tavern rumor pointed {name} toward the site.',
+    'event_story_discovery_map': 'A damaged map gave {name} just enough direction.',
+    'event_story_discovery_omen': 'Strange signs around {location} led {name} onward.',
+    'event_story_journey_request': 'A request from {destination} pushed {name} onto the road.',
+    'event_story_journey_weather': 'Changing weather forced {name} to choose a route quickly.',
+    'event_story_journey_missing_caravan': 'Talk of a missing caravan made the journey urgent.',
+    'event_story_meeting_shared_task': 'A shared task brought {name1} and {name2} face to face.',
+    'event_story_meeting_market_tension': 'Crowded streets at {location} left little room to avoid each other.',
+    'event_story_meeting_old_story': 'An old story drew both {name1} and {name2} to the same place.',
+    'event_story_training_deadline': 'A looming trial gave the training a clear purpose.',
+    'event_story_training_rival': 'Word of a rival sharpened {name}\'s focus.',
+    'event_story_training_failed_attempt': 'A recent failure made practice impossible to ignore.',
     'meeting_positive': '{name1} and {name2} met in {location} and hit it off splendidly. ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
     'meeting_pleasant': '{name1} and {name2} met in {location} and had a pleasant exchange. ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
     'meeting_neutral': '{name1} and {name2} met in {location} and exchanged a polite nod. ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
@@ -347,10 +362,19 @@ TEXT_EN: Dict[str, str] = {
     'events.generic.summary': '{description}',
     'events.battle.summary': '{actor} fought at {location}.',
     'events.battle_result.summary': '{winner} defeated {loser}.{injury}',
+    'events.battle_result.summary.narrative': '{story_hook} {winner} defeated {loser}.{injury}',
     'events.battle_fatal.summary': '{winner} defeated {loser}, who did not survive the encounter.',
+    'events.battle_fatal.summary.narrative': (
+        '{story_hook} {winner} defeated {loser}, who did not survive the encounter.'
+    ),
     'events.meeting.summary': '{actor} met {other} at {location}.',
     'events.meeting_positive.summary': (
         '{name1} and {name2} met in {location} and hit it off splendidly. '
+        '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        'Avg: {relationship_avg:+d})'
+    ),
+    'events.meeting_positive.summary.narrative': (
+        '{story_hook} {name1} and {name2} hit it off splendidly at {location}. '
         '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         'Avg: {relationship_avg:+d})'
     ),
@@ -359,8 +383,18 @@ TEXT_EN: Dict[str, str] = {
         '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         'Avg: {relationship_avg:+d})'
     ),
+    'events.meeting_pleasant.summary.narrative': (
+        '{story_hook} {name1} and {name2} had a pleasant exchange at {location}. '
+        '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        'Avg: {relationship_avg:+d})'
+    ),
     'events.meeting_neutral.summary': (
         '{name1} and {name2} met in {location} and exchanged a polite nod. '
+        '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        'Avg: {relationship_avg:+d})'
+    ),
+    'events.meeting_neutral.summary.narrative': (
+        '{story_hook} {name1} and {name2} exchanged a polite nod at {location}. '
         '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         'Avg: {relationship_avg:+d})'
     ),
@@ -369,16 +403,29 @@ TEXT_EN: Dict[str, str] = {
         '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         'Avg: {relationship_avg:+d})'
     ),
+    'events.meeting_negative.summary.narrative': (
+        '{story_hook} {name1} and {name2} had a tense encounter at {location}. '
+        '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        'Avg: {relationship_avg:+d})'
+    ),
     'events.marriage.summary': (
         '{name1} ({race1} {job1}) and {name2} ({race2} {job2}) were married in {location} '
         'amid great celebration!'
     ),
     'events.discovery.summary': '{name} discovered {item} near {location}. {extra}',
+    'events.discovery.summary.narrative': '{story_hook} {name} discovered {item} near {location}. {extra}',
     'events.skill_training.summary': (
         '{name} {effort} and improved {skill} (Lv {old_level} -> Lv {new_level}).'
     ),
+    'events.skill_training.summary.narrative': (
+        '{story_hook} {name} {effort} and improved {skill} (Lv {old_level} -> Lv {new_level}).'
+    ),
     'events.journey.summary': (
         '{name} journeyed from {old_location} to {destination} ({region_type}) and '
+        '{road_event}.{dungeon_bonus}'
+    ),
+    'events.journey.summary.narrative': (
+        '{story_hook} {name} journeyed from {old_location} to {destination} ({region_type}) and '
         '{road_event}.{dungeon_bonus}'
     ),
     'events.journey_no_destination.summary': '{name} wanted to travel but could find no destination.',
@@ -697,6 +744,7 @@ TEXT_EN: Dict[str, str] = {
     'yearly_report_card_total_events': '  Recorded events: {count}',
     'report_followup_prompt': 'Report view',
     'report_show_detailed_text': 'Show detailed text report',
+    'report_followup_inspect_location': 'Inspect events around {location}.',
     'world_change_category_route': 'Route',
     'world_change_category_location': 'Location',
     'world_change_category_occupation': 'Occupation',
