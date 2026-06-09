@@ -7,6 +7,7 @@ from fantasy_simulator.event_models import WorldEventRecord
 from fantasy_simulator.event_rendering import render_event_record
 from fantasy_simulator.i18n import get_locale, set_locale
 from fantasy_simulator.ids import FactionId, LocationId
+from fantasy_simulator.ui.map_renderer import build_map_info, render_region_map
 from fantasy_simulator.world import World
 from fantasy_simulator.world_change import (
     SetLocationControllingFactionCommand,
@@ -197,7 +198,7 @@ def test_world_occupation_record_follows_pr_k_event_contract() -> None:
     assert record.location_id == "loc_aethoria_capital"
     assert record.summary_key == "events.location_faction_changed.summary"
     assert record.render_params["location_id"] == "loc_aethoria_capital"
-    assert record.render_params["old_faction_id"] is None
+    assert record.render_params["old_faction_id"] == "aethorian_crown_council"
     assert record.render_params["new_faction_id"] == "stormwatch_wardens"
     assert "location:loc_aethoria_capital" in record.tags
     assert record.impacts[0]["attribute"] == "controlling_faction_id"
@@ -208,6 +209,55 @@ def test_world_occupation_record_follows_pr_k_event_contract() -> None:
     assert record.record_id in world.get_location_by_id("loc_aethoria_capital").recent_event_ids
     assert render_event_record(record, locale="en", world=world) != record.summary_key
     assert "location" not in record.render_params
+
+
+def test_world_occupation_change_applies_location_state_pressure_and_map_visibility() -> None:
+    previous_locale = get_locale()
+    set_locale("en")
+    world = World()
+    location = world.get_location_by_id("loc_aethoria_capital")
+    assert location is not None
+    before_occupied = (location.danger, location.rumor_heat, location.safety, location.mood)
+
+    try:
+        occupied = world.apply_controlling_faction_change(
+            "loc_aethoria_capital",
+            "stormwatch_wardens",
+            month=4,
+            day=5,
+        )
+        before_released = (location.danger, location.rumor_heat, location.safety, location.mood)
+        released = world.apply_controlling_faction_change("loc_aethoria_capital", None, month=5, day=1)
+    finally:
+        set_locale(previous_locale)
+
+    assert occupied is not None
+    assert released is not None
+    assert before_released == (
+        min(100, before_occupied[0] + 8),
+        min(100, before_occupied[1] + 12),
+        max(0, before_occupied[2] - 8),
+        max(0, before_occupied[3] - 6),
+    )
+    assert (location.danger, location.rumor_heat, location.safety, location.mood) == (
+        max(0, before_released[0] - 5),
+        min(100, before_released[1] + 8),
+        min(100, before_released[2] + 8),
+        min(100, before_released[3] + 8),
+    )
+    assert location.live_traces[-2]["text"].startswith(
+        "Aethoria Capital changed controlling faction from Aethorian Crown Council to Stormwatch Wardens."
+    )
+    assert location.live_traces[-1]["text"].startswith(
+        "Aethoria Capital changed controlling faction from Stormwatch Wardens to none."
+    )
+
+    info = build_map_info(world)
+    cell = next(cell for cell in info.cells.values() if cell.location_id == "loc_aethoria_capital")
+    assert cell.recent_world_change_count == 2
+    assert cell.recent_world_change_categories == ("occupation",)
+    rendered = render_region_map(info, "loc_aethoria_capital", radius=2)
+    assert "World change: Aethoria Capital changed recently (Occupation)" in rendered
 
 
 def test_world_occupation_change_rejects_unknown_faction_by_default() -> None:
@@ -223,7 +273,7 @@ def test_world_occupation_change_rejects_unknown_faction_by_default() -> None:
     else:
         raise AssertionError("Expected strict faction validation to reject unknown ids")
 
-    assert world.get_location_by_id("loc_aethoria_capital").controlling_faction_id is None
+    assert world.get_location_by_id("loc_aethoria_capital").controlling_faction_id == "aethorian_crown_council"
     assert world.event_records == []
 
 

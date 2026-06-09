@@ -82,6 +82,7 @@ class SupportsSiteSeed(Protocol):
     region_type: str
     x: int
     y: int
+    controlling_faction_id: str
 
 
 def configure_location_state_resolvers(
@@ -305,6 +306,7 @@ def location_state_from_site_seed(
         traffic=defaults["traffic"],
         rumor_heat=defaults["rumor_heat"],
         road_condition=defaults["road_condition"],
+        controlling_faction_id=seed.controlling_faction_id.strip() or None,
     )
     endonym = endonym_for_location(seed.location_id)
     if endonym and endonym != location.canonical_name:

@@ -57,6 +57,123 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         headings = [c for c in out.calls if c[0] == "print_heading"]
         self.assertTrue(len(headings) >= 1, "No headings printed")
 
+    def test_yearly_report_defaults_to_card_without_legacy_text(self) -> None:
+        from types import SimpleNamespace
+        from fantasy_simulator.ui.screens import _show_yearly_report
+
+        world = World()
+        sim = SimpleNamespace(
+            world=world,
+            get_latest_completed_report_year=lambda: world.year,
+            get_yearly_report=lambda year: f"RAW YEARLY REPORT {year}",
+        )
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(menu_keys=["back"])
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_yearly_report(sim, ctx=ctx)
+
+        self.assertIn("Yearly highlights", out.text)
+        self.assertIn("Report view", out.text)
+        self.assertNotIn("RAW YEARLY REPORT", out.text)
+
+    def test_yearly_report_can_show_legacy_detail_on_demand(self) -> None:
+        from types import SimpleNamespace
+        from fantasy_simulator.ui.screens import _show_yearly_report
+
+        world = World()
+        sim = SimpleNamespace(
+            world=world,
+            get_latest_completed_report_year=lambda: world.year,
+            get_yearly_report=lambda year: f"RAW YEARLY REPORT {year}",
+        )
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(menu_keys=["details"])
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_yearly_report(sim, ctx=ctx)
+
+        self.assertIn("Yearly highlights", out.text)
+        self.assertIn("RAW YEARLY REPORT", out.text)
+
+    def test_monthly_report_defaults_to_card_without_legacy_text(self) -> None:
+        from types import SimpleNamespace
+        from fantasy_simulator.ui.screens import _show_monthly_report
+
+        world = World()
+        sim = SimpleNamespace(
+            world=world,
+            get_latest_completed_report_year=lambda: world.year,
+            get_monthly_report=lambda year, month: f"RAW MONTHLY REPORT {year}-{month}",
+        )
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(answers=["1"], menu_keys=["back"])
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_monthly_report(sim, ctx=ctx)
+
+        self.assertIn("Monthly highlights", out.text)
+        self.assertIn("Report view", out.text)
+        self.assertNotIn("RAW MONTHLY REPORT", out.text)
+
+    def test_monthly_report_can_show_legacy_detail_on_demand(self) -> None:
+        from types import SimpleNamespace
+        from fantasy_simulator.ui.screens import _show_monthly_report
+
+        world = World()
+        sim = SimpleNamespace(
+            world=world,
+            get_latest_completed_report_year=lambda: world.year,
+            get_monthly_report=lambda year, month: f"RAW MONTHLY REPORT {year}-{month}",
+        )
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(answers=["1"], menu_keys=["details"])
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_monthly_report(sim, ctx=ctx)
+
+        self.assertIn("Monthly highlights", out.text)
+        self.assertIn("RAW MONTHLY REPORT", out.text)
+
+    def test_monthly_report_follow_up_opens_character_story(self) -> None:
+        from types import SimpleNamespace
+        from fantasy_simulator.events import WorldEventRecord
+        from fantasy_simulator.ui.screens import _show_monthly_report
+
+        world = World()
+        hero = Character("Mira", 24, "Female", "Human", "Ranger", location_id="loc_aethoria_capital")
+        hero.favorite = True
+        hero.history.append("Year 1000: Held the capital gate.")
+        world.add_character(hero)
+        world.record_event(
+            WorldEventRecord(
+                record_id="mira_gate",
+                kind="battle",
+                year=world.year,
+                month=1,
+                day=3,
+                primary_actor_id=hero.char_id,
+                severity=5,
+                description="Mira held the capital gate.",
+            )
+        )
+        sim = SimpleNamespace(
+            world=world,
+            get_latest_completed_report_year=lambda: world.year,
+            get_monthly_report=lambda year, month: f"RAW MONTHLY REPORT {year}-{month}",
+            get_character_story=lambda character_id: "\n".join(hero.history),
+        )
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(answers=["1"], menu_keys=["followup:1"])
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_monthly_report(sim, ctx=ctx)
+
+        self.assertIn("Watched threads", out.text)
+        self.assertIn("Report view", out.text)
+        self.assertIn("Held the capital gate.", out.text)
+        self.assertNotIn("RAW MONTHLY REPORT", out.text)
+
     def test_world_map_goes_through_render_backend(self) -> None:
         """Selecting 'world_map' renders via backend, not print()."""
         from fantasy_simulator.ui.screens import _show_results, _build_default_world
@@ -107,6 +224,46 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         # Backend must have captured output (even if event log happens to be empty,
         # the separator/heading calls prove the route goes through backends)
         self.assertTrue(len(out.calls) > 3, "Too few backend calls captured")
+
+    def test_world_dashboard_follow_up_opens_character_story(self) -> None:
+        from fantasy_simulator.simulator import Simulator
+        from fantasy_simulator.ui.screens import _show_results
+
+        world = World()
+        hero = Character("Mira", 24, "Female", "Human", "Ranger", location_id="loc_aethoria_capital")
+        hero.favorite = True
+        hero.history.append("Year 1000: Watched the capital gate.")
+        world.add_character(hero)
+        sim = Simulator(world, events_per_year=0, seed=1)
+
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(menu_keys=["world_dashboard", "1", "back_to_main"])
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_results(sim, ctx=ctx)
+
+        self.assertIn("Open follow-up", out.text)
+        self.assertIn("Mira", out.text)
+        self.assertIn("Watched the capital gate.", out.text)
+
+    def test_world_dashboard_follow_up_opens_location_map_detail(self) -> None:
+        from fantasy_simulator.simulator import Simulator
+        from fantasy_simulator.ui.screens import _show_results
+
+        world = World()
+        route = world.routes[0]
+        world.apply_route_blocked_change(route.route_id, True, month=2)
+        sim = Simulator(world, events_per_year=0, seed=1)
+
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(menu_keys=["world_dashboard", "1", "back", "back_to_main"])
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_results(sim, ctx=ctx)
+
+        self.assertIn("Open follow-up", out.text)
+        self.assertIn("Location follow-up", out.text)
+        self.assertIn("Local site sketch", out.text)
 
     def test_world_map_auto_mode_uses_minimal_on_narrow_terminal(self) -> None:
         from fantasy_simulator.ui.screens import _show_results, _build_default_world
@@ -190,6 +347,54 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         _show_results(sim, ctx=ctx)
         self.assertIn("Semantic legend", out.text)
         self.assertIn("Keys:", out.text)
+
+    def test_world_map_can_browse_sites_by_local_cue_category(self) -> None:
+        from fantasy_simulator.ui.screens import _show_results, _build_default_world
+
+        world = _build_default_world(num_characters=4, seed=42)
+        from fantasy_simulator.simulator import Simulator
+        sim = Simulator(world, events_per_year=2)
+        sim.advance_years(1)
+
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(
+            answers=["1"],
+            menu_keys=["world_map", "cue", "memory", "back_to_main", "back_to_main"],
+        )
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_results(sim, ctx=ctx)
+
+        self.assertIn("Local cue category", out.text)
+        self.assertIn("Sites with Memory cues", out.text)
+        self.assertIn("Accident site", out.text)
+
+    def test_world_map_detail_can_follow_up_to_location_history(self) -> None:
+        from fantasy_simulator.ui.screens import _show_results, _build_default_world
+
+        world = _build_default_world(num_characters=4, seed=42)
+        world.add_live_trace(
+            "loc_aethoria_capital",
+            1001,
+            "Scout",
+            "A scout marked this gate after sunset.",
+        )
+        from fantasy_simulator.simulator import Simulator
+        sim = Simulator(world, events_per_year=2)
+        sim.advance_years(1)
+
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(
+            answers=["1"],
+            menu_keys=["world_map", "detail", "location_history", "back_to_main", "back_to_main"],
+        )
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_results(sim, ctx=ctx)
+
+        self.assertIn("Location follow-up", out.text)
+        self.assertIn("LOCATION DETAIL - Aethoria Capital", out.text)
+        self.assertIn("A scout marked this gate after sunset.", out.text)
 
     def test_world_map_uses_panel_when_backend_supports_it(self) -> None:
         from fantasy_simulator.ui.screens import _show_results, _build_default_world

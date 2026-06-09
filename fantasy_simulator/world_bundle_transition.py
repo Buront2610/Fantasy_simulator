@@ -47,6 +47,8 @@ def set_setting_bundle_metadata(
     world.propagation_rules = resolve_propagation_rule_overrides(
         world._setting_bundle.world_definition.propagation_rules
     )
+    if hasattr(world, "_era_runtime"):
+        world._era_runtime = None
 
 
 def topology_signature(bundle: SettingBundle) -> Tuple[Tuple[Any, ...], Tuple[Any, ...]]:

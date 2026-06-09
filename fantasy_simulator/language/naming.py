@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import random
+from dataclasses import dataclass
 from typing import Callable, Iterable, List, Mapping
 
 from ..content.setting_bundle import LanguageDefinition, NamingRulesDefinition
@@ -23,6 +24,34 @@ _NAME_POOL_SIZE = 18
 _MAX_GIVEN_LENGTH = 12
 _MAX_SURNAME_LENGTH = 14
 _MAX_TOPONYM_LENGTH = 16
+
+
+@dataclass(frozen=True)
+class ToponymGenerationTrace:
+    """Deterministic construction details for a generated toponym."""
+
+    surface: str
+    language_key: str
+    seed_key: str
+    region_type: str
+    pattern: str
+    primary_stem: str
+    secondary_stem: str
+    suffix: str
+    chunks: List[str]
+
+    def with_context(self, language_key: str, seed_key: str, region_type: str) -> "ToponymGenerationTrace":
+        return ToponymGenerationTrace(
+            surface=self.surface,
+            language_key=language_key,
+            seed_key=seed_key,
+            region_type=region_type,
+            pattern=self.pattern,
+            primary_stem=self.primary_stem,
+            secondary_stem=self.secondary_stem,
+            suffix=self.suffix,
+            chunks=list(self.chunks),
+        )
 
 
 def stable_seed(*parts: str) -> int:
@@ -68,6 +97,111 @@ def shorten_stem(value: str, max_length: int = 4) -> str:
     return cleaned
 
 
+def _join_chunks(chunks: List[str]) -> str:
+    result = ""
+    for chunk in chunks:
+        if not chunk:
+            continue
+        if not result:
+            result = chunk
+            continue
+        if result[-1] == chunk[0]:
+            result += chunk[1:]
+        elif result[-1] in "aeiou" and chunk[0] in "aeiou":
+            result += chunk[1:]
+        else:
+            result += chunk
+    return tidy_word(result)
+
+
+def _stem_variant(stem: str, short: bool) -> str:
+    if not short:
+        return stem
+    return shorten_stem(stem, max_length=3) or stem[:3]
+
+
+def _render_pattern_trace(
+    pattern: str,
+    *,
+    stems: List[str],
+    suffixes: List[str],
+    vowels: List[str],
+    rng: random.Random,
+) -> ToponymGenerationTrace:
+    primary = rng.choice(stems)
+    secondary = rng.choice([stem for stem in stems if stem != primary] or stems)
+    suffix = ""
+    chunks: List[str] = []
+    for marker in pattern:
+        if marker == "R":
+            chunks.append(_stem_variant(primary, short=False))
+        elif marker == "r":
+            chunks.append(_stem_variant(secondary, short=True))
+        elif marker == "L":
+            chunks.append(rng.choice(vowels))
+        elif marker in {"X", "Y"}:
+            suffix = rng.choice(suffixes)
+            chunks.append(suffix)
+    return ToponymGenerationTrace(
+        surface=format_name(_join_chunks(chunks)),
+        language_key="",
+        seed_key="",
+        region_type="",
+        pattern=pattern,
+        primary_stem=primary,
+        secondary_stem=secondary,
+        suffix=suffix,
+        chunks=chunks,
+    )
+
+
+def _generate_patterned_word_trace(
+    *,
+    stems: List[str],
+    suffixes: List[str],
+    vowels: List[str],
+    patterns: List[str],
+    rng: random.Random,
+    max_length: int,
+) -> ToponymGenerationTrace:
+    attempts = 0
+    while attempts < 80:
+        trace = _render_pattern_trace(
+            rng.choice(patterns),
+            stems=stems,
+            suffixes=suffixes,
+            vowels=vowels,
+            rng=rng,
+        )
+        attempts += 1
+        if _is_pleasant_word(trace.surface.lower(), max_length=max_length):
+            return trace
+    stem = rng.choice(stems)
+    suffix = rng.choice(suffixes or [""])
+    fallback = _join_chunks([stem, suffix]).strip()[:max_length]
+    return ToponymGenerationTrace(
+        surface=format_name(fallback),
+        language_key="",
+        seed_key="",
+        region_type="",
+        pattern="fallback",
+        primary_stem=stem,
+        secondary_stem=stem,
+        suffix=suffix,
+        chunks=[stem, suffix],
+    )
+
+
+def _is_pleasant_word(word: str, *, max_length: int) -> bool:
+    if not 3 <= len(word) <= max_length:
+        return False
+    if len(word) >= 4 and word[-4:-2] == word[-2:]:
+        return False
+    if any(word[index:index + 2] == word[index + 2:index + 4] for index in range(len(word) - 3)):
+        return False
+    return True
+
+
 class LanguageNameGenerator:
     """Build deterministic name pools and toponyms for one language tree."""
 
@@ -107,6 +241,36 @@ class LanguageNameGenerator:
             rng=rng,
             max_length=_MAX_TOPONYM_LENGTH,
         )
+
+    def trace_toponym(
+        self,
+        language_key: str,
+        *,
+        seed_key: str,
+        region_type: str,
+        lexicon: List[str],
+    ) -> ToponymGenerationTrace:
+        """Return the same generated toponym plus its selected pattern parts."""
+        language = self._language_index[language_key]
+        stems = self.toponym_stems(language, lexicon)
+        vowels = self._resolved_list(language, "vowels", _DEFAULT_VOWELS)
+        suffixes = self._resolved_list(
+            language,
+            "toponym_suffixes",
+            self._resolved_list(language, "surname_suffixes", _DEFAULT_TOPONYM_SUFFIXES),
+        )
+        suffixes = dedupe_preserve_order(suffixes + self._runtime_state(language_key).derived_toponym_suffixes)
+        patterns = self._resolved_list(language, "toponym_patterns", _DEFAULT_TOPONYM_PATTERNS)
+        rng = random.Random(stable_seed(language_key, "toponym", seed_key, region_type))
+        trace = _generate_patterned_word_trace(
+            stems=stems,
+            suffixes=suffixes,
+            vowels=vowels,
+            patterns=patterns,
+            rng=rng,
+            max_length=_MAX_TOPONYM_LENGTH,
+        )
+        return trace.with_context(language_key, seed_key, region_type)
 
     def build_naming_rules(self, language: LanguageDefinition, lexicon: List[str]) -> NamingRulesDefinition:
         male_suffixes = self._resolved_list(language, "male_suffixes", _DEFAULT_MALE_SUFFIXES)
@@ -181,29 +345,6 @@ class LanguageNameGenerator:
             return self._resolved_list(self._language_index[language.parent_key], attribute, default)
         return list(default)
 
-    @staticmethod
-    def _join_chunks(chunks: List[str]) -> str:
-        result = ""
-        for chunk in chunks:
-            if not chunk:
-                continue
-            if not result:
-                result = chunk
-                continue
-            if result[-1] == chunk[0]:
-                result += chunk[1:]
-            elif result[-1] in "aeiou" and chunk[0] in "aeiou":
-                result += chunk[1:]
-            else:
-                result += chunk
-        return tidy_word(result)
-
-    @staticmethod
-    def _stem_variant(stem: str, short: bool) -> str:
-        if not short:
-            return stem
-        return shorten_stem(stem, max_length=3) or stem[:3]
-
     def _render_pattern(
         self,
         pattern: str,
@@ -218,24 +359,14 @@ class LanguageNameGenerator:
         chunks: List[str] = []
         for marker in pattern:
             if marker == "R":
-                chunks.append(self._stem_variant(primary, short=False))
+                chunks.append(_stem_variant(primary, short=False))
             elif marker == "r":
-                chunks.append(self._stem_variant(secondary, short=True))
+                chunks.append(_stem_variant(secondary, short=True))
             elif marker == "L":
                 chunks.append(rng.choice(vowels))
             elif marker in {"X", "Y"}:
                 chunks.append(rng.choice(suffixes))
-        return self._join_chunks(chunks)
-
-    @staticmethod
-    def _is_pleasant_word(word: str, *, max_length: int) -> bool:
-        if not 3 <= len(word) <= max_length:
-            return False
-        if len(word) >= 4 and word[-4:-2] == word[-2:]:
-            return False
-        if any(word[index:index + 2] == word[index + 2:index + 4] for index in range(len(word) - 3)):
-            return False
-        return True
+        return _join_chunks(chunks)
 
     def _generate_patterned_word(
         self,
@@ -257,9 +388,9 @@ class LanguageNameGenerator:
                 rng=rng,
             )
             attempts += 1
-            if self._is_pleasant_word(rendered, max_length=max_length):
+            if _is_pleasant_word(rendered, max_length=max_length):
                 return format_name(rendered)
-        fallback = self._join_chunks([rng.choice(stems), rng.choice(suffixes or [""])]).strip()
+        fallback = _join_chunks([rng.choice(stems), rng.choice(suffixes or [""])]).strip()
         return format_name(fallback[:max_length])
 
     def _build_name_pool(

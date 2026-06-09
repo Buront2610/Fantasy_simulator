@@ -9,6 +9,13 @@ from typing import Any
 import pytest
 
 from fantasy_simulator.i18n import get_locale, set_locale
+from fantasy_simulator.observation import (
+    build_era_timeline_projection,
+    build_location_history_projection,
+    build_route_status_projection,
+    build_war_map_projection,
+    build_world_change_report_projection,
+)
 from fantasy_simulator.persistence.save_load import load_simulation, save_simulation
 from fantasy_simulator.reports import generate_monthly_report, generate_yearly_report
 from fantasy_simulator.simulator import Simulator
@@ -16,6 +23,8 @@ from fantasy_simulator.ui.map_renderer import (
     build_map_info,
     render_location_detail,
 )
+from fantasy_simulator.ui.view_models import build_monthly_report_card_view, build_world_dashboard_view
+from fantasy_simulator.world import World
 from tests.harness_test_utils import build_seeded_world, content_lines
 
 
@@ -301,6 +310,175 @@ def _capture_simulation_statistics(world_seed: int) -> dict[str, int]:
     }
 
 
+def _build_pr_k_characterization_sim() -> Simulator:
+    """Build a fixed PR-K world-change scenario that spans the observation surfaces."""
+    world = World()
+    route = next(
+        candidate
+        for candidate in world.routes
+        if {candidate.from_site_id, candidate.to_site_id} == {
+            "loc_aethoria_capital",
+            "loc_hearthglow_town",
+        }
+    )
+    records = [
+        world.apply_route_blocked_change(route.route_id, True, month=3, day=1),
+        world.apply_location_rename_change("loc_aethoria_capital", "Aethoria March", month=3, day=2),
+        world.apply_war_declaration(
+            "stormwatch_wardens",
+            "silverbrook_merchant_league",
+            location_ids=("loc_aethoria_capital", "loc_silverbrook"),
+            month=3,
+            day=3,
+        ),
+        world.apply_controlling_faction_change(
+            "loc_silverbrook",
+            "stormwatch_wardens",
+            month=3,
+            day=4,
+        ),
+        world.apply_terrain_cell_change(
+            2,
+            2,
+            biome="forest",
+            elevation=180,
+            location_id="loc_aethoria_capital",
+            month=3,
+            day=5,
+        ),
+        world.apply_era_shift(
+            "age_of_reckoning",
+            authored_era_keys={"age_of_embers", "age_of_reckoning"},
+            month=3,
+            day=6,
+        ),
+        world.apply_civilization_phase_drift(
+            "crisis",
+            score_deltas={"safety": -10, "prosperity": -5},
+            month=3,
+            day=7,
+        ),
+    ]
+    assert all(record is not None for record in records)
+    return Simulator(world, events_per_year=0, adventure_steps_per_year=0, seed=20260604)
+
+
+def _pr_k_characterization_contract(sim: Simulator) -> dict[str, Any]:
+    """Capture the locale-stable PR-K projection contract for a prepared simulator."""
+    world = sim.world
+    route = next(
+        candidate
+        for candidate in world.routes
+        if {candidate.from_site_id, candidate.to_site_id} == {
+            "loc_aethoria_capital",
+            "loc_hearthglow_town",
+        }
+    )
+    year = world.year
+    month = 3
+    records = world.event_records
+    report_projection = build_world_change_report_projection(
+        event_records=records,
+        year=year,
+        month=month,
+    )
+    monthly_card = build_monthly_report_card_view(world, year, month)
+    dashboard = build_world_dashboard_view(world, current_month=month)
+    route_projection = build_route_status_projection(
+        routes=world.routes,
+        event_records=records,
+        route_id=route.route_id,
+    )
+    location_history = build_location_history_projection(
+        locations=world.grid.values(),
+        event_records=records,
+        location_id="loc_aethoria_capital",
+    )
+    war_projection = build_war_map_projection(event_records=records)
+    era_projection = build_era_timeline_projection(event_records=records)
+    map_info = build_map_info(world)
+    tracked_cell_locations = {
+        route.from_site_id,
+        route.to_site_id,
+        "loc_aethoria_capital",
+        "loc_silverbrook",
+    }
+    map_categories = sorted(
+        (cell.location_id, cell.recent_world_change_categories)
+        for cell in map_info.cells.values()
+        if cell.location_id in tracked_cell_locations
+    )
+
+    return {
+        "event_kinds": [record.kind for record in records],
+        "report_counts": [
+            (count.category, count.count) for count in report_projection.counts_by_category
+        ],
+        "report_entries": [
+            (entry.kind, entry.category, entry.location_ids) for entry in report_projection.entries
+        ],
+        "monthly_card": {
+            "entries": [
+                (entry.kind, entry.category) for entry in report_projection.entries
+            ],
+            "threads": [
+                (thread.category, thread.count, tuple(thread.location_names))
+                for thread in monthly_card.world_change_threads
+            ],
+            "highlighted_locations": monthly_card.highlighted_locations,
+        },
+        "dashboard": {
+            "route_closures": [
+                (entry.route_id, entry.from_location_id, entry.to_location_id)
+                for entry in dashboard.current_route_closures
+            ],
+            "active_wars": [
+                (entry.aggressor_faction_id, entry.target_faction_id)
+                for entry in dashboard.active_wars
+            ],
+            "current_occupations": [
+                (entry.location_id, entry.controlling_faction_id)
+                for entry in dashboard.current_occupations
+            ],
+            "era_status": (
+                dashboard.era_status.era_id,
+                dashboard.era_status.civilization_phase,
+            ) if dashboard.era_status is not None else None,
+            "world_change_categories": [
+                entry.category for entry in dashboard.world_change_entries
+            ],
+            "follow_up_keys": [entry.key for entry in dashboard.follow_up_actions],
+        },
+        "route_projection": {
+            "status": route_projection.status,
+            "history": [(entry.kind, entry.blocked) for entry in route_projection.history],
+        },
+        "location_history": {
+            "name": location_history.official_name,
+            "aliases": location_history.aliases,
+            "rename_transitions": [
+                (entry.old_name, entry.new_name) for entry in location_history.rename_history
+            ],
+        },
+        "war_projection": {
+            "active_wars": [
+                (entry.aggressor_faction_id, entry.target_faction_id)
+                for entry in war_projection.active_wars
+            ],
+            "current_occupations": [
+                (entry.location_id, entry.controlling_faction_id)
+                for entry in war_projection.current_occupations
+            ],
+        },
+        "era_projection": {
+            "current_era_id": era_projection.current_era_id,
+            "current_civilization_phase": era_projection.current_civilization_phase,
+            "kinds": [entry.kind for entry in era_projection.entries],
+        },
+        "map_categories": map_categories,
+    }
+
+
 @pytest.fixture(autouse=True)
 def _restore_locale():
     previous = get_locale()
@@ -448,3 +626,119 @@ def test_midyear_save_load_preserves_projection_contract(tmp_path) -> None:
     restored.advance_months(remaining_months)
 
     assert _projection_contract_for_sim(restored) == _projection_contract_for_sim(sim)
+
+
+def test_pr_k_characterization_golden_contract_covers_world_change_surfaces() -> None:
+    set_locale("en")
+    sim = _build_pr_k_characterization_sim()
+
+    contract = _pr_k_characterization_contract(sim)
+
+    assert contract["event_kinds"] == [
+        "route_blocked",
+        "location_renamed",
+        "war_declared",
+        "location_faction_changed",
+        "terrain_cell_mutated",
+        "era_shifted",
+        "civilization_phase_drifted",
+    ]
+    assert contract["report_counts"] == [
+        ("civilization", 1),
+        ("era", 1),
+        ("location", 1),
+        ("occupation", 1),
+        ("route", 1),
+        ("terrain", 1),
+        ("war", 1),
+    ]
+    assert contract["report_entries"] == [
+        ("route_blocked", "route", ("loc_aethoria_capital", "loc_hearthglow_town")),
+        ("location_renamed", "location", ("loc_aethoria_capital",)),
+        ("war_declared", "war", ("loc_aethoria_capital", "loc_silverbrook")),
+        ("location_faction_changed", "occupation", ("loc_silverbrook",)),
+        ("terrain_cell_mutated", "terrain", ("loc_aethoria_capital",)),
+        ("era_shifted", "era", ()),
+        ("civilization_phase_drifted", "civilization", ()),
+    ]
+    assert contract["monthly_card"] == {
+        "entries": [
+            ("route_blocked", "route"),
+            ("location_renamed", "location"),
+            ("war_declared", "war"),
+            ("location_faction_changed", "occupation"),
+            ("terrain_cell_mutated", "terrain"),
+            ("era_shifted", "era"),
+            ("civilization_phase_drifted", "civilization"),
+        ],
+        "threads": [
+            ("civilization", 1, ()),
+            ("era", 1, ()),
+            ("location", 1, ("Aethoria March",)),
+        ],
+        "highlighted_locations": ["Aethoria March", "Silverbrook", "Hearthglow Town"],
+    }
+    assert contract["dashboard"] == {
+        "route_closures": [
+            (
+                "route_024",
+                "loc_aethoria_capital",
+                "loc_hearthglow_town",
+            )
+        ],
+        "active_wars": [("stormwatch_wardens", "silverbrook_merchant_league")],
+        "current_occupations": [("loc_silverbrook", "stormwatch_wardens")],
+        "era_status": ("age_of_reckoning", "crisis"),
+        "world_change_categories": [
+            "route",
+            "location",
+            "war",
+            "occupation",
+            "terrain",
+            "era",
+            "civilization",
+        ],
+        "follow_up_keys": [
+            "inspect_route_closure",
+            "inspect_occupation",
+            "review_active_war",
+            "review_world_change",
+            "review_world_change",
+        ],
+    }
+    assert contract["route_projection"] == {
+        "status": "blocked",
+        "history": [("route_blocked", True)],
+    }
+    assert contract["location_history"] == {
+        "name": "Aethoria March",
+        "aliases": ("Aethoria Capital",),
+        "rename_transitions": [("Aethoria Capital", "Aethoria March")],
+    }
+    assert contract["war_projection"] == {
+        "active_wars": [("stormwatch_wardens", "silverbrook_merchant_league")],
+        "current_occupations": [("loc_silverbrook", "stormwatch_wardens")],
+    }
+    assert contract["era_projection"] == {
+        "current_era_id": "age_of_reckoning",
+        "current_civilization_phase": "crisis",
+        "kinds": ["era_shifted", "civilization_phase_drifted"],
+    }
+    assert contract["map_categories"] == [
+        ("loc_aethoria_capital", ("route", "location", "war", "terrain")),
+        ("loc_hearthglow_town", ("route",)),
+        ("loc_silverbrook", ("war", "occupation")),
+    ]
+
+
+def test_pr_k_characterization_golden_contract_survives_save_load(tmp_path) -> None:
+    set_locale("en")
+    sim = _build_pr_k_characterization_sim()
+    save_path = tmp_path / "pr-k-characterization-golden.json"
+
+    assert save_simulation(sim, str(save_path)) is True
+
+    restored = load_simulation(str(save_path))
+
+    assert restored is not None
+    assert _pr_k_characterization_contract(restored) == _pr_k_characterization_contract(sim)

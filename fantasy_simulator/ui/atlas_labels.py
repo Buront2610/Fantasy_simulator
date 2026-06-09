@@ -18,7 +18,7 @@ def _overlay_suffix(cell: "MapCellInfo") -> str:
     """Compact overlay markers for a site cell.
 
     Markers: ``!`` high danger, ``$`` high traffic, ``?`` high rumor,
-    ``m`` memorial, ``a`` alias, ``+`` recent death.
+    ``m`` memorial, ``a`` alias, ``+`` recent death, ``w`` world change.
     """
     parts: List[str] = []
     if cell.danger_band == "high":
@@ -33,6 +33,8 @@ def _overlay_suffix(cell: "MapCellInfo") -> str:
         parts.append("a")
     if cell.recent_death_site:
         parts.append("+")
+    if cell.recent_world_change_count:
+        parts.append("w")
     return "".join(parts)
 
 

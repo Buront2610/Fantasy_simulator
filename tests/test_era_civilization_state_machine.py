@@ -15,10 +15,12 @@ from fantasy_simulator.world_change import (
     build_era_shift_change_set,
 )
 from fantasy_simulator.world_change.state_machines import (
+    EraRuntimeRules,
     transition_civilization_phase,
     transition_era_shift,
     transition_world_scores,
 )
+from fantasy_simulator.world_change.event_contracts import validate_world_change_event_contract
 
 
 @dataclass
@@ -72,6 +74,18 @@ def test_civilization_phase_state_machine_distinguishes_phase_drift() -> None:
     assert transition.event_kind == "civilization_phase_drifted"
 
 
+def test_civilization_phase_state_machine_accepts_rule_authored_phase() -> None:
+    transition = transition_civilization_phase(
+        "dawn",
+        "storm",
+        civilization_phases=("dawn", "storm", "renewal"),
+    )
+
+    assert transition is not None
+    assert transition.old_phase == "dawn"
+    assert transition.new_phase == "storm"
+
+
 def test_world_score_transition_clamps_to_defined_range() -> None:
     transitions = transition_world_scores(
         {"prosperity": 95, "safety": 8, "traffic": 50, "mood": 50},
@@ -82,6 +96,16 @@ def test_world_score_transition_clamps_to_defined_range() -> None:
         ("prosperity", 95, 100, 5),
         ("safety", 8, 0, -8),
     ]
+
+
+def test_world_score_transition_accepts_rule_authored_score_key() -> None:
+    transitions = transition_world_scores(
+        {"omens": 48},
+        {"omens": 9},
+        score_keys=("omens",),
+    )
+
+    assert [(item.score_key, item.old_value, item.new_value) for item in transitions] == [("omens", 48, 57)]
 
 
 def test_era_shift_changeset_contains_event_and_runtime_update() -> None:
@@ -281,6 +305,37 @@ def test_civilization_phase_drift_changeset_contains_phase_and_score_updates() -
     assert render_event_record(record, locale="en", strict=True) == (
         "Civilization drifted from stable to crisis."
     )
+
+
+def test_civilization_phase_drift_changeset_uses_rule_authored_vocabulary() -> None:
+    runtime = _EraRuntime(
+        era_key="age_of_embers",
+        civilization_phase="dawn",
+        world_scores={"omens": 48},
+    )
+    command = DriftCivilizationPhaseCommand(
+        new_phase="storm",
+        year=1003,
+        score_deltas={"omens": 9},
+    )
+
+    change_set = build_civilization_phase_drift_change_set(
+        command,
+        era_runtime=runtime,
+        era_rules=EraRuntimeRules(
+            civilization_phases=("dawn", "storm", "renewal"),
+            world_score_keys=("omens",),
+        ),
+        describe=_describe,
+    )
+
+    assert change_set is not None
+    record = change_set.events[0]
+    assert record.render_params["new_civilization_phase"] == "storm"
+    assert record.render_params["score_changes"] == [
+        {"score_key": "omens", "old_value": 48, "new_value": 57, "delta": 9},
+    ]
+    validate_world_change_event_contract(record)
 
 
 def test_world_change_reducer_applies_era_runtime_update_and_records_event() -> None:

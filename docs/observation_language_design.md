@@ -660,6 +660,7 @@ python -m fantasy_simulator.content preview-roots bundle.json --language highlan
 
 - primary reason、supplemental reasons、recommendationsをまとめて表示。
 - feasibleなrecommendationをmenu actionへ接続。
+  - first passとして dashboard follow-up から character story と location map detail へ直接遷移できるようにした。
 - dashboardにrecent world-changeとrumor contextを追加。
 - 既存test doublesでfocused UI testsを追加。
 
@@ -684,10 +685,10 @@ python -m fantasy_simulator.content preview-roots bundle.json --language highlan
 
 作業:
 
-- tracking stateを追加。
-- optional audience/bias fieldsを追加。
-- canonical recordから複数rumor phrasingを生成。
-- related location/event/faction IDsを露出。
+- tracking stateを追加。`Rumor.tracked` が保存互換で round-trip し、dashboard の hot rumors で優先される。
+- optional audience/bias fieldsを追加。`audience_key`、`bias_tags`、`distortion_level` を canonical record 起点で生成し、rumor board detail に露出する。
+- canonical recordから複数rumor phrasingを生成。初期 slice では正規 record 由来の tracking metadata を先に固定し、複数 phrasing / audience 別文体は後続で広げる。
+- related location/event/faction IDsを露出。`related_location_ids`、`related_event_ids`、`related_faction_ids` を rumor summary/detail から参照できる。
 
 ### WK-1: world change ripple hooks
 
@@ -697,9 +698,9 @@ python -m fantasy_simulator.content preview-roots bundle.json --language highlan
 
 作業:
 
-- route blockが近傍locationのdanger/traffic/rumor heatへ影響する。
-- occupationがrumor/report hookを生む。
-- terrain mutationをdetail/map/reportに出す。
+- route blockが近傍locationのdanger/traffic/rumor heatへ影響し、自然発生時は tracked rumor と report rumor thread を即時生成する。
+- occupationがrumor/report hookを生む。初期 hook は natural world-change driver の canonical record から tracked rumor を生成する形で共通化済み。
+- terrain mutationをdetail/map/reportに出す。location-linked terrain change も同じ tracked rumor hook を通る。
 - 新規save fieldはcontract文書なしに追加しない。
 
 ### LG-1: etymology DTO / read model
@@ -710,10 +711,12 @@ python -m fantasy_simulator.content preview-roots bundle.json --language highlan
 
 作業:
 
-- `ToponymComponent` と `ToponymEtymology` DTOを追加。
-- 可能な範囲で既存language dataからgenerated endonymのetymology previewを作る。
-- canonical/generated/alias namesを含むlocation-name projectionを追加。
-- location detailに短いetymology lineを出す。
+- `ToponymComponent` と `ToponymEtymology` DTOを追加済み。
+- 既存language dataからgenerated endonymのstem/suffix/pattern traceを取り、etymology previewを作る。
+- authored native nameは生成traceではなく、著者設定の現地名としてread modelに出す。
+- location observation/detailに短いetymology lineを出す。
+  - map location detail でも `Name origin` / `地名由来` を表示し、地図から地名由来へ直接たどれるようにした。
+- 永続化は追加しない。persistent historyはLG-4へ残す。
 
 ### LG-2: semantic roots
 
@@ -723,11 +726,13 @@ python -m fantasy_simulator.content preview-roots bundle.json --language highlan
 
 作業:
 
-- static `SemanticRootDefinition` と `LanguageRootRealization` を追加。
+- static `SemanticRootDefinition` と `LanguageRootRealization` を追加済み。
 - `dark`、`pass`、`river`、`gate`、`ash`、`old`、`sacred`、
-  `market`、`stone` など少数のAethoria rootをseedする。
-- `meaning components -> language roots -> surface` を決定的に生成する。
-- content CLI inspectionを拡張する。
+  `market`、`stone` のAethoria rootをseed済み。
+- `meaning components -> language roots -> surface` を決定的に生成する
+  authoring previewを追加済み。
+- content CLI inspectionと `preview-roots` を拡張済み。
+- 実際のlocation endonym置換や永続etymologyはLG-4へ残す。
 
 ### LG-3: language families
 
@@ -737,10 +742,11 @@ python -m fantasy_simulator.content preview-roots bundle.json --language highlan
 
 作業:
 
-- `LanguageFamilyDefinition` を `SettingBundle` に追加。
-- `parent_key` を壊さず、languageをfamilyへ紐づける。
-- language atlas view modelを追加。
-- authoring coverage checkを追加。
+- `LanguageFamilyDefinition` を `SettingBundle` に追加済み。
+- `parent_key` を壊さず、`LanguageDefinition.family_key` でlanguageをfamilyへ紐づける。
+- language atlas view modelと `preview-language-atlas` を追加済み。
+- authoring coverage checkとして family未設定/未知family参照を検出する。
+- persistent location name historyやfamily別生成ルールはLG-4以降へ残す。
 
 ### LG-4: persistent location name history
 

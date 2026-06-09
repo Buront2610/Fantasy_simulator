@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, Mapping
+from typing import Container, Iterable, Literal, Mapping, cast
 
 
 RouteStatus = Literal["open", "blocked"]
@@ -23,6 +23,17 @@ WORLD_SCORE_KEYS = ("prosperity", "safety", "traffic", "mood")
 
 
 @dataclass(frozen=True)
+class EraRuntimeRules:
+    """Allowed era runtime vocabulary for PR-K era/civilization transitions."""
+
+    civilization_phases: tuple[str, ...] = CIVILIZATION_PHASES
+    world_score_keys: tuple[str, ...] = WORLD_SCORE_KEYS
+
+
+DEFAULT_ERA_RUNTIME_RULES = EraRuntimeRules()
+
+
+@dataclass(frozen=True)
 class RouteStateTransition:
     """A route blocked/open transition."""
 
@@ -31,6 +42,24 @@ class RouteStateTransition:
     old_status: RouteStatus
     new_status: RouteStatus
     event_kind: Literal["route_blocked", "route_reopened"]
+
+
+@dataclass(frozen=True)
+class WarDeclarationTransition:
+    """A headless faction war declaration transition."""
+
+    aggressor_faction_id: str
+    target_faction_id: str
+    event_kind: Literal["war_declared"] = "war_declared"
+
+
+@dataclass(frozen=True)
+class WarEndedTransition:
+    """A headless faction war-ending transition."""
+
+    aggressor_faction_id: str
+    target_faction_id: str
+    event_kind: Literal["war_ended"] = "war_ended"
 
 
 @dataclass(frozen=True)
@@ -122,6 +151,38 @@ def route_status(blocked: bool) -> RouteStatus:
     if not isinstance(blocked, bool):
         raise TypeError("blocked must be a bool")
     return "blocked" if blocked else "open"
+
+
+def transition_war_declaration(
+    aggressor_faction_id: str,
+    target_faction_id: str,
+) -> WarDeclarationTransition:
+    """Return a war declaration transition after validating both factions."""
+    aggressor = aggressor_faction_id.strip()
+    target = target_faction_id.strip()
+    if not aggressor:
+        raise ValueError("aggressor_faction_id must not be blank")
+    if not target:
+        raise ValueError("target_faction_id must not be blank")
+    if aggressor == target:
+        raise ValueError("war declaration requires two distinct factions")
+    return WarDeclarationTransition(aggressor_faction_id=aggressor, target_faction_id=target)
+
+
+def transition_war_ended(
+    aggressor_faction_id: str,
+    target_faction_id: str,
+) -> WarEndedTransition:
+    """Return a war-ending transition after validating both factions."""
+    aggressor = aggressor_faction_id.strip()
+    target = target_faction_id.strip()
+    if not aggressor:
+        raise ValueError("aggressor_faction_id must not be blank")
+    if not target:
+        raise ValueError("target_faction_id must not be blank")
+    if aggressor == target:
+        raise ValueError("war ending requires two distinct factions")
+    return WarEndedTransition(aggressor_faction_id=aggressor, target_faction_id=target)
 
 
 def transition_route_blocked_state(old_blocked: bool, requested_blocked: bool) -> RouteStateTransition | None:
@@ -216,12 +277,25 @@ def transition_terrain_cell(
     return transition
 
 
-def validate_civilization_phase(value: str) -> CivilizationPhase:
+def _allowed_civilization_phases(phases: Iterable[str] | None) -> tuple[str, ...]:
+    if phases is None:
+        return CIVILIZATION_PHASES
+    allowed = tuple(str(phase).strip() for phase in phases if str(phase).strip())
+    if not allowed:
+        raise ValueError("civilization phase rules must not be empty")
+    return allowed
+
+
+def validate_civilization_phase(
+    value: str,
+    *,
+    phases: Iterable[str] | None = None,
+) -> CivilizationPhase:
     """Return a normalized civilization phase or raise for unknown phase names."""
     normalized = value.strip()
-    if normalized not in CIVILIZATION_PHASES:
+    if normalized not in _allowed_civilization_phases(phases):
         raise ValueError(f"unknown civilization phase: {value}")
-    return normalized
+    return cast(CivilizationPhase, normalized)
 
 
 def _normalize_era_key(value: str, *, field_name: str) -> str:
@@ -237,12 +311,13 @@ def transition_era_shift(
     requested_era_key: str,
     old_civilization_phase: str,
     requested_civilization_phase: str,
+    civilization_phases: Iterable[str] | None = None,
 ) -> EraShiftTransition | None:
     """Return an era transition, or ``None`` when era and phase are unchanged."""
     normalized_old_era = _normalize_era_key(old_era_key, field_name="old_era_key")
     normalized_new_era = _normalize_era_key(requested_era_key, field_name="new_era_key")
-    old_phase = validate_civilization_phase(old_civilization_phase)
-    new_phase = validate_civilization_phase(requested_civilization_phase)
+    old_phase = validate_civilization_phase(old_civilization_phase, phases=civilization_phases)
+    new_phase = validate_civilization_phase(requested_civilization_phase, phases=civilization_phases)
     if normalized_old_era == normalized_new_era:
         if old_phase != new_phase:
             raise ValueError("same-era phase changes must use DriftCivilizationPhaseCommand")
@@ -258,10 +333,12 @@ def transition_era_shift(
 def transition_civilization_phase(
     old_phase: str,
     requested_phase: str,
+    *,
+    civilization_phases: Iterable[str] | None = None,
 ) -> CivilizationPhaseTransition | None:
     """Return a civilization phase transition, or ``None`` for an idempotent phase request."""
-    normalized_old = validate_civilization_phase(old_phase)
-    normalized_new = validate_civilization_phase(requested_phase)
+    normalized_old = validate_civilization_phase(old_phase, phases=civilization_phases)
+    normalized_new = validate_civilization_phase(requested_phase, phases=civilization_phases)
     if normalized_old == normalized_new:
         return None
     return CivilizationPhaseTransition(old_phase=normalized_old, new_phase=normalized_new)
@@ -276,11 +353,14 @@ def _score_value(value: int, *, field_name: str) -> int:
 def transition_world_scores(
     current_scores: Mapping[str, int],
     score_deltas: Mapping[str, int],
+    *,
+    score_keys: Container[str] | None = None,
 ) -> tuple[WorldScoreTransition, ...]:
     """Return bounded world-score transitions for non-zero score deltas."""
+    allowed_score_keys = WORLD_SCORE_KEYS if score_keys is None else score_keys
     transitions: list[WorldScoreTransition] = []
     for score_key, delta in score_deltas.items():
-        if score_key not in WORLD_SCORE_KEYS:
+        if score_key not in allowed_score_keys:
             raise ValueError(f"unknown world score: {score_key}")
         if score_key not in current_scores:
             raise KeyError(score_key)

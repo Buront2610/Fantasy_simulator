@@ -31,7 +31,7 @@ def _run_simulation(world: World, years: int, ctx: UIContext | None = None) -> S
     out = ctx.out
     out.print_line()
     out.print_heading(f"  {tr('running_simulation_details', years=years, events=8)}")
-    sim = Simulator(world, events_per_year=8)
+    sim = Simulator(world, events_per_year=8, world_changes_per_year=1)
     for _ in range(years):
         sim.advance_years(1)
         alive = sum(1 for c in world.characters if c.alive)
@@ -60,6 +60,44 @@ def _advance_simulation(sim: Simulator, years: int, ctx: UIContext | None = None
             f"{pending} {tr('pending_choices')}"
         )
     out.print_success(f"  {tr('simulation_advanced_to_year', year=sim.world.year)}")
+
+
+def _format_auto_pause_context(pause_context: dict[str, Any]) -> str:
+    actor = pause_context.get("character", "")
+    location = pause_context.get("location", "")
+    if actor and location:
+        return tr("auto_pause_context", actor=actor, location=location)
+    if location:
+        return tr("auto_pause_context_location", location=location)
+    if actor:
+        return tr("auto_pause_context_actor", actor=actor)
+    return ""
+
+
+def _route_target_label(world: Any, route_id: str) -> str:
+    for route in getattr(world, "routes", []):
+        if getattr(route, "route_id", "") != route_id:
+            continue
+        from_id = getattr(route, "from_site_id", "")
+        to_id = getattr(route, "to_site_id", "")
+        if hasattr(world, "location_name") and from_id and to_id:
+            return f"{world.location_name(from_id)} - {world.location_name(to_id)}"
+        return route_id
+    return route_id
+
+
+def _format_auto_pause_action_target(world: Any, action: dict[str, Any]) -> str:
+    target_type = action.get("target_type", "")
+    target_id = action.get("target_id", "")
+    if not target_type or not target_id:
+        return ""
+    if target_type == "location" and hasattr(world, "location_name"):
+        target = world.location_name(target_id)
+    elif target_type == "route":
+        target = _route_target_label(world, target_id)
+    else:
+        target = str(target_id)
+    return tr(f"auto_pause_action_target_{target_type}", target=target)
 
 
 def _advance_auto(sim: Simulator, ctx: UIContext | None = None) -> None:
@@ -91,10 +129,9 @@ def _advance_auto(sim: Simulator, ctx: UIContext | None = None) -> None:
         out.print_warning(
             f"  {tr('auto_paused_after_months', years=years, months=remainder_months)}: {reason_text}"
         )
-    if pause_context:
-        actor = pause_context.get("character", "-")
-        location = pause_context.get("location", "-")
-        out.print_dim(f"  {tr('auto_pause_context', actor=actor, location=location)}")
+    context_text = _format_auto_pause_context(pause_context)
+    if context_text:
+        out.print_dim(f"  {context_text}")
     subreasons = result.get("pause_subreasons", [])
     if subreasons:
         out.print_dim(f"  {tr('auto_pause_subreasons')}")
@@ -115,6 +152,8 @@ def _advance_auto(sim: Simulator, ctx: UIContext | None = None) -> None:
             action_key = item.get("key", "review_recent_events")
             actor = item.get("character", "-") or "-"
             location = item.get("location", "-") or "-"
+            target_text = _format_auto_pause_action_target(sim.world, item)
+            suffix = f" ({target_text})" if target_text else ""
             out.print_dim(
-                f"    - {tr(f'auto_pause_recommendation_{action_key}', actor=actor, location=location)}"
+                f"    - {tr(f'auto_pause_recommendation_{action_key}', actor=actor, location=location)}{suffix}"
             )

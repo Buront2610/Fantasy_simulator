@@ -13,6 +13,8 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Iterable, Sequence
 
+from .language_families import language_atlas_lines
+from .semantic_roots import build_semantic_root_preview, semantic_root_coverage_lines
 from .setting_bundle import build_setting_bundle_authoring_summary, load_setting_bundle
 
 
@@ -35,8 +37,18 @@ def _cmd_inspect(args: argparse.Namespace) -> int:
     print(f"sites: {summary.site_count}")
     print(f"routes: {summary.route_count}")
     print(f"languages: {summary.language_count}")
+    print(f"language families: {summary.language_family_count}")
+    print(f"semantic roots: {summary.semantic_root_count}")
+    print(f"language root realizations: {summary.language_root_realization_count}")
     print(f"cultures: {summary.culture_count}")
     print(f"factions: {summary.faction_count}")
+    print(f"faction relationships: {summary.faction_relationship_count}")
+    if summary.faction_relationship_status_counts:
+        counts = ", ".join(
+            f"{status}={count}"
+            for status, count in summary.faction_relationship_status_counts.items()
+        )
+        print(f"faction relationship statuses: {counts}")
     if summary.site_ids_without_language_key:
         print("missing site language keys: " + ", ".join(summary.site_ids_without_language_key))
     if summary.site_ids_without_language_community:
@@ -75,6 +87,31 @@ def _language_preview_lines(bundle_path: str, *, limit: int) -> Iterable[str]:
 
 def _cmd_preview_names(args: argparse.Namespace) -> int:
     for line in _language_preview_lines(args.bundle, limit=max(1, args.limit)):
+        print(line)
+    return 0
+
+
+def _cmd_preview_roots(args: argparse.Namespace) -> int:
+    world = _load(args.bundle).world_definition
+    selected_language = args.language or None
+    for line in semantic_root_coverage_lines(world, language_key=selected_language):
+        print(line)
+    if args.roots:
+        root_keys = [root.strip() for root in args.roots.split(",") if root.strip()]
+        if not root_keys:
+            return 0
+        language_keys = [args.language] if args.language else [language.language_key for language in world.languages]
+        for language_key in language_keys:
+            preview = build_semantic_root_preview(world, language_key, root_keys)
+            missing = f" | missing: {', '.join(preview.missing_root_keys)}" if preview.missing_root_keys else ""
+            components = ", ".join(preview.component_surfaces) or "-"
+            print(f"{language_key}: {preview.surface or '-'} [{components}]{missing}")
+    return 0
+
+
+def _cmd_preview_language_atlas(args: argparse.Namespace) -> int:
+    world = _load(args.bundle).world_definition
+    for line in language_atlas_lines(world):
         print(line)
     return 0
 
@@ -123,6 +160,16 @@ def build_parser() -> argparse.ArgumentParser:
     preview_names.add_argument("bundle")
     preview_names.add_argument("--limit", type=int, default=3)
     preview_names.set_defaults(func=_cmd_preview_names)
+
+    preview_roots = subparsers.add_parser("preview-roots")
+    preview_roots.add_argument("bundle")
+    preview_roots.add_argument("--language", default="")
+    preview_roots.add_argument("--roots", default="")
+    preview_roots.set_defaults(func=_cmd_preview_roots)
+
+    preview_language_atlas = subparsers.add_parser("preview-language-atlas")
+    preview_language_atlas.add_argument("bundle")
+    preview_language_atlas.set_defaults(func=_cmd_preview_language_atlas)
 
     diff = subparsers.add_parser("diff")
     diff.add_argument("old_bundle")

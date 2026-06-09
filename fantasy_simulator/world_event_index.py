@@ -47,21 +47,34 @@ def location_ids_for_record(record: WorldEventRecord) -> List[str]:
 
 def _event_signature(records: List[WorldEventRecord]) -> Tuple[Any, ...]:
     """Return a mutation-sensitive signature for direct compatibility edits."""
-    return tuple(
-        (
-            record.record_id,
-            record.kind,
-            record.year,
-            record.month,
-            record.location_id or "",
-            record.primary_actor_id or "",
-            tuple(record.secondary_actor_ids),
-            tuple(record.tags),
-            _freeze_payload(record.render_params),
-            _freeze_payload(record.impacts),
-        )
-        for record in records
+    return tuple(_record_signature(record) for record in records)
+
+
+def _record_signature(record: WorldEventRecord) -> Tuple[Any, ...]:
+    return (
+        record.record_id,
+        record.kind,
+        record.year,
+        record.month,
+        record.location_id or "",
+        record.primary_actor_id or "",
+        tuple(record.secondary_actor_ids),
+        tuple(record.tags),
+        _freeze_payload(record.render_params),
+        _freeze_payload(record.impacts),
     )
+
+
+def _pruned_record_lists(
+    records_by_key: Dict[Any, List[WorldEventRecord]],
+    surviving_ids: Set[str],
+) -> Dict[Any, List[WorldEventRecord]]:
+    return {
+        key: surviving_records
+        for key, records in records_by_key.items()
+        for surviving_records in [[record for record in records if record.record_id in surviving_ids]]
+        if surviving_records
+    }
 
 
 @dataclass
@@ -79,6 +92,20 @@ class EventHistoryIndex:
 
     def invalidate(self) -> None:
         self.signature = ()
+
+    def ensure_record_ids_current(self, records: List[WorldEventRecord]) -> None:
+        """Keep only the duplicate-detection set current for canonical writes.
+
+        Canonical append needs existing record IDs before it mutates the event
+        store.  It does not need the heavier location/actor/year/kind lookup
+        tables; those remain a read-side concern and are rebuilt by
+        ``ensure_current`` when queried.
+        """
+        record_ids = {record.record_id for record in records}
+        if record_ids == self.record_ids:
+            return
+        self.record_ids = record_ids
+        self.invalidate()
 
     def ensure_current(self, records: List[WorldEventRecord]) -> None:
         signature = _event_signature(records)
@@ -119,6 +146,52 @@ class EventHistoryIndex:
         self.by_month = by_month
         self.by_kind = by_kind
         self.signature = signature
+
+    def append_current(self, records: List[WorldEventRecord], record: WorldEventRecord) -> None:
+        """Update an already-current index after a canonical append."""
+        if record not in records:
+            self.invalidate()
+            return
+        if len(self.signature) + 1 == len(records):
+            self._add_record(record)
+            self.signature = (*self.signature, _record_signature(record))
+            return
+
+        self._add_record(record)
+        self._prune_to_surviving_records(records)
+        self.signature = _event_signature(records)
+
+    def _add_record(self, record: WorldEventRecord) -> None:
+        self.record_ids.add(record.record_id)
+        self.by_id[record.record_id] = record
+        for location_id in location_ids_for_record(record):
+            self.by_location.setdefault(location_id, []).append(record)
+        indexed_actor_ids: Set[str] = set()
+        if record.primary_actor_id:
+            self.by_actor.setdefault(record.primary_actor_id, []).append(record)
+            indexed_actor_ids.add(record.primary_actor_id)
+        for actor_id in record.secondary_actor_ids:
+            if actor_id in indexed_actor_ids:
+                continue
+            self.by_actor.setdefault(actor_id, []).append(record)
+            indexed_actor_ids.add(actor_id)
+        self.by_year.setdefault(record.year, []).append(record)
+        self.by_month.setdefault((record.year, record.month), []).append(record)
+        self.by_kind.setdefault(record.kind, []).append(record)
+
+    def _prune_to_surviving_records(self, records: List[WorldEventRecord]) -> None:
+        surviving_ids = {record.record_id for record in records}
+        self.record_ids.intersection_update(surviving_ids)
+        self.by_id = {
+            record_id: record
+            for record_id, record in self.by_id.items()
+            if record_id in surviving_ids
+        }
+        self.by_location = _pruned_record_lists(self.by_location, surviving_ids)
+        self.by_actor = _pruned_record_lists(self.by_actor, surviving_ids)
+        self.by_year = _pruned_record_lists(self.by_year, surviving_ids)
+        self.by_month = _pruned_record_lists(self.by_month, surviving_ids)
+        self.by_kind = _pruned_record_lists(self.by_kind, surviving_ids)
 
     def by_location_id(self, records: List[WorldEventRecord], location_id: str) -> List[WorldEventRecord]:
         self.ensure_current(records)

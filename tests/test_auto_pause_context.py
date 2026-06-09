@@ -2,6 +2,7 @@
 
 from fantasy_simulator.character import Character
 from fantasy_simulator.adventure import AdventureChoice, AdventureRun
+from fantasy_simulator.event_models import WorldEventRecord
 from fantasy_simulator.simulator import Simulator
 from fantasy_simulator.world import World
 
@@ -88,6 +89,43 @@ def test_pending_decision_pause_payload_uses_adventure_ids():
     assert recommendation["location_id"] == "loc_thornwood"
 
 
+def test_world_change_notification_pause_payload_points_to_dashboard_and_location():
+    world = World()
+    record = WorldEventRecord(
+        record_id="evt_route_blocked",
+        kind="route_blocked",
+        year=world.year,
+        month=1,
+        location_id="loc_aethoria_capital",
+        severity=2,
+        tags=["world_change", "location:loc_aethoria_capital"],
+        render_params={"route_id": "route_capital_thornwood"},
+        description="The capital road was blocked.",
+    )
+    sim = Simulator(world, events_per_year=0, seed=1)
+    sim.pending_notifications.append(record)
+
+    assert sim._check_pause_conditions() == "world_change_notification"
+    context = sim._pause_context_for_reason("world_change_notification")
+    subreason = sim._pause_subreasons_for_reason("world_change_notification")[0]
+    recommendation = sim._pause_recommendations_for_reason("world_change_notification")[0]
+
+    assert context["record_id"] == "evt_route_blocked"
+    assert context["event_kind"] == "route_blocked"
+    assert context["location_id"] == "loc_aethoria_capital"
+    assert context["target_type"] == "route"
+    assert context["target_id"] == "route_capital_thornwood"
+    assert subreason["key"] == "world_change_notification"
+    assert subreason["location_id"] == "loc_aethoria_capital"
+    assert subreason["record_id"] == "evt_route_blocked"
+    assert subreason["target_type"] == "route"
+    assert subreason["target_id"] == "route_capital_thornwood"
+    assert recommendation["key"] == "review_world_dashboard"
+    assert recommendation["record_id"] == "evt_route_blocked"
+    assert recommendation["target_type"] == "route"
+    assert recommendation["target_id"] == "route_capital_thornwood"
+
+
 def test_years_elapsed_pause_payload_is_stable_and_recommendations_are_capped():
     world = World()
     char = Character("Dain", 33, "Male", "Human", "Guard", location_id="loc_aethoria_capital")
@@ -110,6 +148,10 @@ def test_years_elapsed_pause_payload_is_stable_and_recommendations_are_capped():
         "character": "",
         "location_id": "",
         "location": "",
+        "record_id": "",
+        "event_kind": "",
+        "target_type": "",
+        "target_id": "",
     }
     assert recommendation == {
         "key": "review_recent_events",
@@ -117,6 +159,14 @@ def test_years_elapsed_pause_payload_is_stable_and_recommendations_are_capped():
         "character": "",
         "location_id": "",
         "location": "",
+        "record_id": "",
+        "event_kind": "",
+        "target_type": "",
+        "target_id": "",
     }
     assert len(combined) <= 3
-    assert len({(item["key"], item["character_id"], item["location_id"]) for item in combined}) == len(combined)
+    identities = {
+        (item["key"], item["character_id"], item["location_id"], item["record_id"], item["target_id"])
+        for item in combined
+    }
+    assert len(identities) == len(combined)

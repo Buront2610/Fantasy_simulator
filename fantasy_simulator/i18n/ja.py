@@ -185,6 +185,21 @@ TEXT_JA: Dict[str, str] = {
     'training_effort_tireless': '手が痛むまでたゆまず鍛え続け',
     'training_effort_scrolls': '古代の巻物を読み込み',
     'training_effort_limits': '限界を越えるまで己を追い込み',
+    'event_story_battle_old_grudge': '古い遺恨がついに表に出た。',
+    'event_story_battle_public_challenge': '人目のある場での挑発が、刃を抜かせた。',
+    'event_story_battle_route_dispute': '街道の通行を巡る争いが、暴力に変わった。',
+    'event_story_discovery_rumor': '酒場で聞いた噂が、{name} をその場所へ向かわせた。',
+    'event_story_discovery_map': '傷んだ地図が、{name} にわずかな手掛かりを与えた。',
+    'event_story_discovery_omen': '{location} 周辺の奇妙な兆しが、{name} を先へ導いた。',
+    'event_story_journey_request': '{destination} からの依頼が、{name} を旅路へ押し出した。',
+    'event_story_journey_weather': '変わり始めた空模様が、{name} に早い決断を迫った。',
+    'event_story_journey_missing_caravan': '行方不明の隊商の噂が、旅に急を告げていた。',
+    'event_story_meeting_shared_task': '共通の用件が、{name1} と {name2} を向き合わせた。',
+    'event_story_meeting_market_tension': '{location} の混み合う通りでは、互いを避ける余地がなかった。',
+    'event_story_meeting_old_story': '古い話に引かれ、{name1} と {name2} は同じ場所へ来ていた。',
+    'event_story_training_deadline': '迫る試練が、その鍛錬に明確な目的を与えていた。',
+    'event_story_training_rival': '好敵手の噂が、{name} の集中を鋭くした。',
+    'event_story_training_failed_attempt': '直近の失敗が、鍛え直す必要を突きつけていた。',
     'meeting_positive': '{name1} と {name2} は {location} で出会い、素晴らしい相性を見せた。（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）',  # noqa: E501
     'meeting_pleasant': '{name1} と {name2} は {location} で気持ちの良い交流をした。（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）',  # noqa: E501
     'meeting_neutral': '{name1} と {name2} は {location} で軽く会釈を交わした。（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）',  # noqa: E501
@@ -347,10 +362,19 @@ TEXT_JA: Dict[str, str] = {
     'events.generic.summary': '{description}',
     'events.battle.summary': '{actor} は {location} で戦った。',
     'events.battle_result.summary': '{winner} は {loser} に勝利した。{injury}',
+    'events.battle_result.summary.narrative': '{story_hook} {winner} は {loser} に勝利した。{injury}',
     'events.battle_fatal.summary': '{winner} は {loser} に勝利したが、{loser} はその戦いを生き延びられなかった。',
+    'events.battle_fatal.summary.narrative': (
+        '{story_hook} {winner} は {loser} に勝利したが、{loser} はその戦いを生き延びられなかった。'
+    ),
     'events.meeting.summary': '{actor} は {location} で {other} と出会った。',
     'events.meeting_positive.summary': (
         '{name1} と {name2} は {location} で出会い、素晴らしい相性を見せた。'
+        '（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        '平均: {relationship_avg:+d}）'
+    ),
+    'events.meeting_positive.summary.narrative': (
+        '{story_hook} {name1} と {name2} は {location} で素晴らしい相性を見せた。'
         '（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         '平均: {relationship_avg:+d}）'
     ),
@@ -359,8 +383,18 @@ TEXT_JA: Dict[str, str] = {
         '（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         '平均: {relationship_avg:+d}）'
     ),
+    'events.meeting_pleasant.summary.narrative': (
+        '{story_hook} {name1} と {name2} は {location} で気持ちの良い交流をした。'
+        '（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        '平均: {relationship_avg:+d}）'
+    ),
     'events.meeting_neutral.summary': (
         '{name1} と {name2} は {location} で軽く会釈を交わした。'
+        '（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        '平均: {relationship_avg:+d}）'
+    ),
+    'events.meeting_neutral.summary.narrative': (
+        '{story_hook} {name1} と {name2} は {location} で軽く会釈を交わした。'
         '（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         '平均: {relationship_avg:+d}）'
     ),
@@ -369,16 +403,29 @@ TEXT_JA: Dict[str, str] = {
         '（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         '平均: {relationship_avg:+d}）'
     ),
+    'events.meeting_negative.summary.narrative': (
+        '{story_hook} {name1} と {name2} は {location} でぎこちない出会いをした。'
+        '（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        '平均: {relationship_avg:+d}）'
+    ),
     'events.marriage.summary': (
         '{name1}（{race1} {job1}）と {name2}（{race2} {job2}）は {location} で盛大に結婚した。'
     ),
     'events.discovery.summary': '{name} は {location} 近くで {item} を発見した。{extra}',
+    'events.discovery.summary.narrative': '{story_hook} {name} は {location} 近くで {item} を発見した。{extra}',
     'events.skill_training.summary': (
         '{name} は {effort}、{skill} を鍛えた。（Lv {old_level} -> Lv {new_level}）'
+    ),
+    'events.skill_training.summary.narrative': (
+        '{story_hook} {name} は {effort}、{skill} を鍛えた。（Lv {old_level} -> Lv {new_level}）'
     ),
     'events.journey.summary': (
         '{name} は {old_location} から {destination}（{region_type}）へ旅し、{road_event}。'
         '{dungeon_bonus}'
+    ),
+    'events.journey.summary.narrative': (
+        '{story_hook} {name} は {old_location} から {destination}（{region_type}）へ旅し、'
+        '{road_event}。{dungeon_bonus}'
     ),
     'events.journey_no_destination.summary': '{name} は旅に出ようとしたが、行き先が見つからなかった。',
     'events.aging_young.summary': '{name} は {age} 歳になった。若さがまだ彼らを前へ押し出している。',
@@ -415,6 +462,12 @@ TEXT_JA: Dict[str, str] = {
     'events.civilization_phase_drifted.summary': (
         '文明段階が {old_civilization_phase} から {new_civilization_phase} へ変化した。'
     ),
+    'events.war_declared.summary': (
+        '{aggressor_faction} が {target_faction} に宣戦布告した。'
+    ),
+    'events.war_ended.summary': (
+        '{aggressor_faction} と {target_faction} の戦争が終結した。'
+    ),
     'journey_road_event_0': '道中で盗賊に遭遇したが、はったりで切り抜けた',
     'journey_road_event_1': '迷子を村まで送り届けた',
     'journey_road_event_2': '旅芸人の一座に出会い、一夜を過ごした',
@@ -430,9 +483,30 @@ TEXT_JA: Dict[str, str] = {
     'report_section_watched': '▶ 注目人物の動向',
     'report_section_notable': '▶ 主な出来事',
     'report_section_world': '▶ 世界の動き',
+    'report_section_world_changes': '▶ 世界変化',
     'report_section_world_overview': '▶ 世界の概要',
     'report_section_locations': '▶ 地域の出来事',
     'report_section_watched_year': '▶ 注目人物の一年',
+    'report_section_headlines': '見出し',
+    'report_headline_category_world_change': '世界変化',
+    'report_headline_category_adventure': '冒険',
+    'report_headline_category_life': '人生',
+    'report_headline_category_conflict': '争い',
+    'report_headline_category_event': '出来事',
+    'report_section_location_threads': '地点ごとの流れ',
+    'report_location_thread_line': (
+        '    {location}: {count}件の出来事、世界変化 {world_changes}件 | {headline}'
+    ),
+    'report_section_watched_threads': '注目人物ごとの流れ',
+    'report_watched_thread_line': '    {actor}: {count}件の出来事 | {headline}',
+    'report_section_world_change_threads': '世界変化ごとの流れ',
+    'report_world_change_thread_line': '    {category}: {count}件の変化、{locations} | {headline}',
+    'report_thread_no_locations': '世界全体',
+    'report_section_rumor_threads': '噂ごとの流れ',
+    'report_rumor_thread_line': (
+        '    {source_event}: {count}件の噂、{location}、{reliability}、拡散 {spread}/10 | {headline}'
+    ),
+    'report_rumor_no_source_event': '元イベントなし',
     'report_total_events': '  イベント総数: {count}',
     'report_deaths_this_year': '  この年の死者数: {count}',
     'report_section_rumors': '▶ 噂',
@@ -467,10 +541,19 @@ TEXT_JA: Dict[str, str] = {
     'rumor_board_filter_not_found': '一致する地点がありません: {location}',
     'rumor_board_detail_title': '噂詳細',
     'rumor_board_detail_source': '発生地: {location} | 経過: {age}ヶ月 | 拡散: {spread}/10',
+    'rumor_board_detail_tracking': (
+        '対象: {audience} | バイアス: {bias} | 歪み: {distortion}/3 | 追跡: {tracked}'
+    ),
     'rumor_board_source_event': '元イベント',
     'rumor_board_no_source_event': 'この噂に元イベントは紐づいていません。',
     'rumor_board_event_missing': '元イベントが見つかりません: {event_id}',
     'rumor_board_related_location': '関連地点',
+    'rumor_board_related_ids': '関連ID',
+    'rumor_board_related_events': 'イベント',
+    'rumor_board_related_factions': '勢力',
+    'rumor_tracked_marker': '[追跡中]',
+    'rumor_tracked_yes': 'はい',
+    'rumor_tracked_no': 'いいえ',
     'season_spring': '春',
     'season_summer': '夏',
     'season_autumn': '秋',
@@ -515,6 +598,15 @@ TEXT_JA: Dict[str, str] = {
     'live_trace_party_safe': '{party} は {destination} から無事に帰還した（{year}年）。',
     'live_trace_party_retreat': '{party} は {destination} から撤退した（{year}年）。',
     'live_trace_party_injury': '{party} は {destination} から負傷して戻った（{year}年）。',
+    'live_trace_route_blocked': '{description} この地の往来に圧力がかかった（{year}年）。',
+    'live_trace_route_reopened': '{description} この地に往来が戻りはじめた（{year}年）。',
+    'live_trace_location_renamed': '{description} 新しい名がこの地に注目を集めた（{year}年）。',
+    'live_trace_war_declared': '{description} 地域の緊張が高まった（{year}年）。',
+    'live_trace_war_ended': '{description} 地域の緊張が緩んだ（{year}年）。',
+    'live_trace_occupation_changed': '{description} 地域の秩序が変化した（{year}年）。',
+    'live_trace_terrain_changed': '{description} 土地そのものが変化した（{year}年）。',
+    'live_trace_era_shifted': '{description} 新しい時代がこの地にも及んだ（{year}年）。',
+    'live_trace_civilization_drifted': '{description} 文明の圧力がこの地にも及んだ（{year}年）。',
     # 記念碑の碑文 — 最小 NarrativeContext ― 職業カテゴリ別 (design §E-2)
     'memorial_epitaph_warrior': (
         'ここに {name} 眠る。{year}年、{location} にて討たれた戦士。'
@@ -573,6 +665,13 @@ TEXT_JA: Dict[str, str] = {
     # 地点詳細ビューの UI ラベル
     'location_detail_header': '地点詳細 - {name}',
     'location_endonym_label': '現地名',
+    'location_etymology_label': '地名由来',
+    'location_etymology_prefix': '{surface_name} < {language_name}',
+    'location_etymology_authored': '{prefix}; {canonical_name} の著者設定現地名',
+    'location_etymology_generated': '{prefix}{pattern}{components}',
+    'location_etymology_pattern': '; pattern={pattern}',
+    'location_etymology_components': '; {components}',
+    'location_etymology_component': '{role}={surface}',
     'location_aliases_label': '別称',
     'location_live_traces_label': '最近の訪問者',
     'location_memorials_label': '記念碑',
@@ -598,19 +697,44 @@ TEXT_JA: Dict[str, str] = {
     'dashboard_watched_actors': '注目人物',
     'dashboard_hot_rumors': '噂',
     'dashboard_dangerous_locations': '危険地域',
+    'dashboard_era_status': '時代と文明',
+    'dashboard_era_status_line': '時代: {era} | 文明段階: {phase}',
+    'dashboard_era_unknown': '不明',
+    'dashboard_civilization_unknown': '不明',
+    'dashboard_current_route_closures': '現在の封鎖路',
+    'dashboard_route_closure_line': '{from_location} から {to_location} への道は封鎖中。',
+    'dashboard_current_occupations': '現在の支配',
+    'dashboard_active_wars': '進行中の戦争',
+    'dashboard_authored_active_war': '{aggressor_faction_id} と {target_faction_id} は開戦状態にある。',
+    'dashboard_initial_site_control': '{location_id} は {controlling_faction_id} の支配下にある。',
     'dashboard_world_changes': '世界変化',
+    'dashboard_recent_world_changes': '最近の世界変化',
+    'dashboard_follow_up': '次の確認',
     'dashboard_empty_section': '-',
     'dashboard_location_status': '{location}（危険度 {danger}、噂熱 {rumor}）',
     'dashboard_actor_status': '{name}{markers}: {status}、負傷 {injury}、現在地 {location}',
     'dashboard_marker_favorite': 'お気に入り',
     'dashboard_marker_spotlighted': '注目',
     'dashboard_marker_playable': '操作対象',
+    'dashboard_follow_up_inspect_character': '{location} の {actor} を確認。',
+    'dashboard_follow_up_inspect_route_closure': '{from_location} から {to_location} への封鎖路を確認。',
+    'dashboard_follow_up_inspect_occupation': '{location} の支配状況を確認。',
+    'dashboard_follow_up_review_active_war': '戦争を確認: {text}',
+    'dashboard_follow_up_review_rumor': '噂を確認: {text}',
+    'dashboard_follow_up_review_world_change': '世界変化を確認: {text}',
+    'dashboard_follow_up_prompt': '次の確認を開く',
+    'dashboard_follow_up_unavailable': 'この確認対象は現在利用できません。',
     'report_location_activity': '{count}件の出来事',
     'monthly_report_card_header': '月間ハイライト（{year}年{month}月）',
     'monthly_report_card_characters': '  注目人物: {names}',
     'monthly_report_card_locations': '  注目地点: {names}',
     'monthly_report_card_adventures': '  最近の冒険: {items}',
     'monthly_report_card_memory': '  新しい記憶: {items}',
+    'yearly_report_card_header': '年間ハイライト（{year}年）',
+    'yearly_report_card_total_events': '  記録イベント数: {count}',
+    'report_followup_prompt': 'レポート表示',
+    'report_show_detailed_text': '詳細テキストレポートを表示',
+    'report_followup_inspect_location': '{location} 周辺の出来事を確認。',
     'world_change_category_route': '経路',
     'world_change_category_location': '地点',
     'world_change_category_occupation': '支配',
@@ -620,11 +744,14 @@ TEXT_JA: Dict[str, str] = {
     'world_change_category_civilization': '文明',
     'world_change_category_world_change': '世界変化',
     'auto_pause_context': '停止要因: {actor} @ {location}',
+    'auto_pause_context_actor': '停止要因: {actor}',
+    'auto_pause_context_location': '停止地点: {location}',
     'auto_pause_subreasons': '重要な理由:',
     'auto_pause_subreason_actor_in_danger': '{actor} は対応しないと死亡する可能性があります。',
     'auto_pause_subreason_watched_condition_worsened': '{actor} の容態が {location} で悪化しました。',
     'auto_pause_subreason_adventure_needs_decision': '{actor} が {location} で冒険判断を待っています。',
     'auto_pause_subreason_watched_party_returned': '{actor} の注目パーティが {location} に帰還しました。',
+    'auto_pause_subreason_world_change_notification': '{location} で世界変化への対応が必要です。',
     'auto_pause_subreason_auto_window_elapsed': '自動進行の指定期間が完了しました。',
     'auto_pause_supplemental': '補足停止理由: {reasons}',
     'auto_pause_recommendations': '推奨確認:',
@@ -632,7 +759,14 @@ TEXT_JA: Dict[str, str] = {
     'auto_pause_recommendation_inspect_location': '{location} 周辺を確認',
     'auto_pause_recommendation_review_pending_adventure': '{actor} の保留中の冒険選択を確認',
     'auto_pause_recommendation_review_party_returned': '{actor} の帰還したパーティを確認',
+    'auto_pause_recommendation_review_world_dashboard': '世界ダッシュボードを確認',
     'auto_pause_recommendation_review_recent_events': '最近の出来事と報告を確認',
+    'auto_pause_action_target_route': '経路: {target}',
+    'auto_pause_action_target_location': '地点: {target}',
+    'auto_pause_action_target_terrain_cell': '地形: {target}',
+    'auto_pause_action_target_world': '世界: {target}',
+    'auto_pause_action_target_era': '時代: {target}',
+    'auto_pause_action_target_civilization': '文明: {target}',
     # PR-G: terrain / route / site labels
     'terrain_biome_ocean': '海洋',
     'terrain_biome_coast': '海岸',
@@ -663,6 +797,8 @@ TEXT_JA: Dict[str, str] = {
     'map_legend_memorial': '記念碑あり',
     'map_legend_alias': '別称あり',
     'map_legend_recent_death': '最近の死亡地点',
+    'map_legend_world_change': '最近の世界変化',
+    'map_legend_control': '支配勢力あり',
     'map_legend_highlighted': 'ハイライト / 選択中',
     'map_region_title': '地域図',
     'map_region_nearby': '周辺の地点',
@@ -677,16 +813,37 @@ TEXT_JA: Dict[str, str] = {
     'map_region_focus_landmark_trace': '痕跡: {location} には最近の往来が残る',
     'map_region_focus_landmark_death': '死地: {location} では最近死者が出た',
     'map_region_focus_blocked': '封鎖: {destination} 方面への道は通れない',
+    'map_region_focus_control': '支配: {location} は {faction} の支配下にある',
+    'map_region_focus_world_change': '世界変化: {location} で最近変化があった（{category}）',
     'map_region_routes': 'この地点からの道路',
+    'map_region_local_cues': '局所手がかり',
+    'map_region_detail_grid': '地域詳細',
+    'map_region_route_sketch': '道のスケッチ',
     'map_region_not_found': '地点が見つかりません: {location}',
     'map_detail_not_found': '地点が見つかりません: {location}',
     'map_detail_prosperity': '繁栄度',
     'map_detail_mood': '雰囲気',
     'map_detail_rumor_heat': '噂の熱量',
+    'map_detail_control': '支配',
+    'map_detail_local_cues': '局所手がかり',
     'map_detail_markers': 'マーカー',
+    'map_detail_aa_title': '局所地点スケッチ',
+    'map_detail_route_sketch': '局所道路スケッチ',
+    'map_detail_aa_legend': 'スケッチ手がかり',
+    'map_detail_followup_prompt': '地点フォローアップ',
+    'map_detail_followup_location_history': '地点の歴史を開く',
     'map_detail_elevation': '標高',
     'map_detail_moisture': '湿度',
     'map_detail_temperature': '気温',
+    'map_elevation_lowland': '低地',
+    'map_elevation_midland': '中標高',
+    'map_elevation_highland': '高地',
+    'map_moisture_dry': '乾燥',
+    'map_moisture_balanced': 'ほどほど',
+    'map_moisture_wet': '湿潤',
+    'map_temperature_cold': '寒冷',
+    'map_temperature_temperate': '温暖',
+    'map_temperature_hot': '暑熱',
     'map_band_low': '低',
     'map_band_medium': '中',
     'map_band_high': '高',
@@ -695,17 +852,33 @@ TEXT_JA: Dict[str, str] = {
     'map_nav_detail': '地点詳細',
     'map_nav_recenter': '別の地点を中心に地域図を再表示',
     'map_nav_legacy': 'クラシック表示',
+    'map_nav_cues': '局所手がかりから探す',
     'map_legend_routes': '道路記号',
     'map_legend_site_marker': '地点',
     'map_legend_site_hub': '拠点（高交通量）',
     'map_legend_site_quiet': '静かな地点（低交通量）',
     'map_legend_traffic_high': '高交通量',
     'map_legend_rumor_high': '高い噂の熱量',
+    'map_feature_gate': '門',
+    'map_feature_market': '市場',
+    'map_feature_notice_board': '掲示板',
+    'map_feature_river': '河川',
+    'map_feature_accident_site': '事故地点',
+    'map_feature_memorial': '墓碑',
+    'map_feature_trace': '痕跡',
+    'map_feature_blocked_route': '封鎖道',
+    'map_cue_category_site': '地点',
+    'map_cue_category_terrain': '地形',
+    'map_cue_category_memory': '記憶',
+    'map_cue_category_route': '道路',
+    'map_cue_category_prompt': '局所手がかりカテゴリ',
+    'map_cue_locations_title': '{category} の手がかりがある地点',
+    'map_no_local_cues': '利用できる局所手がかりはありません。',
     # PR-G2+: アトラスモード / 直接選択 / 地域ランドマーク
     'atlas_site_list': 'アトラス上の地点',
     'map_nav_select': '地点へジャンプ（直接選択）',
     'map_nav_mode': 'アトラス表示モード切替',
-    'map_nav_keys_hint': '操作: メニューは1-6、地点選択は番号入力、表示切替はモード変更',
+    'map_nav_keys_hint': '操作: メニューは1-7、地点選択は番号入力、表示切替はモード変更',
     'atlas_mode_prompt': '表示モード',
     'atlas_mode_auto': '自動（端末幅に合わせる）',
     'atlas_mode_wide': 'ワイドアトラス（全幅）',

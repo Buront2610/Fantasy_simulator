@@ -28,6 +28,38 @@
       "Dawnport Harbor Council",
       "Coral Cove Conclave"
     ],
+    "faction_relationships": [
+      {
+        "faction_a_id": "stormwatch_wardens",
+        "faction_b_id": "silverbrook_merchant_league",
+        "status": "tense",
+        "location_ids": [
+          "loc_stormwatch_keep",
+          "loc_silverbrook"
+        ],
+        "description": "Stormwatch patrol authority and Silverbrook trade rights remain in uneasy tension."
+      },
+      {
+        "faction_a_id": "aethorian_crown_council",
+        "faction_b_id": "hearthglow_healers_guild",
+        "status": "allied",
+        "location_ids": [
+          "loc_aethoria_capital",
+          "loc_hearthglow_town"
+        ],
+        "description": "The Crown Council protects Hearthglow charters in exchange for healing support."
+      },
+      {
+        "faction_a_id": "dawnport_harbor_council",
+        "faction_b_id": "coral_cove_conclave",
+        "status": "neutral",
+        "location_ids": [
+          "loc_dawnport",
+          "loc_coral_cove"
+        ],
+        "description": "Dawnport captains and Coral Cove sea-mages keep a cautious maritime accord."
+      }
+    ],
     "glossary": [
       {
         "term": "Age of Embers",
@@ -350,6 +382,9 @@
         "description": "A treacherous alpine pass haunted by wind spirits.",
         "region_type": "mountain",
         "language_key": "khazic",
+        "tags": [
+          "gate"
+        ],
         "x": 1,
         "y": 0
       },
@@ -379,7 +414,8 @@
         "region_type": "mountain",
         "language_key": "aethic_common",
         "x": 4,
-        "y": 0
+        "y": 0,
+        "controlling_faction_id": "stormwatch_wardens"
       },
       {
         "location_id": "loc_thornwood",
@@ -408,7 +444,12 @@
         "language_key": "aethic_common",
         "native_name": "Silvermere",
         "x": 2,
-        "y": 1
+        "y": 1,
+        "tags": [
+          "market",
+          "river"
+        ],
+        "controlling_faction_id": "silverbrook_merchant_league"
       },
       {
         "location_id": "loc_goblin_warrens",
@@ -455,9 +496,13 @@
         "native_name": "Aethorstead",
         "x": 2,
         "y": 2,
+        "controlling_faction_id": "aethorian_crown_council",
         "tags": [
           "capital",
-          "default_resident"
+          "default_resident",
+          "gate",
+          "market",
+          "notice_board"
         ]
       },
       {
@@ -467,6 +512,9 @@
         "region_type": "dungeon",
         "language_key": "proto_quenic",
         "native_name": "Sairiel",
+        "tags": [
+          "accident_site"
+        ],
         "x": 3,
         "y": 2
       },
@@ -494,6 +542,10 @@
         "description": "A well-worn junction where merchants rest and rumours spread.",
         "region_type": "plains",
         "language_key": "aethic_common",
+        "tags": [
+          "market",
+          "notice_board"
+        ],
         "x": 1,
         "y": 3
       },
@@ -504,7 +556,8 @@
         "region_type": "city",
         "language_key": "aethic_common",
         "x": 2,
-        "y": 3
+        "y": 3,
+        "controlling_faction_id": "hearthglow_healers_guild"
       },
       {
         "location_id": "loc_mirefen_swamp",
@@ -523,7 +576,12 @@
         "language_key": "aethic_common",
         "native_name": "Dawnwick",
         "x": 4,
-        "y": 3
+        "y": 3,
+        "tags": [
+          "market",
+          "notice_board"
+        ],
+        "controlling_faction_id": "dawnport_harbor_council"
       },
       {
         "location_id": "loc_sunbaked_plains",
@@ -559,6 +617,9 @@
         "description": "A massive crater from the Cataclysm, still faintly glowing.",
         "region_type": "dungeon",
         "language_key": "proto_quenic",
+        "tags": [
+          "accident_site"
+        ],
         "x": 3,
         "y": 4
       },
@@ -570,7 +631,8 @@
         "language_key": "quenic",
         "native_name": "Celdhel",
         "x": 4,
-        "y": 4
+        "y": 4,
+        "controlling_faction_id": "coral_cove_conclave"
       }
     ],
     "route_seeds": [
@@ -758,6 +820,7 @@
       {
         "language_key": "elder_speech",
         "display_name": "Elder Speech",
+        "family_key": "elder_speech_family",
         "seed_syllables": ["al", "dor", "el", "gal", "ith", "mir", "sil", "thal"],
         "consonants": ["d", "l", "m", "n", "r", "s", "th", "v"],
         "vowels": ["a", "e", "i", "o", "ae", "ia"],
@@ -781,6 +844,7 @@
         "language_key": "proto_quenic",
         "display_name": "Proto Quenic",
         "parent_key": "elder_speech",
+        "family_key": "quenic_family",
         "seed_syllables": ["quel", "nor", "sai"],
         "sound_shifts": {
           "th": "s",
@@ -810,6 +874,7 @@
         "language_key": "quenic",
         "display_name": "Quenic",
         "parent_key": "proto_quenic",
+        "family_key": "quenic_family",
         "seed_syllables": ["lume", "nare", "sere"],
         "sound_shifts": {
           "nd": "n",
@@ -849,6 +914,7 @@
         "language_key": "sindral",
         "display_name": "Sindral",
         "parent_key": "proto_quenic",
+        "family_key": "quenic_family",
         "seed_syllables": ["bran", "thel", "gwyn"],
         "consonants": ["b", "d", "f", "g", "l", "m", "n", "r", "s", "th", "w"],
         "liquid_consonants": ["l", "r"],
@@ -882,6 +948,7 @@
       {
         "language_key": "proto_aethic",
         "display_name": "Proto Aethic",
+        "family_key": "aethic_family",
         "seed_syllables": ["bar", "cal", "dor", "fen", "mar", "tor", "wyn"],
         "consonants": ["b", "c", "d", "f", "g", "h", "l", "m", "n", "r", "s", "t", "w"],
         "vowels": ["a", "e", "i", "o", "u", "ea"],
@@ -905,6 +972,7 @@
         "language_key": "aethic_common",
         "display_name": "Aethic Common",
         "parent_key": "proto_aethic",
+        "family_key": "aethic_family",
         "seed_syllables": ["ash", "bryn", "vale"],
         "sound_shifts": {
           "ea": "e",
@@ -933,6 +1001,7 @@
       {
         "language_key": "khazic",
         "display_name": "Khazic",
+        "family_key": "khazic_family",
         "seed_syllables": ["bar", "dur", "grim", "kaz", "thor", "zul"],
         "consonants": ["b", "d", "g", "k", "m", "r", "th", "z"],
         "vowels": ["a", "i", "o", "u"],
@@ -965,6 +1034,7 @@
       {
         "language_key": "orcish_steppe",
         "display_name": "Orcish Steppe Tongue",
+        "family_key": "orcish_steppe_family",
         "seed_syllables": ["gor", "krag", "mok", "ur", "zug"],
         "consonants": ["g", "k", "m", "r", "t", "z"],
         "vowels": ["a", "o", "u"],
@@ -992,6 +1062,48 @@
         ],
         "lexicon_size": 22,
         "evolution_interval_years": 70
+      }
+    ],
+    "language_families": [
+      {
+        "family_key": "elder_speech_family",
+        "display_name": "Elder Speech Layer",
+        "proto_language_key": "elder_speech",
+        "origin_region_ids": ["loc_skyveil_monastery"],
+        "cultural_tags": ["ancient", "arcane"],
+        "semantic_domain_tags": ["ritual", "ruin", "star"]
+      },
+      {
+        "family_key": "quenic_family",
+        "display_name": "Quenic Family",
+        "proto_language_key": "proto_quenic",
+        "origin_region_ids": ["loc_dragonbone_ridge", "loc_elderroot_forest"],
+        "cultural_tags": ["court", "elven", "dragonborn"],
+        "semantic_domain_tags": ["forest", "court", "sea"]
+      },
+      {
+        "family_key": "aethic_family",
+        "display_name": "Aethic Family",
+        "proto_language_key": "proto_aethic",
+        "origin_region_ids": ["loc_aethoria_capital", "loc_dusty_crossroads"],
+        "cultural_tags": ["heartlands", "frontier"],
+        "semantic_domain_tags": ["road", "market", "settlement"]
+      },
+      {
+        "family_key": "khazic_family",
+        "display_name": "Khazic Family",
+        "proto_language_key": "khazic",
+        "origin_region_ids": ["loc_frostpeak_summit", "loc_ironvein_mine"],
+        "cultural_tags": ["dwarven", "mountain"],
+        "semantic_domain_tags": ["stone", "craft", "pass"]
+      },
+      {
+        "family_key": "orcish_steppe_family",
+        "display_name": "Orcish Steppe Family",
+        "proto_language_key": "orcish_steppe",
+        "origin_region_ids": ["loc_sunbaked_plains", "loc_sandstone_outpost"],
+        "cultural_tags": ["steppe", "clan"],
+        "semantic_domain_tags": ["plain", "war", "border"]
       }
     ],
     "language_communities": [
@@ -1099,6 +1211,127 @@
         "races": ["Dragonborn"],
         "priority": 15
       }
+    ],
+    "semantic_roots": [
+      {
+        "root_key": "dark",
+        "meaning_key": "dark",
+        "gloss_en": "dark",
+        "gloss_ja": "暗い",
+        "semantic_tags": ["shadow", "color"],
+        "allowed_roles": ["modifier"]
+      },
+      {
+        "root_key": "pass",
+        "meaning_key": "pass",
+        "gloss_en": "mountain pass",
+        "gloss_ja": "峠",
+        "semantic_tags": ["route", "mountain"],
+        "allowed_roles": ["head"]
+      },
+      {
+        "root_key": "river",
+        "meaning_key": "river",
+        "gloss_en": "river",
+        "gloss_ja": "川",
+        "semantic_tags": ["water"],
+        "allowed_roles": ["head"]
+      },
+      {
+        "root_key": "gate",
+        "meaning_key": "gate",
+        "gloss_en": "gate",
+        "gloss_ja": "門",
+        "semantic_tags": ["settlement", "border"],
+        "allowed_roles": ["head"]
+      },
+      {
+        "root_key": "ash",
+        "meaning_key": "ash",
+        "gloss_en": "ash",
+        "gloss_ja": "灰",
+        "semantic_tags": ["fire", "ruin"],
+        "allowed_roles": ["modifier", "head"]
+      },
+      {
+        "root_key": "old",
+        "meaning_key": "old",
+        "gloss_en": "old",
+        "gloss_ja": "古い",
+        "semantic_tags": ["time"],
+        "allowed_roles": ["modifier"]
+      },
+      {
+        "root_key": "sacred",
+        "meaning_key": "sacred",
+        "gloss_en": "sacred",
+        "gloss_ja": "聖なる",
+        "semantic_tags": ["religion"],
+        "allowed_roles": ["modifier"]
+      },
+      {
+        "root_key": "market",
+        "meaning_key": "market",
+        "gloss_en": "market",
+        "gloss_ja": "市場",
+        "semantic_tags": ["trade", "settlement"],
+        "allowed_roles": ["head"]
+      },
+      {
+        "root_key": "stone",
+        "meaning_key": "stone",
+        "gloss_en": "stone",
+        "gloss_ja": "石",
+        "semantic_tags": ["earth", "material"],
+        "allowed_roles": ["modifier", "head"]
+      }
+    ],
+    "language_root_realizations": [
+      {"language_key": "aethic_common", "root_key": "dark", "surface": "black"},
+      {"language_key": "aethic_common", "root_key": "pass", "surface": "gap"},
+      {"language_key": "aethic_common", "root_key": "river", "surface": "brook"},
+      {"language_key": "aethic_common", "root_key": "gate", "surface": "gate"},
+      {"language_key": "aethic_common", "root_key": "ash", "surface": "ash"},
+      {"language_key": "aethic_common", "root_key": "old", "surface": "eld"},
+      {"language_key": "aethic_common", "root_key": "sacred", "surface": "saint"},
+      {"language_key": "aethic_common", "root_key": "market", "surface": "wick"},
+      {"language_key": "aethic_common", "root_key": "stone", "surface": "stone"},
+      {"language_key": "sindral", "root_key": "dark", "surface": "du"},
+      {"language_key": "sindral", "root_key": "pass", "surface": "thal"},
+      {"language_key": "sindral", "root_key": "river", "surface": "lin"},
+      {"language_key": "sindral", "root_key": "gate", "surface": "dor"},
+      {"language_key": "sindral", "root_key": "ash", "surface": "ael"},
+      {"language_key": "sindral", "root_key": "old", "surface": "hen"},
+      {"language_key": "sindral", "root_key": "sacred", "surface": "sil"},
+      {"language_key": "sindral", "root_key": "market", "surface": "bryn"},
+      {"language_key": "sindral", "root_key": "stone", "surface": "car"},
+      {"language_key": "khazic", "root_key": "dark", "surface": "grim"},
+      {"language_key": "khazic", "root_key": "pass", "surface": "kar"},
+      {"language_key": "khazic", "root_key": "river", "surface": "dur"},
+      {"language_key": "khazic", "root_key": "gate", "surface": "bar"},
+      {"language_key": "khazic", "root_key": "ash", "surface": "zul"},
+      {"language_key": "khazic", "root_key": "old", "surface": "kaz"},
+      {"language_key": "khazic", "root_key": "sacred", "surface": "thor"},
+      {"language_key": "khazic", "root_key": "market", "surface": "dum"},
+      {"language_key": "khazic", "root_key": "stone", "surface": "gran"},
+      {"language_key": "orcish_steppe", "root_key": "dark", "surface": "mok"},
+      {"language_key": "orcish_steppe", "root_key": "pass", "surface": "gar"},
+      {"language_key": "orcish_steppe", "root_key": "river", "surface": "ur"},
+      {"language_key": "orcish_steppe", "root_key": "gate", "surface": "krag"},
+      {"language_key": "orcish_steppe", "root_key": "ash", "surface": "zug"},
+      {"language_key": "orcish_steppe", "root_key": "old", "surface": "gor"},
+      {"language_key": "orcish_steppe", "root_key": "sacred", "surface": "tur"},
+      {"language_key": "orcish_steppe", "root_key": "market", "surface": "maw"},
+      {"language_key": "orcish_steppe", "root_key": "stone", "surface": "tak"},
+      {"language_key": "quenic", "root_key": "dark", "surface": "dhel"},
+      {"language_key": "quenic", "root_key": "pass", "surface": "nor"},
+      {"language_key": "quenic", "root_key": "river", "surface": "riel"},
+      {"language_key": "quenic", "root_key": "gate", "surface": "var"},
+      {"language_key": "quenic", "root_key": "ash", "surface": "sere"},
+      {"language_key": "quenic", "root_key": "old", "surface": "lume"},
+      {"language_key": "quenic", "root_key": "sacred", "surface": "cel"},
+      {"language_key": "quenic", "root_key": "market", "surface": "nare"},
+      {"language_key": "quenic", "root_key": "stone", "surface": "ril"}
     ]
   }
 }

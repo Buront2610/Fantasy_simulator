@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from fantasy_simulator.event_models import WorldEventRecord
+from fantasy_simulator.i18n import get_locale, set_locale
 from fantasy_simulator.ids import LocationId
 from fantasy_simulator.terrain import BIOME_TYPES, TerrainCell, TerrainMap
+from fantasy_simulator.ui.map_renderer import build_map_info, render_region_map
 from fantasy_simulator.world import World
 from fantasy_simulator.world_change import (
     MutateTerrainCellCommand,
@@ -310,3 +312,68 @@ def test_world_terrain_cell_change_rejects_unknown_or_mismatched_explicit_locati
 
     assert unowned_cell.to_dict() == unowned_payload
     assert world.event_records == []
+
+
+def test_world_terrain_cell_change_applies_location_state_pressure_and_map_visibility() -> None:
+    previous_locale = get_locale()
+    set_locale("en")
+    world = World()
+    location = world.get_location_by_id("loc_aethoria_capital")
+    assert location is not None
+    before = (
+        location.danger,
+        location.rumor_heat,
+        location.safety,
+        location.mood,
+        location.road_condition,
+    )
+
+    try:
+        record = world.apply_terrain_cell_change(
+            2,
+            2,
+            biome="swamp",
+            elevation=180,
+            moisture=190,
+            temperature=80,
+            location_id="loc_aethoria_capital",
+            reason_key="fey_bloom",
+            month=3,
+            day=4,
+        )
+    finally:
+        set_locale(previous_locale)
+
+    assert record is not None
+    assert (location.danger, location.rumor_heat, location.safety, location.mood, location.road_condition) == (
+        min(100, before[0] + 14),
+        min(100, before[1] + 10),
+        max(0, before[2] - 8),
+        max(0, before[3] - 4),
+        max(0, before[4] - 20),
+    )
+    assert location.live_traces[-1]["text"].startswith("Terrain at (2, 2) changed:")
+    assert record.record_id in location.recent_event_ids
+
+    info = build_map_info(world)
+    cell = next(cell for cell in info.cells.values() if cell.location_id == "loc_aethoria_capital")
+    assert cell.terrain_biome == "swamp"
+    assert cell.recent_world_change_count == 1
+    assert cell.recent_world_change_categories == ("terrain",)
+    rendered = render_region_map(info, "loc_aethoria_capital", radius=2)
+    assert "World change: Aethoria Capital changed recently (Terrain)" in rendered
+
+
+def test_world_terrain_cell_change_without_location_does_not_apply_location_pressure() -> None:
+    world = World()
+    assert world.terrain_map is not None
+    world.grid.pop((0, 0))
+    location = world.get_location_by_id("loc_aethoria_capital")
+    assert location is not None
+    before = (location.danger, location.rumor_heat, list(location.live_traces))
+
+    record = world.apply_terrain_cell_change(0, 0, biome="forest", elevation=160)
+
+    assert record is not None
+    assert record.location_id is None
+    assert (location.danger, location.rumor_heat, list(location.live_traces)) == before

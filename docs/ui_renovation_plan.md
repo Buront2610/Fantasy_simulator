@@ -221,15 +221,25 @@ map renderer は最低でも次のモードを持つ。
 > 注: region map の読解性強化は後続の PR-H1 で補強済み
 - [x] `terrain + site overlay` を扱える world-scale map renderer を導入する
 - [x] ワールド全体図で海岸線、山脈、森林帯、平野、主要 route、world memory を表示できるようにする
-- [ ] 地域図で導線、峠、河川、門、市場、掲示板、墓碑、事故地点、封鎖道、痕跡を判断可能な形で読めるようにする
+- [x] 地域図で導線、峠、河川、門、市場、掲示板、墓碑、事故地点、封鎖道、痕跡を判断可能な形で読めるようにする first pass
   - [x]  PR-G2 で region 基盤は導入済み
   - [x]  PR-H1 で summary / closure / danger / rumor / world memory の読解性を強化済み
-  - [ ]  門 / 市場 / 掲示板 / 河川などの richer local semantics の拡張
+  - [x]  門 / 市場 / 掲示板 / 河川 / 事故地点を site seed tags と terrain biome から region/detail に表示する first pass
+  - [x]  墓碑 / 封鎖道 / live trace を runtime state から region/detail の局所手がかりへ統合する first pass
+  - [x]  局所手がかりを category / tag / label / priority を持つ view model cue として構造化し、将来の Textual / Rich 表示でフィルタ・強調できる形へ拡張する
+  - [x]  world map から局所手がかりカテゴリ別に地点を探し、該当地点の region map へ入れる導線を追加する
+- [x] 地点詳細図からその地点の履歴ビューへ直接進める follow-up 導線を追加する
 - [x] 地点詳細図で局所 AA / 準AA と最近の痕跡を接続する
+  - [x] 都市 / 村 / ダンジョン / 山岳 / 森林 / 野外向けの記号ベース局所スケッチを追加する
+  - [x] 都市スケッチを拡大し、門・市場広場・主要街路が読める局所AAへ更新する
+  - [x] 地点詳細に局所 route sketch を追加し、接続路をグリッド盤面とは別の放射状進入路として表示する
+  - [x] 地域図に拡大 route sketch を追加し、道路をグリッドセル間の連続線として読めるようにする first pass
+  - [x] 地域図の route sketch で都市を 1 文字 marker ではなく 3×3 の街区として描き、道路が街区外縁へ接続するようにする
+  - [x] 地域図本体に拡大 terrain/site overlay を追加し、コンパクトな座標グリッドとは別に地形面・都市街区・地点 marker を読めるようにする
 - [x] world サイズが固定 5×5 でなくても描画できるようにする
 - [x] `wide` / `compact` / `minimal` 表示モードを導入する
 - [x] `WorldEventRecord` から月報カード用 view model を生成する
-- [ ] 年次・月次レポートをカード形式で全面統一する
+- [x] 年次・月次レポートをカード主体の表示へ統一し、旧詳細テキストはオンデマンド表示へ分離する
 
 ### Phase 2.5：worldgen PoC 表示支援（並行任意）
 - [x] seed 固定 terrain preview を ASCII で出力できるようにする（TD-1〜TD-4）
@@ -257,9 +267,12 @@ map renderer は最低でも次のモードを持つ。
 - [x] region map の summary / closure / danger / rumor / world memory の focused テストを追加する
 - [x] region / atlas の一部画面について snapshot-style テストを追加する
 - [x] `compact` / `minimal` 表示について EN / JA の表示幅 budget 検証を追加する
-- [ ] 日本語英語混在時のセンタリング、表幅、AA 罫線が崩れないことを確認する包括的な幅崩れテストを拡張する
-- [ ] メインメニュー、ワールドマップ、月報、キャラクター一覧など主要画面全体の文字出力スナップショット比較テストを追加する
-- [ ] `WorldEventRecord` から期待するパネル・レポート・通知カードが生成されることを確認するイベント表示テストを追加する
+- [x] 日本語英語混在時のセンタリング、表幅、AA 罫線が崩れないことを確認する包括的な幅崩れテストを拡張する
+  - [x] overview / region / detail の EN / JA 表示幅 budget と、地点詳細 AA 罫線幅の一致を snapshot harness で固定する
+- [x] メインメニュー、ワールドマップ、月報、キャラクター一覧など主要画面全体の文字出力スナップショット比較テストを追加する
+  - [x] monthly report card / character roster / world map screen の screen-level snapshot-style テストを追加する
+- [x] `WorldEventRecord` から期待するパネル・レポート・通知カードが生成されることを確認するイベント表示テストを追加する
+  - [x] canonical route-block record が notification view / monthly report card / dashboard route closure・recent world change・follow-up に到達することを固定する
 - [x] 端末幅に応じて `compact` / `minimal` 表示へ自動的に切り替える統合テストを追加する（PR-H2）
 - [ ] seed 固定 terrain preview / worldgen PoC の再現性テストは PR-G3 以降で追加する
 

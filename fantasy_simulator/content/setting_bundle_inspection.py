@@ -3,12 +3,24 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List
+
+from fantasy_simulator.ids import CultureId, FactionId, normalize_slug_id
 
 
 def setting_entry_key(name: str) -> str:
     """Return a stable inspection key for lightweight named setting entries."""
-    return name.strip().lower().replace(" ", "_").replace("-", "_").replace("'", "")
+    return str(normalize_slug_id(name, field_name="setting entry", id_type=str))
+
+
+def culture_entry_key(name: str) -> CultureId:
+    """Return the nominal culture inspection key for an authored culture name."""
+    return normalize_slug_id(name, field_name="culture", id_type=CultureId)
+
+
+def faction_entry_key(name: str) -> FactionId:
+    """Return the nominal faction inspection key for an authored faction name."""
+    return normalize_slug_id(name, field_name="faction", id_type=FactionId)
 
 
 @dataclass(frozen=True)
@@ -31,17 +43,25 @@ class SettingBundleAuthoringSummary:
     language_count: int
     culture_count: int = 0
     faction_count: int = 0
+    faction_relationship_count: int = 0
     glossary_count: int = 0
+    language_family_count: int = 0
     language_community_count: int = 0
+    semantic_root_count: int = 0
+    language_root_realization_count: int = 0
     resident_site_ids: List[str] = field(default_factory=list)
     capital_site_ids: List[str] = field(default_factory=list)
     culture_keys: List[str] = field(default_factory=list)
     faction_keys: List[str] = field(default_factory=list)
+    faction_relationship_status_counts: Dict[str, int] = field(default_factory=dict)
     glossary_keys: List[str] = field(default_factory=list)
     site_counts_by_region_type: Dict[str, int] = field(default_factory=dict)
     route_counts_by_type: Dict[str, int] = field(default_factory=dict)
     language_keys: List[str] = field(default_factory=list)
+    language_family_keys: List[str] = field(default_factory=list)
     community_keys_by_region: Dict[str, List[str]] = field(default_factory=dict)
+    root_realization_coverage_by_language: Dict[str, int] = field(default_factory=dict)
+    language_keys_without_family: List[str] = field(default_factory=list)
     sites_with_native_names: List[str] = field(default_factory=list)
     site_ids_without_language_key: List[str] = field(default_factory=list)
     site_ids_without_language_community: List[str] = field(default_factory=list)
@@ -49,10 +69,17 @@ class SettingBundleAuthoringSummary:
 
 
 def named_setting_entries(entry_type: str, names: List[str]) -> List[SettingEntryInspection]:
+    key_resolver: Callable[[str], object]
+    if entry_type == "culture":
+        key_resolver = culture_entry_key
+    elif entry_type == "faction":
+        key_resolver = faction_entry_key
+    else:
+        key_resolver = setting_entry_key
     return [
         SettingEntryInspection(
             entry_type=entry_type,
-            key=setting_entry_key(name),
+            key=str(key_resolver(name)),
             display_name=name,
         )
         for name in names
@@ -84,6 +111,30 @@ def community_keys_by_region(language_communities: List[Any]) -> Dict[str, List[
         for region_id in community.regions:
             mapping.setdefault(region_id, []).append(community.community_key)
     return {region_id: sorted(keys) for region_id, keys in sorted(mapping.items())}
+
+
+def root_realization_coverage_by_language(
+    languages: List[Any],
+    language_root_realizations: List[Any],
+) -> Dict[str, int]:
+    counts = {language.language_key: 0 for language in languages}
+    for realization in language_root_realizations:
+        if realization.language_key in counts:
+            counts[realization.language_key] += 1
+    return dict(sorted(counts.items()))
+
+
+def faction_relationship_status_counts(relationships: List[Any]) -> Dict[str, int]:
+    return counts_by_attr(relationships, "status")
+
+
+def language_keys_without_family(languages: List[Any], language_families: List[Any]) -> List[str]:
+    family_keys = {family.family_key for family in language_families}
+    return sorted(
+        language.language_key
+        for language in languages
+        if not language.family_key.strip() or language.family_key not in family_keys
+    )
 
 
 def site_ids_without_language_key(site_seeds: List[Any]) -> List[str]:
@@ -132,19 +183,33 @@ def build_setting_bundle_authoring_summary(bundle: Any) -> SettingBundleAuthorin
         language_count=len(world.languages),
         culture_count=len(world.cultures),
         faction_count=len(world.factions),
+        faction_relationship_count=len(world.faction_relationships),
         glossary_count=len(world.glossary),
+        language_family_count=len(world.language_families),
         language_community_count=len(world.language_communities),
+        semantic_root_count=len(world.semantic_roots),
+        language_root_realization_count=len(world.language_root_realizations),
         resident_site_ids=world.resident_site_ids(),
         capital_site_ids=world.capital_site_ids(),
         culture_keys=sorted(entry.key for entry in world.culture_entries()),
         faction_keys=sorted(entry.key for entry in world.faction_entries()),
+        faction_relationship_status_counts=faction_relationship_status_counts(world.faction_relationships),
         glossary_keys=sorted(entry.key for entry in world.glossary_entries()),
         site_counts_by_region_type=world.site_counts_by_region_type(),
         route_counts_by_type=world.route_counts_by_type(),
         language_keys=sorted(language.language_key for language in world.languages),
+        language_family_keys=sorted(family.family_key for family in world.language_families),
         community_keys_by_region=world.community_keys_by_region(),
+        root_realization_coverage_by_language=root_realization_coverage_by_language(
+            world.languages,
+            world.language_root_realizations,
+        ),
         sites_with_native_names=sorted(
             seed.location_id for seed in world.site_seeds if seed.native_name.strip()
+        ),
+        language_keys_without_family=language_keys_without_family(
+            world.languages,
+            world.language_families,
         ),
         site_ids_without_language_key=world.site_ids_without_language_key(),
         site_ids_without_language_community=world.site_ids_without_language_community(),

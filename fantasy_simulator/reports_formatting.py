@@ -3,7 +3,17 @@
 from __future__ import annotations
 
 from .i18n import tr
+from .reports_models import WorldChangeReportLine
 from .reports_models import MonthlyReport, YearlyReport
+
+
+def _append_world_change_lines(lines: list[str], entries: list[WorldChangeReportLine]) -> None:
+    if not entries:
+        return
+    lines.append("")
+    lines.append(f"  {tr('report_section_world_changes')}")
+    for entry in entries:
+        lines.append(f"    {tr(f'world_change_category_{entry.category}')}: {entry.text}")
 
 
 def format_monthly_report(report: MonthlyReport) -> str:
@@ -45,6 +55,8 @@ def format_monthly_report(report: MonthlyReport) -> str:
                 lines.append(
                     f"    {location.name}: {tr('report_location_activity', count=location.event_count)}"
                 )
+
+    _append_world_change_lines(lines, report.world_change_entries)
 
     if report.rumor_entries:
         lines.append("")
@@ -90,6 +102,8 @@ def format_yearly_report(report: YearlyReport) -> str:
                 lines.append(
                     f"    {location.name}: {tr('report_location_activity', count=location.event_count)}"
                 )
+
+    _append_world_change_lines(lines, report.world_change_entries)
 
     if report.character_entries:
         lines.append("")

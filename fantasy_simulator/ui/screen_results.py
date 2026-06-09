@@ -14,6 +14,7 @@ from .screen_history import (
     _show_location_history,
     _show_monthly_report,
     _show_single_story,
+    _show_yearly_report,
 )
 from .screen_map import _show_world_map
 from .screen_persistence import _save_simulation_snapshot
@@ -69,9 +70,7 @@ def _show_results(sim: Simulator, ctx: UIContext | None = None) -> None:
         elif action == "world_dashboard":
             _show_world_dashboard(sim, ctx=ctx)
         elif action == "yearly_report":
-            out.print_line()
-            out.print_line(sim.get_latest_yearly_report())
-            inp.pause()
+            _show_yearly_report(sim, ctx=ctx)
         elif action == "monthly_report":
             _show_monthly_report(sim, ctx=ctx)
         elif action == "rumor_board":

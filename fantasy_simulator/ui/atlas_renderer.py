@@ -93,6 +93,7 @@ def render_atlas_overview(info: "MapRenderInfo") -> str:
         f"m={tr('map_legend_memorial')}",
         f"a={tr('map_legend_alias')}",
         f"+={tr('map_legend_recent_death')}",
+        f"w={tr('map_legend_world_change')}",
     ]
     lines.append(
         f"    {tr('map_legend_overlays')}: {' '.join(ov_parts)}"

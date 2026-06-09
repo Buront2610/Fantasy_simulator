@@ -95,6 +95,81 @@ def validate_language_patterns(language: LanguageDefinition, *, source: str) -> 
             )
 
 
+def validate_language_families(
+    world: WorldDefinition,
+    language_index: Dict[str, LanguageDefinition],
+    site_ids: List[str],
+    *,
+    source: str,
+) -> None:
+    family_keys: set[str] = set()
+    for family in world.language_families:
+        if not family.family_key:
+            raise ValueError(f"Setting bundle {source} has language family without family_key")
+        if family.family_key in family_keys:
+            raise ValueError(f"Setting bundle {source} has duplicate language family: {family.family_key}")
+        family_keys.add(family.family_key)
+        if family.proto_language_key and family.proto_language_key not in language_index:
+            raise ValueError(
+                f"Setting bundle {source} language family {family.family_key} references unknown "
+                f"proto language: {family.proto_language_key}"
+            )
+        unknown_regions = [region_id for region_id in family.origin_region_ids if region_id not in site_ids]
+        if unknown_regions:
+            raise ValueError(
+                f"Setting bundle {source} language family {family.family_key} references unknown "
+                f"origin regions: {', '.join(unknown_regions)}"
+            )
+
+    for language in world.languages:
+        if language.family_key and language.family_key not in family_keys:
+            raise ValueError(
+                f"Setting bundle {source} language {language.language_key} references unknown "
+                f"language family: {language.family_key}"
+            )
+
+
+def validate_semantic_roots(
+    world: WorldDefinition,
+    language_index: Dict[str, LanguageDefinition],
+    *,
+    source: str,
+) -> None:
+    root_keys: set[str] = set()
+    for root in world.semantic_roots:
+        if not root.root_key:
+            raise ValueError(f"Setting bundle {source} has semantic root without root_key")
+        if root.root_key in root_keys:
+            raise ValueError(f"Setting bundle {source} has duplicate semantic root: {root.root_key}")
+        if not root.meaning_key:
+            raise ValueError(f"Setting bundle {source} semantic root {root.root_key} has empty meaning_key")
+        root_keys.add(root.root_key)
+
+    seen_realizations: set[tuple[str, str]] = set()
+    for realization in world.language_root_realizations:
+        key = (realization.language_key, realization.root_key)
+        if key in seen_realizations:
+            raise ValueError(
+                f"Setting bundle {source} has duplicate language root realization: "
+                f"{realization.language_key}/{realization.root_key}"
+            )
+        seen_realizations.add(key)
+        if realization.language_key not in language_index:
+            raise ValueError(
+                f"Setting bundle {source} references unknown root realization language: "
+                f"{realization.language_key}"
+            )
+        if realization.root_key not in root_keys:
+            raise ValueError(
+                f"Setting bundle {source} references unknown semantic root: {realization.root_key}"
+            )
+        if not realization.surface.strip():
+            raise ValueError(
+                f"Setting bundle {source} has empty root realization surface: "
+                f"{realization.language_key}/{realization.root_key}"
+            )
+
+
 def validate_language_inheritance(language_index: Dict[str, LanguageDefinition], *, source: str) -> None:
     visiting: set[str] = set()
     visited: set[str] = set()
@@ -135,6 +210,7 @@ def validate_languages(world: WorldDefinition, *, source: str) -> Dict[str, Lang
         validate_language_patterns(language, source=source)
 
     validate_language_inheritance(language_index, source=source)
+    validate_semantic_roots(world, language_index, source=source)
     return language_index
 
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import List
 
-from .setting_bundle_inspection import setting_entry_key as _setting_entry_key
+from .setting_bundle_inspection import culture_entry_key, faction_entry_key
 from .setting_bundle_schema import (
     SettingBundle,
     WorldDefinition,
@@ -13,6 +13,9 @@ from .setting_bundle_schema import (
     merge_propagation_rule_overrides,
 )
 from .setting_bundle_validation_common import duplicate_values, validate_named_entries
+
+
+FACTION_RELATIONSHIP_STATUSES = {"allied", "neutral", "tense", "war"}
 
 
 def validate_bundle_identity(bundle: SettingBundle, world: WorldDefinition, *, source: str) -> None:
@@ -32,14 +35,14 @@ def validate_bundle_unique_names(world: WorldDefinition, *, source: str) -> None
         source=source,
         entry_label="culture",
         key_label="culture inspection keys",
-        key_resolver=_setting_entry_key,
+        key_resolver=lambda value: str(culture_entry_key(value)),
     )
     validate_named_entries(
         world.factions,
         source=source,
         entry_label="faction",
         key_label="faction inspection keys",
-        key_resolver=_setting_entry_key,
+        key_resolver=lambda value: str(faction_entry_key(value)),
     )
 
     blank_glossary_terms = [entry.term for entry in world.glossary if not entry.term.strip()]
@@ -90,6 +93,22 @@ def validate_bundle_unique_names(world: WorldDefinition, *, source: str) -> None
             f"Setting bundle {source} contains duplicate language community keys: {', '.join(duplicate_community_keys)}"
         )
 
+    _validate_named_rule_list(world.civilization_phases, source=source, field_name="civilization_phases")
+    _validate_named_rule_list(world.world_score_keys, source=source, field_name="world_score_keys")
+
+
+def _validate_named_rule_list(values: List[str], *, source: str, field_name: str) -> None:
+    if not values:
+        raise ValueError(f"Setting bundle {source} must define world_definition.{field_name}")
+    blank_values = [value for value in values if not value.strip()]
+    if blank_values:
+        raise ValueError(f"Setting bundle {source} contains blank {field_name}")
+    duplicate_names = duplicate_values(values)
+    if duplicate_names:
+        raise ValueError(
+            f"Setting bundle {source} contains duplicate {field_name}: {', '.join(duplicate_names)}"
+        )
+
 
 def validate_site_seeds(world: WorldDefinition, *, source: str) -> tuple[List[str], set[str]]:
     site_ids = [seed.location_id for seed in world.site_seeds]
@@ -123,7 +142,23 @@ def validate_site_seeds(world: WorldDefinition, *, source: str) -> tuple[List[st
     if any(seed.x < 0 or seed.y < 0 for seed in world.site_seeds):
         raise ValueError(f"Setting bundle {source} contains negative site seed coordinates")
 
+    _validate_site_seed_controllers(world, source=source)
+
     return site_ids, canonical_ids
+
+
+def _validate_site_seed_controllers(world: WorldDefinition, *, source: str) -> None:
+    known_faction_ids = {str(faction_entry_key(name)) for name in world.factions}
+    unknown_controllers = [
+        seed.controlling_faction_id
+        for seed in world.site_seeds
+        if seed.controlling_faction_id.strip() and seed.controlling_faction_id not in known_faction_ids
+    ]
+    if unknown_controllers:
+        raise ValueError(
+            f"Setting bundle {source} site_seeds reference unknown controlling factions: "
+            f"{', '.join(unknown_controllers)}"
+        )
 
 
 def validate_route_seeds(world: WorldDefinition, canonical_ids: set[str], *, source: str) -> None:
@@ -153,6 +188,39 @@ def validate_route_seeds(world: WorldDefinition, canonical_ids: set[str], *, sou
             )
         if route.distance < 1:
             raise ValueError(f"Setting bundle {source} route {route.route_id} must have distance >= 1")
+
+
+def validate_faction_relationships(world: WorldDefinition, canonical_ids: set[str], *, source: str) -> None:
+    known_faction_ids = {str(faction_entry_key(name)) for name in world.factions}
+    seen_pairs: set[tuple[str, str]] = set()
+    for relationship in world.faction_relationships:
+        faction_a_id = relationship.faction_a_id.strip()
+        faction_b_id = relationship.faction_b_id.strip()
+        if not faction_a_id or not faction_b_id:
+            raise ValueError(f"Setting bundle {source} contains blank faction relationship ids")
+        if faction_a_id == faction_b_id:
+            raise ValueError(f"Setting bundle {source} contains self faction relationship: {faction_a_id}")
+        if faction_a_id not in known_faction_ids or faction_b_id not in known_faction_ids:
+            raise ValueError(f"Setting bundle {source} faction_relationships reference unknown factions")
+        first, second = sorted((faction_a_id, faction_b_id))
+        pair = (first, second)
+        if pair in seen_pairs:
+            raise ValueError(f"Setting bundle {source} contains duplicate faction_relationships: {pair[0]}->{pair[1]}")
+        seen_pairs.add(pair)
+
+        status = relationship.status.strip()
+        if status not in FACTION_RELATIONSHIP_STATUSES:
+            raise ValueError(f"Setting bundle {source} contains unknown faction relationship status: {status}")
+        unknown_locations = [
+            location_id
+            for location_id in relationship.location_ids
+            if location_id not in canonical_ids
+        ]
+        if unknown_locations:
+            raise ValueError(
+                f"Setting bundle {source} faction_relationships reference unknown site ids: "
+                f"{', '.join(unknown_locations)}"
+            )
 
 
 def validate_naming_rules(world: WorldDefinition, *, source: str) -> None:

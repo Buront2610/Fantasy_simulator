@@ -366,6 +366,30 @@ class TestGenerateMonthlyReport:
 
         assert [entry.rumor_id for entry in report.rumor_entries] == ["rumor_irregular_months"]
 
+    def test_monthly_report_includes_pr_k_world_change_section(self, world_with_chars):
+        route = world_with_chars.routes[0]
+        route_record = world_with_chars.apply_route_blocked_change(route.route_id, True, year=1000, month=3)
+        rename_record = world_with_chars.apply_location_rename_change(
+            "loc_aethoria_capital",
+            "Aethoria March",
+            year=1000,
+            month=3,
+        )
+
+        report = generate_monthly_report(world_with_chars, 1000, 3)
+        text = format_monthly_report(report)
+
+        assert route_record is not None
+        assert rename_record is not None
+        assert [(entry.record_id, entry.category) for entry in report.world_change_entries] == [
+            (route_record.record_id, "route"),
+            (rename_record.record_id, "location"),
+        ]
+        assert "▶ World Changes" in text
+        assert "Route:" in text
+        assert "Location:" in text
+        assert "Aethoria March" in text
+
 
 # ---------------------------------------------------------------------------
 # Yearly report generation tests
@@ -516,6 +540,35 @@ class TestGenerateYearlyReport:
         assert report_at_1003.character_entries[0].name == "Hero"
         # deaths_this_year comes from events, not current state; no death events in year 1000
         assert report_at_1003.deaths_this_year == 0
+
+    def test_yearly_report_includes_pr_k_world_change_section(self, world_with_chars):
+        terrain_record = world_with_chars.apply_terrain_cell_change(
+            2,
+            2,
+            biome="forest",
+            location_id="loc_aethoria_capital",
+            year=1001,
+            month=4,
+        )
+        occupation_record = world_with_chars.apply_controlling_faction_change(
+            "loc_aethoria_capital",
+            "stormwatch_wardens",
+            year=1001,
+            month=5,
+        )
+
+        report = generate_yearly_report(world_with_chars, 1001)
+        text = format_yearly_report(report)
+
+        assert terrain_record is not None
+        assert occupation_record is not None
+        assert [(entry.record_id, entry.category) for entry in report.world_change_entries] == [
+            (terrain_record.record_id, "terrain"),
+            (occupation_record.record_id, "occupation"),
+        ]
+        assert "▶ World Changes" in text
+        assert "Terrain:" in text
+        assert "Occupation:" in text
 
 
 # ---------------------------------------------------------------------------
@@ -858,6 +911,7 @@ class TestReportI18n:
         assert tr("report_section_watched") != "report_section_watched"
         assert tr("report_section_notable") != "report_section_notable"
         assert tr("report_section_world") != "report_section_world"
+        assert tr("report_section_world_changes") != "report_section_world_changes"
         assert tr("report_section_watched_year") != "report_section_watched_year"
         assert tr("report_deaths_this_year", count=0) != "report_deaths_this_year"
         assert tr("season_winter") != "season_winter"
@@ -867,6 +921,7 @@ class TestReportI18n:
         assert tr("report_monthly_title", year=1000, month=1, season="冬") != "report_monthly_title"
         assert tr("report_yearly_title", year=1000) != "report_yearly_title"
         assert tr("report_section_watched") != "report_section_watched"
+        assert tr("report_section_world_changes") != "report_section_world_changes"
         assert tr("report_section_watched_year") != "report_section_watched_year"
         assert tr("report_deaths_this_year", count=1) != "report_deaths_this_year"
         assert tr("season_winter") == "冬"

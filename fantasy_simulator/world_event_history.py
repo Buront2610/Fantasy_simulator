@@ -57,7 +57,7 @@ def record_world_event(
     watched_actor_tag_prefix: str,
 ) -> WorldEventRecord:
     """Store a canonical world event and keep event-history indexes coherent."""
-    event_index.ensure_current(event_records)
+    event_index.ensure_record_ids_current(event_records)
     watched_tags = watched_actor_tags_for_record(
         record,
         get_character_by_id=get_character_by_id,

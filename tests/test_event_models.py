@@ -219,6 +219,44 @@ def test_render_event_record_uses_summary_key_render_params_and_locale() -> None
         set_locale(previous)
 
 
+def test_render_event_record_uses_story_hook_narrative_template() -> None:
+    record = WorldEventRecord(
+        kind="discovery",
+        description="Fallback discovery.",
+        summary_key="events.discovery.summary",
+        render_params={
+            "name": "Aldric",
+            "item": "Ancient Relic",
+            "location": "Thornwood",
+            "extra_key": "discovery_extra_knowledge",
+            "story_hook_key": "event_story_discovery_map",
+        },
+    )
+
+    rendered = render_event_record(record, locale="en")
+
+    assert rendered.startswith("A damaged map gave Aldric just enough direction.")
+    assert "Aldric discovered Ancient Relic near Thornwood." in rendered
+
+
+def test_render_event_record_without_story_hook_keeps_base_summary_template() -> None:
+    record = WorldEventRecord(
+        kind="discovery",
+        description="Fallback discovery.",
+        summary_key="events.discovery.summary",
+        render_params={
+            "name": "Aldric",
+            "item": "Ancient Relic",
+            "location": "Thornwood",
+            "extra_key": "discovery_extra_knowledge",
+        },
+    )
+
+    rendered = render_event_record(record, locale="en")
+
+    assert rendered.startswith("Aldric discovered Ancient Relic near Thornwood.")
+
+
 def test_render_event_record_falls_back_to_description_for_missing_key_or_params() -> None:
     missing_key = WorldEventRecord(
         description="Known only by legacy text.",

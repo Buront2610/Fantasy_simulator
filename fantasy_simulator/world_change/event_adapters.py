@@ -13,8 +13,108 @@ from .domain_events import (
     LocationRenamed,
     RouteStatusChanged,
     TerrainCellMutated,
+    WarDeclared,
+    WarEnded,
     WorldScoreChanged,
 )
+
+
+def _faction_tag(faction_id: str) -> str:
+    return f"faction:{faction_id}"
+
+
+def war_declared_render_params(event: WarDeclared) -> dict[str, Any]:
+    """Return semantic render params for a war declaration event."""
+    return {
+        "aggressor_faction_id": str(event.aggressor_faction_id),
+        "target_faction_id": str(event.target_faction_id),
+        "belligerent_faction_ids": event.belligerent_faction_ids,
+        "location_ids": [str(location_id) for location_id in event.location_ids],
+        **_cause_render_params(cause_event_id=event.cause_event_id, cause_key=event.cause_key),
+    }
+
+
+def war_declared_fallback_description(event: WarDeclared) -> str:
+    """Return a non-localized compatibility fallback for war declarations."""
+    cause = f" over {event.cause_key}" if event.cause_key else ""
+    return f"{event.aggressor_faction_id} declared war on {event.target_faction_id}{cause}."
+
+
+def war_declared_to_record(
+    event: WarDeclared,
+    *,
+    description: str,
+) -> WorldEventRecord:
+    """Adapt a war declaration domain event into canonical event history."""
+    location_tags = [f"{LOCATION_TAG_PREFIX}{location_id}" for location_id in event.location_ids]
+    return WorldEventRecord(
+        kind=event.kind,
+        year=event.year,
+        month=event.month,
+        day=event.day,
+        location_id=str(event.location_ids[0]) if event.location_ids else None,
+        description=description,
+        severity=4,
+        visibility="public",
+        calendar_key=event.calendar_key,
+        summary_key=event.summary_key,
+        render_params=war_declared_render_params(event),
+        tags=[
+            "world_change",
+            "war",
+            _faction_tag(str(event.aggressor_faction_id)),
+            _faction_tag(str(event.target_faction_id)),
+            *location_tags,
+        ],
+        impacts=[],
+    )
+
+
+def war_ended_render_params(event: WarEnded) -> dict[str, Any]:
+    """Return semantic render params for a war-ending event."""
+    return {
+        "aggressor_faction_id": str(event.aggressor_faction_id),
+        "target_faction_id": str(event.target_faction_id),
+        "belligerent_faction_ids": event.belligerent_faction_ids,
+        "location_ids": [str(location_id) for location_id in event.location_ids],
+        **_cause_render_params(cause_event_id=event.cause_event_id, cause_key=event.cause_key),
+    }
+
+
+def war_ended_fallback_description(event: WarEnded) -> str:
+    """Return a non-localized compatibility fallback for war endings."""
+    cause = f" after {event.cause_key}" if event.cause_key else ""
+    return f"{event.aggressor_faction_id} ended war with {event.target_faction_id}{cause}."
+
+
+def war_ended_to_record(
+    event: WarEnded,
+    *,
+    description: str,
+) -> WorldEventRecord:
+    """Adapt a war-ending domain event into canonical event history."""
+    location_tags = [f"{LOCATION_TAG_PREFIX}{location_id}" for location_id in event.location_ids]
+    return WorldEventRecord(
+        kind=event.kind,
+        year=event.year,
+        month=event.month,
+        day=event.day,
+        location_id=str(event.location_ids[0]) if event.location_ids else None,
+        description=description,
+        severity=3,
+        visibility="public",
+        calendar_key=event.calendar_key,
+        summary_key=event.summary_key,
+        render_params=war_ended_render_params(event),
+        tags=[
+            "world_change",
+            "war",
+            _faction_tag(str(event.aggressor_faction_id)),
+            _faction_tag(str(event.target_faction_id)),
+            *location_tags,
+        ],
+        impacts=[],
+    )
 
 
 def route_status_render_params(event: RouteStatusChanged) -> dict[str, Any]:

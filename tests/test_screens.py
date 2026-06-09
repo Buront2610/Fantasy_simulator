@@ -345,6 +345,72 @@ class TestAutoAdvanceScreen(unittest.TestCase):
         self.assertIn("Aldric may die without attention.", text)
         self.assertIn("Inspect Aldric's condition", text)
 
+    def test_auto_advance_screen_prints_location_only_world_change_context(self) -> None:
+        from fantasy_simulator.ui.screen_simulation import _advance_auto
+        from fantasy_simulator.ui.ui_context import UIContext
+        from fantasy_simulator.ui.render_backend import PrintRenderBackend
+
+        set_locale("en")
+        route = SimpleNamespace(
+            route_id="route_capital_thornwood",
+            from_site_id="loc_aethoria_capital",
+            to_site_id="loc_thornwood",
+        )
+        sim = SimpleNamespace(
+            world=SimpleNamespace(
+                characters=[SimpleNamespace(alive=True)],
+                months_per_year=12,
+                year=1000,
+                routes=[route],
+                location_name=lambda location_id: {
+                    "loc_aethoria_capital": "Aethoria Capital",
+                    "loc_thornwood": "Thornwood",
+                }.get(location_id, location_id),
+            ),
+            get_pending_adventure_choices=lambda: [],
+            advance_until_pause=lambda max_years: {
+                "months_advanced": 1,
+                "pause_reason": "world_change_notification",
+                "pause_context": {"location": "Aethoria Capital"},
+                "pause_subreasons": [
+                    {
+                        "key": "world_change_notification",
+                        "location": "Aethoria Capital",
+                    }
+                ],
+                "supplemental_reasons": [],
+                "recommended_actions": [
+                    {
+                        "key": "review_world_dashboard",
+                        "location": "Aethoria Capital",
+                        "target_type": "route",
+                        "target_id": "route_capital_thornwood",
+                    }
+                ],
+            },
+        )
+
+        class NoopInputBackend:
+            def read_line(self, prompt: str = "") -> str:
+                return ""
+
+            def read_menu_key(self, pairs, default=None):
+                return pairs[0][0]
+
+            def pause(self, message: str = "") -> None:
+                pass
+
+        ctx = UIContext(inp=NoopInputBackend(), out=PrintRenderBackend())
+        captured = io.StringIO()
+        with redirect_stdout(captured):
+            _advance_auto(sim, ctx=ctx)
+        text = _ANSI_RE.sub("", captured.getvalue())
+
+        self.assertIn("Cause context: Aethoria Capital", text)
+        self.assertNotIn("Cause context:  @ Aethoria Capital", text)
+        self.assertIn("A world change requires attention at Aethoria Capital.", text)
+        self.assertIn("Review the world dashboard (route: Aethoria Capital - Thornwood)", text)
+
 
 class TestWorldDashboardScreen(unittest.TestCase):
     def test_world_dashboard_surfaces_observer_state(self) -> None:
@@ -406,6 +472,8 @@ class TestWorldDashboardScreen(unittest.TestCase):
         self.assertIn("Mira [favorite]", text)
         self.assertIn("The capital road is dangerous.", text)
         self.assertIn("Aethoria Capital (danger 91", text)
+        self.assertIn("Follow up", text)
+        self.assertIn("Inspect Mira at Aethoria Capital.", text)
 
 
 class TestRumorBoardScreen(unittest.TestCase):
@@ -601,6 +669,12 @@ class TestRumorBoardScreen(unittest.TestCase):
                 source_event_id="evt_road",
                 age_in_months=1,
                 spread_level=7,
+                audience_key="local",
+                bias_tags=["local", "route"],
+                distortion_level=1,
+                tracked=True,
+                related_event_ids=["evt_road", "evt_cause"],
+                related_faction_ids=["stormwatch_wardens"],
             )
         )
         sim = Simulator(world, events_per_year=0, seed=1)
@@ -627,6 +701,11 @@ class TestRumorBoardScreen(unittest.TestCase):
         self.assertIn("RUMOR DETAIL", text)
         self.assertIn("Source event", text)
         self.assertIn("A road incident was recorded.", text)
+        self.assertIn("audience: local", text)
+        self.assertIn("tracked: yes", text)
+        self.assertIn("Related IDs", text)
+        self.assertIn("evt_cause", text)
+        self.assertIn("stormwatch_wardens", text)
         self.assertIn("Related location", text)
         self.assertIn("Recent events", text)
 

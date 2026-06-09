@@ -25,6 +25,7 @@ class DayPhaseKind(str, Enum):
     INJURY_RECOVERY = "injury_recovery"
     ADVENTURE = "adventure"
     RANDOM_EVENTS = "random_events"
+    WORLD_CHANGES = "world_changes"
     MONTH_END = "month_end"
 
 
@@ -66,6 +67,7 @@ def build_day_phase_plan(day_context: DayPhaseContext) -> list[DayPhase]:
             DayPhase(DayPhaseKind.INJURY_RECOVERY),
             DayPhase(DayPhaseKind.ADVENTURE),
             DayPhase(DayPhaseKind.RANDOM_EVENTS),
+            DayPhase(DayPhaseKind.WORLD_CHANGES),
         ]
     )
     if day_context.is_month_end:

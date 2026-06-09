@@ -130,6 +130,13 @@ class TestEventMeeting:
         assert f"Bob->Alice: {rel_b:+d}" in result.description
         assert f"Avg: {rel_avg:+d}" in result.description
 
+    def test_generated_meeting_records_story_hook(self, es, char_a, char_b, world):
+        result = es.event_meeting(char_a, char_b, world, rng=random.Random(0))
+
+        render_params = result.metadata["render_params"]
+        assert render_params["story_hook_key"].startswith("event_story_meeting_")
+        assert result.description.split(".", 1)[0]
+
     def test_description_tone_matches_average_relationship(self, es, char_a, char_b, world):
         result = es.event_meeting(char_a, char_b, world, rng=random.Random(3))
 
@@ -169,6 +176,20 @@ class TestEventBattle:
     def test_event_type_battle(self, es, char_a, char_b, world):
         result = es.event_battle(char_a, char_b, world)
         assert result.event_type in ("battle", "battle_fatal")
+
+    def test_generated_battle_records_story_hook(self, es, char_a, char_b, world):
+        result = es.event_battle(char_a, char_b, world, rng=random.Random(0))
+
+        render_params = result.metadata["render_params"]
+        assert render_params["story_hook_key"].startswith("event_story_battle_")
+
+    def test_generated_battle_records_detailed_combat_log(self, es, char_a, char_b, world):
+        result = es.event_battle(char_a, char_b, world, rng=random.Random(0))
+
+        combat_log = result.metadata["combat_log"]
+        assert len(combat_log) == 3
+        assert combat_log[0]["round_number"] == 1
+        assert combat_log[-1]["outcome"] == "decisive"
 
     def test_stat_changes_present(self, es, char_a, char_b, world):
         result = es.event_battle(char_a, char_b, world)
@@ -218,6 +239,12 @@ class TestEventDiscovery:
     def test_event_type(self, es, char_a, world):
         result = es.event_discovery(char_a, world)
         assert result.event_type == "discovery"
+
+    def test_generated_discovery_records_story_hook(self, es, char_a, world):
+        result = es.event_discovery(char_a, world, rng=random.Random(0))
+
+        render_params = result.metadata["render_params"]
+        assert render_params["story_hook_key"].startswith("event_story_discovery_")
 
     def test_stat_changes_applied(self, es, char_a, world):
         import random
@@ -279,6 +306,12 @@ class TestEventSkillTraining:
         assert "spent long hours in the training yard" not in result.description
         assert "pushed themselves beyond their limits" not in result.description
 
+    def test_generated_training_records_story_hook(self, es, char_a, world):
+        result = es.event_skill_training(char_a, world, rng=random.Random(0))
+
+        render_params = result.metadata["render_params"]
+        assert render_params["story_hook_key"].startswith("event_story_training_")
+
 
 # ---------------------------------------------------------------------------
 # event_journey
@@ -307,6 +340,12 @@ class TestEventJourney:
         assert destination is not None
         assert destination.visited is True
         assert result.event_type == "journey"
+
+    def test_generated_journey_records_story_hook(self, es, char_a, world):
+        result = es.event_journey(char_a, world, rng=random.Random(0))
+
+        render_params = result.metadata["render_params"]
+        assert render_params["story_hook_key"].startswith("event_story_journey_")
 
     def test_japanese_locale_localizes_region_type(self, es, char_a, world):
         set_locale("ja")

@@ -9,13 +9,17 @@ from fantasy_simulator.content.setting_bundle import (
     CalendarDefinition,
     CalendarMonthDefinition,
     DEFAULT_AETHORIA_BUNDLE_PATH,
+    FactionRelationshipDefinition,
     GlossaryEntryDefinition,
     JobDefinition,
     LanguageCommunityDefinition,
     LanguageDefinition,
+    LanguageFamilyDefinition,
+    LanguageRootRealization,
     NamingRulesDefinition,
     RaceDefinition,
     RouteSeedDefinition,
+    SemanticRootDefinition,
     SettingBundle,
     SettingEntryInspection,
     SiteSeedDefinition,
@@ -35,13 +39,17 @@ def test_setting_bundle_facade_supports_public_from_import_contract():
         "CalendarDefinition",
         "CalendarMonthDefinition",
         "DEFAULT_AETHORIA_BUNDLE_PATH",
+        "FactionRelationshipDefinition",
         "GlossaryEntryDefinition",
         "JobDefinition",
         "LanguageCommunityDefinition",
         "LanguageDefinition",
+        "LanguageFamilyDefinition",
+        "LanguageRootRealization",
         "NamingRulesDefinition",
         "RaceDefinition",
         "RouteSeedDefinition",
+        "SemanticRootDefinition",
         "SettingBundle",
         "SettingBundleAuthoringSummary",
         "SettingEntryInspection",
@@ -60,8 +68,10 @@ def test_setting_bundle_facade_supports_public_from_import_contract():
     exec(
         "from fantasy_simulator.content.setting_bundle import ("
         "CalendarDefinition, CalendarMonthDefinition, DEFAULT_AETHORIA_BUNDLE_PATH, "
-        "GlossaryEntryDefinition, JobDefinition, LanguageCommunityDefinition, LanguageDefinition, "
-        "NamingRulesDefinition, RaceDefinition, RouteSeedDefinition, SettingBundle, "
+        "FactionRelationshipDefinition, GlossaryEntryDefinition, JobDefinition, "
+        "LanguageCommunityDefinition, LanguageDefinition, "
+        "LanguageFamilyDefinition, LanguageRootRealization, NamingRulesDefinition, "
+        "RaceDefinition, RouteSeedDefinition, SemanticRootDefinition, SettingBundle, "
         "SettingBundleAuthoringSummary, SettingEntryInspection, SiteSeedDefinition, WorldDefinition, "
         "build_setting_bundle_authoring_summary, bundle_from_dict_validated, default_aethoria_bundle, "
         "default_calendar_definition, legacy_location_id_alias, load_setting_bundle, "
@@ -82,6 +92,10 @@ def test_setting_bundle_facade_supports_public_from_import_contract():
     assert namespace["CalendarDefinition"] is schema.CalendarDefinition
     assert namespace["SettingBundle"] is schema.SettingBundle
     assert namespace["WorldDefinition"] is schema.WorldDefinition
+    assert namespace["FactionRelationshipDefinition"] is schema.FactionRelationshipDefinition
+    assert namespace["LanguageFamilyDefinition"] is schema.LanguageFamilyDefinition
+    assert namespace["SemanticRootDefinition"] is schema.SemanticRootDefinition
+    assert namespace["LanguageRootRealization"] is schema.LanguageRootRealization
     assert namespace["SettingEntryInspection"] is inspection.SettingEntryInspection
     assert namespace["build_setting_bundle_authoring_summary"] is inspection.build_setting_bundle_authoring_summary
     assert namespace["bundle_from_dict_validated"] is loader.bundle_from_dict_validated
@@ -90,6 +104,7 @@ def test_setting_bundle_facade_supports_public_from_import_contract():
     assert schema.CalendarDefinition is calendar_schema.CalendarDefinition
     assert schema.RaceDefinition is core_schema.RaceDefinition
     assert schema.LanguageDefinition is language_schema.LanguageDefinition
+    assert schema.LanguageFamilyDefinition is language_schema.LanguageFamilyDefinition
     assert schema.WorldDefinition is world_schema.WorldDefinition
 
 
@@ -107,8 +122,17 @@ def test_setting_bundle_public_json_round_trip_uses_facade_exports():
             ),
             races=[RaceDefinition("Human", "Adaptable people.", {"charisma": 1})],
             jobs=[JobDefinition("Scout", "Roadwise watcher.", ["Perception"])],
+            factions=["Gate Wardens"],
             site_seeds=[
-                SiteSeedDefinition("loc_gate", "Gate", "A border gate.", "plains", 0, 0),
+                SiteSeedDefinition(
+                    "loc_gate",
+                    "Gate",
+                    "A border gate.",
+                    "plains",
+                    0,
+                    0,
+                    controlling_faction_id="gate_wardens",
+                ),
                 SiteSeedDefinition("loc_keep", "Keep", "A hill keep.", "hills", 1, 0),
             ],
             route_seeds=[
@@ -187,18 +211,38 @@ def test_world_definition_round_trip():
         era="Second Dawn",
         cultures=["Skyfolk"],
         factions=["Wardens"],
+        civilization_phases=["dawn", "storm", "renewal"],
+        world_score_keys=["omens", "cohesion"],
+        faction_relationships=[
+            FactionRelationshipDefinition(
+                faction_a_id="skyfolk",
+                faction_b_id="wardens",
+                status="tense",
+                location_ids=["loc_sky"],
+                description="The Skyfolk test the Wardens' border.",
+            )
+        ],
         languages=[
             LanguageDefinition(
                 language_key="proto",
                 display_name="Proto",
+                family_key="sky_family",
                 seed_syllables=["ar", "bel"],
             ),
             LanguageDefinition(
                 language_key="child",
                 display_name="Child",
                 parent_key="proto",
+                family_key="sky_family",
                 sound_shifts={"b": "v"},
             ),
+        ],
+        language_families=[
+            LanguageFamilyDefinition(
+                family_key="sky_family",
+                display_name="Sky Family",
+                proto_language_key="proto",
+            )
         ],
         language_communities=[
             LanguageCommunityDefinition(
@@ -209,11 +253,36 @@ def test_world_definition_round_trip():
                 priority=5,
             )
         ],
+        semantic_roots=[
+            SemanticRootDefinition(
+                root_key="dark",
+                meaning_key="dark",
+                gloss_en="dark",
+                allowed_roles=["modifier"],
+            )
+        ],
+        language_root_realizations=[
+            LanguageRootRealization("child", "dark", "kar"),
+        ],
     )
 
     restored = WorldDefinition.from_dict(world_def.to_dict())
 
     assert restored == world_def
+
+
+def test_world_definition_defaults_era_runtime_rules_for_legacy_payloads():
+    restored = WorldDefinition.from_dict(
+        {
+            "world_key": "legacy",
+            "display_name": "Legacy Realm",
+            "lore_text": "Legacy lore",
+        }
+    )
+
+    assert restored.civilization_phases == ["stable", "crisis", "transition", "new_era", "aftermath"]
+    assert restored.world_score_keys == ["prosperity", "safety", "traffic", "mood"]
+    assert restored.faction_relationships == []
 
 
 def test_setting_bundle_round_trip():
@@ -231,18 +300,43 @@ def test_setting_bundle_round_trip():
     assert restored == bundle
 
 
+def test_world_era_runtime_uses_setting_bundle_rule_vocabulary():
+    world = World()
+    bundle = world.setting_bundle
+    bundle.world_definition.civilization_phases = ["dawn", "storm", "renewal"]
+    bundle.world_definition.world_score_keys = ["omens", "cohesion"]
+    world.apply_setting_bundle(bundle)
+
+    runtime = world._world_era_runtime()
+    assert runtime.civilization_phase == "dawn"
+    assert runtime.world_scores == {"omens": 50, "cohesion": 50}
+
+    record = world.apply_civilization_phase_drift(
+        "storm",
+        score_deltas={"omens": 7},
+        month=2,
+        day=3,
+    )
+
+    assert record is not None
+    assert record.render_params["new_civilization_phase"] == "storm"
+    assert record.render_params["score_changes"] == [
+        {"score_key": "omens", "old_value": 50, "new_value": 57, "delta": 7},
+    ]
+
+
 def test_world_definition_exposes_typed_culture_and_faction_inspection_entries():
     world_def = WorldDefinition(
         world_key="custom",
         display_name="Custom Realm",
         lore_text="Custom lore",
-        cultures=["Skyfolk", "River Clans"],
+        cultures=["Skyfolk", " River Clans "],
         factions=["Wardens", "Dawn-Court"],
     )
 
     assert world_def.culture_entries() == [
         SettingEntryInspection("culture", "skyfolk", "Skyfolk"),
-        SettingEntryInspection("culture", "river_clans", "River Clans"),
+        SettingEntryInspection("culture", "river_clans", " River Clans "),
     ]
     assert world_def.faction_entries() == [
         SettingEntryInspection("faction", "wardens", "Wardens"),
@@ -281,6 +375,10 @@ def test_setting_bundle_authoring_summary_includes_culture_and_faction_keys():
             lore_text="Custom lore",
             cultures=["Skyfolk", "River Clans"],
             factions=["Wardens", "Dawn-Court"],
+            faction_relationships=[
+                FactionRelationshipDefinition("wardens", "dawn_court", status="war"),
+                FactionRelationshipDefinition("wardens", "river_clans", status="tense"),
+            ],
         ),
     )
 
@@ -288,8 +386,10 @@ def test_setting_bundle_authoring_summary_includes_culture_and_faction_keys():
 
     assert summary.culture_count == 2
     assert summary.faction_count == 2
+    assert summary.faction_relationship_count == 2
     assert summary.culture_keys == ["river_clans", "skyfolk"]
     assert summary.faction_keys == ["dawn_court", "wardens"]
+    assert summary.faction_relationship_status_counts == {"tense": 1, "war": 1}
 
 
 def test_setting_bundle_authoring_summary_includes_glossary_keys():
@@ -442,6 +542,13 @@ def test_default_aethoria_bundle_has_minimal_phase_i_slots():
     assert bundle.world_definition.era == "Age of Embers"
     assert bundle.world_definition.culture_entries()
     assert bundle.world_definition.faction_entries()
+    assert {
+        (relationship.faction_a_id, relationship.faction_b_id, relationship.status)
+        for relationship in bundle.world_definition.faction_relationships
+    } >= {
+        ("stormwatch_wardens", "silverbrook_merchant_league", "tense"),
+        ("aethorian_crown_council", "hearthglow_healers_guild", "allied"),
+    }
     assert bundle.world_definition.races
     assert bundle.world_definition.jobs
     assert bundle.world_definition.site_seeds
@@ -456,6 +563,31 @@ def test_default_aethoria_bundle_has_minimal_phase_i_slots():
     )
     assert "capital" in capital_seed.tags
     assert "default_resident" in capital_seed.tags
+    assert {"gate", "market", "notice_board"}.issubset(set(capital_seed.tags))
+    assert capital_seed.controlling_faction_id == "aethorian_crown_council"
+    tags_by_site_id = {
+        seed.location_id: set(seed.tags)
+        for seed in bundle.world_definition.site_seeds
+    }
+    assert {"market", "river"}.issubset(tags_by_site_id["loc_silverbrook"])
+    assert "accident_site" in tags_by_site_id["loc_sunken_ruins"]
+    controllers_by_site_id = {
+        seed.location_id: seed.controlling_faction_id
+        for seed in bundle.world_definition.site_seeds
+        if seed.controlling_faction_id
+    }
+    assert controllers_by_site_id.items() >= {
+        "loc_aethoria_capital": "aethorian_crown_council",
+        "loc_silverbrook": "silverbrook_merchant_league",
+        "loc_stormwatch_keep": "stormwatch_wardens",
+    }.items()
+
+
+def test_default_aethoria_world_seeds_initial_location_control():
+    world = World()
+
+    assert world.get_location_by_id("loc_aethoria_capital").controlling_faction_id == "aethorian_crown_council"
+    assert world.get_location_by_id("loc_silverbrook").controlling_faction_id == "silverbrook_merchant_league"
 
 
 def test_aethoria_bundle_has_expected_authored_native_names():
@@ -1119,6 +1251,37 @@ def test_bundle_validation_rejects_negative_site_coordinates() -> None:
         raise AssertionError("Expected negative coordinates to fail fast")
 
 
+def test_bundle_validation_rejects_unknown_site_controlling_faction() -> None:
+    payload = {
+        "schema_version": 1,
+        "world_definition": {
+            "world_key": "bad_controller",
+            "display_name": "Bad Controller",
+            "lore_text": "Malformed",
+            "factions": ["Known Wardens"],
+            "site_seeds": [
+                {
+                    "location_id": "loc_bad",
+                    "name": "Bad",
+                    "description": "",
+                    "region_type": "city",
+                    "x": 0,
+                    "y": 0,
+                    "controlling_faction_id": "missing_faction",
+                }
+            ],
+        },
+    }
+
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "unknown controlling factions" in str(exc)
+        assert "missing_faction" in str(exc)
+    else:
+        raise AssertionError("Expected unknown site controlling faction to fail fast")
+
+
 def test_bundle_from_dict_rejects_string_cultures_and_factions() -> None:
     payload = {
         "schema_version": 1,
@@ -1231,6 +1394,85 @@ def test_bundle_validation_rejects_blank_cultures_and_factions() -> None:
         assert "blank faction names" in str(exc)
     else:
         raise AssertionError("Expected blank factions to fail fast")
+
+
+def test_bundle_validation_rejects_invalid_era_runtime_rule_lists() -> None:
+    payload = {
+        "schema_version": 1,
+        "world_definition": {
+            "world_key": "rules",
+            "display_name": "Rules",
+            "lore_text": "Rules lore",
+            "civilization_phases": ["dawn", "dawn"],
+            "world_score_keys": ["omens"],
+        },
+    }
+
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "duplicate civilization_phases" in str(exc)
+    else:
+        raise AssertionError("Expected duplicate civilization phases to fail fast")
+
+    payload["world_definition"]["civilization_phases"] = ["dawn"]
+    payload["world_definition"]["world_score_keys"] = ["  "]
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "blank world_score_keys" in str(exc)
+    else:
+        raise AssertionError("Expected blank world score keys to fail fast")
+
+
+def test_bundle_validation_rejects_invalid_faction_relationships() -> None:
+    payload = {
+        "schema_version": 1,
+        "world_definition": {
+            "world_key": "politics",
+            "display_name": "Politics",
+            "lore_text": "Politics lore",
+            "factions": ["Wardens", "Dawn Court"],
+            "site_seeds": [
+                {
+                    "location_id": "loc_gate",
+                    "name": "Gate",
+                    "description": "A border gate.",
+                    "region_type": "city",
+                    "x": 1,
+                    "y": 1,
+                }
+            ],
+            "faction_relationships": [
+                {
+                    "faction_a_id": "wardens",
+                    "faction_b_id": "dawn_court",
+                    "status": "war",
+                    "location_ids": ["loc_gate"],
+                }
+            ],
+        },
+    }
+
+    bundle = bundle_from_dict_validated(payload, source="test bundle")
+    assert bundle.world_definition.faction_relationships[0].status == "war"
+
+    payload["world_definition"]["faction_relationships"][0]["status"] = "feuding"
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "unknown faction relationship status" in str(exc)
+    else:
+        raise AssertionError("Expected unknown faction relationship status to fail fast")
+
+    payload["world_definition"]["faction_relationships"][0]["status"] = "war"
+    payload["world_definition"]["faction_relationships"][0]["location_ids"] = ["loc_missing"]
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "unknown site ids" in str(exc)
+    else:
+        raise AssertionError("Expected unknown relationship site id to fail fast")
 
 
 def test_bundle_validation_rejects_blank_glossary_terms() -> None:
@@ -1447,14 +1689,22 @@ def test_bundle_authoring_summary_exposes_region_route_and_language_breakdowns()
     assert "loc_aethoria_capital" in summary.resident_site_ids
     assert summary.culture_count == len(bundle.world_definition.cultures)
     assert summary.faction_count == len(bundle.world_definition.factions)
+    assert summary.faction_relationship_count == len(bundle.world_definition.faction_relationships)
     assert summary.glossary_count == len(bundle.world_definition.glossary)
+    assert summary.language_family_count == len(bundle.world_definition.language_families)
     assert "aethic_heartlanders" in summary.culture_keys
     assert "aethorian_crown_council" in summary.faction_keys
+    assert summary.faction_relationship_status_counts["tense"] >= 1
     assert "arcane_cataclysm" in summary.glossary_keys
     assert "ley_lines" in summary.glossary_keys
     assert summary.site_counts_by_region_type["city"] >= 1
     assert summary.route_counts_by_type["road"] >= 1
     assert "aethic_common" in summary.language_keys
+    assert "aethic_family" in summary.language_family_keys
+    assert summary.language_keys_without_family == []
+    assert summary.semantic_root_count >= 9
+    assert summary.language_root_realization_count >= 45
+    assert summary.root_realization_coverage_by_language["aethic_common"] >= 9
     assert "loc_thornwood" in summary.community_keys_by_region
     assert summary.language_community_count == len(bundle.world_definition.language_communities)
     assert summary.site_ids_without_language_key == []
@@ -1531,6 +1781,58 @@ def test_bundle_validation_treats_blank_native_name_as_absent() -> None:
     bundle = bundle_from_dict_validated(payload, source="test bundle")
 
     assert bundle.world_definition.site_seeds[0].native_name == "   "
+
+
+def test_bundle_validation_rejects_unknown_language_root_realization_reference() -> None:
+    payload = {
+        "schema_version": 1,
+        "world_definition": {
+            "world_key": "bad_root_realization",
+            "display_name": "Bad Root Realization",
+            "lore_text": "Malformed",
+            "languages": [
+                {"language_key": "root", "display_name": "Root"},
+            ],
+            "semantic_roots": [
+                {"root_key": "dark", "meaning_key": "dark", "gloss_en": "dark"},
+            ],
+            "language_root_realizations": [
+                {"language_key": "root", "root_key": "missing", "surface": "kar"},
+            ],
+        },
+    }
+
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "unknown semantic root" in str(exc)
+    else:
+        raise AssertionError("Expected unknown semantic root realization to fail fast")
+
+
+def test_bundle_validation_rejects_unknown_language_family_reference() -> None:
+    payload = {
+        "schema_version": 1,
+        "world_definition": {
+            "world_key": "bad_language_family",
+            "display_name": "Bad Language Family",
+            "lore_text": "Malformed",
+            "languages": [
+                {
+                    "language_key": "root",
+                    "display_name": "Root",
+                    "family_key": "missing_family",
+                },
+            ],
+        },
+    }
+
+    try:
+        bundle_from_dict_validated(payload, source="test bundle")
+    except ValueError as exc:
+        assert "unknown language family" in str(exc)
+    else:
+        raise AssertionError("Expected unknown language family reference to fail fast")
 
 
 def test_bundle_validation_rejects_non_positive_route_distance() -> None:

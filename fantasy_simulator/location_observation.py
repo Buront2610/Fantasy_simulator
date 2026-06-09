@@ -7,6 +7,7 @@ from typing import List, TYPE_CHECKING
 
 from .event_rendering import render_event_record
 from .i18n import tr, tr_term
+from .location_names import ToponymEtymology, build_toponym_etymology, render_toponym_etymology_line
 
 if TYPE_CHECKING:
     from .world import World
@@ -23,6 +24,13 @@ class RumorSummaryView:
     source_event_id: str | None = None
     age_in_months: int = 0
     spread_level: int = 0
+    audience_key: str = ""
+    bias_tags: List[str] = field(default_factory=list)
+    distortion_level: int = 0
+    tracked: bool = False
+    related_location_ids: List[str] = field(default_factory=list)
+    related_event_ids: List[str] = field(default_factory=list)
+    related_faction_ids: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -31,6 +39,7 @@ class LocationObservationView:
     location_name: str
     region_type: str
     generated_endonym: str = ""
+    name_etymology: ToponymEtymology | None = None
     aliases: List[str] = field(default_factory=list)
     memorials: List[str] = field(default_factory=list)
     traces: List[str] = field(default_factory=list)
@@ -81,6 +90,13 @@ def build_rumor_summary_views(
             source_event_id=rumor.source_event_id,
             age_in_months=rumor.age_in_months,
             spread_level=rumor.spread_level,
+            audience_key=getattr(rumor, "audience_key", ""),
+            bias_tags=list(getattr(rumor, "bias_tags", [])),
+            distortion_level=getattr(rumor, "distortion_level", 0),
+            tracked=getattr(rumor, "tracked", False),
+            related_location_ids=list(getattr(rumor, "related_location_ids", [])),
+            related_event_ids=list(getattr(rumor, "related_event_ids", [])),
+            related_faction_ids=list(getattr(rumor, "related_faction_ids", [])),
         )
         for rumor in rumors
     ]
@@ -136,6 +152,7 @@ def build_location_observation_view(
         location_name=location.canonical_name,
         region_type=tr_term(location.region_type),
         generated_endonym=location.generated_endonym,
+        name_etymology=build_toponym_etymology(world, location.id),
         aliases=list(location.aliases),
         memorials=memorials,
         traces=traces,
@@ -148,13 +165,18 @@ def build_location_observation_view(
 
 def render_rumor_brief(view: RumorSummaryView) -> str:
     reliability = tr(f"rumor_reliability_{view.reliability}")
-    return f"{view.description} ({reliability})"
+    tracking = f" {tr('rumor_tracked_marker')}" if view.tracked else ""
+    return f"{view.description}{tracking} ({reliability})"
 
 
 def render_location_observation_sections(view: LocationObservationView) -> List[str]:
     lines: List[str] = []
     if view.generated_endonym:
         lines.append(f"  {tr('location_endonym_label')}: {view.generated_endonym}")
+        lines.append("")
+
+    if view.name_etymology is not None:
+        lines.append(f"  {tr('location_etymology_label')}: {render_toponym_etymology_line(view.name_etymology)}")
         lines.append("")
 
     lines.append(f"  {tr('location_aliases_label')}:")
@@ -206,6 +228,10 @@ def render_query_location_observation_sections(view: LocationObservationView) ->
     lines: List[str] = []
     if view.generated_endonym:
         lines.append(f"  {tr('location_endonym_label')}: {view.generated_endonym}")
+        lines.append("")
+
+    if view.name_etymology is not None:
+        lines.append(f"  {tr('location_etymology_label')}: {render_toponym_etymology_line(view.name_etymology)}")
         lines.append("")
 
     if view.resident_names:

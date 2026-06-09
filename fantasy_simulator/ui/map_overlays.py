@@ -22,4 +22,8 @@ def _overlay_suffix(cell: MapCellInfo) -> str:
         parts.append("a")
     if cell.recent_death_site:
         parts.append("+")
+    if cell.recent_world_change_count:
+        parts.append("w")
+    if cell.controlling_faction_id:
+        parts.append("c")
     return "".join(parts)

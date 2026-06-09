@@ -161,6 +161,7 @@ def _simulator_payload(
     history: list[dict] | None = None,
     events_per_year: int = 8,
     adventure_steps_per_year: int = 3,
+    world_changes_per_year: int = 0,
 ) -> dict:
     return {
         "schema_version": schema_version,
@@ -168,6 +169,7 @@ def _simulator_payload(
         "characters": list(characters or []),
         "events_per_year": events_per_year,
         "adventure_steps_per_year": adventure_steps_per_year,
+        "world_changes_per_year": world_changes_per_year,
         "history": list(history or []),
     }
 
@@ -581,6 +583,17 @@ class TestLoadSimulation:
             json.dump(data, f)
         restored = load_simulation(str(path))
         assert restored is not None  # Should not crash
+
+    def test_world_change_budget_roundtrips(self, tmp_path):
+        path = tmp_path / "world_change_budget.json"
+        sim = Simulator(_make_world(), events_per_year=0, world_changes_per_year=7, seed=1)
+
+        assert save_simulation(sim, str(path)) is True
+        restored = load_simulation(str(path))
+
+        assert restored is not None
+        assert restored.events_per_year == 0
+        assert restored.world_changes_per_year == 7
 
     def test_load_returns_none_for_duplicate_character_ids(self, tmp_path):
         path = tmp_path / "duplicate_ids.json"

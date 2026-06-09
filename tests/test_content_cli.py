@@ -22,7 +22,18 @@ def test_content_inspect_json_reports_authoring_summary(capsys) -> None:
     data = json.loads(capsys.readouterr().out)
     assert data["site_count"] > 0
     assert data["language_count"] > 0
+    assert data["faction_relationship_count"] > 0
+    assert "tense" in data["faction_relationship_status_counts"]
     assert "language_keys" in data
+
+
+def test_content_inspect_text_reports_faction_relationships(capsys) -> None:
+    exit_code = main(["inspect", str(DEFAULT_AETHORIA_BUNDLE_PATH)])
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert "faction relationships:" in output
+    assert "faction relationship statuses:" in output
 
 
 def test_content_preview_map_and_names_are_nonempty(capsys) -> None:
@@ -33,6 +44,25 @@ def test_content_preview_map_and_names_are_nonempty(capsys) -> None:
     assert main(["preview-names", str(DEFAULT_AETHORIA_BUNDLE_PATH), "--limit", "2"]) == 0
     names_output = capsys.readouterr().out
     assert "names [" in names_output
+
+    assert main([
+        "preview-roots",
+        str(DEFAULT_AETHORIA_BUNDLE_PATH),
+        "--language",
+        "aethic_common",
+        "--roots",
+        "dark,pass",
+    ]) == 0
+    roots_output = capsys.readouterr().out
+    assert "semantic roots:" in roots_output
+    assert "aethic_common:" in roots_output
+    assert "Blackgap [black, gap]" in roots_output
+
+    assert main(["preview-language-atlas", str(DEFAULT_AETHORIA_BUNDLE_PATH)]) == 0
+    atlas_output = capsys.readouterr().out
+    assert "language families:" in atlas_output
+    assert "aethic_family:" in atlas_output
+    assert "aethic_common" in atlas_output
 
 
 def test_content_preview_map_legend_lists_site_details(capsys) -> None:

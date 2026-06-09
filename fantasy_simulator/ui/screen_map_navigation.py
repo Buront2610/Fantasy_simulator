@@ -9,6 +9,7 @@ from ..i18n import tr, tr_term
 from ..simulator import Simulator
 from ..world import World
 from .screen_input import _get_numeric_choice
+from .screen_history import _show_location_history_for_location
 from .screen_map_payloads import (
     _render_location_detail_for_location,
     _render_region_map_for_location,
@@ -25,7 +26,6 @@ def _show_detail_for_location(
     """Render the detail panel for a single location."""
     ctx = _default_ctx(ctx)
     out = ctx.out
-    inp = ctx.inp
     out.print_line()
     out.print_line(
         _render_location_detail_for_location(
@@ -35,7 +35,15 @@ def _show_detail_for_location(
             include_observation_notes=True,
         )
     )
-    inp.pause()
+    action = ctx.choose_key(
+        tr("map_detail_followup_prompt"),
+        [
+            ("location_history", tr("map_detail_followup_location_history")),
+            ("back", tr("back_to_main")),
+        ],
+    )
+    if action == "location_history":
+        _show_location_history_for_location(world, loc, ctx=ctx)
 
 
 def _visible_locations(world: World, info: Any, center_loc: Any, radius: int = 2) -> list[Any]:
@@ -70,6 +78,65 @@ def _choose_location(locations: list[Any], ctx: UIContext) -> Any | None:
     if idx is None:
         return None
     return locations[idx]
+
+
+def _cue_categories_for_info(info: Any) -> list[tuple[str, str]]:
+    seen: set[str] = set()
+    categories: list[tuple[int, str]] = []
+    category_priority = {
+        "site": 10,
+        "terrain": 20,
+        "memory": 30,
+        "route": 40,
+    }
+    for cell in info.cells.values():
+        for cue in cell.local_feature_cues:
+            if cue.category not in seen:
+                seen.add(cue.category)
+                categories.append((category_priority.get(cue.category, 99), cue.category))
+    return [
+        (category, tr(f"map_cue_category_{category}"))
+        for _priority, category in sorted(categories)
+    ]
+
+
+def _locations_for_cue_category(world: World, info: Any, category: str) -> list[Any]:
+    location_ids = {
+        cell.location_id
+        for cell in info.cells.values()
+        if any(cue.category == category for cue in cell.local_feature_cues)
+    }
+    return [
+        loc for loc in _all_locations(world)
+        if loc.id in location_ids
+    ]
+
+
+def _print_cue_location_choices(info: Any, locations: list[Any], category: str, ctx: UIContext) -> None:
+    cells_by_id = {cell.location_id: cell for cell in info.cells.values()}
+    ctx.out.print_line()
+    ctx.out.print_heading(f"  {tr('map_cue_locations_title', category=tr(f'map_cue_category_{category}'))}:")
+    for i, loc in enumerate(locations, 1):
+        cell = cells_by_id.get(loc.id)
+        labels = []
+        if cell is not None:
+            labels = [cue.label for cue in cell.local_feature_cues if cue.category == category]
+        suffix = f" - {', '.join(labels)}" if labels else ""
+        ctx.out.print_line(f"  {i}. {loc.canonical_name} ({tr_term(loc.region_type)}){suffix}")
+
+
+def _choose_location_by_local_cue(world: World, info: Any, ctx: UIContext) -> Any | None:
+    categories = _cue_categories_for_info(info)
+    if not categories:
+        ctx.out.print_dim(f"  {tr('map_no_local_cues')}")
+        return None
+    category = ctx.choose_key(tr("map_cue_category_prompt"), categories)
+    locations = _locations_for_cue_category(world, info, category)
+    if not locations:
+        ctx.out.print_dim(f"  {tr('map_no_local_cues')}")
+        return None
+    _print_cue_location_choices(info, locations, category, ctx)
+    return _choose_location(locations, ctx)
 
 
 def _region_drill_loop(
@@ -170,7 +237,7 @@ def _print_map_legend(ctx: UIContext) -> None:
     out.print_error(f"    !  {tr('map_legend_danger_high')}")
     out.print_warning(f"    $  {tr('map_legend_traffic_high')}")
     out.print_highlighted(f"    ?  {tr('map_legend_rumor_high')}")
-    out.print_dim(f"    m  {tr('map_legend_memorial')} / a  {tr('map_legend_alias')}")
+    out.print_dim(f"    m  {tr('map_legend_memorial')} / a  {tr('map_legend_alias')} / c  {tr('map_legend_control')}")
     out.print_dim(f"  {tr('map_nav_keys_hint')}")
     out.print_line()
 
@@ -212,6 +279,7 @@ def _show_world_map(sim: Simulator, ctx: UIContext | None = None) -> None:
             tr("map_nav_prompt"),
             [
                 ("select", tr("map_nav_select")),
+                ("cue", tr("map_nav_cues")),
                 ("region", tr("map_nav_region")),
                 ("detail", tr("map_nav_detail")),
                 ("mode", tr("map_nav_mode")),
@@ -229,6 +297,11 @@ def _show_world_map(sim: Simulator, ctx: UIContext | None = None) -> None:
                 loc = world.get_location_by_id(loc_id)
                 if loc is not None:
                     _region_drill_loop(world, info, loc, ctx=ctx)
+
+        elif action == "cue":
+            loc = _choose_location_by_local_cue(world, info, ctx)
+            if loc is not None:
+                _region_drill_loop(world, info, loc, ctx=ctx)
 
         elif action == "region":
             center_loc = _choose_from_all_locations(world, ctx)

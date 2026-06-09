@@ -19,6 +19,7 @@ class LanguageDefinition:
     language_key: str
     display_name: str
     parent_key: str = ""
+    family_key: str = ""
     seed_syllables: List[str] = field(default_factory=list)
     consonants: List[str] = field(default_factory=list)
     vowels: List[str] = field(default_factory=list)
@@ -51,6 +52,7 @@ class LanguageDefinition:
             "language_key": self.language_key,
             "display_name": self.display_name,
             "parent_key": self.parent_key,
+            "family_key": self.family_key,
             "seed_syllables": list(self.seed_syllables),
             "consonants": list(self.consonants),
             "vowels": list(self.vowels),
@@ -90,6 +92,7 @@ class LanguageDefinition:
             language_key=data["language_key"],
             display_name=data.get("display_name", data["language_key"]),
             parent_key=data.get("parent_key", ""),
+            family_key=data.get("family_key", ""),
             seed_syllables=string_list_payload(data.get("seed_syllables", []), field_name="seed_syllables"),
             consonants=string_list_payload(data.get("consonants", []), field_name="consonants"),
             vowels=string_list_payload(data.get("vowels", []), field_name="vowels"),
@@ -188,4 +191,109 @@ class LanguageCommunityDefinition:
             regions=string_list_payload(data.get("regions", []), field_name="regions"),
             priority=int(data.get("priority", 0)),
             is_lingua_franca=bool(data.get("is_lingua_franca", False)),
+        )
+
+
+@dataclass(frozen=True)
+class LanguageFamilyDefinition:
+    """Authoring/UI grouping for related languages without replacing parent_key lineage."""
+
+    family_key: str
+    display_name: str
+    proto_language_key: str = ""
+    origin_region_ids: List[str] = field(default_factory=list)
+    cultural_tags: List[str] = field(default_factory=list)
+    phonology_profile_key: str = ""
+    naming_profile_key: str = ""
+    semantic_domain_tags: List[str] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "family_key": self.family_key,
+            "display_name": self.display_name,
+            "proto_language_key": self.proto_language_key,
+            "origin_region_ids": list(self.origin_region_ids),
+            "cultural_tags": list(self.cultural_tags),
+            "phonology_profile_key": self.phonology_profile_key,
+            "naming_profile_key": self.naming_profile_key,
+            "semantic_domain_tags": list(self.semantic_domain_tags),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "LanguageFamilyDefinition":
+        return cls(
+            family_key=data["family_key"],
+            display_name=data.get("display_name", data["family_key"]),
+            proto_language_key=data.get("proto_language_key", ""),
+            origin_region_ids=string_list_payload(data.get("origin_region_ids", []), field_name="origin_region_ids"),
+            cultural_tags=string_list_payload(data.get("cultural_tags", []), field_name="cultural_tags"),
+            phonology_profile_key=data.get("phonology_profile_key", ""),
+            naming_profile_key=data.get("naming_profile_key", ""),
+            semantic_domain_tags=string_list_payload(
+                data.get("semantic_domain_tags", []),
+                field_name="semantic_domain_tags",
+            ),
+        )
+
+
+@dataclass(frozen=True)
+class SemanticRootDefinition:
+    """Shared semantic meaning used by authored or generated toponyms."""
+
+    root_key: str
+    meaning_key: str
+    gloss_en: str
+    gloss_ja: str = ""
+    semantic_tags: List[str] = field(default_factory=list)
+    allowed_roles: List[str] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "root_key": self.root_key,
+            "meaning_key": self.meaning_key,
+            "gloss_en": self.gloss_en,
+            "gloss_ja": self.gloss_ja,
+            "semantic_tags": list(self.semantic_tags),
+            "allowed_roles": list(self.allowed_roles),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SemanticRootDefinition":
+        return cls(
+            root_key=data["root_key"],
+            meaning_key=data.get("meaning_key", data["root_key"]),
+            gloss_en=data.get("gloss_en", data["root_key"]),
+            gloss_ja=data.get("gloss_ja", ""),
+            semantic_tags=string_list_payload(data.get("semantic_tags", []), field_name="semantic_tags"),
+            allowed_roles=string_list_payload(data.get("allowed_roles", []), field_name="allowed_roles"),
+        )
+
+
+@dataclass(frozen=True)
+class LanguageRootRealization:
+    """Language-specific surface form for one shared semantic root."""
+
+    language_key: str
+    root_key: str
+    surface: str
+    archaic_surface: str = ""
+    notes: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "language_key": self.language_key,
+            "root_key": self.root_key,
+            "surface": self.surface,
+            "archaic_surface": self.archaic_surface,
+            "notes": self.notes,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "LanguageRootRealization":
+        return cls(
+            language_key=data["language_key"],
+            root_key=data["root_key"],
+            surface=data["surface"],
+            archaic_surface=data.get("archaic_surface", ""),
+            notes=data.get("notes", ""),
         )

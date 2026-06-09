@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import NewType
+from typing import Callable, Iterable, NewType, TypeVar
 
 
 CharacterId = NewType("CharacterId", str)
@@ -15,6 +15,54 @@ EraKey = NewType("EraKey", str)
 CultureId = NewType("CultureId", str)
 
 
+TId = TypeVar("TId")
+
+
+def normalize_required_id(value: object, *, field_name: str, id_type: Callable[[str], TId]) -> TId:
+    """Normalize a required nominal ID at a command or adapter boundary."""
+    normalized = str(value).strip()
+    if not normalized:
+        raise ValueError(f"{field_name} must not be blank")
+    return id_type(normalized)
+
+
+def normalize_optional_id(value: object | None, *, id_type: Callable[[str], TId]) -> TId | None:
+    """Normalize an optional nominal ID, treating blank values as absent."""
+    if value is None:
+        return None
+    normalized = str(value).strip()
+    return id_type(normalized) if normalized else None
+
+
+def normalize_id_sequence(
+    values: Iterable[object],
+    *,
+    field_name: str,
+    id_type: Callable[[str], TId],
+) -> tuple[TId, ...]:
+    """Normalize required IDs while preserving first-seen order and dropping duplicates."""
+    normalized_values = []
+    for value in values:
+        normalized = normalize_required_id(value, field_name=field_name, id_type=id_type)
+        if normalized not in normalized_values:
+            normalized_values.append(normalized)
+    return tuple(normalized_values)
+
+
+def normalize_slug_id(value: object, *, field_name: str, id_type: Callable[[str], TId]) -> TId:
+    """Normalize a display/authored name into a stable lowercase slug ID."""
+    normalized = str(normalize_required_id(value, field_name=field_name, id_type=str))
+    slug = normalized.lower().replace(" ", "_").replace("-", "_").replace("'", "")
+    if not slug:
+        raise ValueError(f"{field_name} must not produce a blank ID")
+    return id_type(slug)
+
+
+def terrain_cell_id_for_coords(x: int, y: int) -> TerrainCellId:
+    """Return the canonical terrain-cell ID for grid coordinates."""
+    return TerrainCellId(f"terrain:{x}:{y}")
+
+
 __all__ = [
     "CharacterId",
     "LocationId",
@@ -24,4 +72,9 @@ __all__ = [
     "EventRecordId",
     "EraKey",
     "CultureId",
+    "normalize_required_id",
+    "normalize_optional_id",
+    "normalize_id_sequence",
+    "normalize_slug_id",
+    "terrain_cell_id_for_coords",
 ]

@@ -7,7 +7,7 @@ from typing import Dict, List, Set
 from ..i18n import tr, tr_term
 from .map_overlays import _overlay_suffix
 from .map_route_helpers import route_endpoint_name
-from .map_view_models import MapCellInfo, RouteRenderInfo
+from .map_view_models import LocalMapCue, MapCellInfo, RouteRenderInfo
 
 
 _DANGER_MARKERS: Dict[str, str] = {"low": " ", "medium": ".", "high": "!"}
@@ -16,6 +16,7 @@ _RUMOR_MARKERS: Dict[str, str] = {"low": " ", "medium": "~", "high": "?"}
 _MAX_REGION_STANDOUT_ITEMS = 4
 _OPEN_ROUTE_MARKER = "<->"
 _BLOCKED_ROUTE_MARKER = "x->"
+_LOCAL_CUE_CATEGORY_ORDER = ("site", "terrain", "memory", "route")
 
 
 def append_region_focus(lines: List[str], standout_lines: List[str]) -> None:
@@ -73,6 +74,27 @@ def append_region_routes(
             f"    {from_name} <-> {to_name}"
             f" ({tr_term(route.route_type)}){blocked}"
         )
+
+
+def _format_local_cue_groups(cues: List[LocalMapCue]) -> str:
+    groups: Dict[str, List[str]] = {category: [] for category in _LOCAL_CUE_CATEGORY_ORDER}
+    for cue in sorted(cues, key=lambda item: item.priority):
+        groups.setdefault(cue.category, []).append(cue.label)
+    parts = []
+    for category in _LOCAL_CUE_CATEGORY_ORDER:
+        labels = groups.get(category, [])
+        if labels:
+            parts.append(f"{tr(f'map_cue_category_{category}')}: {', '.join(labels)}")
+    return "; ".join(parts)
+
+
+def append_region_local_cues(lines: List[str], visible_cells: List[MapCellInfo]) -> None:
+    cue_cells = [cell for cell in visible_cells if cell.local_feature_cues]
+    if not cue_cells:
+        return
+    lines.append(f"  {tr('map_region_local_cues')}:")
+    for cell in cue_cells:
+        lines.append(f"    {cell.canonical_name}: {_format_local_cue_groups(list(cell.local_feature_cues))}")
 
 
 def append_region_landmarks(

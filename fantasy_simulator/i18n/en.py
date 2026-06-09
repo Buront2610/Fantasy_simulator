@@ -185,6 +185,21 @@ TEXT_EN: Dict[str, str] = {
     'training_effort_tireless': 'practised tirelessly until their hands bled',
     'training_effort_scrolls': 'studied ancient scrolls',
     'training_effort_limits': 'pushed themselves beyond their limits',
+    'event_story_battle_old_grudge': 'An old grudge finally surfaced.',
+    'event_story_battle_public_challenge': 'A public challenge drew witnesses before steel was raised.',
+    'event_story_battle_route_dispute': 'A dispute over passage on the road turned violent.',
+    'event_story_discovery_rumor': 'A tavern rumor pointed {name} toward the site.',
+    'event_story_discovery_map': 'A damaged map gave {name} just enough direction.',
+    'event_story_discovery_omen': 'Strange signs around {location} led {name} onward.',
+    'event_story_journey_request': 'A request from {destination} pushed {name} onto the road.',
+    'event_story_journey_weather': 'Changing weather forced {name} to choose a route quickly.',
+    'event_story_journey_missing_caravan': 'Talk of a missing caravan made the journey urgent.',
+    'event_story_meeting_shared_task': 'A shared task brought {name1} and {name2} face to face.',
+    'event_story_meeting_market_tension': 'Crowded streets at {location} left little room to avoid each other.',
+    'event_story_meeting_old_story': 'An old story drew both {name1} and {name2} to the same place.',
+    'event_story_training_deadline': 'A looming trial gave the training a clear purpose.',
+    'event_story_training_rival': 'Word of a rival sharpened {name}\'s focus.',
+    'event_story_training_failed_attempt': 'A recent failure made practice impossible to ignore.',
     'meeting_positive': '{name1} and {name2} met in {location} and hit it off splendidly. ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
     'meeting_pleasant': '{name1} and {name2} met in {location} and had a pleasant exchange. ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
     'meeting_neutral': '{name1} and {name2} met in {location} and exchanged a polite nod. ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
@@ -347,10 +362,19 @@ TEXT_EN: Dict[str, str] = {
     'events.generic.summary': '{description}',
     'events.battle.summary': '{actor} fought at {location}.',
     'events.battle_result.summary': '{winner} defeated {loser}.{injury}',
+    'events.battle_result.summary.narrative': '{story_hook} {winner} defeated {loser}.{injury}',
     'events.battle_fatal.summary': '{winner} defeated {loser}, who did not survive the encounter.',
+    'events.battle_fatal.summary.narrative': (
+        '{story_hook} {winner} defeated {loser}, who did not survive the encounter.'
+    ),
     'events.meeting.summary': '{actor} met {other} at {location}.',
     'events.meeting_positive.summary': (
         '{name1} and {name2} met in {location} and hit it off splendidly. '
+        '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        'Avg: {relationship_avg:+d})'
+    ),
+    'events.meeting_positive.summary.narrative': (
+        '{story_hook} {name1} and {name2} hit it off splendidly at {location}. '
         '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         'Avg: {relationship_avg:+d})'
     ),
@@ -359,8 +383,18 @@ TEXT_EN: Dict[str, str] = {
         '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         'Avg: {relationship_avg:+d})'
     ),
+    'events.meeting_pleasant.summary.narrative': (
+        '{story_hook} {name1} and {name2} had a pleasant exchange at {location}. '
+        '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        'Avg: {relationship_avg:+d})'
+    ),
     'events.meeting_neutral.summary': (
         '{name1} and {name2} met in {location} and exchanged a polite nod. '
+        '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        'Avg: {relationship_avg:+d})'
+    ),
+    'events.meeting_neutral.summary.narrative': (
+        '{story_hook} {name1} and {name2} exchanged a polite nod at {location}. '
         '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         'Avg: {relationship_avg:+d})'
     ),
@@ -369,16 +403,29 @@ TEXT_EN: Dict[str, str] = {
         '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         'Avg: {relationship_avg:+d})'
     ),
+    'events.meeting_negative.summary.narrative': (
+        '{story_hook} {name1} and {name2} had a tense encounter at {location}. '
+        '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        'Avg: {relationship_avg:+d})'
+    ),
     'events.marriage.summary': (
         '{name1} ({race1} {job1}) and {name2} ({race2} {job2}) were married in {location} '
         'amid great celebration!'
     ),
     'events.discovery.summary': '{name} discovered {item} near {location}. {extra}',
+    'events.discovery.summary.narrative': '{story_hook} {name} discovered {item} near {location}. {extra}',
     'events.skill_training.summary': (
         '{name} {effort} and improved {skill} (Lv {old_level} -> Lv {new_level}).'
     ),
+    'events.skill_training.summary.narrative': (
+        '{story_hook} {name} {effort} and improved {skill} (Lv {old_level} -> Lv {new_level}).'
+    ),
     'events.journey.summary': (
         '{name} journeyed from {old_location} to {destination} ({region_type}) and '
+        '{road_event}.{dungeon_bonus}'
+    ),
+    'events.journey.summary.narrative': (
+        '{story_hook} {name} journeyed from {old_location} to {destination} ({region_type}) and '
         '{road_event}.{dungeon_bonus}'
     ),
     'events.journey_no_destination.summary': '{name} wanted to travel but could find no destination.',
@@ -421,6 +468,12 @@ TEXT_EN: Dict[str, str] = {
     'events.civilization_phase_drifted.summary': (
         'Civilization drifted from {old_civilization_phase} to {new_civilization_phase}.'
     ),
+    'events.war_declared.summary': (
+        '{aggressor_faction} declared war on {target_faction}.'
+    ),
+    'events.war_ended.summary': (
+        '{aggressor_faction} ended war with {target_faction}.'
+    ),
     'journey_road_event_0': 'encountered bandits on the road but bluffed their way past',
     'journey_road_event_1': 'helped a lost child find their village',
     'journey_road_event_2': 'stumbled upon a travelling circus and spent the night',
@@ -436,9 +489,30 @@ TEXT_EN: Dict[str, str] = {
     'report_section_watched': '▶ Watched Characters',
     'report_section_notable': '▶ Notable Events',
     'report_section_world': '▶ World News',
+    'report_section_world_changes': '▶ World Changes',
     'report_section_world_overview': '▶ World Overview',
     'report_section_locations': '▶ Regional Events',
     'report_section_watched_year': '▶ Watched Characters This Year',
+    'report_section_headlines': 'Headlines',
+    'report_headline_category_world_change': 'World change',
+    'report_headline_category_adventure': 'Adventure',
+    'report_headline_category_life': 'Life',
+    'report_headline_category_conflict': 'Conflict',
+    'report_headline_category_event': 'Event',
+    'report_section_location_threads': 'Location threads',
+    'report_location_thread_line': (
+        '    {location}: {count} event(s), {world_changes} world change(s) | {headline}'
+    ),
+    'report_section_watched_threads': 'Watched threads',
+    'report_watched_thread_line': '    {actor}: {count} event(s) | {headline}',
+    'report_section_world_change_threads': 'World-change threads',
+    'report_world_change_thread_line': '    {category}: {count} change(s), {locations} | {headline}',
+    'report_thread_no_locations': 'worldwide',
+    'report_section_rumor_threads': 'Rumor threads',
+    'report_rumor_thread_line': (
+        '    {source_event}: {count} rumor(s), {location}, {reliability}, spread {spread}/10 | {headline}'
+    ),
+    'report_rumor_no_source_event': 'unlinked source',
     'report_total_events': '  Total events: {count}',
     'report_deaths_this_year': '  Deaths this year: {count}',
     'report_section_rumors': '▶ Rumors',
@@ -473,10 +547,19 @@ TEXT_EN: Dict[str, str] = {
     'rumor_board_filter_not_found': 'No matching location: {location}',
     'rumor_board_detail_title': 'RUMOR DETAIL',
     'rumor_board_detail_source': 'source: {location} | age: {age} month(s) | spread: {spread}/10',
+    'rumor_board_detail_tracking': (
+        'audience: {audience} | bias: {bias} | distortion: {distortion}/3 | tracked: {tracked}'
+    ),
     'rumor_board_source_event': 'Source event',
     'rumor_board_no_source_event': 'No source event is attached to this rumor.',
     'rumor_board_event_missing': 'Source event is no longer available: {event_id}',
     'rumor_board_related_location': 'Related location',
+    'rumor_board_related_ids': 'Related IDs',
+    'rumor_board_related_events': 'events',
+    'rumor_board_related_factions': 'factions',
+    'rumor_tracked_marker': '[tracked]',
+    'rumor_tracked_yes': 'yes',
+    'rumor_tracked_no': 'no',
     'season_spring': 'Spring',
     'season_summer': 'Summer',
     'season_autumn': 'Autumn',
@@ -525,6 +608,15 @@ TEXT_EN: Dict[str, str] = {
     'live_trace_party_safe': '{party} returned safely from {destination} (Year {year}).',
     'live_trace_party_retreat': '{party} retreated from {destination} (Year {year}).',
     'live_trace_party_injury': '{party} returned wounded from {destination} (Year {year}).',
+    'live_trace_route_blocked': '{description} Travel pressure rose here (Year {year}).',
+    'live_trace_route_reopened': '{description} Travel flow returned here (Year {year}).',
+    'live_trace_location_renamed': '{description} The new name drew attention here (Year {year}).',
+    'live_trace_war_declared': '{description} Local tension surged (Year {year}).',
+    'live_trace_war_ended': '{description} Local tension eased (Year {year}).',
+    'live_trace_occupation_changed': '{description} Local order shifted (Year {year}).',
+    'live_trace_terrain_changed': '{description} The land itself shifted (Year {year}).',
+    'live_trace_era_shifted': '{description} A new era reached this place (Year {year}).',
+    'live_trace_civilization_drifted': '{description} Civilization pressure reached this place (Year {year}).',
     # Memorial epitaphs — minimal NarrativeContext variant selection (design §E-2)
     'memorial_epitaph_warrior': (
         'Here fell {name}, a warrior who met their end at {location} in year {year}.'
@@ -583,6 +675,13 @@ TEXT_EN: Dict[str, str] = {
     # Location detail view UI labels
     'location_detail_header': 'LOCATION DETAIL - {name}',
     'location_endonym_label': 'Native name',
+    'location_etymology_label': 'Name origin',
+    'location_etymology_prefix': '{surface_name} < {language_name}',
+    'location_etymology_authored': '{prefix}; authored native name for {canonical_name}',
+    'location_etymology_generated': '{prefix}{pattern}{components}',
+    'location_etymology_pattern': '; pattern={pattern}',
+    'location_etymology_components': '; {components}',
+    'location_etymology_component': '{role}={surface}',
     'location_aliases_label': 'Known as',
     'location_live_traces_label': 'Recent visitors',
     'location_memorials_label': 'Memorials',
@@ -608,19 +707,44 @@ TEXT_EN: Dict[str, str] = {
     'dashboard_watched_actors': 'Watched actors',
     'dashboard_hot_rumors': 'Rumors',
     'dashboard_dangerous_locations': 'Dangerous locations',
+    'dashboard_era_status': 'Era and civilization',
+    'dashboard_era_status_line': 'era: {era} | civilization: {phase}',
+    'dashboard_era_unknown': 'unknown',
+    'dashboard_civilization_unknown': 'unknown',
+    'dashboard_current_route_closures': 'Current route closures',
+    'dashboard_route_closure_line': 'The route from {from_location} to {to_location} is blocked.',
+    'dashboard_current_occupations': 'Current control',
+    'dashboard_active_wars': 'Active wars',
+    'dashboard_authored_active_war': '{aggressor_faction_id} and {target_faction_id} are already at war.',
+    'dashboard_initial_site_control': '{location_id} is controlled by {controlling_faction_id}.',
     'dashboard_world_changes': 'World changes',
+    'dashboard_recent_world_changes': 'Recent world changes',
+    'dashboard_follow_up': 'Follow up',
     'dashboard_empty_section': '-',
     'dashboard_location_status': '{location} (danger {danger}, rumor heat {rumor})',
     'dashboard_actor_status': '{name}{markers}: {status}, injury {injury}, at {location}',
     'dashboard_marker_favorite': 'favorite',
     'dashboard_marker_spotlighted': 'spotlighted',
     'dashboard_marker_playable': 'playable',
+    'dashboard_follow_up_inspect_character': 'Inspect {actor} at {location}.',
+    'dashboard_follow_up_inspect_route_closure': 'Inspect the blocked route from {from_location} to {to_location}.',
+    'dashboard_follow_up_inspect_occupation': 'Inspect control at {location}.',
+    'dashboard_follow_up_review_active_war': 'Review war: {text}',
+    'dashboard_follow_up_review_rumor': 'Review rumor: {text}',
+    'dashboard_follow_up_review_world_change': 'Review world change: {text}',
+    'dashboard_follow_up_prompt': 'Open follow-up',
+    'dashboard_follow_up_unavailable': 'That follow-up target is no longer available.',
     'report_location_activity': '{count} event(s)',
     'monthly_report_card_header': 'Monthly highlights ({year}-{month})',
     'monthly_report_card_characters': '  Notable people: {names}',
     'monthly_report_card_locations': '  Notable places: {names}',
     'monthly_report_card_adventures': '  Recent adventures: {items}',
     'monthly_report_card_memory': '  New memories: {items}',
+    'yearly_report_card_header': 'Yearly highlights ({year})',
+    'yearly_report_card_total_events': '  Recorded events: {count}',
+    'report_followup_prompt': 'Report view',
+    'report_show_detailed_text': 'Show detailed text report',
+    'report_followup_inspect_location': 'Inspect events around {location}.',
     'world_change_category_route': 'Route',
     'world_change_category_location': 'Location',
     'world_change_category_occupation': 'Occupation',
@@ -630,11 +754,14 @@ TEXT_EN: Dict[str, str] = {
     'world_change_category_civilization': 'Civilization',
     'world_change_category_world_change': 'World change',
     'auto_pause_context': 'Cause context: {actor} @ {location}',
+    'auto_pause_context_actor': 'Cause context: {actor}',
+    'auto_pause_context_location': 'Cause context: {location}',
     'auto_pause_subreasons': 'Why this matters:',
     'auto_pause_subreason_actor_in_danger': '{actor} may die without attention.',
     'auto_pause_subreason_watched_condition_worsened': "{actor}'s condition worsened at {location}.",
     'auto_pause_subreason_adventure_needs_decision': '{actor} needs an adventure decision at {location}.',
     'auto_pause_subreason_watched_party_returned': "{actor}'s watched party returned to {location}.",
+    'auto_pause_subreason_world_change_notification': 'A world change requires attention at {location}.',
     'auto_pause_subreason_auto_window_elapsed': 'The auto-advance window completed.',
     'auto_pause_supplemental': 'Additional pause reasons: {reasons}',
     'auto_pause_recommendations': 'Recommended checks:',
@@ -642,7 +769,14 @@ TEXT_EN: Dict[str, str] = {
     'auto_pause_recommendation_inspect_location': 'Inspect {location}',
     'auto_pause_recommendation_review_pending_adventure': 'Resolve the pending adventure choice for {actor}',
     'auto_pause_recommendation_review_party_returned': "Review {actor}'s returned party",
+    'auto_pause_recommendation_review_world_dashboard': 'Review the world dashboard',
     'auto_pause_recommendation_review_recent_events': 'Review recent events and reports',
+    'auto_pause_action_target_route': 'route: {target}',
+    'auto_pause_action_target_location': 'location: {target}',
+    'auto_pause_action_target_terrain_cell': 'terrain: {target}',
+    'auto_pause_action_target_world': 'world: {target}',
+    'auto_pause_action_target_era': 'era: {target}',
+    'auto_pause_action_target_civilization': 'civilization: {target}',
     # PR-G: terrain / route / site labels
     'terrain_biome_ocean': 'Ocean',
     'terrain_biome_coast': 'Coast',
@@ -673,6 +807,8 @@ TEXT_EN: Dict[str, str] = {
     'map_legend_memorial': 'Memorial present',
     'map_legend_alias': 'Has alias',
     'map_legend_recent_death': 'Recent death site',
+    'map_legend_world_change': 'Recent world change',
+    'map_legend_control': 'Controlled site',
     'map_legend_highlighted': 'Highlighted / selected',
     'map_region_title': 'REGION MAP',
     'map_region_nearby': 'Nearby sites',
@@ -687,16 +823,37 @@ TEXT_EN: Dict[str, str] = {
     'map_region_focus_landmark_trace': 'Trace: {location} shows recent movement',
     'map_region_focus_landmark_death': 'Death-site: {location} saw a recent death',
     'map_region_focus_blocked': 'Closure: route toward {destination} is blocked',
+    'map_region_focus_control': 'Control: {location} is held by {faction}',
+    'map_region_focus_world_change': 'World change: {location} changed recently ({category})',
     'map_region_routes': 'Routes from here',
+    'map_region_local_cues': 'Local cues',
+    'map_region_detail_grid': 'Region detail',
+    'map_region_route_sketch': 'Route sketch',
     'map_region_not_found': 'Location not found: {location}',
     'map_detail_not_found': 'Location not found: {location}',
     'map_detail_prosperity': 'Prosperity',
     'map_detail_mood': 'Mood',
     'map_detail_rumor_heat': 'Rumor heat',
+    'map_detail_control': 'Control',
+    'map_detail_local_cues': 'Local cues',
     'map_detail_markers': 'Markers',
+    'map_detail_aa_title': 'Local site sketch',
+    'map_detail_route_sketch': 'Local route sketch',
+    'map_detail_aa_legend': 'Sketch cues',
+    'map_detail_followup_prompt': 'Location follow-up',
+    'map_detail_followup_location_history': 'Open location history',
     'map_detail_elevation': 'Elev',
     'map_detail_moisture': 'Moist',
     'map_detail_temperature': 'Temp',
+    'map_elevation_lowland': 'lowland',
+    'map_elevation_midland': 'midland',
+    'map_elevation_highland': 'highland',
+    'map_moisture_dry': 'dry',
+    'map_moisture_balanced': 'balanced',
+    'map_moisture_wet': 'wet',
+    'map_temperature_cold': 'cold',
+    'map_temperature_temperate': 'temperate',
+    'map_temperature_hot': 'hot',
     'map_band_low': 'low',
     'map_band_medium': 'medium',
     'map_band_high': 'high',
@@ -705,17 +862,33 @@ TEXT_EN: Dict[str, str] = {
     'map_nav_detail': 'Location detail',
     'map_nav_recenter': 'Re-center region on another site',
     'map_nav_legacy': 'Classic grid view',
+    'map_nav_cues': 'Browse by local cue',
     'map_legend_routes': 'Route lines',
     'map_legend_site_marker': 'Location',
     'map_legend_site_hub': 'Hub (high traffic)',
     'map_legend_site_quiet': 'Quiet (low traffic)',
     'map_legend_traffic_high': 'High traffic',
     'map_legend_rumor_high': 'High rumor heat',
+    'map_feature_gate': 'Gate',
+    'map_feature_market': 'Market',
+    'map_feature_notice_board': 'Notice board',
+    'map_feature_river': 'River',
+    'map_feature_accident_site': 'Accident site',
+    'map_feature_memorial': 'Memorial',
+    'map_feature_trace': 'Trace',
+    'map_feature_blocked_route': 'Blocked route',
+    'map_cue_category_site': 'Site',
+    'map_cue_category_terrain': 'Terrain',
+    'map_cue_category_memory': 'Memory',
+    'map_cue_category_route': 'Route',
+    'map_cue_category_prompt': 'Local cue category',
+    'map_cue_locations_title': 'Sites with {category} cues',
+    'map_no_local_cues': 'No local cues are available.',
     # PR-G2+: atlas mode / direct selection / region landmarks
     'atlas_site_list': 'Sites on atlas',
     'map_nav_select': 'Jump to site (direct selection)',
     'map_nav_mode': 'Switch atlas display mode',
-    'map_nav_keys_hint': 'Keys: 1-6 for menu, numbers for site list, mode for display switch',
+    'map_nav_keys_hint': 'Keys: 1-7 for menu, numbers for site list, mode for display switch',
     'atlas_mode_prompt': 'Display mode',
     'atlas_mode_auto': 'Auto (fit terminal width)',
     'atlas_mode_wide': 'Wide atlas (full)',

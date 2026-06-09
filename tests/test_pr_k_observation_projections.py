@@ -26,7 +26,7 @@ def test_location_history_projection_includes_control_history() -> None:
     assert second is not None
     assert [entry.record_id for entry in projection.control_history] == [first.record_id, second.record_id]
     assert [(entry.old_faction_id, entry.new_faction_id) for entry in projection.control_history] == [
-        (None, "stormwatch_wardens"),
+        ("aethorian_crown_council", "stormwatch_wardens"),
         ("stormwatch_wardens", None),
     ]
     assert projection.control_history[0].summary_key == "events.location_faction_changed.summary"
@@ -38,7 +38,7 @@ def test_war_map_projection_tracks_current_occupations_from_event_records() -> N
 
     occupied = world.apply_controlling_faction_change("loc_aethoria_capital", "stormwatch_wardens", month=4)
     released = world.apply_controlling_faction_change("loc_aethoria_capital", None, month=5)
-    reoccupied = world.apply_controlling_faction_change("loc_silverbrook", "silverbrook_merchant_league", month=6)
+    reoccupied = world.apply_controlling_faction_change("loc_silverbrook", "stormwatch_wardens", month=6)
 
     projection = build_war_map_projection(event_records=world.event_records)
 
@@ -51,7 +51,7 @@ def test_war_map_projection_tracks_current_occupations_from_event_records() -> N
         reoccupied.record_id,
     ]
     assert [(entry.location_id, entry.controlling_faction_id) for entry in projection.current_occupations] == [
-        ("loc_silverbrook", "silverbrook_merchant_league")
+        ("loc_silverbrook", "stormwatch_wardens")
     ]
     assert projection.affected_location_ids == ("loc_aethoria_capital", "loc_silverbrook")
     assert "stormwatch_wardens" in projection.faction_ids
@@ -116,7 +116,7 @@ def test_world_change_report_projection_counts_world_change_categories() -> None
     rename_record = world.apply_location_rename_change("loc_aethoria_capital", "Aethoria March", month=8)
     occupation_record = world.apply_controlling_faction_change(
         "loc_silverbrook",
-        "silverbrook_merchant_league",
+        "stormwatch_wardens",
         month=8,
     )
 

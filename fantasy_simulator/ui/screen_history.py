@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from ..i18n import tr, tr_term
 from ..simulator import Simulator
 from ..world import World
@@ -9,10 +11,28 @@ from .presenters import LocationPresenter, ReportPresenter
 from .screen_input import _get_numeric_choice
 from .ui_context import UIContext, _default_ctx
 from .view_models import (
+    FollowUpActionView,
     LocationHistoryView,
     build_location_observation_view,
     build_monthly_report_card_view,
+    build_yearly_report_card_view,
 )
+
+
+def _open_report_follow_up(sim: Simulator, action: FollowUpActionView, ctx: UIContext) -> None:
+    world = sim.world
+    if action.target_type == "character":
+        character = world.get_character_by_id(action.target_id)
+        if character is not None:
+            _show_character_story(sim, character.char_id, ctx=ctx)
+            return
+    if action.target_type in {"location", "world_change"} and action.location_id:
+        loc = world.get_location_by_id(action.location_id)
+        if loc is not None:
+            _show_location_history_for_location(world, loc, ctx=ctx)
+            return
+    ctx.out.print_dim(f"  {tr('dashboard_follow_up_unavailable')}")
+    ctx.inp.pause()
 
 
 def _month_season_hint(world: World, year: int) -> str:
@@ -26,7 +46,7 @@ def _month_season_hint(world: World, year: int) -> str:
 
 
 def _show_monthly_report(sim: Simulator, ctx: UIContext | None = None) -> None:
-    """Show a monthly report for the latest completed year."""
+    """Show a monthly report card for the latest completed year."""
     ctx = _default_ctx(ctx)
     out = ctx.out
 
@@ -47,8 +67,51 @@ def _show_monthly_report(sim: Simulator, ctx: UIContext | None = None) -> None:
     card = build_monthly_report_card_view(sim.world, year, month)
     for line in ReportPresenter.render_monthly_card(card):
         out.print_line(f"  {line}")
+
+    follow_up_options = [
+        (f"followup:{index}", item.label)
+        for index, item in enumerate(card.follow_up_actions, 1)
+    ]
+    action = ctx.choose_key(
+        tr("report_followup_prompt"),
+        [
+            ("details", tr("report_show_detailed_text")),
+            *follow_up_options,
+            ("back", tr("back_to_main")),
+        ],
+    )
+    if action == "details":
+        out.print_line()
+        out.print_line(sim.get_monthly_report(year, month))
+    elif action.startswith("followup:"):
+        index = int(action.split(":", 1)[1]) - 1
+        if 0 <= index < len(card.follow_up_actions):
+            _open_report_follow_up(sim, card.follow_up_actions[index], ctx)
+            return
+    ctx.inp.pause()
+
+
+def _show_yearly_report(sim: Simulator, ctx: UIContext | None = None) -> None:
+    """Show a yearly report card, with detailed text available on demand."""
+    ctx = _default_ctx(ctx)
+    out = ctx.out
+
+    year = sim.get_latest_completed_report_year()
     out.print_line()
-    out.print_line(sim.get_monthly_report(year, month))
+    card = build_yearly_report_card_view(sim.world, year)
+    for line in ReportPresenter.render_yearly_card(card):
+        out.print_line(f"  {line}")
+
+    action = ctx.choose_key(
+        tr("report_followup_prompt"),
+        [
+            ("details", tr("report_show_detailed_text")),
+            ("back", tr("back_to_main")),
+        ],
+    )
+    if action == "details":
+        out.print_line()
+        out.print_line(sim.get_yearly_report(year))
     ctx.inp.pause()
 
 
@@ -73,8 +136,14 @@ def _show_single_story(sim: Simulator, ctx: UIContext | None = None) -> None:
     if idx is None:
         return
     character = world.characters[idx]
-    out.print_line()
-    out.print_line(sim.get_character_story(character.char_id))
+    _show_character_story(sim, character.char_id, ctx=ctx)
+
+
+def _show_character_story(sim: Simulator, character_id: str, ctx: UIContext | None = None) -> None:
+    """Show one already-selected character story."""
+    ctx = _default_ctx(ctx)
+    ctx.out.print_line()
+    ctx.out.print_line(sim.get_character_story(character_id))
     ctx.inp.pause()
 
 
@@ -101,7 +170,14 @@ def _show_location_history(world: World, ctx: UIContext | None = None) -> None:
     if idx is None:
         return
 
-    loc = locations[idx]
+    _show_location_history_for_location(world, locations[idx], ctx=ctx)
+
+
+def _show_location_history_for_location(world: World, loc: Any, ctx: UIContext | None = None) -> None:
+    """Show live traces, memorials, and aliases for one already-selected location."""
+    ctx = _default_ctx(ctx)
+    out = ctx.out
+
     observation = build_location_observation_view(world, loc.id)
     out.print_line()
     out.print_separator()

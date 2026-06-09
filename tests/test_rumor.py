@@ -81,6 +81,13 @@ def test_rumor_serialization_roundtrip():
         source_event_id="evt_456",
         year_created=1005,
         month_created=6,
+        audience_key="local",
+        bias_tags=["local", "world_change"],
+        distortion_level=2,
+        tracked=True,
+        related_location_ids=["loc_thornwood", "loc_aethoria_capital"],
+        related_event_ids=["evt_456", "evt_cause"],
+        related_faction_ids=["stormwatch_wardens"],
     )
     data = rumor.to_dict()
     restored = Rumor.from_dict(data)
@@ -95,6 +102,29 @@ def test_rumor_serialization_roundtrip():
     assert restored.source_event_id == rumor.source_event_id
     assert restored.year_created == rumor.year_created
     assert restored.month_created == rumor.month_created
+    assert restored.audience_key == "local"
+    assert restored.bias_tags == ["local", "world_change"]
+    assert restored.distortion_level == 2
+    assert restored.tracked is True
+    assert restored.related_location_ids == ["loc_thornwood", "loc_aethoria_capital"]
+    assert restored.related_event_ids == ["evt_456", "evt_cause"]
+    assert restored.related_faction_ids == ["stormwatch_wardens"]
+
+
+def test_rumor_legacy_serialization_defaults_tracking_metadata():
+    restored = Rumor.from_dict({
+        "id": "rum_legacy",
+        "description": "Old rumor",
+        "source_event_id": "evt_old",
+    })
+
+    assert restored.audience_key == ""
+    assert restored.bias_tags == []
+    assert restored.distortion_level == 0
+    assert restored.tracked is False
+    assert restored.related_location_ids == []
+    assert restored.related_event_ids == []
+    assert restored.related_faction_ids == []
 
 
 def test_rumor_spread_level_clamped():
@@ -166,6 +196,38 @@ def test_generate_rumor_from_high_severity_event():
     assert rumor.reliability in RELIABILITY_LEVELS
     assert rumor.source_event_id == "evt_test"
     assert rumor.category == "battle"
+
+
+def test_generate_rumor_from_event_exposes_tracking_metadata():
+    rng = random.Random(1)
+    event = _make_event(severity=5, kind="war_declared")
+    event.tags = [
+        "world_change",
+        "location:loc_aethoria_capital",
+        "location:loc_silverbrook",
+        "faction:stormwatch_wardens",
+    ]
+    event.render_params = {
+        "cause_event_id": "evt_cause",
+        "target_faction_id": "silverbrook_merchant_league",
+    }
+
+    rumor = generate_rumor_from_event(
+        event,
+        listener_location_id="loc_silverbrook",
+        current_year=1000,
+        current_month=6,
+        rng=rng,
+    )
+
+    assert rumor is not None
+    assert rumor.audience_key == "distant"
+    assert "world_change" in rumor.bias_tags
+    assert rumor.distortion_level in {0, 1, 2, 3}
+    assert rumor.tracked is False
+    assert rumor.related_location_ids == ["loc_aethoria_capital", "loc_silverbrook"]
+    assert rumor.related_event_ids == ["evt_test", "evt_cause"]
+    assert rumor.related_faction_ids == ["stormwatch_wardens", "silverbrook_merchant_league"]
 
 
 def test_generate_rumor_rejects_low_severity():
@@ -365,6 +427,40 @@ def test_should_notify_favorite_any():
     assert sim.should_notify(record) is True
 
 
+def test_should_notify_favorite_secondary_actor():
+    world = _make_world_with_events()
+    char = world.characters[0]
+    char.favorite = True
+    sim = Simulator(world)
+    record = WorldEventRecord(
+        record_id="evt_fav_secondary",
+        kind="meeting",
+        year=1000,
+        month=6,
+        severity=1,
+        secondary_actor_ids=[char.char_id],
+        description="A minor meeting",
+    )
+    assert sim.should_notify(record) is True
+
+
+def test_should_notify_uses_semantic_actor_ids_fallback():
+    world = _make_world_with_events()
+    char = world.characters[0]
+    char.favorite = True
+    sim = Simulator(world)
+    record = WorldEventRecord(
+        record_id="evt_fav_semantic_actor",
+        kind="meeting",
+        year=1000,
+        month=6,
+        severity=1,
+        render_params={"actor_ids": [char.char_id]},
+        description="A minor meeting",
+    )
+    assert sim.should_notify(record) is True
+
+
 def test_should_notify_low_severity_no_flags():
     world = World()
     char = Character(
@@ -383,6 +479,21 @@ def test_should_notify_low_severity_no_flags():
         description="A quiet day",
     )
     assert sim.should_notify(record) is False
+
+
+def test_should_notify_world_change_records():
+    world = World()
+    sim = Simulator(world)
+    record = WorldEventRecord(
+        record_id="evt_world_change",
+        kind="route_blocked",
+        year=1000,
+        month=6,
+        severity=2,
+        tags=["world_change"],
+        description="A route was blocked.",
+    )
+    assert sim.should_notify(record) is True
 
 
 def test_should_notify_spotlighted_serious():

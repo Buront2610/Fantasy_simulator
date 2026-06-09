@@ -26,7 +26,49 @@ from .setting_bundle_schema_core import (
     copy_rule_overrides,
     string_list_payload,
 )
-from .setting_bundle_schema_language import LanguageCommunityDefinition, LanguageDefinition
+from .setting_bundle_schema_language import (
+    LanguageCommunityDefinition,
+    LanguageDefinition,
+    LanguageFamilyDefinition,
+    LanguageRootRealization,
+    SemanticRootDefinition,
+)
+
+
+DEFAULT_CIVILIZATION_PHASES = ["stable", "crisis", "transition", "new_era", "aftermath"]
+DEFAULT_WORLD_SCORE_KEYS = ["prosperity", "safety", "traffic", "mood"]
+
+
+@dataclass
+class FactionRelationshipDefinition:
+    """Authored initial relationship between two setting factions."""
+
+    faction_a_id: str
+    faction_b_id: str
+    status: str = "neutral"
+    location_ids: List[str] = field(default_factory=list)
+    description: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "faction_a_id": self.faction_a_id,
+            "faction_b_id": self.faction_b_id,
+            "status": self.status,
+            "location_ids": list(self.location_ids),
+        }
+        if self.description:
+            payload["description"] = self.description
+        return payload
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "FactionRelationshipDefinition":
+        return cls(
+            faction_a_id=str(data["faction_a_id"]),
+            faction_b_id=str(data["faction_b_id"]),
+            status=str(data.get("status", "neutral")),
+            location_ids=string_list_payload(data.get("location_ids", []), field_name="location_ids"),
+            description=str(data.get("description", "")),
+        )
 
 
 @dataclass
@@ -39,6 +81,9 @@ class WorldDefinition:
     era: str = ""
     cultures: List[str] = field(default_factory=list)
     factions: List[str] = field(default_factory=list)
+    civilization_phases: List[str] = field(default_factory=lambda: list(DEFAULT_CIVILIZATION_PHASES))
+    world_score_keys: List[str] = field(default_factory=lambda: list(DEFAULT_WORLD_SCORE_KEYS))
+    faction_relationships: List[FactionRelationshipDefinition] = field(default_factory=list)
     glossary: List[GlossaryEntryDefinition] = field(default_factory=list)
     calendar: CalendarDefinition = field(default_factory=lambda: default_calendar_definition())
     races: List[RaceDefinition] = field(default_factory=list)
@@ -47,7 +92,10 @@ class WorldDefinition:
     route_seeds: List[RouteSeedDefinition] = field(default_factory=list)
     naming_rules: NamingRulesDefinition = field(default_factory=NamingRulesDefinition)
     languages: List[LanguageDefinition] = field(default_factory=list)
+    language_families: List[LanguageFamilyDefinition] = field(default_factory=list)
     language_communities: List[LanguageCommunityDefinition] = field(default_factory=list)
+    semantic_roots: List[SemanticRootDefinition] = field(default_factory=list)
+    language_root_realizations: List[LanguageRootRealization] = field(default_factory=list)
     event_impact_rules: Dict[str, Dict[str, int]] = field(default_factory=dict)
     propagation_rules: Dict[str, Dict[str, Any]] = field(default_factory=dict)
 
@@ -126,6 +174,12 @@ class WorldDefinition:
             "era": self.era,
             "cultures": list(self.cultures),
             "factions": list(self.factions),
+            "civilization_phases": list(self.civilization_phases),
+            "world_score_keys": list(self.world_score_keys),
+            "faction_relationships": [
+                relationship.to_dict()
+                for relationship in self.faction_relationships
+            ],
             "glossary": [entry.to_dict() for entry in self.glossary],
             "calendar": self.calendar.to_dict(),
             "races": [race.to_dict() for race in self.races],
@@ -134,7 +188,13 @@ class WorldDefinition:
             "route_seeds": [seed.to_dict() for seed in self.route_seeds],
             "naming_rules": self.naming_rules.to_dict(),
             "languages": [language.to_dict() for language in self.languages],
+            "language_families": [family.to_dict() for family in self.language_families],
             "language_communities": [community.to_dict() for community in self.language_communities],
+            "semantic_roots": [root.to_dict() for root in self.semantic_roots],
+            "language_root_realizations": [
+                realization.to_dict()
+                for realization in self.language_root_realizations
+            ],
             "event_impact_rules": {
                 kind: {attr: int(delta) for attr, delta in deltas.items()}
                 for kind, deltas in self.event_impact_rules.items()
@@ -157,6 +217,18 @@ class WorldDefinition:
             era=data.get("era", ""),
             cultures=string_list_payload(data.get("cultures", []), field_name="cultures"),
             factions=string_list_payload(data.get("factions", []), field_name="factions"),
+            civilization_phases=string_list_payload(
+                data.get("civilization_phases", list(DEFAULT_CIVILIZATION_PHASES)),
+                field_name="civilization_phases",
+            ),
+            world_score_keys=string_list_payload(
+                data.get("world_score_keys", list(DEFAULT_WORLD_SCORE_KEYS)),
+                field_name="world_score_keys",
+            ),
+            faction_relationships=[
+                FactionRelationshipDefinition.from_dict(item)
+                for item in data.get("faction_relationships", [])
+            ],
             glossary=[
                 GlossaryEntryDefinition.from_dict(item)
                 for item in data.get("glossary", [])
@@ -183,9 +255,21 @@ class WorldDefinition:
                 LanguageDefinition.from_dict(item)
                 for item in data.get("languages", [])
             ],
+            language_families=[
+                LanguageFamilyDefinition.from_dict(item)
+                for item in data.get("language_families", [])
+            ],
             language_communities=[
                 LanguageCommunityDefinition.from_dict(item)
                 for item in data.get("language_communities", [])
+            ],
+            semantic_roots=[
+                SemanticRootDefinition.from_dict(item)
+                for item in data.get("semantic_roots", [])
+            ],
+            language_root_realizations=[
+                LanguageRootRealization.from_dict(item)
+                for item in data.get("language_root_realizations", [])
             ],
             event_impact_rules=copy_rule_overrides(
                 data.get("event_impact_rules", {}),

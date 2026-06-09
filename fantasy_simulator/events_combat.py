@@ -5,7 +5,9 @@ from __future__ import annotations
 import random
 from typing import TYPE_CHECKING, Any, Dict, List
 
+from .combat import Combatant, CombatResolution, resolve_combat
 from .event_models import EventResult, generate_record_id
+from .event_story import prefix_description_with_story_hook
 from .i18n import tr
 
 if TYPE_CHECKING:
@@ -13,13 +15,50 @@ if TYPE_CHECKING:
     from .world import World
 
 
-def _rival_tag_updates(winner: "Character", loser: "Character") -> List[Dict[str, str]]:
+def _rival_tag_updates(winner: Combatant, loser: Combatant) -> List[Dict[str, str]]:
     winner.add_relation_tag(loser.char_id, "rival")
     loser.add_relation_tag(winner.char_id, "rival")
     return [
         {"source": winner.char_id, "target": loser.char_id, "tag": "rival"},
         {"source": loser.char_id, "target": winner.char_id, "tag": "rival"},
     ]
+
+
+def _apply_battle_side_effects(resolution: CombatResolution) -> None:
+    resolution.winner.apply_stat_delta(resolution.winner_gains)
+    resolution.loser.apply_stat_delta(resolution.loser_losses)
+    resolution.winner.update_mutual_relationship(resolution.loser, -20, delta_other=-30)
+
+
+def _battle_render_metadata(
+    summary_key: str,
+    resolution: CombatResolution,
+    story_hook_key: str,
+) -> Dict[str, Any]:
+    return {
+        "summary_key": summary_key,
+        "render_params": {
+            "winner": resolution.winner.name,
+            "loser": resolution.loser.name,
+            "loser_injury_status": resolution.loser.injury_status,
+            "story_hook_key": story_hook_key,
+        },
+    }
+
+
+def _battle_metadata(
+    summary_key: str,
+    event_source_id: str,
+    relation_tag_updates: List[Dict[str, str]],
+    resolution: CombatResolution,
+    story_hook_key: str,
+) -> Dict[str, Any]:
+    return {
+        "relation_tag_updates": relation_tag_updates,
+        "record_id": event_source_id,
+        "combat_log": resolution.combat_log_payload(),
+        **_battle_render_metadata(summary_key, resolution, story_hook_key),
+    }
 
 
 def resolve_battle_event(
@@ -31,74 +70,89 @@ def resolve_battle_event(
     rng: Any = random,
 ) -> EventResult:
     """Resolve a battle, including injury staging and possible fatal outcome."""
-    power1 = char1.combat_power + rng.randint(0, 30)
-    power2 = char2.combat_power + rng.randint(0, 30)
-    winner, loser = (char1, char2) if power1 >= power2 else (char2, char1)
-
-    winner_gains = {"strength": rng.randint(1, 3), "constitution": rng.randint(0, 2)}
-    loser_losses = {"constitution": -rng.randint(2, 8), "strength": -rng.randint(0, 3)}
-    winner.apply_stat_delta(winner_gains)
-    loser.apply_stat_delta(loser_losses)
-    winner.update_mutual_relationship(loser, -20, delta_other=-30)
+    resolution = resolve_combat(char1, char2, rng)
+    _apply_battle_side_effects(resolution)
 
     event_source_id = generate_record_id(rng)
-    relation_tag_updates = _rival_tag_updates(winner, loser)
+    relation_tag_updates = _rival_tag_updates(resolution.winner, resolution.loser)
 
-    old_status = loser.injury_status
-    loser.worsen_injury()
-    loser_died = loser.injury_status == "dying" and loser.constitution <= 5 and rng.random() < 0.4
-
-    def _render_metadata(summary_key: str) -> Dict[str, Any]:
-        return {
-            "summary_key": summary_key,
-            "render_params": {
-                "winner": winner.name,
-                "loser": loser.name,
-                "loser_injury_status": loser.injury_status,
-            },
-        }
+    old_status = resolution.loser.injury_status
+    resolution.loser.worsen_injury()
+    loser_died = (
+        resolution.loser.injury_status == "dying"
+        and resolution.loser.constitution <= 5
+        and rng.random() < 0.4
+    )
+    desc, story_hook_key = _battle_description(resolution, loser_died, old_status, rng)
 
     if loser_died:
-        event_death(loser, world, rng=rng)
-        desc = tr("battle_fatal", winner=winner.name, loser=loser.name)
-        winner.add_history(tr(
-            "history_battle_fatal", year=world.year, name=loser.name,
-            location=world.location_name(winner.location_id),
+        event_death(resolution.loser, world, rng=rng)
+        resolution.winner.add_history(tr(
+            "history_battle_fatal", year=world.year, name=resolution.loser.name,
+            location=world.location_name(resolution.winner.location_id),
         ))
         return EventResult(
             description=desc,
-            affected_characters=[winner.char_id, loser.char_id],
-            stat_changes={winner.char_id: winner_gains, loser.char_id: loser_losses},
+            affected_characters=[resolution.winner.char_id, resolution.loser.char_id],
+            stat_changes=_battle_stat_changes(resolution),
             event_type="battle_fatal",
             year=world.year,
-            metadata={
-                "relation_tag_updates": relation_tag_updates,
-                "record_id": event_source_id,
-                **_render_metadata("events.battle_fatal.summary"),
-            },
+            metadata=_battle_metadata(
+                "events.battle_fatal.summary",
+                event_source_id,
+                relation_tag_updates,
+                resolution,
+                story_hook_key,
+            ),
         )
 
-    injury_key = f"battle_injury_{loser.injury_status}"
-    desc = tr("battle_normal", winner=winner.name, loser=loser.name)
-    if loser.injury_status != old_status and loser.injury_status != "none":
-        desc += " " + tr(injury_key, name=loser.name)
-    winner.add_history(tr(
-        "history_battle_win", year=world.year, name=loser.name,
-        location=world.location_name(winner.location_id),
+    resolution.winner.add_history(tr(
+        "history_battle_win", year=world.year, name=resolution.loser.name,
+        location=world.location_name(resolution.winner.location_id),
     ))
-    loser.add_history(tr(
-        "history_battle_loss", year=world.year, name=winner.name,
-        location=world.location_name(loser.location_id),
+    resolution.loser.add_history(tr(
+        "history_battle_loss", year=world.year, name=resolution.winner.name,
+        location=world.location_name(resolution.loser.location_id),
     ))
     return EventResult(
         description=desc,
-        affected_characters=[winner.char_id, loser.char_id],
-        stat_changes={winner.char_id: winner_gains, loser.char_id: loser_losses},
+        affected_characters=[resolution.winner.char_id, resolution.loser.char_id],
+        stat_changes=_battle_stat_changes(resolution),
         event_type="battle",
         year=world.year,
-        metadata={
-            "relation_tag_updates": relation_tag_updates,
-            "record_id": event_source_id,
-            **_render_metadata("events.battle_result.summary"),
-        },
+        metadata=_battle_metadata(
+            "events.battle_result.summary",
+            event_source_id,
+            relation_tag_updates,
+            resolution,
+            story_hook_key,
+        ),
     )
+
+
+def _battle_description(
+    resolution: CombatResolution,
+    loser_died: bool,
+    old_status: str,
+    rng: Any,
+) -> tuple[str, str]:
+    if loser_died:
+        desc = tr("battle_fatal", winner=resolution.winner.name, loser=resolution.loser.name)
+    else:
+        desc = tr("battle_normal", winner=resolution.winner.name, loser=resolution.loser.name)
+        if resolution.loser.injury_status != old_status and resolution.loser.injury_status != "none":
+            desc += " " + tr(f"battle_injury_{resolution.loser.injury_status}", name=resolution.loser.name)
+    return prefix_description_with_story_hook(
+        "battle",
+        rng,
+        desc,
+        winner=resolution.winner.name,
+        loser=resolution.loser.name,
+    )
+
+
+def _battle_stat_changes(resolution: CombatResolution) -> Dict[str, Dict[str, int]]:
+    return {
+        resolution.winner.char_id: resolution.winner_gains,
+        resolution.loser.char_id: resolution.loser_losses,
+    }

@@ -17,6 +17,7 @@ from .screen_history import (  # noqa: F401
     _month_season_hint as _month_season_hint,
     _show_location_history as _show_location_history,
     _show_monthly_report as _show_monthly_report,
+    _show_yearly_report as _show_yearly_report,
     _show_single_story as _show_single_story,
 )
 from .screen_input import (  # noqa: F401
