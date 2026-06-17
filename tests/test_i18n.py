@@ -172,7 +172,7 @@ class TestI18n:
     def test_rumor_board_templates_render(self):
         set_locale("ja")
         assert tr("rumor_board_menu") == "噂一覧"
-        assert "Aethoria" in tr("rumor_board_meta", location="Aethoria", age=2, spread=4, event_id="evt1")
+        assert "Aethoria" in tr("rumor_board_meta", location="Aethoria", age=2, spread=4, event="変化あり")
         assert "Aethoria" in tr("rumor_board_detail_source", location="Aethoria", age=2, spread=4)
         assert "local" in tr(
             "rumor_board_detail_tracking",
@@ -183,7 +183,7 @@ class TestI18n:
         )
         set_locale("en")
         assert tr("rumor_board_menu") == "Rumor board"
-        assert "evt1" in tr("rumor_board_meta", location="Aethoria", age=2, spread=4, event_id="evt1")
+        assert "Changed" in tr("rumor_board_meta", location="Aethoria", age=2, spread=4, event="Changed")
         assert "Aethoria" in tr("rumor_board_detail_source", location="Aethoria", age=2, spread=4)
         assert tr("rumor_tracked_marker") == "[tracked]"
         assert "tracked: yes" in tr(
@@ -235,13 +235,14 @@ class TestI18n:
         ) == "    Route: 2 change(s), Aethoria | Changed"
         assert tr(
             "report_rumor_thread_line",
-            source_event="evt1",
+            source_event="Changed",
             count=2,
             location="Aethoria",
             reliability="plausible",
             spread=7,
             headline="Changed",
-        ) == "    evt1: 2 rumor(s), Aethoria, plausible, spread 7/10 | Changed"
+        ) == "    Changed: 2 rumor(s), Aethoria, plausible, spread 7/10 | Changed"
+        assert tr("event_log_caused_by", events="Cause text") == "Because: Cause text"
 
     def test_dashboard_templates_render(self):
         set_locale("ja")

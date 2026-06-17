@@ -58,14 +58,13 @@ def _render_rumor_rows(rumors: list[RumorSummaryView], ctx: UIContext) -> None:
     out = ctx.out
     for index, rumor in enumerate(rumors, 1):
         location = rumor.source_location_name or "-"
-        event_id = rumor.source_event_id or "-"
         out.print_line(f"  {index}. {render_rumor_brief(rumor)}")
         meta = tr(
             "rumor_board_meta",
             location=location,
             age=rumor.age_in_months,
             spread=rumor.spread_level,
-            event_id=event_id,
+            event=_source_event_label(rumor),
         )
         out.print_dim(f"     {meta}")
 
@@ -108,7 +107,7 @@ def _show_rumor_detail(sim: Simulator, rumor: RumorSummaryView, ctx: UIContext) 
     if rumor.source_event_id:
         record = sim.world.get_event_by_id(rumor.source_event_id)
         if record is None:
-            out.print_dim(f"  {tr('rumor_board_event_missing', event_id=rumor.source_event_id)}")
+            out.print_dim(f"  {tr('rumor_board_event_missing')}")
         else:
             out.print_line()
             out.print_highlighted(f"  {tr('rumor_board_source_event')}")
@@ -122,9 +121,36 @@ def _show_rumor_detail(sim: Simulator, rumor: RumorSummaryView, ctx: UIContext) 
         out.print_line(sim.get_location_observation(rumor.source_location_id))
     if rumor.related_event_ids or rumor.related_faction_ids:
         out.print_line()
-        out.print_highlighted(f"  {tr('rumor_board_related_ids')}")
+        out.print_highlighted(f"  {tr('rumor_board_related_records')}")
         if rumor.related_event_ids:
-            out.print_dim(f"    {tr('rumor_board_related_events')}: {', '.join(rumor.related_event_ids)}")
+            related_events = _related_event_labels(sim.world, rumor)
+            out.print_dim(f"    {tr('rumor_board_related_events')}: {' | '.join(related_events)}")
         if rumor.related_faction_ids:
-            out.print_dim(f"    {tr('rumor_board_related_factions')}: {', '.join(rumor.related_faction_ids)}")
+            related_factions = [_display_faction_id(faction_id) for faction_id in rumor.related_faction_ids]
+            out.print_dim(f"    {tr('rumor_board_related_factions')}: {', '.join(related_factions)}")
     ctx.inp.pause()
+
+
+def _source_event_label(rumor: RumorSummaryView) -> str:
+    if rumor.source_event_text:
+        return rumor.source_event_text
+    if rumor.source_event_id:
+        return tr("rumor_board_event_unavailable")
+    return "-"
+
+
+def _related_event_labels(world: "World", rumor: RumorSummaryView) -> list[str]:
+    labels: list[str] = []
+    for record_id in rumor.related_event_ids:
+        record = world.get_event_by_id(record_id)
+        label = (
+            render_event_record(record, world=world)
+            if record is not None
+            else tr("rumor_board_event_unavailable")
+        )
+        labels.append(label)
+    return labels
+
+
+def _display_faction_id(faction_id: str) -> str:
+    return faction_id.replace("_", " ").title()

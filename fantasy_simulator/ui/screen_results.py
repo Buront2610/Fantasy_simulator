@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ..event_rendering import render_event_record
 from ..i18n import tr
 from ..simulator import Simulator
 from .screen_adventures import (
@@ -63,9 +64,42 @@ def _result_menu_options() -> list[tuple[str, str]]:
 
 def _show_event_log(sim: Simulator, ctx: UIContext, last_n: int | None = None) -> None:
     ctx.out.print_line()
-    for entry in sim.get_event_log(last_n=last_n):
-        ctx.out.print_line(f"  - {entry}")
+    records = list(getattr(sim.world, "event_records", []))
+    shown = records[-last_n:] if last_n is not None else records
+    if not shown:
+        ctx.out.print_dim(f"  {tr('event_log_empty')}")
+        ctx.inp.pause()
+        return
+    for record in shown:
+        ctx.out.print_line(f"  - {_event_log_prefix(record)} {render_event_record(record, world=sim.world)}")
+        cause_text = _event_log_cause_text(sim, record)
+        if cause_text:
+            ctx.out.print_dim(f"      {cause_text}")
     ctx.inp.pause()
+
+
+def _event_log_prefix(record: object) -> str:
+    year = int(getattr(record, "year", 0) or 0)
+    month = int(getattr(record, "month", 0) or 0)
+    day = int(getattr(record, "day", 0) or 0)
+    if day > 0 and month > 0:
+        return tr("event_log_prefix_day", year=year, month=month, day=day)
+    if month > 0:
+        return tr("event_log_prefix_month", year=year, month=month)
+    return tr("event_log_prefix", year=year)
+
+
+def _event_log_cause_text(sim: Simulator, record: object) -> str:
+    cause_ids = list(getattr(record, "cause_event_ids", []))
+    if not cause_ids:
+        return ""
+    causes = [
+        render_event_record(cause, world=sim.world)
+        for cause in sim.world.get_event_causes(getattr(record, "record_id", ""))
+    ]
+    if not causes:
+        return tr("event_log_causes_unavailable")
+    return tr("event_log_caused_by", events=" | ".join(causes))
 
 
 def _update_dirty_state_for_action(action: str, sim: Simulator, ctx: UIContext) -> bool | None:

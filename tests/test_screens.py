@@ -530,7 +530,8 @@ class TestRumorBoardScreen(unittest.TestCase):
         self.assertIn("RUMOR BOARD", text)
         self.assertIn("A road is said to be blocked.", text)
         self.assertIn("source: Aethoria Capital", text)
-        self.assertIn("event: evt_road", text)
+        self.assertIn("event: unavailable event", text)
+        self.assertNotIn("event: evt_road", text)
 
     def test_rumor_board_filters_by_location_query_and_clears_filter(self) -> None:
         from fantasy_simulator.rumor_models import Rumor
@@ -600,7 +601,8 @@ class TestRumorBoardScreen(unittest.TestCase):
 
         self.assertIn("Invalid choice", text)
         self.assertIn("No matching location: missing place", text)
-        self.assertIn("Source event is no longer available: evt_missing", text)
+        self.assertIn("Source event is no longer available.", text)
+        self.assertNotIn("evt_missing", text)
 
         world.rumors.clear()
         captured = io.StringIO()
@@ -703,11 +705,62 @@ class TestRumorBoardScreen(unittest.TestCase):
         self.assertIn("A road incident was recorded.", text)
         self.assertIn("audience: local", text)
         self.assertIn("tracked: yes", text)
-        self.assertIn("Related IDs", text)
-        self.assertIn("evt_cause", text)
-        self.assertIn("stormwatch_wardens", text)
+        self.assertIn("Related records", text)
+        self.assertIn("unavailable event", text)
+        self.assertIn("Stormwatch Wardens", text)
+        self.assertNotIn("evt_cause", text)
+        self.assertNotIn("stormwatch_wardens", text)
         self.assertIn("Related location", text)
         self.assertIn("Recent events", text)
+
+    def test_rumor_board_does_not_render_internal_event_hashes(self) -> None:
+        from fantasy_simulator.event_models import WorldEventRecord
+        from fantasy_simulator.rumor_models import Rumor
+        from fantasy_simulator.ui.screen_rumors import _show_rumor_board
+        from fantasy_simulator.ui.ui_context import UIContext
+        from fantasy_simulator.ui.render_backend import PrintRenderBackend
+
+        set_locale("en")
+        source_id = "0123456789abcdef0123456789abcdef"
+        missing_id = "fedcba9876543210fedcba9876543210"
+        world = World()
+        world.record_event(
+            WorldEventRecord(
+                record_id=source_id,
+                kind="journey",
+                year=world.year,
+                month=1,
+                day=1,
+                location_id="loc_aethoria_capital",
+                description="A road incident was recorded.",
+            )
+        )
+        world.rumors.append(
+            Rumor(
+                id="rum_hash",
+                description="Travelers whisper about the road.",
+                reliability="plausible",
+                source_location_id="loc_aethoria_capital",
+                source_event_id=source_id,
+                related_event_ids=[source_id, missing_id],
+                age_in_months=1,
+                spread_level=5,
+            )
+        )
+        sim = Simulator(world, events_per_year=0, seed=1)
+        ctx = UIContext(
+            inp=self._ScriptedInputBackend(["1", ""]),
+            out=PrintRenderBackend(),
+        )
+
+        captured = io.StringIO()
+        with redirect_stdout(captured):
+            _show_rumor_board(sim, ctx=ctx)
+        text = _ANSI_RE.sub("", captured.getvalue())
+
+        self.assertIn("A road incident was recorded.", text)
+        self.assertIn("unavailable event", text)
+        self.assertIsNone(re.search(r"\b[0-9a-f]{32}\b", text))
 
 
 if __name__ == "__main__":

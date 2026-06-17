@@ -257,6 +257,46 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         # the separator/heading calls prove the route goes through backends)
         self.assertTrue(len(out.calls) > 3, "Too few backend calls captured")
 
+    def test_event_log_renders_causal_chain_without_internal_hashes(self) -> None:
+        from types import SimpleNamespace
+        from fantasy_simulator.event_models import WorldEventRecord
+        from fantasy_simulator.ui.screens import _show_results
+
+        cause_id = "0123456789abcdef0123456789abcdef"
+        effect_id = "fedcba9876543210fedcba9876543210"
+        world = World()
+        world.record_event(
+            WorldEventRecord(
+                record_id=cause_id,
+                kind="war_declared",
+                year=world.year,
+                month=1,
+                day=2,
+                description="The northern houses declared war.",
+            )
+        )
+        world.record_event(
+            WorldEventRecord(
+                record_id=effect_id,
+                kind="war_battle",
+                year=world.year,
+                month=2,
+                day=9,
+                description="The armies clashed at the old bridge.",
+                cause_event_ids=[cause_id],
+            )
+        )
+        sim = SimpleNamespace(world=world)
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(menu_keys=["event_log_last_30", "back_to_main", "exit"])
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_results(sim, ctx=ctx)
+
+        self.assertIn("The armies clashed at the old bridge.", out.text)
+        self.assertIn("Because: The northern houses declared war.", out.text)
+        self.assertIsNone(re.search(r"\b[0-9a-f]{32}\b", out.text))
+
     def test_world_dashboard_follow_up_opens_character_story(self) -> None:
         from fantasy_simulator.simulator import Simulator
         from fantasy_simulator.ui.screens import _show_results
