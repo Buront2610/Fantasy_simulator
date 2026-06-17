@@ -8,6 +8,7 @@ from typing import Any, Dict, Optional
 
 from ..i18n import get_locale, set_locale
 from ..narrative.template_history import TemplateHistory
+from ..schema import CURRENT_SCHEMA_VERSION
 
 
 class EnginePersistenceMixin:
@@ -49,6 +50,44 @@ class EnginePersistenceMixin:
             return False
         return False
 
+    def _serialize_active_seasonal_deltas(self) -> list[dict[str, Any]]:
+        """Return in-progress seasonal modifiers in a save-friendly shape."""
+        payload: list[dict[str, Any]] = []
+        for loc, attr, applied_delta in self._active_seasonal_deltas:
+            location_id = getattr(loc, "id", None)
+            if not location_id:
+                continue
+            payload.append({
+                "location_id": location_id,
+                "attribute": str(attr),
+                "applied_delta": int(applied_delta),
+            })
+        return payload
+
+    @staticmethod
+    def _restore_active_seasonal_deltas(world: Any, payload: Any) -> list[tuple[Any, str, int]]:
+        """Rebind serialized seasonal modifiers to loaded LocationState objects."""
+        if not isinstance(payload, list):
+            return []
+        active_deltas: list[tuple[Any, str, int]] = []
+        for entry in payload:
+            if not isinstance(entry, dict):
+                continue
+            location_id = entry.get("location_id")
+            attr = entry.get("attribute")
+            applied_delta = entry.get("applied_delta")
+            if not isinstance(location_id, str) or not isinstance(attr, str):
+                continue
+            loc = world.get_location_by_id(location_id)
+            if loc is None or not hasattr(loc, attr):
+                continue
+            try:
+                delta_value = int(applied_delta)
+            except (TypeError, ValueError):
+                continue
+            active_deltas.append((loc, attr, delta_value))
+        return active_deltas
+
     def to_dict(self) -> Dict[str, Any]:
         """Serialise simulator state.
 
@@ -59,18 +98,22 @@ class EnginePersistenceMixin:
         contain the legacy fields.
         """
         return {
+            "schema_version": CURRENT_SCHEMA_VERSION,
             "world": self.world.to_dict(),
             "characters": [char.to_dict() for char in self.world.characters],
             "events_per_year": self.events_per_year,
             "adventure_steps_per_year": self.adventure_steps_per_year,
             "world_changes_per_year": self.world_changes_per_year,
+            "population_maintenance_enabled": self.population_maintenance_enabled,
             "current_month": self.current_month,
             "current_day": self.current_day,
             "elapsed_days": self.elapsed_days,
             "start_year": self.start_year,
+            "starting_population": self.starting_population,
             "locale": get_locale(),
             "rng_state": repr(self.rng.getstate()),
             "id_rng_state": repr(self.id_rng.getstate()),
+            "active_seasonal_deltas": self._serialize_active_seasonal_deltas(),
             "memorial_template_history": self.memorial_template_history.to_dict(),
             "alias_template_history": self.alias_template_history.to_dict(),
         }
@@ -103,6 +146,7 @@ class EnginePersistenceMixin:
             events_per_year=data.get("events_per_year", 8),
             adventure_steps_per_year=data.get("adventure_steps_per_year", 3),
             world_changes_per_year=data.get("world_changes_per_year", 0),
+            population_maintenance_enabled=data.get("population_maintenance_enabled", True),
         )
         set_locale(data.get("locale", get_locale()))
         sim._restore_rng_state(sim.rng, data.get("rng_state"))
@@ -114,6 +158,16 @@ class EnginePersistenceMixin:
         )
         sim.elapsed_days = max(0, int(data.get("elapsed_days", 0)))
         sim.start_year = data.get("start_year", sim.world.year)
+        sim.starting_population = int(
+            data.get(
+                "starting_population",
+                sum(1 for char in sim.world.characters if char.alive),
+            )
+        )
+        sim._active_seasonal_deltas = sim._restore_active_seasonal_deltas(
+            sim.world,
+            data.get("active_seasonal_deltas", []),
+        )
         sim.memorial_template_history = TemplateHistory.from_dict(
             data.get("memorial_template_history", {})
         )

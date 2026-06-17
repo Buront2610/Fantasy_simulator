@@ -36,10 +36,10 @@ class EventRecorderMixin:
 
     # Severity scale: 1=minor, 2=notable, 3=significant, 4=major, 5=critical
     _SEVERITY_MAP: Dict[str, int] = {
-        "death": 5, "battle_fatal": 5, "marriage": 4,
+        "death": 5, "battle_fatal": 5, "marriage": 4, "birth": 4,
         "discovery": 3, "battle": 3, "journey": 2,
         "meeting": 1, "aging": 1, "skill_training": 1,
-        "romance": 2, "anniversary": 2,
+        "romance": 2, "anniversary": 2, "immigration": 2,
         "condition_worsened": 3, "dying_rescued": 4,
     }
 
@@ -68,6 +68,7 @@ class EventRecorderMixin:
         location_id: Optional[str] = None,
         primary_actor_id: Optional[str] = None,
         secondary_actor_ids: Optional[List[str]] = None,
+        cause_event_ids: Optional[List[str]] = None,
         severity: int = 1,
         visibility: str = "public",
     ) -> WorldEventRecord:
@@ -100,6 +101,7 @@ class EventRecorderMixin:
             severity=severity,
             visibility=visibility,
             calendar_key=self.world.calendar_definition.calendar_key,
+            cause_event_ids=[] if cause_event_ids is None else list(cause_event_ids),
         )
         self._ensure_event_record_id_available(record.record_id)
         impacts = self.world.apply_event_impact(kind, canonical_location_id)

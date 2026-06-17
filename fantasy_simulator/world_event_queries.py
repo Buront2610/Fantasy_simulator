@@ -61,3 +61,31 @@ def event_by_id(
 ) -> WorldEventRecord | None:
     """Return one event record by canonical record id."""
     return event_index.by_record_id(event_records, record_id)
+
+
+def event_causes(
+    event_index: EventHistoryIndex,
+    event_records: List[WorldEventRecord],
+    record_id: str,
+) -> List[WorldEventRecord]:
+    """Return direct cause records for one event, preserving stored cause order."""
+    record = event_by_id(event_index, event_records, record_id)
+    if record is None:
+        return []
+    causes: List[WorldEventRecord] = []
+    for cause_event_id in record.cause_event_ids:
+        cause = event_by_id(event_index, event_records, cause_event_id)
+        if cause is not None:
+            causes.append(cause)
+    return causes
+
+
+def events_caused_by(
+    event_records: List[WorldEventRecord],
+    cause_event_id: str,
+) -> List[WorldEventRecord]:
+    """Return direct effect records that cite *cause_event_id*."""
+    return [
+        record for record in event_records
+        if cause_event_id in record.cause_event_ids
+    ]

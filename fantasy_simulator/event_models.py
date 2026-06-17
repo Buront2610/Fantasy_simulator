@@ -116,6 +116,78 @@ def _validate_legacy_event_result_scalars(projected: EventResult) -> None:
         raise ValueError("legacy_event_result.metadata must be a dict")
 
 
+def _metadata_cause_event_ids(metadata: Dict[str, Any]) -> List[str]:
+    cause_event_ids: List[str] = []
+    cause_event_id = metadata.get("cause_event_id")
+    if isinstance(cause_event_id, str) and cause_event_id:
+        cause_event_ids.append(cause_event_id)
+    raw_cause_event_ids = metadata.get("cause_event_ids", [])
+    if raw_cause_event_ids is None:
+        raise ValueError("cause_event_ids must be a list of strings when provided in metadata")
+    if not isinstance(raw_cause_event_ids, list):
+        raise ValueError("cause_event_ids must be a list of strings when provided in metadata")
+    if any(not isinstance(item, str) for item in raw_cause_event_ids):
+        raise ValueError("cause_event_ids must be a list of strings when provided in metadata")
+    cause_event_ids.extend(item for item in raw_cause_event_ids if item)
+    return list(dict.fromkeys(cause_event_ids))
+
+
+def _cause_event_ids_from_render_params(render_params: Dict[str, Any]) -> List[str]:
+    cause_event_ids: List[str] = []
+    cause_event_id = render_params.get("cause_event_id")
+    if isinstance(cause_event_id, str) and cause_event_id:
+        cause_event_ids.append(cause_event_id)
+    raw_cause_event_ids = render_params.get("cause_event_ids", [])
+    if isinstance(raw_cause_event_ids, list):
+        cause_event_ids.extend(value for value in raw_cause_event_ids if isinstance(value, str) and value)
+    return list(dict.fromkeys(cause_event_ids))
+
+
+def _normalize_cause_event_ids_payload(payload: Any, render_params: Dict[str, Any]) -> List[str]:
+    if payload is None:
+        raise ValueError("cause_event_ids must be a list of strings when provided")
+    if not isinstance(payload, list) or any(not isinstance(item, str) for item in payload):
+        raise ValueError("cause_event_ids must be a list of strings")
+    return list(dict.fromkeys([*payload, *_cause_event_ids_from_render_params(render_params)]))
+
+
+def _validate_render_params_payload(payload: Any) -> Dict[str, Any]:
+    if payload is None:
+        raise ValueError("render_params must be a dict when provided")
+    if not isinstance(payload, dict):
+        raise ValueError("render_params must be a dict")
+    _validate_json_object_payload(payload, "render_params")
+    return deepcopy(payload)
+
+
+def _validate_json_object_payload(payload: Any, field_name: str) -> None:
+    if not isinstance(payload, dict):
+        raise ValueError(f"{field_name} must be a dict")
+    for key, value in payload.items():
+        if not isinstance(key, str):
+            raise ValueError(f"{field_name} keys must be strings")
+        _validate_json_value_payload(value, f"{field_name}.{key}")
+
+
+def _validate_json_value_payload(value: Any, field_name: str) -> None:
+    if value is None or isinstance(value, str) or isinstance(value, bool):
+        return
+    if isinstance(value, int):
+        return
+    if isinstance(value, float):
+        if not isfinite(value):
+            raise ValueError(f"{field_name} must be JSON-compatible")
+        return
+    if isinstance(value, list):
+        for index, item in enumerate(value):
+            _validate_json_value_payload(item, f"{field_name}[{index}]")
+        return
+    if isinstance(value, dict):
+        _validate_json_object_payload(value, field_name)
+        return
+    raise ValueError(f"{field_name} must be JSON-compatible")
+
+
 @dataclass(slots=True)
 class WorldEventRecord:
     """A structured record of a world event for history and analysis."""
@@ -135,6 +207,7 @@ class WorldEventRecord:
     calendar_key: str = ""
     summary_key: str = ""
     render_params: Dict[str, Any] = field(default_factory=dict)
+    cause_event_ids: List[str] = field(default_factory=list)
     tags: List[str] = field(default_factory=list)
     impacts: List[Dict[str, Any]] = field(default_factory=list)
     legacy_event_result: Optional[Dict[str, Any]] = None
@@ -159,7 +232,8 @@ class WorldEventRecord:
         self.visibility = self._validate_string_payload(self.visibility, "visibility")
         self.calendar_key = self._validate_string_payload(self.calendar_key, "calendar_key")
         self.summary_key = self._validate_summary_key(self.summary_key)
-        self.render_params = self._validate_render_params_payload(self.render_params)
+        self.render_params = _validate_render_params_payload(self.render_params)
+        self.cause_event_ids = _normalize_cause_event_ids_payload(self.cause_event_ids, self.render_params)
         self.tags = self._validate_string_list_payload(self.tags, "tags")
         self.impacts = self._validate_impacts_payload(self.impacts)
         self.legacy_event_result = self._validate_legacy_event_result_payload(self.legacy_event_result)
@@ -184,6 +258,8 @@ class WorldEventRecord:
         }
         if self.render_params:
             payload["render_params"] = deepcopy(self.render_params)
+        if self.cause_event_ids:
+            payload["cause_event_ids"] = list(self.cause_event_ids)
         payload["tags"] = list(self.tags)
         payload["impacts"] = deepcopy(self.impacts)
         if self.legacy_event_result is not None:
@@ -264,43 +340,6 @@ class WorldEventRecord:
             raise ValueError("impacts entries must be dicts")
         return deepcopy(payload)
 
-    @staticmethod
-    def _validate_render_params_payload(payload: Any) -> Dict[str, Any]:
-        if payload is None:
-            raise ValueError("render_params must be a dict when provided")
-        if not isinstance(payload, dict):
-            raise ValueError("render_params must be a dict")
-        WorldEventRecord._validate_json_object_payload(payload, "render_params")
-        return deepcopy(payload)
-
-    @staticmethod
-    def _validate_json_object_payload(payload: Any, field_name: str) -> None:
-        if not isinstance(payload, dict):
-            raise ValueError(f"{field_name} must be a dict")
-        for key, value in payload.items():
-            if not isinstance(key, str):
-                raise ValueError(f"{field_name} keys must be strings")
-            WorldEventRecord._validate_json_value_payload(value, f"{field_name}.{key}")
-
-    @staticmethod
-    def _validate_json_value_payload(value: Any, field_name: str) -> None:
-        if value is None or isinstance(value, str) or isinstance(value, bool):
-            return
-        if isinstance(value, int):
-            return
-        if isinstance(value, float):
-            if not isfinite(value):
-                raise ValueError(f"{field_name} must be JSON-compatible")
-            return
-        if isinstance(value, list):
-            for index, item in enumerate(value):
-                WorldEventRecord._validate_json_value_payload(item, f"{field_name}[{index}]")
-            return
-        if isinstance(value, dict):
-            WorldEventRecord._validate_json_object_payload(value, field_name)
-            return
-        raise ValueError(f"{field_name} must be JSON-compatible")
-
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "WorldEventRecord":
         return cls(
@@ -321,7 +360,8 @@ class WorldEventRecord:
             visibility=cls._validate_string_payload(data.get("visibility", "public"), "visibility"),
             calendar_key=cls._validate_string_payload(data.get("calendar_key", ""), "calendar_key"),
             summary_key=cls._validate_string_payload(data.get("summary_key", ""), "summary_key"),
-            render_params=cls._validate_render_params_payload(data.get("render_params", {})),
+            render_params=_validate_render_params_payload(data.get("render_params", {})),
+            cause_event_ids=cls._validate_string_list_payload(data.get("cause_event_ids", []), "cause_event_ids"),
             tags=cls._validate_string_list_payload(data.get("tags", []), "tags"),
             impacts=cls._validate_impacts_payload(data.get("impacts", [])),
             legacy_event_result=cls._validate_legacy_event_result_payload(data.get("legacy_event_result")),
@@ -342,6 +382,7 @@ class WorldEventRecord:
         calendar_key: str = "",
         summary_key: str = "",
         render_params: Optional[Dict[str, Any]] = None,
+        cause_event_ids: Optional[List[str]] = None,
     ) -> "WorldEventRecord":
         """Create a WorldEventRecord from an EventResult."""
         primary = result.affected_characters[0] if result.affected_characters else None
@@ -355,6 +396,8 @@ class WorldEventRecord:
         metadata_render_params = result.metadata.get("render_params", {})
         if not isinstance(metadata_render_params, dict):
             raise ValueError("render_params must be a dict when provided in metadata")
+        metadata_cause_event_ids = _metadata_cause_event_ids(result.metadata)
+        resolved_render_params = render_params if render_params is not None else metadata_render_params
         resolved_summary_key = summary_key or result.summary_key or metadata_summary_key
         cls._validate_summary_key(resolved_summary_key)
         return cls(
@@ -371,7 +414,8 @@ class WorldEventRecord:
             severity=severity,
             calendar_key=calendar_key,
             summary_key=resolved_summary_key,
-            render_params=render_params if render_params is not None else metadata_render_params,
+            render_params=resolved_render_params,
+            cause_event_ids=list(cause_event_ids or metadata_cause_event_ids),
             legacy_event_result=legacy_event_result,
         )
 
@@ -384,6 +428,9 @@ class WorldEventRecord:
         adapter_metadata: Dict[str, Any] = {}
         if self.render_params:
             adapter_metadata["render_params"] = deepcopy(self.render_params)
+        if self.cause_event_ids:
+            adapter_metadata["cause_event_ids"] = list(self.cause_event_ids)
+            adapter_metadata["cause_event_id"] = self.cause_event_ids[0]
         if self.legacy_event_result is not None:
             projected = EventResult.from_dict(self.legacy_event_result)
             projected.description = self.description

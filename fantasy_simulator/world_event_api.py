@@ -13,7 +13,9 @@ from .world_event_history import (
     record_world_event,
 )
 from .world_event_queries import (
+    event_causes,
     event_by_id,
+    events_caused_by,
     events_by_actor,
     events_by_kind,
     events_by_location,
@@ -215,3 +217,11 @@ class WorldEventMixin:
     def get_event_by_id(self, record_id: str) -> WorldEventRecord | None:
         """Return one event record by canonical record id."""
         return event_by_id(self._event_index, self.event_records, record_id)
+
+    def get_event_causes(self, record_id: str) -> List[WorldEventRecord]:
+        """Return direct cause records for a canonical event."""
+        return event_causes(self._event_index, self.event_records, record_id)
+
+    def get_events_caused_by(self, cause_event_id: str) -> List[WorldEventRecord]:
+        """Return direct effect records citing a canonical event id."""
+        return events_caused_by(self.event_records, cause_event_id)

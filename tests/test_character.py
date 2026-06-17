@@ -415,6 +415,26 @@ class TestSerialization:
         assert restored.relation_tags == {"ally_001": ["friend", "savior"]}
         assert restored.relation_tag_sources["ally_001:friend"] == ["evt_001"]
 
+    def test_from_dict_preserves_zero_score_relationship_details(self):
+        data = {
+            "name": "Neutral",
+            "age": 30,
+            "gender": "Male",
+            "race": "Human",
+            "job": "Warrior",
+            "relationship_details": {
+                "known_001": {
+                    "score": 0,
+                    "tags": [],
+                    "tag_sources": {},
+                }
+            },
+        }
+
+        restored = Character.from_dict(data)
+
+        assert restored.relationships == {"known_001": 0}
+
     def test_from_dict_prefers_nested_payload_over_flat_legacy_fields(self):
         data = {
             "name": "Priority",

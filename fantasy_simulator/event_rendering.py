@@ -216,6 +216,17 @@ def _apply_world_change_params(
             world=world,
             translate=translate,
         )
+    if record.summary_key == "events.war_battle.summary":
+        params["attacker_faction"] = _display_faction(
+            params.get("attacker_faction_id"),
+            world=world,
+            translate=translate,
+        )
+        params["defender_faction"] = _display_faction(
+            params.get("defender_faction_id"),
+            world=world,
+            translate=translate,
+        )
     if record.summary_key == "events.terrain_cell_mutated.summary":
         if "old_biome" in params:
             params["old_biome"] = _display_biome(params["old_biome"], translate=translate)

@@ -22,6 +22,7 @@ def _serialize_base_world_state(world: Any) -> Dict[str, Any]:
         "year": world.year,
         "grid": [loc.to_dict() for loc in world.grid.values()],
         "event_records": [r.to_dict() for r in world.event_records],
+        "world_arcs": [arc.to_dict() for arc in world.world_arcs],
         "rumors": [r.to_dict() for r in world.rumors],
         "rumor_archive": [r.to_dict() for r in world.rumor_archive],
         "active_adventures": [run.to_dict() for run in world.active_adventures],

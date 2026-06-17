@@ -250,8 +250,7 @@ def expand_relationship_details(
     relation_tag_sources: Dict[str, List[str]] = {}
     for target_id, raw_data in payload.items():
         relationship = Relationship.from_dict(target_id, raw_data)
-        if relationship.score != 0:
-            relationships[target_id] = relationship.score
+        relationships[target_id] = relationship.score
         if relationship.tags:
             relation_tags[target_id] = list(relationship.tags)
         for tag_name, source_ids in relationship.tag_sources.items():

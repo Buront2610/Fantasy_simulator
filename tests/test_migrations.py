@@ -7,6 +7,9 @@ from fantasy_simulator.persistence.migrations import (
     _migrate_v1_to_v2,
     _migrate_v2_to_v3,
     _migrate_v4_to_v5,
+    _migrate_v5_to_v6,
+    _migrate_v6_to_v7,
+    _migrate_v8_to_v9,
     migrate,
 )
 from fantasy_simulator.content.world_data import NAME_TO_LOCATION_ID
@@ -80,6 +83,25 @@ class TestMigrations:
         completed = result["world"]["completed_adventures"][0]
         assert completed["origin"] == "loc_millhaven"
         assert completed["destination"] == "loc_sunken_ruins"
+
+    def test_v1_to_v2_does_not_double_prefix_existing_location_ids(self):
+        data = {
+            "schema_version": 1,
+            "characters": [],
+            "world": {
+                "grid": [],
+                "active_adventures": [
+                    {"origin": "loc_aethoria_capital", "destination": "loc_thornwood"},
+                ],
+                "completed_adventures": [],
+            },
+        }
+
+        result = _migrate_v1_to_v2(data)
+
+        active = result["world"]["active_adventures"][0]
+        assert active["origin"] == "loc_aethoria_capital"
+        assert active["destination"] == "loc_thornwood"
 
     def test_unknown_location_uses_slug_fallback(self):
         data = {
@@ -246,7 +268,7 @@ class TestMigrations:
         # v3→v4 migration adds party fields to adventures (none here, so grid stays intact)
 
     def test_current_version_constant(self):
-        assert CURRENT_VERSION == 8
+        assert CURRENT_VERSION == 9
 
     def test_v3_to_v4_adds_party_fields_to_adventures(self):
         """PR-E migration adds party fields to existing AdventureRun data."""
@@ -289,6 +311,7 @@ class TestMigrations:
         assert adv["retreat_rule"] == "on_serious"
         assert adv["supply_state"] == "full"
         assert adv["danger_level"] == 50
+        assert adv["related_event_ids"] == []
 
     def test_v3_to_v4_already_has_member_ids_respected(self):
         """If member_ids already exists (partial pre-migration), it is preserved."""
@@ -398,6 +421,60 @@ class TestMigrations:
         loc = result["world"]["grid"][0]
         assert len(loc["live_traces"]) == 1
         assert loc["live_traces"][0]["char_name"] == "X"
+
+    def test_v5_to_v6_preserves_existing_terrain_sites_and_routes(self):
+        data = {
+            "schema_version": 5,
+            "characters": [],
+            "world": {
+                "width": 1,
+                "height": 1,
+                "grid": [],
+                "terrain_map": {"cells": [{"x": 0, "y": 0, "biome": "swamp"}]},
+                "sites": [{"site_id": "custom_site"}],
+                "routes": [{"route_id": "custom_route"}],
+            },
+        }
+
+        result = _migrate_v5_to_v6(data)
+
+        assert result["world"]["terrain_map"] == {"cells": [{"x": 0, "y": 0, "biome": "swamp"}]}
+        assert result["world"]["sites"] == [{"site_id": "custom_site"}]
+        assert result["world"]["routes"] == [{"route_id": "custom_route"}]
+
+    def test_v6_to_v7_preserves_existing_atlas_layout(self):
+        data = {
+            "schema_version": 6,
+            "characters": [],
+            "world": {
+                "width": 1,
+                "height": 1,
+                "terrain_map": {"cells": []},
+                "sites": [],
+                "routes": [],
+                "atlas_layout": {"landmasses": [{"name": "Existing"}]},
+            },
+        }
+
+        result = _migrate_v6_to_v7(data)
+
+        assert result["world"]["atlas_layout"] == {"landmasses": [{"name": "Existing"}]}
+
+    def test_v8_to_v9_preserves_existing_world_arcs(self):
+        data = {
+            "schema_version": 8,
+            "characters": [],
+            "world": {
+                "event_records": [],
+                "world_arcs": [{"arc_id": "existing", "kind": "war", "phase": "active", "start_year": 1000}],
+            },
+        }
+
+        result = _migrate_v8_to_v9(data)
+
+        assert result["world"]["world_arcs"] == [
+            {"arc_id": "existing", "kind": "war", "phase": "active", "start_year": 1000}
+        ]
 
     def test_full_migration_from_v0_reaches_v5(self):
         """A bare-minimum v0 save file migrates all the way to CURRENT_VERSION (5)."""

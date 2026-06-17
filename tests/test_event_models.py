@@ -65,6 +65,7 @@ def test_world_event_record_round_trip_and_defensive_copy() -> None:
         day=12,
         summary_key="events.battle.summary",
         render_params={"actor": "Aldric", "location": "Thornwood"},
+        cause_event_ids=["cause_1"],
         impacts=[{"delta": {"danger": 1}}],
         tags=["combat"],
     )
@@ -72,9 +73,11 @@ def test_world_event_record_round_trip_and_defensive_copy() -> None:
     dumped = record.to_dict()
     dumped["impacts"][0]["delta"]["danger"] = 9
     dumped["render_params"]["actor"] = "Changed"
+    dumped["cause_event_ids"].append("changed")
 
     assert record.impacts[0]["delta"]["danger"] == 1
     assert record.render_params["actor"] == "Aldric"
+    assert record.cause_event_ids == ["cause_1"]
 
     restored = WorldEventRecord.from_dict(record.to_dict())
     assert restored.to_dict() == record.to_dict()
@@ -101,6 +104,62 @@ def test_world_event_record_rejects_malformed_render_params_at_load_boundary() -
         assert "render_params" in str(exc)
     else:
         raise AssertionError("Expected malformed render_params to fail fast")
+
+
+def test_world_event_record_derives_cause_event_ids_from_render_params() -> None:
+    record = WorldEventRecord(
+        record_id="effect",
+        kind="war_battle",
+        render_params={"cause_event_id": "cause"},
+    )
+
+    assert record.cause_event_ids == ["cause"]
+    assert record.to_dict()["cause_event_ids"] == ["cause"]
+
+
+def test_world_event_record_from_event_result_uses_metadata_cause_ids() -> None:
+    result = EventResult(
+        description="Effect",
+        event_type="war_ended",
+        metadata={"cause_event_id": "cause-a", "cause_event_ids": ["cause-b"]},
+    )
+
+    record = WorldEventRecord.from_event_result(result)
+    projected = record.to_event_result()
+
+    assert record.cause_event_ids == ["cause-a", "cause-b"]
+    assert projected.metadata["cause_event_id"] == "cause-a"
+    assert projected.metadata["cause_event_ids"] == ["cause-a", "cause-b"]
+
+
+def test_world_event_record_rejects_malformed_cause_event_ids_at_load_boundary() -> None:
+    malformed = {
+        "record_id": "bad-cause",
+        "kind": "war_ended",
+        "cause_event_ids": "cause",
+    }
+
+    try:
+        WorldEventRecord.from_dict(malformed)
+    except ValueError as exc:
+        assert "cause_event_ids" in str(exc)
+    else:
+        raise AssertionError("Expected malformed cause_event_ids to fail fast")
+
+
+def test_world_event_record_rejects_malformed_metadata_cause_event_ids() -> None:
+    result = EventResult(
+        description="Effect",
+        event_type="war_ended",
+        metadata={"cause_event_ids": ["cause", 3]},
+    )
+
+    try:
+        WorldEventRecord.from_event_result(result)
+    except ValueError as exc:
+        assert "cause_event_ids" in str(exc)
+    else:
+        raise AssertionError("Expected malformed metadata cause_event_ids to fail fast")
 
 
 def test_world_event_record_rejects_non_string_render_param_keys() -> None:

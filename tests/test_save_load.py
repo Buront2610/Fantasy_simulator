@@ -236,11 +236,35 @@ class TestSaveSimulation:
         assert "event_records" in data["world"]
         assert "event_log" not in data["world"]
 
+    def test_simulator_to_dict_includes_schema_version(self):
+        sim = Simulator(_make_world(), seed=0)
+
+        payload = sim.to_dict()
+
+        assert payload["schema_version"] == CURRENT_VERSION
+
     def test_save_returns_false_on_bad_path(self, tmp_path):
         sim = Simulator(_make_world(), seed=0)
         bad_path = str(tmp_path / "nonexistent_dir" / "file.json")
         result = save_simulation(sim, bad_path)
         assert result is False
+
+    def test_save_failure_does_not_corrupt_existing_file(self, tmp_path, monkeypatch):
+        path = tmp_path / "existing.json"
+        path.write_text('{"ok": true}\n', encoding="utf-8")
+        sim = Simulator(_make_world(), seed=0)
+
+        def failing_dump(_payload, handle, **_kwargs):
+            handle.write("{broken")
+            raise OSError("simulated write failure")
+
+        monkeypatch.setattr("fantasy_simulator.persistence.save_load.json.dump", failing_dump)
+
+        result = save_simulation(sim, str(path))
+
+        assert result is False
+        assert path.read_text(encoding="utf-8") == '{"ok": true}\n'
+        assert list(tmp_path.glob(".save-*.tmp")) == []
 
 
 class TestLoadSimulation:
@@ -310,6 +334,24 @@ class TestLoadSimulation:
         assert restored_route.distance == route.distance
         assert restored_route.blocked is True
         assert {item.route_id for item in restored.world.routes} == {item.route_id for item in sim.world.routes}
+
+    def test_round_trip_preserves_active_seasonal_deltas_for_month_end_revert(self, tmp_path):
+        path = tmp_path / "seasonal-midmonth.json"
+        sim = Simulator(World(), seed=0)
+        mountain = next(loc for loc in sim.world.grid.values() if loc.region_type == "mountain")
+        original_danger = mountain.danger
+        sim._apply_seasonal_modifiers(1)
+        assert mountain.danger > original_danger
+
+        assert save_simulation(sim, str(path)) is True
+        restored = load_simulation(str(path))
+
+        assert restored is not None
+        restored_mountain = restored.world.get_location_by_id(mountain.id)
+        assert restored_mountain is not None
+        assert restored_mountain.danger == mountain.danger
+        restored._revert_seasonal_modifiers()
+        assert restored_mountain.danger == original_danger
 
     def test_load_preserves_bundle_backed_route_overlay_when_payload_order_changes(self, tmp_path):
         path = tmp_path / "route-overlay-order.json"

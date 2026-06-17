@@ -66,7 +66,10 @@ def site_tags_by_location_id(data: Dict[str, Any]) -> Dict[str, list[str]]:
 
 
 def resolve_location_id(data: Dict[str, Any], name: str) -> str:
-    return location_name_to_id(data).get(name, _FALLBACK_LOCATION_ID(name))
+    name_to_id = location_name_to_id(data)
+    if name in set(name_to_id.values()) or str(name).startswith("loc_"):
+        return name
+    return name_to_id.get(name, _FALLBACK_LOCATION_ID(name))
 
 
 def location_state_defaults(loc_id: str, region_type: str, *, site_tags: list[str] | None = None) -> Dict[str, Any]:

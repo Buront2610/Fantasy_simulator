@@ -17,6 +17,7 @@ from .migration_context import (
     site_tags_by_location_id,
 )
 from .migration_event_records import canonicalize_legacy_event_adapters
+from ..world_arcs import reconstruct_world_arcs_from_records
 
 
 def migrate_v0_to_v1(data: Dict[str, Any]) -> Dict[str, Any]:
@@ -158,6 +159,7 @@ def migrate_v3_to_v4(data: Dict[str, Any]) -> Dict[str, Any]:
             adv.setdefault("retreat_rule", "on_serious")
             adv.setdefault("supply_state", "full")
             adv.setdefault("danger_level", 50)
+            adv.setdefault("related_event_ids", [])
     data["schema_version"] = 4
     return data
 
@@ -194,9 +196,9 @@ def migrate_v5_to_v6(data: Dict[str, Any]) -> Dict[str, Any]:
             for loc_data in grid
         ],
     )
-    world_data["terrain_map"] = payload["terrain_map"]
-    world_data["sites"] = payload["sites"]
-    world_data["routes"] = payload["routes"]
+    world_data.setdefault("terrain_map", payload["terrain_map"])
+    world_data.setdefault("sites", payload["sites"])
+    world_data.setdefault("routes", payload["routes"])
     data["schema_version"] = 6
     return data
 
@@ -215,7 +217,7 @@ def migrate_v6_to_v7(data: Dict[str, Any]) -> Dict[str, Any]:
         routes=world_data.get("routes", []),
         terrain_cells=world_data.get("terrain_map", {}).get("cells", []),
     )
-    world_data["atlas_layout"] = build_default_atlas_layout(inputs).to_dict()
+    world_data.setdefault("atlas_layout", build_default_atlas_layout(inputs).to_dict())
 
     data["schema_version"] = 7
     return data
@@ -225,4 +227,17 @@ def migrate_v7_to_v8(data: Dict[str, Any]) -> Dict[str, Any]:
     """Canonicalize legacy event adapters into world.event_records."""
     canonicalize_legacy_event_adapters(data)
     data["schema_version"] = 8
+    return data
+
+
+def migrate_v8_to_v9(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Add persistent WorldArc state reconstructed from canonical records."""
+    canonicalize_legacy_event_adapters(data)
+    world_data = data.setdefault("world", {})
+    if "world_arcs" not in world_data:
+        world_data["world_arcs"] = [
+            arc.to_dict()
+            for arc in reconstruct_world_arcs_from_records(world_data.get("event_records", []))
+        ]
+    data["schema_version"] = 9
     return data

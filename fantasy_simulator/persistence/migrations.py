@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Dict
 
+from ..schema import CURRENT_SCHEMA_VERSION
 from ..content.world_data import (
     DEFAULT_LOCATIONS,
     NAME_TO_LOCATION_ID,
@@ -20,9 +21,10 @@ from .migration_steps import (
     migrate_v5_to_v6 as _migrate_v5_to_v6,
     migrate_v6_to_v7 as _migrate_v6_to_v7,
     migrate_v7_to_v8 as _migrate_v7_to_v8,
+    migrate_v8_to_v9 as _migrate_v8_to_v9,
 )
 
-CURRENT_VERSION = 8
+CURRENT_VERSION = CURRENT_SCHEMA_VERSION
 
 configure_legacy_world_data(
     default_locations=DEFAULT_LOCATIONS,
@@ -40,6 +42,7 @@ MIGRATIONS: Dict[int, Callable[[Dict[str, Any]], Dict[str, Any]]] = {
     6: _migrate_v5_to_v6,
     7: _migrate_v6_to_v7,
     8: _migrate_v7_to_v8,
+    9: _migrate_v8_to_v9,
 }
 
 
