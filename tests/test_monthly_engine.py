@@ -20,6 +20,7 @@ from fantasy_simulator.character import Character
 from fantasy_simulator.character_creator import CharacterCreator
 from fantasy_simulator.event_models import EventResult
 from fantasy_simulator.events import WorldEventRecord
+from fantasy_simulator.simulation.population import population_pressure_factor
 from fantasy_simulator.simulator import Simulator
 from fantasy_simulator.world import World
 
@@ -65,6 +66,24 @@ class TestSeededWorldGenerationIsDeterministic:
         w1 = _build_seeded_world(42)
         w2 = _build_seeded_world(42)
         assert w1.to_dict() == w2.to_dict()
+
+
+class TestPopulationMaintenance:
+    def test_population_pressure_scales_activity_above_baseline(self):
+        world = _build_seeded_world(7, n_chars=40)
+
+        assert population_pressure_factor(world) == 2.0
+
+    def test_year_end_population_maintenance_adds_migrants_when_population_low(self):
+        world = _build_seeded_world(7, n_chars=2)
+        sim = Simulator(world, events_per_year=1, adventure_steps_per_year=0, seed=7)
+        sim.starting_population = 5
+
+        sim.advance_years(1)
+
+        alive = [char for char in sim.world.characters if char.alive]
+        assert len(alive) >= 3
+        assert any(record.kind == "immigration" for record in sim.world.event_records)
 
 
 # ---------------------------------------------------------------------------
@@ -352,18 +371,25 @@ class TestMonthlyEventTimestamps:
                 assert 1 <= rec.month <= 12
                 assert 1 <= rec.day <= 30
 
-    def test_aging_events_stamped_to_month12(self):
-        """Deterministic aging should occur at year-end for all living characters."""
+    def test_notable_aging_events_stamped_to_month12(self):
+        """Annual aging mutates everyone, but only notable aging ticks enter the event ledger."""
         world = _build_seeded_world(88, n_chars=4)
-        living_ids = {c.char_id for c in world.characters if c.alive}
+        for index, char in enumerate(world.characters):
+            char.age = 29 + index
+        expected_notable_ids = {
+            char.char_id
+            for char in world.characters
+            if char.alive and (char.age + 1) % 10 == 0
+        }
         sim = Simulator(world, events_per_year=0, adventure_steps_per_year=0, seed=88)
 
         sim.advance_months(12)
 
         aging_records = [r for r in world.event_records if r.kind == "aging"]
-        assert len(aging_records) == len(living_ids)
-        assert {r.primary_actor_id for r in aging_records} == living_ids
+        assert len(aging_records) == len(expected_notable_ids)
+        assert {r.primary_actor_id for r in aging_records} == expected_notable_ids
         assert {r.month for r in aging_records} == {12}
+        assert all(char.age == 30 + index for index, char in enumerate(world.characters))
 
 
 # ---------------------------------------------------------------------------

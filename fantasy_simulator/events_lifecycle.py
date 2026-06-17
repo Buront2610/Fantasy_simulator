@@ -18,6 +18,16 @@ if TYPE_CHECKING:
 DeathEventCallback = Callable[["Character", "World", Any], EventResult]
 
 
+def _age_band_for_ratio(age_ratio: float) -> str:
+    if age_ratio < 0.35:
+        return "young"
+    if age_ratio < 0.60:
+        return "prime"
+    if age_ratio < 0.85:
+        return "middle"
+    return "old"
+
+
 def character_lifespan_years(char: "Character", world: "World") -> int:
     """Return bundle-authored race lifespan with Character.max_age as compatibility fallback."""
     world_lifespan = world.race_lifespan_years(char.race)
@@ -26,11 +36,21 @@ def character_lifespan_years(char: "Character", world: "World") -> int:
     return char.max_age
 
 
+def should_record_aging_event(char: "Character", world: "World") -> bool:
+    """Return whether the latest annual aging tick is notable enough for the event ledger."""
+    max_age = max(character_lifespan_years(char, world), 1)
+    previous_age_ratio = max(char.age - 1, 0) / max_age
+    current_age_ratio = char.age / max_age
+    return char.age % 10 == 0 or _age_band_for_ratio(previous_age_ratio) != _age_band_for_ratio(current_age_ratio)
+
+
 def resolve_aging_event(char: "Character", world: "World", rng: Any = random) -> EventResult:
     """Resolve one annual aging tick for a character."""
     char.age += 1
     max_age = character_lifespan_years(char, world)
-    if char.age < 30:
+    age_ratio = char.age / max(max_age, 1)
+    age_band = _age_band_for_ratio(age_ratio)
+    if age_band == "young":
         stat_changes = {
             "strength": rng.randint(0, 2),
             "intelligence": rng.randint(0, 2),
@@ -39,17 +59,17 @@ def resolve_aging_event(char: "Character", world: "World", rng: Any = random) ->
         }
         summary_key = "events.aging_young.summary"
         desc = tr("aging_young", name=char.name, age=char.age)
-    elif char.age < 50:
+    elif age_band == "prime":
         stat_changes = {
             "intelligence": rng.randint(0, 2),
-            "wisdom": rng.randint(0, 2),
+            "wisdom": rng.randint(0, 1),
             "strength": rng.randint(-1, 1),
         }
         summary_key = "events.aging_prime.summary"
         desc = tr("aging_prime", name=char.name, age=char.age)
-    elif char.age < max_age * 0.75:
+    elif age_band == "middle":
         stat_changes = {
-            "wisdom": rng.randint(1, 3),
+            "wisdom": rng.randint(0, 1) * 0,
             "charisma": rng.randint(0, 1),
             "dexterity": -rng.randint(0, 2),
             "strength": -rng.randint(0, 1),
@@ -58,7 +78,7 @@ def resolve_aging_event(char: "Character", world: "World", rng: Any = random) ->
         desc = tr("aging_middle", name=char.name, age=char.age)
     else:
         stat_changes = {
-            "wisdom": rng.randint(0, 2),
+            "wisdom": -rng.randint(0, 1),
             "strength": -rng.randint(1, 3),
             "dexterity": -rng.randint(1, 3),
             "constitution": -rng.randint(1, 4),
@@ -66,6 +86,8 @@ def resolve_aging_event(char: "Character", world: "World", rng: Any = random) ->
         summary_key = "events.aging_old.summary"
         desc = tr("aging_old", name=char.name, age=char.age)
 
+    if char.wisdom >= 85 and stat_changes.get("wisdom", 0) > 0:
+        stat_changes["wisdom"] = 0
     char.apply_stat_delta(stat_changes)
     char.add_history(tr("history_turned_age", year=world.year, age=char.age))
     return EventResult(

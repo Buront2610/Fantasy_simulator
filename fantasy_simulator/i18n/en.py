@@ -63,9 +63,16 @@ TEXT_EN: Dict[str, str] = {
     'choice_resolved': 'Choice resolved.',
     'choice_resolve_failed': 'Could not resolve that choice.',
     'save_path_prompt': 'Save path (default {default_name}): ',
+    'save_overwrite_prompt': 'Overwrite existing snapshot?: {path}',
+    'save_overwrite_confirm': 'Overwrite',
+    'save_overwrite_cancel': 'Cancel',
+    'save_cancelled': 'Save cancelled.',
     'save_failed': 'Could not save snapshot: {error}',
     'save_error_io': 'I/O or serialization error',
     'save_succeeded': 'Snapshot saved to {path}.',
+    'unsaved_leave_prompt': 'There are unsaved simulation results. Return to the main menu?',
+    'unsaved_leave_confirm': 'Leave without saving',
+    'unsaved_leave_keep_reviewing': 'Keep reviewing',
     'load_snapshot_header': 'LOAD SIMULATION SNAPSHOT',
     'load_path_prompt': 'Load path (default {default_name}): ',
     'load_not_found': 'Snapshot not found: {path}',
@@ -146,6 +153,12 @@ TEXT_EN: Dict[str, str] = {
     'set_out_for_adventure': 'Year {year}: Set out from {origin} toward {destination}.',
     'summary_adventure_set_out': '{name} set out from {origin} toward {destination}.',
     'detail_adventure_set_out': '{name} began an expedition from {origin} toward {destination}.',
+    'detail_adventure_warfront_pressure': (
+        '{destination} lay inside an active war zone, raising the expedition danger.'
+    ),
+    'detail_adventure_blocked_route_pressure': (
+        'Blocked roads near {location} forced the party onto a more hazardous detour.'
+    ),
     'summary_adventure_arrived': '{name} reached {destination} and began the expedition.',
     'detail_adventure_arrived': '{name} left {origin}, arrived at {destination}, and started scouting the area.',
     'choice_dangerous_approach': '{name} found a dangerous approach into {destination}.',
@@ -211,6 +224,14 @@ TEXT_EN: Dict[str, str] = {
     'history_anniversary': 'Year {year}: Celebrated marriage anniversary with {name}.',
     'marriage_happened': '{name1} ({race1} {job1}) and {name2} ({race2} {job2}) were married in {location} amid great celebration!',  # noqa: E501
     'history_married': 'Year {year}: Married {name} in {location}.',
+    'birth_happened': '{child}, child of {parent1} and {parent2}, was born in {location}.',
+    'history_child_born': 'Year {year}: {child}, child with {partner}, was born.',
+    'history_born_to_parents': 'Year {year}: Born to {parent1} and {parent2}.',
+    'population_migrant_arrived': (
+        '{name} ({race} {job}) arrived in {location}, drawn by rumors of opportunity.'
+    ),
+    'population_migrants_arrived': '{count} new wanderers arrived in Aethoria, keeping the world in motion.',
+    'history_migrated_to_world': 'Year {year}: Arrived in {location} as a migrant adventurer.',
     'battle_fatal': '{winner} defeated {loser}, who did not survive the encounter.',
     'battle_normal': '{winner} defeated {loser}.',
     'history_battle_win': 'Year {year}: Won a battle against {name} at {location}.',
@@ -319,6 +340,8 @@ TEXT_EN: Dict[str, str] = {
     'relation_tag_friend': 'Friend',
     'relation_tag_rival': 'Rival',
     'relation_tag_spouse': 'Spouse',
+    'relation_tag_parent': 'Parent',
+    'relation_tag_child': 'Child',
     'relation_tag_savior': 'Savior',
     'relation_tag_rescued': 'Rescued',
     'relation_tag_mentor': 'Mentor',
@@ -343,10 +366,12 @@ TEXT_EN: Dict[str, str] = {
     'event_type_battle': 'Battle',
     'event_type_aging': 'Aging',
     'event_type_marriage': 'Marriage',
+    'event_type_birth': 'Birth',
     'event_type_battle_fatal': 'Fatal battle',
     'event_type_death': 'Death',
     'event_type_anniversary': 'Anniversary',
     'event_type_romance': 'Romance',
+    'event_type_immigration': 'Immigration',
     'event_type_generic': 'Other',
     'event_type_injury_recovery': 'Injury recovery',
     'event_type_adventure_started': 'Adventure departure',
@@ -412,6 +437,7 @@ TEXT_EN: Dict[str, str] = {
         '{name1} ({race1} {job1}) and {name2} ({race2} {job2}) were married in {location} '
         'amid great celebration!'
     ),
+    'events.birth.summary': '{child}, child of {parent1} and {parent2}, was born in {location}.',
     'events.discovery.summary': '{name} discovered {item} near {location}. {extra}',
     'events.discovery.summary.narrative': '{story_hook} {name} discovered {item} near {location}. {extra}',
     'events.skill_training.summary': (
@@ -473,6 +499,9 @@ TEXT_EN: Dict[str, str] = {
     ),
     'events.war_ended.summary': (
         '{aggressor_faction} ended war with {target_faction}.'
+    ),
+    'events.war_battle.summary': (
+        '{attacker_faction} and {defender_faction} fought near {location}.'
     ),
     'journey_road_event_0': 'encountered bandits on the road but bluffed their way past',
     'journey_road_event_1': 'helped a lost child find their village',
@@ -591,6 +620,9 @@ TEXT_EN: Dict[str, str] = {
     'summary_adventure_scouting': '{name} scouted the area around {destination}.',
     'detail_adventure_scouting': (
         '{name} carefully surveyed the surroundings of {destination} but found nothing of note.'
+    ),
+    'detail_adventure_hazard_combat': (
+        '{name} fought a {hazard} at {destination} and was wounded after {rounds} rounds.'
     ),
     # UI labels
     'party_members_label': 'Party',
@@ -903,6 +935,13 @@ TEXT_EN: Dict[str, str] = {
 }
 
 TERMS_EN: Dict[str, str] = {
+    'city': 'City',
+    'village': 'Village',
+    'forest': 'Forest',
+    'dungeon': 'Dungeon',
+    'mountain': 'Mountain',
+    'plains': 'Plains',
+    'sea': 'Sea',
     # PR-G: biome terms
     'ocean': 'Ocean',
     'coast': 'Coast',

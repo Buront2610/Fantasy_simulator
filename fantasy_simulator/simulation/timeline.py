@@ -8,8 +8,10 @@ across the full year instead of pinning them to a few scripted months.
 
 from __future__ import annotations
 
+from ..events_lifecycle import should_record_aging_event
 from ..i18n import tr
 from .calendar import annual_probability_to_fraction, distributed_budget
+from .population import population_pressure_factor, run_population_maintenance
 from .timeline_calendar import propagation_month_window
 from .timeline_pipeline import (
     DayPhaseContext,
@@ -25,6 +27,11 @@ from .timeline_seasons import (
 )
 
 
+def record_aging_event_if_notable(simulator, char, result) -> None:
+    if should_record_aging_event(char, simulator.world):
+        simulator._record_event(result, location_id=char.location_id)
+
+
 class TimelineMixin:
     """Mixin providing daily processing methods for the Simulator.
 
@@ -36,7 +43,6 @@ class TimelineMixin:
     - ``adventure_steps_per_year``: target adventure step budget per year
     - ``event_system``: EventSystem instance
     - ``rng``: RNG for simulation decisions
-    - ``_favorites_worsened_this_year`` and seasonal delta trackers
     """
 
     # Seasonal modifiers applied to locations each month (design §5.7).
@@ -52,7 +58,7 @@ class TimelineMixin:
     def _events_for_month(self, month: int) -> int:
         """Compatibility helper exposing the old month-level random-event budget."""
         return distributed_budget(
-            self.events_per_year * self.SIMULATION_DENSITY,
+            self.events_per_year * self.SIMULATION_DENSITY * population_pressure_factor(self.world),
             self.world.months_per_year,
             self.rng,
         )
@@ -61,7 +67,7 @@ class TimelineMixin:
         """Number of random events to generate on this in-world day."""
         del month, day
         return distributed_budget(
-            self.events_per_year * self.SIMULATION_DENSITY,
+            self.events_per_year * self.SIMULATION_DENSITY * population_pressure_factor(self.world),
             self.world.days_per_year,
             self.rng,
         )
@@ -197,6 +203,7 @@ class TimelineMixin:
         """Advance annual character aging only at the last month of the year."""
         if month == self.world.months_per_year:
             self._age_characters()
+            run_population_maintenance(self)
 
     def _age_characters(self) -> None:
         """Advance every living character by one year exactly once per 360 days."""
@@ -204,7 +211,7 @@ class TimelineMixin:
             if not char.alive:
                 continue
             result = self.event_system.event_aging(char, self.world, rng=self.rng)
-            self._record_event(result, location_id=char.location_id)
+            record_aging_event_if_notable(self, char, result)
 
     def _resolve_dying_characters(self, year_fraction: float | None = None) -> None:
         """Give dying characters a daily chance at rescue, decline, or stasis."""

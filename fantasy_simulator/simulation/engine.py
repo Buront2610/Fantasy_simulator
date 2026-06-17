@@ -68,11 +68,13 @@ class Simulator(
         adventure_steps_per_year: int = 3,
         world_changes_per_year: int = 0,
         seed: Optional[int] = None,
+        population_maintenance_enabled: bool = True,
     ) -> None:
         self.world = world
         self.events_per_year = events_per_year
         self.adventure_steps_per_year = adventure_steps_per_year
         self.world_changes_per_year = world_changes_per_year
+        self.population_maintenance_enabled = population_maintenance_enabled
         self.event_system = EventSystem()
         # Mutable progress marker for structured event timestamps within the
         # current simulated year. This value is serialized and restored as-is
@@ -83,6 +85,7 @@ class Simulator(
         # Baseline year used for "latest completed report year" fallback when
         # the simulation has not yet completed a full year.
         self.start_year: int = world.year
+        self.starting_population: int = sum(1 for char in world.characters if char.alive)
         self.rng = random.Random(seed)
         self.id_rng = random.Random(self._id_seed_from_seed(seed))
         # Events that passed the should_notify() threshold during the

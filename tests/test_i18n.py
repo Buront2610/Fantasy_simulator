@@ -71,6 +71,60 @@ class TestI18n:
         set_locale("en")
         assert tr_term("an ancient relic") == "an ancient relic"
 
+    def test_region_terms_render_in_english(self):
+        set_locale("en")
+        for term in ("city", "village", "forest", "dungeon", "mountain", "plains", "sea"):
+            assert tr_term(term) != term
+
+    def test_japanese_history_templates_do_not_mix_english_year_label(self):
+        set_locale("ja")
+        history_keys = [
+            "history_recovered_from_injuries",
+            "set_out_for_adventure",
+            "history_adventure_detail",
+            "history_met",
+            "history_anniversary",
+            "history_married",
+            "history_child_born",
+            "history_born_to_parents",
+            "history_migrated_to_world",
+            "history_battle_win",
+            "history_battle_loss",
+            "history_battle_fatal",
+            "history_discovery",
+            "history_turned_age",
+            "history_passed_away",
+            "history_lost_spouse",
+            "history_trained_skill",
+            "history_travelled",
+            "history_condition_worsened",
+            "history_condition_improved",
+            "history_narrowly_survived",
+        ]
+        for key in history_keys:
+            rendered = tr(
+                key,
+                year=1000,
+                origin="Capital",
+                destination="Forest",
+                detail="detail",
+                name="Aldric",
+                location="Capital",
+                partner="Mira",
+                child="Lio",
+                parent1="Aldric",
+                parent2="Mira",
+                item="an ancient relic",
+                skill="Swordsmanship",
+                new_level=2,
+                old_location="Capital",
+                status="負傷中",
+                age=30,
+                cause="老衰で",
+            )
+            assert "Year 1000:" not in rendered
+            assert "1000年:" in rendered
+
     def test_event_log_prefix_translations(self):
         set_locale("ja")
         assert "[1000年]" == tr("event_log_prefix", year=1000)

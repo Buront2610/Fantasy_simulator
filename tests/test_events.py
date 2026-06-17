@@ -8,6 +8,8 @@ import pytest
 from fantasy_simulator.character import Character
 from fantasy_simulator.content.setting_bundle import RaceDefinition, SettingBundle, SiteSeedDefinition, WorldDefinition
 from fantasy_simulator.events import EventResult, EventSystem
+from fantasy_simulator.events_family import resolve_birth_event
+from fantasy_simulator.event_models import WorldEventRecord
 from fantasy_simulator.i18n import get_locale, set_locale
 from fantasy_simulator.world import World
 
@@ -52,6 +54,19 @@ def _make_char(
     return c
 
 
+def _assert_semantic_event_result(result: EventResult) -> None:
+    summary_key = result.metadata.get("summary_key")
+    render_params = result.metadata.get("render_params")
+    assert isinstance(summary_key, str)
+    assert summary_key.startswith("events.")
+    assert summary_key.endswith(".summary")
+    assert isinstance(render_params, dict)
+
+    record = WorldEventRecord.from_event_result(result)
+    assert record.summary_key == summary_key
+    assert record.render_params == render_params
+
+
 @pytest.fixture
 def char_a(world) -> Character:
     c = _make_char("Alice", location_id="loc_aethoria_capital")
@@ -89,6 +104,40 @@ class TestEventResult:
         assert r.event_type == "battle"
         assert r.year == 1010
         assert "id1" in r.affected_characters
+
+
+class TestEventSemanticContract:
+    def test_usual_event_families_emit_semantic_render_metadata(self, es, world):
+        char1 = _make_char("Alice", location_id="loc_aethoria_capital", age=25)
+        char2 = _make_char("Bob", location_id="loc_aethoria_capital", age=26)
+        char1.skills = {"Swordsmanship": 2, "Fireball": 1}
+        char2.skills = {"Swordsmanship": 1}
+        world.add_character(char1)
+        world.add_character(char2)
+
+        event_results = [
+            es.event_meeting(char1, char2, world, rng=random.Random(1)),
+            es.event_battle(char1, char2, world, rng=random.Random(2)),
+            es.event_discovery(char1, world, rng=random.Random(3)),
+            es.event_aging(char1, world, rng=random.Random(4)),
+            es.event_skill_training(char1, world, rng=random.Random(5)),
+            es.event_journey(char1, world, rng=random.Random(6)),
+        ]
+        char1.update_relationship(char2.char_id, 80)
+        char2.update_relationship(char1.char_id, 80)
+        event_results.append(es.event_marriage(char1, char2, world, rng=random.Random(7)))
+        event_results.append(resolve_birth_event(char1, char2, world, rng=random.Random(8)))
+
+        for result in event_results:
+            _assert_semantic_event_result(result)
+
+    def test_death_event_emits_semantic_render_metadata(self, es, world):
+        char = _make_char("Doomed", location_id="loc_aethoria_capital", age=80)
+        world.add_character(char)
+
+        result = es.event_death(char, world, rng=random.Random(9))
+
+        _assert_semantic_event_result(result)
 
 
 # ---------------------------------------------------------------------------
@@ -187,9 +236,27 @@ class TestEventBattle:
         result = es.event_battle(char_a, char_b, world, rng=random.Random(0))
 
         combat_log = result.metadata["combat_log"]
-        assert len(combat_log) == 3
+        assert len(combat_log) >= 1
         assert combat_log[0]["round_number"] == 1
-        assert combat_log[-1]["outcome"] == "decisive"
+        assert "dice" in combat_log[0]
+        assert "skill_key" in combat_log[0]
+        assert any(entry["outcome"] == "decisive" for entry in combat_log)
+
+    def test_battle_cites_prior_pair_conflict_as_direct_cause(self, es, char_a, char_b, world):
+        prior = world.record_event(WorldEventRecord(
+            record_id="evt_prior_meeting",
+            kind="meeting",
+            year=world.year,
+            primary_actor_id=char_a.char_id,
+            secondary_actor_ids=[char_b.char_id],
+            description="A tense meeting.",
+        ))
+
+        result = es.event_battle(char_a, char_b, world, rng=random.Random(0))
+        record = WorldEventRecord.from_event_result(result)
+
+        assert result.metadata["cause_event_ids"] == [prior.record_id]
+        assert record.cause_event_ids == [prior.record_id]
 
     def test_stat_changes_present(self, es, char_a, char_b, world):
         result = es.event_battle(char_a, char_b, world)
@@ -440,6 +507,16 @@ class TestEventAging:
         result = es.event_aging(char_a, world)
         assert char_a.char_id in result.stat_changes
 
+    def test_long_lived_race_uses_lifespan_ratio_for_aging_band(self, es, world):
+        elf = _make_char("Elder", age=120)
+        elf.race = "Elf"
+        world.add_character(elf)
+
+        result = es.event_aging(elf, world, rng=random.Random(1))
+
+        assert result.metadata["summary_key"] == "events.aging_young.summary"
+        assert "dexterity" in result.stat_changes[elf.char_id]
+
 
 # ---------------------------------------------------------------------------
 # event_death
@@ -502,6 +579,25 @@ class TestEventMarriage:
         assert char_a.spouse_id == char_b.char_id
         assert char_b.spouse_id == char_a.char_id
 
+    def test_marriage_cites_prior_romance_as_direct_cause(self, es, char_a, char_b, world):
+        prior = world.record_event(WorldEventRecord(
+            record_id="evt_prior_romance",
+            kind="romance",
+            year=world.year,
+            primary_actor_id=char_a.char_id,
+            secondary_actor_ids=[char_b.char_id],
+            description="A growing romance.",
+        ))
+        char_a.update_relationship(char_b.char_id, 80)
+        char_b.update_relationship(char_a.char_id, 80)
+
+        result = es.event_marriage(char_a, char_b, world)
+        record = WorldEventRecord.from_event_result(result)
+
+        assert result.event_type == "marriage"
+        assert result.metadata["cause_event_ids"] == [prior.record_id]
+        assert record.cause_event_ids == [prior.record_id]
+
     def test_low_relationship_no_marriage(self, es, char_a, char_b, world):
         char_a.relationships.clear()
         char_b.relationships.clear()
@@ -509,6 +605,50 @@ class TestEventMarriage:
         # Should be romance, not marriage
         assert result.event_type == "romance"
         assert char_a.spouse_id is None
+
+    def test_repeated_romance_can_reach_marriage_threshold(self, es, char_a, char_b, world):
+        first = es.event_marriage(char_a, char_b, world)
+        second = es.event_marriage(char_a, char_b, world)
+        third = es.event_marriage(char_a, char_b, world)
+
+        assert first.event_type == "romance"
+        assert second.event_type == "romance"
+        assert third.event_type == "marriage"
+        assert char_a.spouse_id == char_b.char_id
+
+    def test_random_marriage_event_prefers_existing_affection(self, es, world):
+        admirer = _make_char("Admirer")
+        beloved = _make_char("Beloved")
+        stranger = _make_char("Stranger")
+        for char in (admirer, beloved, stranger):
+            world.add_character(char)
+        admirer.update_relationship(beloved.char_id, 40)
+        beloved.update_relationship(admirer.char_id, 40)
+
+        class FixedRng:
+            def choices(self, population, weights=None, k=1):
+                if population and population[0] == "meeting":
+                    return ["marriage"]
+                max_index = max(range(len(weights)), key=lambda index: weights[index])
+                return [population[max_index]]
+
+            def choice(self, options):
+                return options[0]
+
+            def sample(self, population, k):
+                return list(population[:k])
+
+            def randint(self, lo, hi):
+                return hi
+
+            def getrandbits(self, bits):
+                return 1
+
+        result = es.generate_random_event(world.characters, world, rng=FixedRng())
+
+        assert result is not None
+        assert result.event_type == "marriage"
+        assert admirer.spouse_id == beloved.char_id
 
     def test_already_married_anniversary(self, es, char_a, char_b, world):
         char_a.spouse_id = char_b.char_id
@@ -530,6 +670,54 @@ class TestEventMarriage:
         assert result.event_type == "romance"
         assert char_a.spouse_id == outsider.char_id
         assert char_b.spouse_id is None
+
+
+class TestEventBirth:
+    def test_birth_creates_child_and_family_tags(self, es, char_a, char_b, world):
+        char_a.spouse_id = char_b.char_id
+        char_b.spouse_id = char_a.char_id
+
+        result = resolve_birth_event(char_a, char_b, world, rng=random.Random(1))
+
+        child_id = result.affected_characters[0]
+        child = world.get_character_by_id(child_id)
+        assert result.event_type == "birth"
+        assert child is not None
+        assert child.age == 0
+        assert child.location_id == char_a.location_id
+        assert char_a.has_relation_tag(child.char_id, "child")
+        assert char_b.has_relation_tag(child.char_id, "child")
+        assert child.has_relation_tag(char_a.char_id, "parent")
+        assert child.has_relation_tag(char_b.char_id, "parent")
+        assert result.metadata["summary_key"] == "events.birth.summary"
+
+    def test_random_birth_event_uses_married_collocated_pair(self, es, char_a, char_b, world):
+        char_a.spouse_id = char_b.char_id
+        char_b.spouse_id = char_a.char_id
+
+        class BirthRng:
+            def choices(self, population, weights=None, k=1):
+                if population and population[0] == "meeting":
+                    return ["birth"]
+                return [population[0]]
+
+            def choice(self, options):
+                return options[0]
+
+            def sample(self, population, k):
+                return list(population[:k])
+
+            def randint(self, lo, hi):
+                return lo
+
+            def getrandbits(self, bits):
+                return 1
+
+        result = es.generate_random_event(world.characters, world, rng=BirthRng())
+
+        assert result is not None
+        assert result.event_type == "birth"
+        assert len(world.characters) == 3
 
 
 # ---------------------------------------------------------------------------

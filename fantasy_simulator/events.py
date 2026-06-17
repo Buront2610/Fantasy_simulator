@@ -24,7 +24,7 @@ from .events_lifecycle import (
     resolve_death_event,
 )
 from .events_relationships import resolve_marriage_event, resolve_meeting_event
-from .events_selection import EVENT_WEIGHTS, find_collocated_pair, generate_random_event
+from .events_selection import EVENT_WEIGHTS, find_collocated_pair, find_romance_pair, generate_random_event
 
 if TYPE_CHECKING:
     from .character import Character
@@ -129,3 +129,7 @@ class EventSystem:
     @staticmethod
     def _find_collocated_pair(alive: List[Character], rng: Any = random) -> Optional[Tuple[Character, Character]]:
         return find_collocated_pair(alive, rng=rng)
+
+    @staticmethod
+    def _find_romance_pair(alive: List[Character], rng: Any = random) -> Optional[Tuple[Character, Character]]:
+        return find_romance_pair(alive, rng=rng)
