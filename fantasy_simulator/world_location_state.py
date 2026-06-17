@@ -35,6 +35,10 @@ def clamp_state(value: int) -> int:
     return max(0, min(100, int(value)))
 
 
+def clamp_reputation(value: int) -> int:
+    return max(-100, min(100, int(value)))
+
+
 def string_list_payload(payload: Any, *, field_name: str) -> List[str]:
     if payload is None:
         return []
@@ -138,6 +142,8 @@ class LocationState:
     generated_endonym: str = ""
     memorial_ids: List[str] = field(default_factory=list)
     live_traces: List[Dict[str, Any]] = field(default_factory=list)
+    exploration_progress: int = 0
+    adventure_reputation: int = 0
 
     def __post_init__(self) -> None:
         for field_name in (
@@ -150,6 +156,8 @@ class LocationState:
             "road_condition",
         ):
             setattr(self, field_name, clamp_state(getattr(self, field_name)))
+        self.exploration_progress = clamp_state(self.exploration_progress)
+        self.adventure_reputation = clamp_reputation(self.adventure_reputation)
 
     @property
     def name(self) -> str:
@@ -211,6 +219,8 @@ class LocationState:
             "generated_endonym": self.generated_endonym,
             "memorial_ids": list(self.memorial_ids),
             "live_traces": [deepcopy(trace) for trace in self.live_traces],
+            "exploration_progress": self.exploration_progress,
+            "adventure_reputation": self.adventure_reputation,
         }
 
     @classmethod
@@ -281,6 +291,8 @@ class LocationState:
             generated_endonym=str(data.get("generated_endonym", "")),
             memorial_ids=string_list_payload(data.get("memorial_ids", []), field_name="memorial_ids"),
             live_traces=trace_list_payload(data.get("live_traces", []), field_name="live_traces"),
+            exploration_progress=data.get("exploration_progress", 0),
+            adventure_reputation=data.get("adventure_reputation", 0),
         )
 
 

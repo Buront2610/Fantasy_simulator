@@ -71,6 +71,8 @@ def copy_location_runtime_state(source: Any, target: Any) -> None:
     target.generated_endonym = structural_endonym
     target.memorial_ids = list(source.memorial_ids)
     target.live_traces = deepcopy(source.live_traces)
+    target.exploration_progress = getattr(source, "exploration_progress", 0)
+    target.adventure_reputation = getattr(source, "adventure_reputation", 0)
 
 
 def preserved_locations_by_normalized_id(

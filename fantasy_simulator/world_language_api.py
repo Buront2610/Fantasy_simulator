@@ -61,5 +61,19 @@ class WorldLanguageMixin:
     def _apply_language_evolution_record(self, record: LanguageEvolutionRecord) -> bool:
         return language_facade.apply_language_evolution_record(self, record)
 
+    def apply_language_evolution_from_event(
+        self,
+        record: Any,
+        *,
+        language_key: str | None = None,
+        cause_key: str = "",
+    ) -> LanguageEvolutionRecord | None:
+        return language_facade.apply_language_evolution_from_event(
+            self,
+            record,
+            language_key=language_key,
+            cause_key=cause_key,
+        )
+
     def _maybe_evolve_languages_for_year(self, year: int) -> None:
         language_facade.maybe_evolve_languages_for_year(self, year)

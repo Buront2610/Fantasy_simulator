@@ -860,6 +860,64 @@ class TestWorld:
         assert len(restored.language_evolution_history) == 1
         assert restored.language_evolution_history[0].year == 1002
 
+    def test_world_change_event_can_drive_language_evolution_with_cause_history(self):
+        world = World(name="Custom", year=1000)
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="loc_custom",
+                        name="Custom",
+                        description="Custom site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                        language_key="custom_lang",
+                    ),
+                ],
+                languages=[
+                    LanguageDefinition(
+                        language_key="custom_lang",
+                        display_name="Custom Lang",
+                        seed_syllables=["tor", "sel", "mar"],
+                        name_stems=["tor"],
+                        toponym_suffixes=["um"],
+                        evolution_rule_pool=[
+                            SoundChangeRuleDefinition(
+                                rule_key="custom_lang.t_to_d",
+                                source="t",
+                                target="d",
+                            ),
+                        ],
+                        evolution_interval_years=10,
+                    )
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+
+        record = world.apply_location_rename_change("loc_custom", "Custom March")
+
+        assert record is not None
+        assert len(world.language_evolution_history) == 1
+        evolution = world.language_evolution_history[0]
+        assert evolution.language_key == "custom_lang"
+        assert evolution.cause_key == "location_renamed"
+        assert evolution.cause_event_id == record.record_id
+        assert world.apply_language_evolution_from_event(record, cause_key="manual_replay") is None
+
+        restored = World.from_dict(world.to_dict())
+
+        assert len(restored.language_evolution_history) == 1
+        restored_evolution = restored.language_evolution_history[0]
+        assert restored_evolution.cause_key == "location_renamed"
+        assert restored_evolution.cause_event_id == record.record_id
+        assert restored_evolution.rule_key == "custom_lang.t_to_d"
+
     def test_setting_bundle_rebases_language_origin_year_for_new_language_state(self):
         world = World(name="Custom", year=1010)
         bundle = SettingBundle(
@@ -1569,6 +1627,22 @@ class TestWorld:
 
         assert world.get_event_by_id("r1") is first
         assert world.get_event_by_id("missing") is None
+
+    def test_event_record_indexes_support_causal_queries(self):
+        from fantasy_simulator.events import WorldEventRecord
+        world = World()
+        cause = world.record_event(WorldEventRecord(record_id="cause", kind="war_declared"))
+        effect = world.record_event(
+            WorldEventRecord(
+                record_id="effect",
+                kind="war_battle",
+                render_params={"cause_event_id": cause.record_id},
+            )
+        )
+
+        assert effect.cause_event_ids == [cause.record_id]
+        assert world.get_event_causes("effect") == [cause]
+        assert world.get_events_caused_by("cause") == [effect]
 
     def test_direct_record_event_adds_semantic_render_param_ids(self):
         from fantasy_simulator.events import WorldEventRecord

@@ -8,6 +8,7 @@ from .language.engine import LanguageEngine
 from .language.state import LanguageEvolutionRecord
 from .world_language import (
     advance_world_languages_for_year,
+    apply_language_evolution_from_event as apply_event_language_evolution,
     apply_evolution_record,
     build_language_engine,
     derive_evolution_record,
@@ -122,6 +123,22 @@ def apply_language_evolution_record(world: Any, record: LanguageEvolutionRecord)
         return False
     world._language_runtime_states = updated_runtime_states
     return True
+
+
+def apply_language_evolution_from_event(
+    world: Any,
+    record: Any,
+    *,
+    language_key: str | None = None,
+    cause_key: str = "",
+) -> LanguageEvolutionRecord | None:
+    """Apply one immediate language evolution record caused by a world event."""
+    return apply_event_language_evolution(
+        world,
+        record,
+        language_key=language_key,
+        cause_key=cause_key,
+    )
 
 
 def maybe_evolve_languages_for_year(world: Any, year: int) -> None:

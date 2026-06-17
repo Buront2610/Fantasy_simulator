@@ -15,6 +15,7 @@ from .world_change import (
     build_era_shift_change_set,
 )
 from .world_change.state_machines import DEFAULT_ERA_RUNTIME_RULES, EraRuntimeRules
+from . import world_language_facade
 
 if TYPE_CHECKING:
     from .world_location_state import LocationState
@@ -169,6 +170,11 @@ class WorldEraMixin:
             max_live_traces=self.MAX_LIVE_TRACES,
             world_context=self,
         )
+        world_language_facade.apply_language_evolution_from_event(
+            self,
+            stored_records[0],
+            cause_key=cause_key or "era_shifted",
+        )
         return stored_records[0]
 
     def apply_civilization_phase_drift(
@@ -227,5 +233,10 @@ class WorldEraMixin:
             location_index=self._location_id_index,
             max_live_traces=self.MAX_LIVE_TRACES,
             world_context=self,
+        )
+        world_language_facade.apply_language_evolution_from_event(
+            self,
+            stored_records[0],
+            cause_key=reason_key or "civilization_phase_drifted",
         )
         return stored_records[0]

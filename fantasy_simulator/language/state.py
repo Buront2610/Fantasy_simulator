@@ -31,6 +31,8 @@ class LanguageEvolutionRecord:
     rule_after: str = ""
     rule_position: str = "any"
     rule_description: str = ""
+    cause_key: str = ""
+    cause_event_id: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -45,6 +47,8 @@ class LanguageEvolutionRecord:
             "rule_after": self.rule_after,
             "rule_position": self.rule_position,
             "rule_description": self.rule_description,
+            "cause_key": self.cause_key,
+            "cause_event_id": self.cause_event_id,
         }
 
     @classmethod
@@ -61,6 +65,8 @@ class LanguageEvolutionRecord:
             rule_after=str(data.get("rule_after", "")),
             rule_position=str(data.get("rule_position", "any")),
             rule_description=str(data.get("rule_description", "")),
+            cause_key=str(data.get("cause_key", "")),
+            cause_event_id=str(data.get("cause_event_id", "")),
         )
 
     def to_rule_definition(self) -> SoundChangeRuleDefinition | None:
