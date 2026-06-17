@@ -85,6 +85,12 @@ def test_adventure_run_round_trip_serialization():
     )
     run.summary_log.append("Aldric reached the woods.")
     run.detail_log.append("Aldric paused at the ruins entrance.")
+    run.combat_logs.append({
+        "step": 2,
+        "location_id": "loc_thornwood",
+        "combat_log": [{"round_number": 1, "action_kind": "weapon_attack"}],
+    })
+    run.related_event_ids.append("evt_started")
     run.pending_choice = AdventureChoice(
         prompt="Press onward?",
         options=["press_on", "retreat"],
@@ -99,6 +105,12 @@ def test_adventure_run_round_trip_serialization():
     assert restored.injury_status == "injured"
     assert restored.loot_summary == ["an ancient relic"]
     assert restored.summary_log == ["Aldric reached the woods."]
+    assert restored.combat_logs == [{
+        "step": 2,
+        "location_id": "loc_thornwood",
+        "combat_log": [{"round_number": 1, "action_kind": "weapon_attack"}],
+    }]
+    assert restored.related_event_ids == ["evt_started"]
     assert restored.pending_choice is not None
     assert restored.pending_choice.default_option == "retreat"
 
@@ -150,6 +162,44 @@ def test_travel_step_can_enter_waiting_for_choice_state():
         CHOICE_RETREAT,
         CHOICE_WITHDRAW,
     }
+
+
+def test_adventure_to_warfront_destination_inherits_war_danger_pressure():
+    set_locale("en")
+    world = World()
+    destination = world.get_location_by_id("loc_goblin_warrens")
+    assert destination is not None
+    char = _make_character()
+    char.location_id = "loc_silverbrook"
+    world.add_character(char)
+    world.apply_war_declaration(
+        "stormwatch_wardens",
+        "silverbrook_merchant_league",
+        location_ids=(destination.id,),
+        month=2,
+        day=3,
+    )
+
+    run = create_adventure_run(char, world, rng=FakeRng([0.9], choice_value=destination))
+
+    assert run.destination == destination.id
+    assert run.danger_level == min(100, destination.danger + 20)
+    assert any("active war zone" in detail for detail in run.detail_log)
+
+
+def test_adventure_route_near_blocked_road_records_hazardous_detour():
+    set_locale("en")
+    world = World()
+    char = _make_character()
+    world.add_character(char)
+    world.apply_route_blocked_change("route_015", True, month=2, day=3)
+
+    run = create_adventure_run(char, world, rng=FakeRng([0.9]))
+    destination = world.get_location_by_id(run.destination)
+    assert destination is not None
+
+    assert run.danger_level >= min(100, destination.danger + 10)
+    assert any("Blocked roads near Aethoria Capital" in detail for detail in run.detail_log)
 
 
 def test_waiting_choice_defaults_automatically_on_next_step():
@@ -207,6 +257,35 @@ def test_simulator_integrates_adventures_into_normal_year_loop(monkeypatch):
     assert run.outcome == "safe_return"
     assert any("set out" in entry.lower() for entry in world.event_log)
     assert sim.get_adventure_summaries()
+
+
+def test_completed_adventure_updates_and_persists_site_state(tmp_path):
+    from fantasy_simulator.persistence.save_load import load_simulation, save_simulation
+
+    world = World()
+    char = _make_character()
+    world.add_character(char)
+    sim = Simulator(world, events_per_year=0, adventure_steps_per_year=4, seed=1)
+    sim.rng = FakeRng([0.9, 0.3, 0.1, 0.9])
+
+    sim._start_solo_adventure([char])
+    sim._advance_adventures(steps=4)
+
+    run = world.completed_adventures[0]
+    location = world.get_location_by_id(run.destination)
+    assert location is not None
+    assert location.exploration_progress >= 25
+    assert location.adventure_reputation >= 12
+
+    path = tmp_path / "site-state.json"
+    sim.rng = random.Random(0)
+    assert save_simulation(sim, str(path))
+    restored = load_simulation(str(path))
+    assert restored is not None
+    restored_location = restored.world.get_location_by_id(run.destination)
+    assert restored_location is not None
+    assert restored_location.exploration_progress == location.exploration_progress
+    assert restored_location.adventure_reputation == location.adventure_reputation
 
 
 def test_pending_choice_persists_until_later_year(monkeypatch):
@@ -436,9 +515,9 @@ def test_combat_score_scales_injury_chance():
     assert strong_chance < weak_chance, (
         f"Expected strong_chance ({strong_chance:.3f}) < weak_chance ({weak_chance:.3f})"
     )
-    # Sanity bounds: must stay within clamped range [0.04, 0.22]
-    assert 0.04 <= strong_chance <= 0.22
-    assert 0.04 <= weak_chance <= 0.22
+    # Sanity bounds: risk now has enough headroom for danger and policy to matter.
+    assert 0.02 <= strong_chance <= 0.45
+    assert 0.02 <= weak_chance <= 0.45
 
 
 def test_danger_level_scales_injury_chance():
@@ -879,6 +958,103 @@ def test_select_party_policy_wisdom_favours_cautious():
     policy = select_party_policy(wise_party, FixedRng())
     # Wisdom scores highest for CAUTIOUS and RESCUE — should NOT be ASSAULT
     assert policy != POLICY_ASSAULT, f"Unexpected policy for high-WIS: {policy}"
+
+
+def test_adventure_injury_risk_keeps_danger_and_policy_visible():
+    """High danger and aggressive policy should not disappear behind a low clamp."""
+    members = [_make_character("A")]
+    safe = AdventureRun(
+        character_id="c1",
+        character_name="A",
+        origin="loc_aethoria_capital",
+        destination="loc_thornwood",
+        year_started=1000,
+        danger_level=15,
+        policy=POLICY_CAUTIOUS,
+    )
+    dangerous = AdventureRun(
+        character_id="c1",
+        character_name="A",
+        origin="loc_aethoria_capital",
+        destination="loc_thornwood",
+        year_started=1000,
+        danger_level=90,
+        policy=POLICY_ASSAULT,
+    )
+
+    assert safe._compute_injury_chance(members) < dangerous._compute_injury_chance(members)
+    assert dangerous._compute_injury_chance(members) > 0.22
+
+
+def test_adventure_critical_band_can_create_dying_injury():
+    hero = _make_character("A")
+    run = AdventureRun(
+        character_id=hero.char_id,
+        character_name=hero.name,
+        origin="loc_aethoria_capital",
+        destination="loc_thornwood",
+        year_started=1000,
+        danger_level=90,
+        policy=POLICY_ASSAULT,
+        state="exploring",
+    )
+    world = World()
+    world.add_character(hero)
+
+    run.step(hero, world, rng=FakeRng([0.30, 0.99]))
+
+    assert hero.injury_status == "dying"
+    assert run.outcome is None
+    assert run.combat_logs
+    assert run.combat_logs[-1]["combat_log"]
+
+
+def test_adventure_hazard_records_combat_log():
+    hero = _make_character("A")
+    run = AdventureRun(
+        character_id=hero.char_id,
+        character_name=hero.name,
+        origin="loc_aethoria_capital",
+        destination="loc_thornwood",
+        year_started=1000,
+        danger_level=80,
+        policy=POLICY_ASSAULT,
+        state="exploring",
+    )
+    world = World()
+    world.add_character(hero)
+
+    run.step(hero, world, rng=FakeRng([0.10]))
+
+    assert run.combat_logs
+    log_entry = run.combat_logs[-1]
+    assert log_entry["member_id"] == hero.char_id
+    assert log_entry["location_id"] == "loc_thornwood"
+    assert log_entry["combat_log"][0]["round_number"] == 1
+
+
+def test_adventure_loot_responds_to_danger():
+    members = [_make_character("A")]
+    low_danger = AdventureRun(
+        character_id="c1",
+        character_name="A",
+        origin="loc_aethoria_capital",
+        destination="loc_thornwood",
+        year_started=1000,
+        danger_level=15,
+        policy=POLICY_TREASURE,
+    )
+    high_danger = AdventureRun(
+        character_id="c1",
+        character_name="A",
+        origin="loc_aethoria_capital",
+        destination="loc_thornwood",
+        year_started=1000,
+        danger_level=90,
+        policy=POLICY_TREASURE,
+    )
+
+    assert low_danger._compute_loot_chance(members) < high_danger._compute_loot_chance(members)
 
 
 def test_simulator_starts_party_adventure():

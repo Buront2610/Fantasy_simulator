@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, List
 
 from ..adventure import AdventureRun, generate_adventure_id
+from ..adventure_site_state import apply_adventure_site_state
 from ..i18n import tr
 from ..narrative.context import alias_for_event, build_narrative_context, derive_relation_hint, epitaph_for_character
 
@@ -22,6 +23,7 @@ class AdventureMemoryMixin:
 
         trace_text = self._build_adventure_trace_text(run, dest_name)
         self.world.add_live_trace(dest, self.world.year, run.character_name, trace_text)
+        apply_adventure_site_state(self.world, run)
 
         if run.outcome != "death":
             return

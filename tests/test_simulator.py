@@ -60,7 +60,7 @@ def medium_world() -> World:
 
 @pytest.fixture
 def sim_small(small_world) -> Simulator:
-    return Simulator(small_world, events_per_year=4, seed=0)
+    return Simulator(small_world, events_per_year=4, seed=0, population_maintenance_enabled=False)
 
 
 @pytest.fixture
@@ -1153,6 +1153,25 @@ class TestWorldEventRecordIntegration:
         key2 = f"{char1.char_id}:rival"
         assert char1.relation_tag_sources.get(key1) == [record_id]
         assert char2.relation_tag_sources.get(key2) == [record_id]
+
+    def test_adventure_event_records_form_direct_causal_chain(self, small_world):
+        sim = Simulator(small_world, events_per_year=0, adventure_steps_per_year=1, seed=42)
+        adventurer = sim.world.characters[0]
+
+        sim._start_solo_adventure([adventurer])
+        run = sim.world.active_adventures[0]
+        start_record = sim.world.get_event_by_id(run.related_event_ids[-1])
+        sim._advance_adventures(steps=1)
+
+        adventure_records = [
+            record for record in sim.world.event_records
+            if record.kind.startswith("adventure_") and record.primary_actor_id == adventurer.char_id
+        ]
+
+        assert start_record is not None
+        assert len(adventure_records) >= 2
+        assert adventure_records[1].cause_event_ids == [start_record.record_id]
+        assert run.related_event_ids[-1] == adventure_records[1].record_id
 
 
 # ---------------------------------------------------------------------------

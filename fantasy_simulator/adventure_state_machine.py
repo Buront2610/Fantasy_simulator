@@ -14,6 +14,10 @@ from .adventure_constants import (
     CHOICE_RETREAT,
     CHOICE_WITHDRAW,
 )
+from .adventure_hazards import (
+    resolve_critical_hazard,
+    resolve_hazard_band,
+)
 from .adventure_policy import AdventurePolicyEngine
 from .adventure_protocols import AdventureRunLike
 from .i18n import tr, tr_term
@@ -109,9 +113,9 @@ class AdventureStateMachine:
             injured_member = rng.choice(members)
 
         if roll < injury_chance:
-            return self._resolve_hazard_band(injured_member, character, world, destination_name)
+            return resolve_hazard_band(self.run, injured_member, character, world, rng, destination_name)
         if roll < critical_chance:
-            return self._resolve_nonfatal_injury(injured_member, destination_name)
+            return resolve_critical_hazard(self.run, injured_member, world, rng, destination_name)
 
         loot_chance = self.policy.compute_loot_chance(members)
         if rng.random() < loot_chance:
@@ -143,43 +147,6 @@ class AdventureStateMachine:
             self.run.state = "returning"
         return [self.run.summary_log[-1]]
 
-    def _resolve_hazard_band(
-        self,
-        injured_member: "Character",
-        leader: "Character",
-        world: "World",
-        destination_name: str,
-    ) -> List[str]:
-        if injured_member.injury_status == "dying":
-            self.run.outcome = "death"
-            self.run.state = "resolved"
-            self.run.resolution_year = world.year
-            injured_member.alive = False
-            injured_member.active_adventure_id = None
-            self.run.death_member_id = injured_member.char_id
-            leader.active_adventure_id = None
-            self.run._clear_member_adventures(world)
-            summary = tr("summary_adventure_died", name=injured_member.name, destination=destination_name)
-            detail = tr("detail_adventure_died", name=injured_member.name, destination=destination_name)
-            self.run._record(summary, detail)
-            injured_member.add_history(tr("history_adventure_detail", year=world.year, detail=detail))
-            return [summary]
-        return self._resolve_nonfatal_injury(injured_member, destination_name)
-
-    def _resolve_nonfatal_injury(
-        self,
-        injured_member: "Character",
-        destination_name: str,
-    ) -> List[str]:
-        injured_member.worsen_injury()
-        self.run.injury_status = injured_member.injury_status
-        self.run.injury_member_id = injured_member.char_id
-        summary = tr("summary_adventure_injured", name=injured_member.name)
-        detail = tr("detail_adventure_injured", name=injured_member.name, destination=destination_name)
-        self.run._record(summary, detail)
-        self.run.state = "returning"
-        return [summary]
-
     def _step_returning(
         self,
         character: "Character",
@@ -192,7 +159,18 @@ class AdventureStateMachine:
         self.run.resolution_year = world.year
         history_target = character
         if self.run.outcome != "death":
-            if self.run.injury_status != "none":
+            if self.run.injury_status == "dying":
+                injured_member = world.get_character_by_id(self.run.injury_member_id or self.run.character_id)
+                if injured_member is None:
+                    injured_member = character
+                injured_member.alive = False
+                injured_member.active_adventure_id = None
+                self.run.outcome = "death"
+                self.run.death_member_id = injured_member.char_id
+                summary = tr("summary_adventure_died", name=injured_member.name, destination=destination_name)
+                detail = tr("detail_adventure_died", name=injured_member.name, destination=destination_name)
+                history_target = injured_member
+            elif self.run.injury_status != "none":
                 self.run.outcome = "injury"
                 injured_member = world.get_character_by_id(self.run.injury_member_id or self.run.character_id)
                 if injured_member is None:

@@ -59,13 +59,15 @@ class AdventureMixin(
                 summaries = run.step(char, self.world, rng=self.rng)
                 for entry in summaries:
                     kind, location_id, severity = self._classify_adventure_summary(previous_state, run)
-                    self._record_world_event(
+                    record = self._record_world_event(
                         entry,
                         kind=kind,
                         location_id=location_id,
                         primary_actor_id=run.character_id,
+                        cause_event_ids=run.related_event_ids[-1:],
                         severity=severity,
                     )
+                    run.related_event_ids.append(record.record_id)
                 if not char.alive:
                     self.event_system.handle_death_side_effects(char, self.world)
                 if run.is_resolved:
@@ -87,13 +89,9 @@ class AdventureMixin(
         run.pending_choice = None
         run.state = "resolved"
         run.outcome = "death"
+        run.death_member_id = char.char_id
         run.resolution_year = self.world.year
-        char.active_adventure_id = None
-        for mid in run.member_ids:
-            if mid != run.character_id:
-                member = self.world.get_character_by_id(mid)
-                if member is not None:
-                    member.active_adventure_id = None
+        run._clear_member_adventures(self.world)
         char.add_history(
             tr(
                 "history_adventure_detail",
