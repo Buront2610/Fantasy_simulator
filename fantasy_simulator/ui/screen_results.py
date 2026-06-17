@@ -24,90 +24,124 @@ from .screen_simulation import _advance_auto, _advance_simulation
 from .ui_context import UIContext, _default_ctx
 
 
+def _confirm_leave_with_unsaved_changes(ctx: UIContext) -> bool:
+    choice = ctx.choose_key(
+        tr("unsaved_leave_prompt"),
+        [
+            ("keep_reviewing", tr("unsaved_leave_keep_reviewing")),
+            ("exit", tr("unsaved_leave_confirm")),
+        ],
+        default="1",
+    )
+    return choice == "exit"
+
+
+def _result_menu_options() -> list[tuple[str, str]]:
+    return [
+        ("advance_1_year", tr("advance_1_year")),
+        ("advance_5_years", tr("advance_5_years")),
+        ("advance_auto", tr("advance_auto")),
+        ("world_dashboard", tr("dashboard_menu")),
+        ("yearly_report", tr("yearly_report")),
+        ("monthly_report", tr("monthly_report")),
+        ("rumor_board", tr("rumor_board_menu")),
+        ("world_map", tr("world_map")),
+        ("character_roster", tr("character_roster")),
+        ("event_log_last_30", tr("event_log_last_30")),
+        ("full_event_log", tr("full_event_log")),
+        ("adventure_summaries", tr("adventure_summaries")),
+        ("adventure_details", tr("adventure_details")),
+        ("resolve_pending_choice", tr("resolve_pending_choice")),
+        ("save_snapshot", tr("save_snapshot")),
+        ("character_story", tr("character_story")),
+        ("all_character_stories", tr("all_character_stories")),
+        ("simulation_summary", tr("simulation_summary")),
+        ("location_history", tr("location_history_menu")),
+        ("back_to_main", tr("back_to_main")),
+    ]
+
+
+def _show_event_log(sim: Simulator, ctx: UIContext, last_n: int | None = None) -> None:
+    ctx.out.print_line()
+    for entry in sim.get_event_log(last_n=last_n):
+        ctx.out.print_line(f"  - {entry}")
+    ctx.inp.pause()
+
+
+def _update_dirty_state_for_action(action: str, sim: Simulator, ctx: UIContext) -> bool | None:
+    if action == "advance_1_year":
+        _advance_simulation(sim, 1, ctx=ctx)
+        return True
+    if action == "advance_5_years":
+        _advance_simulation(sim, 5, ctx=ctx)
+        return True
+    if action == "advance_auto":
+        _advance_auto(sim, ctx=ctx)
+        return True
+    if action == "resolve_pending_choice":
+        _resolve_pending_adventure_choice(sim, ctx=ctx)
+        return True
+    if action == "save_snapshot":
+        return not _save_simulation_snapshot(sim, ctx=ctx)
+    return None
+
+
+def _show_result_view(action: str, sim: Simulator, ctx: UIContext) -> bool:
+    if action == "world_dashboard":
+        _show_world_dashboard(sim, ctx=ctx)
+    elif action == "yearly_report":
+        _show_yearly_report(sim, ctx=ctx)
+    elif action == "monthly_report":
+        _show_monthly_report(sim, ctx=ctx)
+    elif action == "rumor_board":
+        _show_rumor_board(sim, ctx=ctx)
+    elif action == "world_map":
+        _show_world_map(sim, ctx=ctx)
+    elif action == "character_roster":
+        _show_roster(sim.world, ctx=ctx)
+    elif action == "event_log_last_30":
+        _show_event_log(sim, ctx, last_n=30)
+    elif action == "full_event_log":
+        _show_event_log(sim, ctx)
+    elif action == "adventure_summaries":
+        _show_adventure_summaries(sim, ctx=ctx)
+    elif action == "adventure_details":
+        _show_adventure_details(sim, ctx=ctx)
+    elif action == "character_story":
+        _show_single_story(sim, ctx=ctx)
+    elif action == "all_character_stories":
+        ctx.out.print_line()
+        ctx.out.print_line(sim.get_all_stories())
+        ctx.inp.pause()
+    elif action == "simulation_summary":
+        ctx.out.print_line()
+        ctx.out.print_line(sim.get_summary())
+        ctx.inp.pause()
+    elif action == "location_history":
+        _show_location_history(sim.world, ctx=ctx)
+    else:
+        return False
+    return True
+
+
 def _show_results(sim: Simulator, ctx: UIContext | None = None) -> None:
     ctx = _default_ctx(ctx)
     out = ctx.out
-    inp = ctx.inp
-    world = sim.world
+    has_unsaved_changes = True
 
     while True:
         out.print_line()
         out.print_separator("=")
         out.print_heading(f"  {tr('post_results')}")
         out.print_separator("=")
-        action = ctx.choose_key(
-            tr("what_to_view"),
-            [
-                ("advance_1_year", tr("advance_1_year")),
-                ("advance_5_years", tr("advance_5_years")),
-                ("advance_auto", tr("advance_auto")),
-                ("world_dashboard", tr("dashboard_menu")),
-                ("yearly_report", tr("yearly_report")),
-                ("monthly_report", tr("monthly_report")),
-                ("rumor_board", tr("rumor_board_menu")),
-                ("world_map", tr("world_map")),
-                ("character_roster", tr("character_roster")),
-                ("event_log_last_30", tr("event_log_last_30")),
-                ("full_event_log", tr("full_event_log")),
-                ("adventure_summaries", tr("adventure_summaries")),
-                ("adventure_details", tr("adventure_details")),
-                ("resolve_pending_choice", tr("resolve_pending_choice")),
-                ("save_snapshot", tr("save_snapshot")),
-                ("character_story", tr("character_story")),
-                ("all_character_stories", tr("all_character_stories")),
-                ("simulation_summary", tr("simulation_summary")),
-                ("location_history", tr("location_history_menu")),
-                ("back_to_main", tr("back_to_main")),
-            ],
-        )
+        action = ctx.choose_key(tr("what_to_view"), _result_menu_options())
 
-        if action == "advance_1_year":
-            _advance_simulation(sim, 1, ctx=ctx)
-        elif action == "advance_5_years":
-            _advance_simulation(sim, 5, ctx=ctx)
-        elif action == "advance_auto":
-            _advance_auto(sim, ctx=ctx)
-        elif action == "world_dashboard":
-            _show_world_dashboard(sim, ctx=ctx)
-        elif action == "yearly_report":
-            _show_yearly_report(sim, ctx=ctx)
-        elif action == "monthly_report":
-            _show_monthly_report(sim, ctx=ctx)
-        elif action == "rumor_board":
-            _show_rumor_board(sim, ctx=ctx)
-        elif action == "world_map":
-            _show_world_map(sim, ctx=ctx)
-        elif action == "character_roster":
-            _show_roster(world, ctx=ctx)
-        elif action == "event_log_last_30":
-            out.print_line()
-            for entry in sim.get_event_log(last_n=30):
-                out.print_line(f"  - {entry}")
-            inp.pause()
-        elif action == "full_event_log":
-            out.print_line()
-            for entry in sim.get_event_log():
-                out.print_line(f"  - {entry}")
-            inp.pause()
-        elif action == "adventure_summaries":
-            _show_adventure_summaries(sim, ctx=ctx)
-        elif action == "adventure_details":
-            _show_adventure_details(sim, ctx=ctx)
-        elif action == "resolve_pending_choice":
-            _resolve_pending_adventure_choice(sim, ctx=ctx)
-        elif action == "save_snapshot":
-            _save_simulation_snapshot(sim, ctx=ctx)
-        elif action == "character_story":
-            _show_single_story(sim, ctx=ctx)
-        elif action == "all_character_stories":
-            out.print_line()
-            out.print_line(sim.get_all_stories())
-            inp.pause()
-        elif action == "simulation_summary":
-            out.print_line()
-            out.print_line(sim.get_summary())
-            inp.pause()
-        elif action == "location_history":
-            _show_location_history(world, ctx=ctx)
-        else:
-            break
+        dirty_state = _update_dirty_state_for_action(action, sim, ctx)
+        if dirty_state is not None:
+            has_unsaved_changes = dirty_state
+            continue
+        if _show_result_view(action, sim, ctx):
+            continue
+        if has_unsaved_changes and not _confirm_leave_with_unsaved_changes(ctx):
+            continue
+        break

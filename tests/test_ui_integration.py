@@ -11,8 +11,10 @@ from __future__ import annotations
 import io
 import os
 import re
+import tempfile
 import unittest
 from contextlib import redirect_stdout
+from pathlib import Path
 from unittest.mock import patch
 
 from fantasy_simulator.character import Character
@@ -56,6 +58,36 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         # Heading calls must exist (post-results header)
         headings = [c for c in out.calls if c[0] == "print_heading"]
         self.assertTrue(len(headings) >= 1, "No headings printed")
+
+    def test_results_leave_warning_can_keep_reviewing_then_exit(self) -> None:
+        from fantasy_simulator.simulator import Simulator
+        from fantasy_simulator.ui.screens import _build_default_world, _show_results
+
+        world = _build_default_world(num_characters=4, seed=42)
+        sim = Simulator(world, events_per_year=0)
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(menu_keys=["back_to_main", "keep_reviewing", "back_to_main", "exit"])
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_results(sim, ctx=ctx)
+
+        self.assertIn("There are unsaved simulation results.", out.text)
+
+    def test_save_snapshot_cancel_preserves_existing_file(self) -> None:
+        from fantasy_simulator.ui.screens import _save_simulation_snapshot
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "snapshot.json"
+            path.write_text("original", encoding="utf-8")
+            out = RecordingRenderBackend()
+            inp = ScriptedInputBackend(answers=[str(path)], menu_keys=["cancel"])
+            ctx = UIContext(inp=inp, out=out)
+
+            saved = _save_simulation_snapshot(object(), ctx=ctx)
+
+            self.assertFalse(saved)
+            self.assertEqual(path.read_text(encoding="utf-8"), "original")
+            self.assertIn("Save cancelled.", out.text)
 
     def test_yearly_report_defaults_to_card_without_legacy_text(self) -> None:
         from types import SimpleNamespace

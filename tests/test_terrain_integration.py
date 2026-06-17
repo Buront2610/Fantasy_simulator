@@ -423,7 +423,7 @@ class TestMigrationV5ToV6:
         }
 
     def test_current_version_is_8(self):
-        assert CURRENT_VERSION == 8
+        assert CURRENT_VERSION == 9
 
     def test_migration_adds_terrain(self):
         data = self._make_v5_data()

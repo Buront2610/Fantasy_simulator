@@ -4,20 +4,13 @@ ui_helpers.py - Display formatting and input utilities for the CLI.
 
 from __future__ import annotations
 
-import unicodedata
-from typing import Any, List, Optional
+from typing import List, Optional
 
+from .. import display_width as _display_width
 from ..i18n import tr
 
-try:
-    from wcwidth import wcwidth as _imported_wcwidth
-    from wcwidth import wcswidth as _imported_wcswidth
-except ImportError:  # pragma: no cover - depends on optional ui extra
-    _wcwidth: Any = None
-    _wcswidth: Any = None
-else:
-    _wcwidth = _imported_wcwidth
-    _wcswidth = _imported_wcswidth
+_wcwidth = _display_width._wcwidth
+_wcswidth = _display_width._wcswidth
 
 
 def _c(text: str, code: str) -> str:
@@ -63,57 +56,34 @@ def _hr(char: str = "=",
 
 def _pause(message: str = "") -> None:
     suffix = f"  {message}\n" if message else ""
-    input(dim(f"\n{suffix}  {tr('press_enter')} "))
+    try:
+        input(dim(f"\n{suffix}  {tr('press_enter')} "))
+    except EOFError:
+        return
 
 
 def display_width(text: str) -> int:
-    if _wcswidth is not None:
-        width = _wcswidth(text)
-        return max(width, 0)
-
-    width = 0
-    for char in text:
-        width += _char_display_width(char)
-    return width
-
-
-def _char_display_width(char: str) -> int:
-    if _wcwidth is not None:
-        return max(_wcwidth(char), 0)
-    return _fallback_char_display_width(char)
-
-
-def _fallback_char_display_width(char: str) -> int:
-    if unicodedata.combining(char):
-        return 0
-    return 2 if unicodedata.east_asian_width(char) in ("F", "W") else 1
+    old_wcwidth = _display_width._wcwidth
+    old_wcswidth = _display_width._wcswidth
+    try:
+        _display_width._wcwidth = _wcwidth
+        _display_width._wcswidth = _wcswidth
+        return _display_width.display_width(text)
+    finally:
+        _display_width._wcwidth = old_wcwidth
+        _display_width._wcswidth = old_wcswidth
 
 
 def fit_display_width(text: str, width: int, suffix: str = "...") -> str:
-    """Pad or truncate text to a target terminal display width."""
-    if width <= 0:
-        return ""
-    current_width = display_width(text)
-    if current_width <= width:
-        return text + " " * (width - current_width)
-
-    suffix_width = display_width(suffix)
-    if suffix_width >= width:
-        suffix = ""
-        suffix_width = 0
-
-    kept: List[str] = []
-    used_width = 0
-    limit = width - suffix_width
-    for char in text:
-        char_width = _char_display_width(char)
-        if used_width + char_width > limit:
-            break
-        kept.append(char)
-        used_width += char_width
-
-    clipped = "".join(kept) + suffix
-    return clipped + " " * (width - display_width(clipped))
+    old_wcwidth = _display_width._wcwidth
+    old_wcswidth = _display_width._wcswidth
+    try:
+        _display_width._wcwidth = _wcwidth
+        _display_width._wcswidth = _wcswidth
+        return _display_width.fit_display_width(text, width, suffix=suffix)
+    finally:
+        _display_width._wcwidth = old_wcwidth
+        _display_width._wcswidth = old_wcswidth
 
 
 def _render_menu(
@@ -144,13 +114,29 @@ def _read_menu_choice(
     Pure input — assumes the menu options have already been rendered.
     """
     while True:
-        hint = f" (default {default})" if default else ""
-        raw = input(f"  {bold(tr('your_choice'))}{hint}: ").strip()
+        hint = f" ({tr('menu_default_short')} {default})" if default else ""
+        try:
+            raw = input(f"  {bold(tr('your_choice'))}{hint}: ").strip()
+        except EOFError:
+            return _closed_input_menu_key(key_label_pairs, default)
         if not raw and default:
             raw = default
         if raw.isdigit() and 1 <= int(raw) <= len(key_label_pairs):
             return key_label_pairs[int(raw) - 1][0]
         print(red(f"  {tr('invalid_choice')}"))
+
+
+def _closed_input_menu_key(
+    key_label_pairs: List[tuple[str, str]],
+    default: Optional[str] = None,
+) -> str:
+    for preferred in ("exit", "back", "return", "cancel"):
+        for key, _label in key_label_pairs:
+            if key == preferred:
+                return key
+    if default and default.isdigit() and 1 <= int(default) <= len(key_label_pairs):
+        return key_label_pairs[int(default) - 1][0]
+    return key_label_pairs[-1][0] if key_label_pairs else ""
 
 
 # Kept for backward compatibility with external code / tests that import it.

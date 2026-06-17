@@ -107,8 +107,8 @@ def _restore_locale():
 
 def _assert_seeded_map_visible_bundle(bundle: dict[str, list[str]]) -> None:
     assert bundle["overview"][0] == "  === WORLD OVERVIEW: Aethoria (Year: 1002) ==="
-    assert any("The Verdant Vale - village" in line for line in bundle["overview"])
-    assert any("Aethoria Capital - city" in line for line in bundle["overview"])
+    assert any("The Verdant Vale - Village" in line for line in bundle["overview"])
+    assert any("Aethoria Capital - City" in line for line in bundle["overview"])
 
     assert bundle["region"][:5] == [
         "  === REGION MAP: The Verdant Vale ===",
@@ -144,7 +144,7 @@ def _assert_seeded_map_visible_bundle(bundle: dict[str, list[str]]) -> None:
     assert any("Native name: Branthethal" in line for line in bundle["region"])
 
     assert bundle["detail"][:32] == [
-        "  | V The Verdant Vale (village)                     |",
+        "  | V The Verdant Vale (Village)                     |",
         "  | Local site sketch                                |",
         "  |         _       _          B                     |",
         "  |    ____/ \\__ __/ \\____    []                     |",
@@ -165,7 +165,7 @@ def _assert_seeded_map_visible_bundle(bundle: dict[str, list[str]]) -> None:
         "  |  |                               |               |",
         "  |  +-------------------------------+               |",
         "  | Sketch cues: !=High danger                       |",
-        "  | Terrain: plains (,)                              |",
+        "  | Terrain: Plains (,)                              |",
         "  | Elev: midland (50%)                              |",
         "  | Moist: balanced (50%)                            |",
         "  | Temp: temperate (50%)                            |",
@@ -190,7 +190,7 @@ def _assert_memory_heavy_bundle(bundle: dict[str, list[str]]) -> None:
     assert "    The Verdant Vale: Memory: Memorial, Trace" in bundle["region"]
 
     assert bundle["detail"][:33] == [
-        "  | V The Verdant Vale (village)                     |",
+        "  | V The Verdant Vale (Village)                     |",
         "  | Local site sketch                                |",
         "  |         _       _          B                     |",
         "  |    ____/ \\__ __/ \\____    []                     |",
@@ -211,7 +211,7 @@ def _assert_memory_heavy_bundle(bundle: dict[str, list[str]]) -> None:
         "  |  |                               |               |",
         "  |  +-------------------------------+               |",
         "  | Sketch cues: M=Memorial                          |",
-        "  | Terrain: plains (,)                              |",
+        "  | Terrain: Plains (,)                              |",
         "  | Elev: midland (50%)                              |",
         "  | Moist: balanced (50%)                            |",
         "  | Temp: temperate (50%)                            |",

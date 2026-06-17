@@ -42,7 +42,10 @@ class StdInputBackend:
     """Default backend that delegates to Python's builtin ``input()``."""
 
     def read_line(self, prompt: str = "") -> str:
-        return input(prompt)
+        try:
+            return input(prompt)
+        except EOFError:
+            return ""
 
     def read_menu_key(
         self,
@@ -67,7 +70,10 @@ class PromptToolkitInputBackend(StdInputBackend):
         self._session = PromptSession(history=InMemoryHistory())
 
     def read_line(self, prompt: str = "") -> str:
-        return self._session.prompt(prompt)
+        try:
+            return self._session.prompt(prompt)
+        except EOFError:
+            return ""
 
     def read_menu_key(
         self,
@@ -107,12 +113,16 @@ class PromptToolkitInputBackend(StdInputBackend):
             )
 
         while True:
-            raw = self._session.prompt(
-                prompt,
-                completer=completer,
-                validator=validator,
-                validate_while_typing=False,
-            )
+            try:
+                raw = self._session.prompt(
+                    prompt,
+                    completer=completer,
+                    validator=validator,
+                    validate_while_typing=False,
+                )
+            except EOFError:
+                from .ui_helpers import _closed_input_menu_key
+                return _closed_input_menu_key(key_label_pairs, default)
             resolved = _resolve(raw)
             if resolved is not None:
                 return resolved
