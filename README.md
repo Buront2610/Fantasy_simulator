@@ -34,7 +34,7 @@ influence.
   - region drill-down
   - location detail panels
 - Save/load support for simulation snapshots
-- Schema-versioned save migration support for older data (`schema_version = 8`)
+- Schema-versioned save migration support for older data (`schema_version = 9`)
 - Structured world event records with causal impact tracking and rumors
 - UI abstraction through input/render backends plus lightweight presenter/view-model layers
 - CLI localization support for Japanese and English
@@ -119,7 +119,9 @@ Agent-oriented verification profiles:
 ```bash
 python scripts/quality_gate.py minimal --pytest-target tests/test_character_creator.py
 python scripts/quality_gate.py standard
+python scripts/quality_gate.py playtest
 python scripts/quality_gate.py strict
+python scripts/quality_gate.py exhaustive
 ```
 
 Minimal role-based orchestration (planner -> implementer -> verifier -> reviewer):
@@ -153,9 +155,14 @@ for the changed area you want to verify.
 architecture constraints, the quality-gate self-test, the agent workflow docs
 checks, doc freshness, and the harness scenario suite.
 
+`playtest` runs deterministic world-health bands for long-run population,
+social, adventure, and combat regressions.
+
 `strict` adds lint, complexity, focused mypy over the `[tool.mypy]` file list,
-and the full pytest suite. The focused type-check target list is mirrored by
-`scripts/quality_gate.py` and guarded by `tests/test_quality_gate.py`; workflow
+and the playtest bands without re-running the full suite. Use `exhaustive` for
+static checks plus one full pytest pass. The focused type-check target
+list is mirrored by `scripts/quality_gate.py` and guarded by
+`tests/test_quality_gate.py`; workflow
 coverage should be reviewed against the same list when CI changes are in scope.
 
 ## Project Structure

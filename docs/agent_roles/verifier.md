@@ -4,7 +4,7 @@
 Run repository quality gates with a profile selected from changed areas.
 
 ## Output Shape
-- `verification_profile`: `minimal` / `standard` / `strict`
+- `verification_profile`: `minimal` / `standard` / `playtest` / `strict` / `exhaustive`
 - `verification_commands`: executable command list
 - `verification_result`: overall status
 - `command_results`: per-command return code and status

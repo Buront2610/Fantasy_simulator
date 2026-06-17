@@ -25,6 +25,8 @@ form that tests can enforce.
 
 - `simulation/` must not import `ui/` or `persistence/`.
 - `persistence/` must not import `ui/`.
+- Root domain modules under `fantasy_simulator/*.py` must not import `ui/`;
+  `fantasy_simulator/main.py` is the CLI composition-root exception.
 - `world_change/` must not import `ui/`, `persistence/`, Rich, or Textual.
 - `observation/` must not import `ui/`, `persistence/`, Rich, or Textual.
 - Core UI modules (`input_backend.py`, `render_backend.py`, `ui_context.py`,
@@ -32,8 +34,9 @@ form that tests can enforce.
   `atlas_renderer.py`) must not import `simulation/` or `persistence/`.
 - `ui/screens.py` is the allowed composition layer that can depend on
   `simulation/`, `persistence/`, and UI helpers together.
-- `world.py.render_map()` is an explicit compatibility wrapper into the UI map
-  renderer. It is the current exception and should remain narrow.
+- `world.py.render_map()` is a backward-compatible wrapper around the
+  renderer-agnostic map snapshot and root ASCII renderer. It must not import
+  `ui/`.
 
 ## Canonical Event Data
 
@@ -102,17 +105,26 @@ form that tests can enforce.
   focused subagent work.
 - `pyproject.toml` is the dependency metadata source of truth; `requirements-dev.txt`
   is a compatibility shim for tools or workflows that still expect a requirements file.
+- `fantasy_simulator/app/` is the headless AppService boundary for future UI
+  adapters. Commands and returned view models must stay JSON-serializable plain
+  data; UI code may render these payloads, while domain code should continue to
+  mutate state through the simulator/world-change APIs.
 - `docs/session_handoffs/` is for concise repo-local handoffs; keep entries
   short and factual, anchored to the template, and avoid carrying more than
   the latest relevant dated note.
-- `scripts/quality_gate.py` provides `minimal`, `standard`, and `strict`
-  verification profiles for agent workflows. The `standard` profile is the
-  routine guardrail suite for architecture constraints, quality-gate coverage,
-  agent workflow docs, doc freshness, and harness scenarios. The `strict`
-  profile layers lint, complexity, focused mypy targets, and full pytest over
-  that suite; newly split `world_*` API/facade/helper modules belong in the
-  focused mypy target list when they become maintenance surfaces, unless
-  `scripts/quality_gate.py` records an explicit temporary exclusion reason.
+- `scripts/quality_gate.py` provides `minimal`, `standard`, `playtest`,
+  `strict`, and `exhaustive` verification profiles for agent workflows. The `standard` profile is
+  the routine guardrail suite for architecture constraints, quality-gate
+  coverage, agent workflow docs, doc freshness, and harness scenarios. The
+  `playtest` profile runs deterministic world-health and balance bands. The
+  `strict` profile runs the standard guardrail suite, lint, complexity, focused mypy targets,
+  and playtest bands without a full-suite pytest pre-pass, so it
+  remains suitable for local agent turns with bounded command time. The
+  `exhaustive` profile runs static checks plus one full pytest pass for final
+  release-style validation. The newly split `world_*` API/facade/helper modules
+  belong in the focused mypy target list when they become maintenance surfaces,
+  unless `scripts/quality_gate.py` records an explicit temporary exclusion
+  reason.
 - `scripts/architecture_guard.py` plus `architecture_guard.json` define the
   machine-checkable architecture fitness rules for CI/CD: dependency
   boundaries, headless-domain I/O bans, deterministic reducer imports, and

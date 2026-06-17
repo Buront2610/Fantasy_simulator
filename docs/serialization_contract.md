@@ -29,6 +29,11 @@ this precedence:
   semantic `render_params` whenever those fields exist.
   Production display may fall back to `description`; strict rendering paths
   should raise on missing translation keys or params when validating contracts.
+- Event causality: `WorldEventRecord.cause_event_ids` is the canonical direct
+  cause edge list for query and health checks. Existing
+  `render_params["cause_event_id"]` and `render_params["cause_event_ids"]`
+  remain compatibility inputs and are normalized into `cause_event_ids` at the
+  record boundary.
 - Event record order: `world.event_records` is canonical insertion order.
   Projections that need current state consume that order unless a projection
   explicitly documents and tests a stable sort key.
@@ -70,6 +75,10 @@ this precedence:
   surface strings, so records can render cleanly in another locale. If a record
   also stores compatibility display labels, it must keep the semantic IDs
   alongside them.
+- `cause_event_ids` must be a list of canonical record IDs. It may be empty for
+  root events, but non-empty cause IDs should point to existing
+  `world.event_records` entries unless the payload is explicitly preserving a
+  legacy dangling reference for diagnostics.
 - Route visibility must cover both endpoints. Route block/reopen records store
   `from_location_id`, `to_location_id`, `endpoint_location_ids`, and matching
   `location:*` tags so reports and location queries can see the event from

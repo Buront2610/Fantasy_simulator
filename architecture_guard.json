@@ -51,6 +51,20 @@
       ]
     },
     {
+      "name": "root_domain_stays_ui_free",
+      "description": "Root domain modules must not depend on UI adapters; fantasy_simulator/main.py is the CLI composition root.",
+      "include": [
+        "fantasy_simulator/*.py"
+      ],
+      "exclude": [
+        "fantasy_simulator/__main__.py",
+        "fantasy_simulator/main.py"
+      ],
+      "forbid": [
+        "fantasy_simulator.ui"
+      ]
+    },
+    {
       "name": "world_change_is_headless_domain",
       "description": "World-change code must remain deterministic and free of renderer/storage adapters.",
       "include": [
@@ -210,13 +224,6 @@
         "removal_condition": "Remove when fantasy_simulator/character.py::Character fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
-        "target": "fantasy_simulator/events_relationships.py::resolve_marriage_event",
-        "reason": "Narrative branch legacy resolver; split once relationship events move to a policy object.",
-        "max_function_lines": 130,
-        "owner": "architecture-maintainers",
-        "removal_condition": "Remove when fantasy_simulator/events_relationships.py::resolve_marriage_event fits the default complexity budgets or is split behind a narrower compatibility adapter."
-      },
-      {
         "target": "fantasy_simulator/language/phonology.py::default_feature_sets",
         "reason": "Dense linguistic feature table builder; candidate for data-table extraction.",
         "max_cyclomatic_complexity": 26,
@@ -326,15 +333,6 @@
         "max_cognitive_complexity": 32,
         "owner": "architecture-maintainers",
         "removal_condition": "Remove when fantasy_simulator/ui/map_world_overview.py::render_world_overview fits the default complexity budgets or is split behind a narrower compatibility adapter."
-      },
-      {
-        "target": "fantasy_simulator/ui/screen_results.py::_show_results",
-        "reason": "Interactive result screen dispatch remains a compatibility menu path.",
-        "max_cyclomatic_complexity": 23,
-        "max_cognitive_complexity": 28,
-        "max_function_lines": 89,
-        "owner": "architecture-maintainers",
-        "removal_condition": "Remove when fantasy_simulator/ui/screen_results.py::_show_results fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/world_memory_api.py::WorldMemoryMixin",

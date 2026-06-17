@@ -14,7 +14,7 @@ Fantasy Simulator: Python CLI世界シミュレーション（Aethoria）。Pyth
   `terrain.py` が terrain/site/route/atlas layout を担当
 - **UI**: `ui/screens.py` が画面制御、`ui/map_renderer.py` / `ui/atlas_renderer.py` が地図描画、
   `ui/presenters.py` / `ui/view_models.py` が表示整形を担当
-- **永続化**: `persistence/save_load.py`（JSON）、`persistence/migrations.py`（現行 schema v8）
+- **永続化**: `persistence/save_load.py`（JSON）、`persistence/migrations.py`（現行 schema v9）
 - **叙述補助**: `narrative/context.py` と `narrative/template_history.py` が最小 NarrativeContext を提供
 
 ## Directory Structure
@@ -81,6 +81,16 @@ Fantasy_simulator/
 - シリアライズは `to_dict()` / `from_dict()` パターン
 - テストは `tests/test_<module>.py`
 
+## Design Conventions（設計規約）
+
+詳細は `docs/design_philosophy_review_2026-06-10.md` §5.3 を参照。
+
+- **契約の使い分け（DbC）**: 識別子・参照・永続化境界の不正は fail-fast（例外で拒否。例: record_id 重複、トポロジー不整合）。ゲームプレイ数値（ステータス・関係値等）はクランプして続行。迷ったら「壊れたデータが保存されうるか？」で判定し、されうるなら fail-fast 側に倒す
+- **プロセス状態は必ずシリアライズ**: 複数ティックにまたがる進行中状態（補正の帳簿・アーク・保留選択・蓄積圧力）は導入初日から to_dict/from_dict に含める。一時補正は「保存値の書き換え＋後で巻き戻し」ではなく「読み出し時に合成する派生値」を優先する
+- **構造はテストで守る。体験は計測で守る**: バランス・確率・進行速度に影響する変更は統計的検証（World Health Check のヘルスバンド、導入までは playtest スクリプト）を通す。バンド変更は同一 PR で理由とともに行う
+- **SRP / guard の較正**: SRP は機械的な小分割ではなく凝集と変更理由の単一化で判断する。既存の complexity / size gate が過剰に分割を促している可能性も監査対象に含め、ゲート追加や閾値強化は実害・回帰検出価値・保守コストを説明できる場合に限る
+- **YAGNI**: 汎用エンジン・基盤を先に作らない。1 例目は具体的に書き切り、2 例目を書くときに共通部分を抽出する
+
 ## Setup & Validation
 
 ```bash
@@ -100,13 +110,19 @@ python main.py
 python -m pytest tests/ -v
 
 # Lint
-flake8 --max-line-length=120 --exclude=node_modules,__pycache__,.claude,.worktrees .
+flake8 --max-line-length=120 --exclude=node_modules,__pycache__,.claude,.worktrees,.trunk .
 
 # 一括検証
-flake8 --max-line-length=120 --exclude=node_modules,__pycache__,.claude,.worktrees . && python -m pytest tests/ -v
+flake8 --max-line-length=120 --exclude=node_modules,__pycache__,.claude,.worktrees,.trunk . && python -m pytest tests/ -v
 
-# 品質ゲート（lint / complexity / focused mypy / full pytest）
+# プレイ検証（長期 world-health / balance bands）
+python scripts/quality_gate.py playtest
+
+# 品質ゲート（lint / complexity / focused mypy / playtest）
 python scripts/quality_gate.py strict
+
+# 全件検証（static checks / full pytest）
+python scripts/quality_gate.py exhaustive
 ```
 
 ## NEVER

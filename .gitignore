@@ -8,6 +8,7 @@ __pycache__/
 .history/
 .runs/*
 !.runs/README.md
+.world_health_report*.json
 *.egg-info/
 build/
 dist/

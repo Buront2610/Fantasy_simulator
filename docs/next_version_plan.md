@@ -8,7 +8,7 @@
 
 > **注意**: 実装順・PR 分割・完了条件・現状認識の正本は `docs/implementation_plan.md` に従ってください。本書は中長期の設計目標を定義する文書です。正式な migration chain・ID 規則・location 参照修正方針も `docs/implementation_plan.md` を優先し、本書の §15 migration 例は設計上の参考例として扱います。
 > 現在の main では、月次進行基盤、world memory、terrain/site/route 分離、atlas 観測 UI 初版、
-> schema v8 migration、PR-H1 相当の region 観測強化まで実装済みです。本書の As-Is は「この設計書が解決を意図した歴史的な弱点」として読んでください。
+> schema v9 migration、PR-H1 相当の region 観測強化まで実装済みです。本書の As-Is は「この設計書が解決を意図した歴史的な弱点」として読んでください。
 
 ---
 
