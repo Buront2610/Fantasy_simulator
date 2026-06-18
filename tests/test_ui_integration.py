@@ -766,6 +766,32 @@ class TestShowRosterUsesBackends(unittest.TestCase):
             world.add_character(character)
         world.record_event(
             WorldEventRecord(
+                record_id="rescue_1",
+                kind="dying_rescued",
+                year=1001,
+                primary_actor_id=hero.char_id,
+                secondary_actor_ids=[spouse.char_id],
+                description="Mira pulled Aldric from a collapsed bridge.",
+            )
+        )
+        world.record_event(
+            WorldEventRecord(
+                record_id="comfort_1",
+                kind="relationship_comfort",
+                year=1002,
+                primary_actor_id=hero.char_id,
+                secondary_actor_ids=[spouse.char_id],
+                description="Aldric and Mira found a quiet moment of comfort.",
+                cause_event_ids=["rescue_1"],
+                render_params={
+                    "personality_affinity": 6,
+                    "personality_factors": "mutual warmth; relief after recovery",
+                    "relationship_delta": 12,
+                },
+            )
+        )
+        world.record_event(
+            WorldEventRecord(
                 record_id="battle_1",
                 kind="battle",
                 year=1002,
@@ -806,6 +832,10 @@ class TestShowRosterUsesBackends(unittest.TestCase):
         self.assertIn("Children: Lio", out.text)
         self.assertIn("Relationships", out.text)
         self.assertIn("Mira: +72", out.text)
+        self.assertIn("Relationship history", out.text)
+        self.assertIn("Aldric and Mira found a quiet moment of comfort.", out.text)
+        self.assertIn("Because: Mira pulled Aldric from a collapsed bridge.", out.text)
+        self.assertIn("Factors: personality mutual warmth; relief after recovery", out.text)
         self.assertIn("Recent history", out.text)
         self.assertIn("Guarded the north road", out.text)
         self.assertIn("Recent combat", out.text)

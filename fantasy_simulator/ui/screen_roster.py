@@ -7,6 +7,7 @@ from typing import Any
 from ..character_founder_background import render_founder_summary
 from ..character_personality import render_personality_summary
 from ..combat_log_index import CombatLogEntryView, build_combat_log_index
+from ..event_rendering import render_event_record
 from ..i18n import tr, tr_term
 from ..world import World
 from .screen_input import _get_numeric_choice
@@ -16,7 +17,22 @@ from .ui_helpers import fit_display_width
 
 RECENT_HISTORY_LIMIT = 8
 PROFILE_RELATION_LIMIT = 6
+PROFILE_RELATION_EVENT_LIMIT = 6
 PROFILE_COMBAT_LIMIT = 5
+PROFILE_RELATION_EVENT_KINDS = {
+    "meeting",
+    "romance",
+    "marriage",
+    "anniversary",
+    "dying_rescued",
+    "battle",
+    "battle_fatal",
+    "relationship_reconciliation",
+    "relationship_conflict",
+    "relationship_mentorship",
+    "relationship_betrayal",
+    "relationship_comfort",
+}
 
 
 def _show_roster(world: World, ctx: UIContext | None = None) -> None:
@@ -72,6 +88,11 @@ def _show_character_profile(world: World, character: Any, ctx: UIContext) -> Non
     _print_profile_section(ctx, tr("roster_profile_background"), _background_lines(character))
     _print_profile_section(ctx, tr("roster_profile_family"), _family_lines(world, character))
     _print_profile_section(ctx, tr("roster_profile_relationships"), _relationship_lines(world, character))
+    _print_profile_section(
+        ctx,
+        tr("roster_profile_relationship_history"),
+        _relationship_history_lines(world, character),
+    )
     _print_profile_section(ctx, tr("roster_profile_recent_history"), _history_lines(character))
     _print_profile_section(ctx, tr("roster_profile_recent_combat"), _combat_lines(world, character))
     ctx.inp.pause()
@@ -143,6 +164,92 @@ def _relationship_lines(world: World, character: Any) -> list[str]:
     return [line for _, line in rows[:PROFILE_RELATION_LIMIT]] or [tr("roster_profile_no_relationships")]
 
 
+def _relationship_history_lines(world: World, character: Any) -> list[str]:
+    char_id = getattr(character, "char_id", "")
+    if not char_id:
+        return [tr("roster_profile_no_relationship_history")]
+    rows: list[str] = []
+    for record in reversed(list(getattr(world, "event_records", []))):
+        if not _record_involves_character(record, char_id):
+            continue
+        render_params = getattr(record, "render_params", {})
+        is_relationship_event = getattr(record, "kind", "") in PROFILE_RELATION_EVENT_KINDS
+        has_relationship_factors = isinstance(render_params, dict) and "personality_affinity" in render_params
+        if not is_relationship_event and not has_relationship_factors:
+            continue
+        rows.extend(_relationship_event_lines(world, record))
+        if len(rows) >= PROFILE_RELATION_EVENT_LIMIT * 3:
+            break
+    return rows[:PROFILE_RELATION_EVENT_LIMIT * 3] or [tr("roster_profile_no_relationship_history")]
+
+
+def _record_involves_character(record: object, char_id: str) -> bool:
+    actor_ids = set(getattr(record, "secondary_actor_ids", []))
+    primary_actor_id = getattr(record, "primary_actor_id", None)
+    if isinstance(primary_actor_id, str) and primary_actor_id:
+        actor_ids.add(primary_actor_id)
+    return char_id in actor_ids
+
+
+def _relationship_event_lines(world: World, record: Any) -> list[str]:
+    kind = _event_kind_label(getattr(record, "kind", "generic"))
+    lines = [
+        tr(
+            "roster_profile_relationship_event",
+            date=_record_date_label(record),
+            kind=kind,
+            description=render_event_record(record, world=world),
+        )
+    ]
+    cause_text = _relationship_event_cause_text(world, record)
+    if cause_text:
+        lines.append(cause_text)
+    factor_text = _relationship_event_factor_text(record)
+    if factor_text:
+        lines.append(factor_text)
+    return lines
+
+
+def _relationship_event_cause_text(world: World, record: object) -> str:
+    if not getattr(record, "cause_event_ids", []):
+        return ""
+    causes = [
+        render_event_record(cause, world=world)
+        for cause in world.get_event_causes(getattr(record, "record_id", ""))
+    ]
+    if not causes:
+        return tr("roster_profile_relationship_cause_unavailable")
+    return tr("roster_profile_relationship_cause", causes=" | ".join(causes))
+
+
+def _relationship_event_factor_text(record: object) -> str:
+    render_params = getattr(record, "render_params", {})
+    if not isinstance(render_params, dict):
+        return ""
+    parts = []
+    if "personality_affinity" in render_params:
+        parts.append(
+            tr(
+                "event_log_personality_reason",
+                affinity=render_params.get("personality_affinity", 0),
+                factors=render_params.get("personality_factors", tr("event_log_no_personality_factors")),
+                delta=render_params.get("relationship_delta", 0),
+            )
+        )
+    catalyst_bonus = int(render_params.get("relationship_catalyst_bonus", 0) or 0)
+    if catalyst_bonus:
+        parts.append(
+            tr(
+                "event_log_catalyst_reason",
+                bonus=catalyst_bonus,
+                factors=render_params.get("relationship_catalyst_factors", tr("event_log_no_catalyst_factors")),
+            )
+        )
+    if not parts:
+        return ""
+    return tr("roster_profile_relationship_factor", factors=" / ".join(parts))
+
+
 def _history_lines(character: Any) -> list[str]:
     history = [str(entry) for entry in getattr(character, "history", []) if str(entry).strip()]
     return history[-RECENT_HISTORY_LIMIT:] or [tr("roster_profile_no_history")]
@@ -175,6 +282,23 @@ def _date_label(entry: CombatLogEntryView) -> str:
     if entry.month > 0:
         return tr("event_log_prefix_month", year=entry.year, month=entry.month)
     return tr("event_log_prefix", year=entry.year)
+
+
+def _record_date_label(record: object) -> str:
+    year = int(getattr(record, "year", 0) or 0)
+    month = int(getattr(record, "month", 0) or 0)
+    day = int(getattr(record, "day", 0) or 0)
+    if day > 0 and month > 0:
+        return tr("event_log_prefix_day", year=year, month=month, day=day)
+    if month > 0:
+        return tr("event_log_prefix_month", year=year, month=month)
+    return tr("event_log_prefix", year=year)
+
+
+def _event_kind_label(kind: str) -> str:
+    key = f"event_type_{kind}"
+    label = tr(key)
+    return label if label != key else kind
 
 
 def _related_characters(world: World, character: Any, tag: str) -> list[Any]:
