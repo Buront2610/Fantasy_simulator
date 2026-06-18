@@ -6,7 +6,6 @@ from collections.abc import MutableMapping as MutableMappingABC
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
-from . import world_event_log_facade as event_log_facade
 from .event_models import WorldEventRecord
 from .world_event_history import (
     latest_absolute_day_before_or_on as latest_event_absolute_day_before_or_on,
@@ -38,7 +37,6 @@ class WorldEventRecorderSnapshot:
 
     event_records: List[WorldEventRecord]
     recent_event_ids: Tuple[Tuple[Any, List[str]], ...]
-    display_event_log: List[str] | None
     event_index_state: Dict[str, Any] | None
 
 
@@ -61,7 +59,6 @@ class WorldEventRecorderPort:
                 if hasattr(location, "recent_event_ids"):
                     locations_by_identity[id(location)] = location
 
-        display_event_log = getattr(self._owner, "_display_event_log", None)
         event_index = getattr(self._owner, "_event_index", None)
         event_index_state = None
         if event_index is not None:
@@ -92,7 +89,6 @@ class WorldEventRecorderPort:
                 (location, list(location.recent_event_ids))
                 for location in locations_by_identity.values()
             ),
-            display_event_log=None if not isinstance(display_event_log, list) else list(display_event_log),
             event_index_state=event_index_state,
         )
 
@@ -101,13 +97,6 @@ class WorldEventRecorderPort:
 
         for location, recent_event_ids in snapshot.recent_event_ids:
             location.recent_event_ids = list(recent_event_ids)
-
-        if snapshot.display_event_log is not None:
-            display_event_log = getattr(self._owner, "_display_event_log", None)
-            if isinstance(display_event_log, list):
-                display_event_log[:] = snapshot.display_event_log
-            else:
-                self._owner._display_event_log = list(snapshot.display_event_log)
 
         event_index = getattr(self._owner, "_event_index", None)
         if event_index is None or snapshot.event_index_state is None:
@@ -144,7 +133,6 @@ class WorldEventMixin:
     if TYPE_CHECKING:
         event_records: List[WorldEventRecord]
         year: int
-        _display_event_log: List[str]
         _event_index: EventHistoryIndex
         _location_id_index: Dict[str, LocationState]
         grid: Dict[Tuple[int, int], LocationState]
@@ -172,7 +160,6 @@ class WorldEventMixin:
             get_character_by_id=self.get_character_by_id,
             watched_actor_tag_prefix=self.WATCHED_ACTOR_TAG_PREFIX,
         )
-        event_log_facade.clear_display_event_log(self)
         return stored_record
 
     def world_change_event_recorder(self) -> WorldEventRecorderPort:

@@ -200,8 +200,7 @@ class TestEventStoreStoreCoverage:
         assert len(sim.world.event_log) == 1
         assert "adventure" in sim.world.event_log[0].lower() or len(sim.world.event_log[0]) > 0
 
-    def test_record_world_event_updates_history_adapter(self):
-        """Legacy history must project the same canonical event."""
+    def test_record_world_event_updates_canonical_store(self):
         sim = _make_sim()
         loc_id = _first_location_id(sim.world)
         sim._record_world_event(
@@ -209,11 +208,10 @@ class TestEventStoreStoreCoverage:
             kind="injury_recovery",
             location_id=loc_id,
         )
-        assert len(sim.history) == 1
-        assert sim.history[0].event_type == "injury_recovery"
+        assert len(sim.world.event_records) == 1
+        assert sim.world.event_records[0].kind == "injury_recovery"
 
-    def test_record_event_updates_canonical_store_and_adapters(self):
-        """_record_event must still surface through legacy adapters."""
+    def test_record_event_updates_canonical_store_and_event_log_projection(self):
         from fantasy_simulator.events import EventResult
         sim = _make_sim()
         result = EventResult(
@@ -223,14 +221,11 @@ class TestEventStoreStoreCoverage:
             year=sim.world.year,
         )
         sim._record_event(result, location_id=None)
-        assert len(sim.history) == 1
-        assert sim.history[0].event_type == "battle"
         assert len(sim.world.event_records) == 1
         assert sim.world.event_records[0].kind == "battle"
         assert len(sim.world.event_log) == 1
 
-    def test_events_by_type_reads_canonical_world_events_too(self):
-        """events_by_type() should project the full canonical event set."""
+    def test_events_by_kind_reads_canonical_world_events(self):
         sim = _make_sim()
         loc_id = _first_location_id(sim.world)
         sim._record_world_event(
@@ -238,7 +233,6 @@ class TestEventStoreStoreCoverage:
             kind="adventure_started",
             location_id=loc_id,
         )
-        assert len(sim.events_by_type("adventure_started")) == 1
         assert len(sim.events_by_kind("adventure_started")) == 1
 
 
@@ -260,31 +254,9 @@ class TestEventStoreUnification:
         assert len(matches) > 0
         assert all(r.kind == first_kind for r in matches)
 
-    def test_events_by_type_returns_actual_results(self):
-        """events_by_type() must find events for types routed via _record_event."""
+    def test_event_records_populated(self):
         sim = _make_sim_with_characters(n_chars=6, seed=42)
         sim.advance_months(12)
-        assert len(sim.history) > 0, (
-            "A full year with 6 characters should populate history"
-        )
-        first_type = sim.history[0].event_type
-        matches = sim.events_by_type(first_type)
-        assert len(matches) > 0
-        assert all(ev.event_type == first_type for ev in matches)
-
-    def test_event_records_and_history_adapters_cover_same_types(self):
-        """The history adapter should mirror canonical kinds."""
-        sim = _make_sim_with_characters(n_chars=6, seed=42)
-        sim.advance_months(12)
-        history_types = {ev.event_type for ev in sim.history}
-        record_kinds = {rec.kind for rec in sim.world.event_records}
-        assert history_types == record_kinds
-
-    def test_history_adapter_and_event_records_both_populated(self):
-        """Legacy history remains available through projection."""
-        sim = _make_sim_with_characters(n_chars=6, seed=42)
-        sim.advance_months(12)
-        assert len(sim.history) > 0
         assert len(sim.world.event_records) > 0
 
     def test_event_log_populated_as_display_derived(self):
@@ -323,7 +295,6 @@ class TestSaveLoadCompatibility:
         restored = Simulator.from_dict(data)
         assert restored.current_month == sim.current_month
         assert restored.world.year == sim.world.year
-        assert len(restored.history) == len(sim.history)
         assert len(restored.world.event_records) == len(sim.world.event_records)
         assert len(restored.world.event_log) == len(sim.world.event_log)
 
@@ -369,7 +340,7 @@ class TestSaveLoadCompatibility:
         restored = Simulator.from_dict(data)
         assert restored.current_month == sim.current_month
         assert restored.world.year == sim.world.year
-        assert len(restored.history) == len(sim.history)
+        assert len(restored.world.event_records) == len(sim.world.event_records)
 
 
 class TestSimulatorFunctionality:

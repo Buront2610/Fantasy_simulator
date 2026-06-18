@@ -72,7 +72,6 @@ def normalize_after_load(
     rebuild_adventure_index: Callable[[], None],
     rebuild_recent_event_ids_fn: Callable[[], None],
     rebuild_location_memorial_ids_fn: Callable[[], None],
-    rebuild_compatibility_event_log: Callable[[], None],
 ) -> None:
     """Rebuild derived indexes and repair invariants after deserialization."""
     repair_location_references()
@@ -83,5 +82,3 @@ def normalize_after_load(
     rebuild_adventure_index()
     rebuild_recent_event_ids_fn()
     rebuild_location_memorial_ids_fn()
-    if event_records:
-        rebuild_compatibility_event_log()

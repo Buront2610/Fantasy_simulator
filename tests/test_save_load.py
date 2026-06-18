@@ -1164,8 +1164,8 @@ class TestLoadSimulation:
 
         assert restored is not None
         assert len(restored.world.event_records) == 1
-        assert restored.world.event_records[0].legacy_event_log_entry == payload["world"]["event_log"][0]
         assert restored.world.event_records[0].description == payload["world"]["event_log"][0]
+        assert "legacy_event_log_entry" not in restored.world.event_records[0].to_dict()
         restored.world.record_event(
             WorldEventRecord(
                 record_id="rec_new",
@@ -1176,9 +1176,9 @@ class TestLoadSimulation:
                 description="A new structured event.",
             )
         )
-        compatibility_log = restored.world.get_compatibility_event_log()
-        assert payload["world"]["event_log"][0] in compatibility_log
-        assert any("A new structured event." in entry for entry in compatibility_log)
+        projected_log = list(restored.world.event_log)
+        assert any(payload["world"]["event_log"][0] in entry for entry in projected_log)
+        assert any("A new structured event." in entry for entry in projected_log)
 
     def test_migration_lifts_legacy_history_into_canonical_event_records(self, tmp_path):
         path = tmp_path / "legacy-history-only.json"
@@ -1207,10 +1207,7 @@ class TestLoadSimulation:
         assert restored is not None
         assert len(restored.world.event_records) == 1
         assert restored.world.event_records[0].kind == "battle"
-        assert len(restored.history) == 1
-        assert restored.history[0].event_type == "battle"
-        assert restored.history[0].stat_changes == {"char_1": {"strength": -2}}
-        assert restored.history[0].metadata == {"source": "legacy"}
+        assert restored.world.event_records[0].primary_actor_id == "char_1"
 
     def test_current_schema_event_records_take_precedence_over_stale_event_log(self, tmp_path):
         path = tmp_path / "current-schema-stale-event-log.json"
@@ -1224,17 +1221,17 @@ class TestLoadSimulation:
                 description="A canonical meeting should be displayed.",
             )
         ]
-        payload["world"]["event_log"] = ["Year 999: A stale compatibility line should not survive."]
+        payload["world"]["event_log"] = ["Year 999: A stale event-log line should not survive."]
         _write_payload(path, payload)
 
         restored = load_simulation(str(path))
 
         assert restored is not None
         assert [record.record_id for record in restored.world.event_records] == ["canonical_001"]
-        compatibility_log = list(restored.world.get_compatibility_event_log())
-        assert len(compatibility_log) == 1
-        assert "A canonical meeting should be displayed." in compatibility_log[0]
-        assert "stale compatibility line" not in compatibility_log[0]
+        projected_log = list(restored.world.event_log)
+        assert len(projected_log) == 1
+        assert "A canonical meeting should be displayed." in projected_log[0]
+        assert "stale event-log line" not in projected_log[0]
 
     def test_load_current_schema_backfills_watched_tags_for_untagged_canonical_records(self, tmp_path):
         path = tmp_path / "current-schema-untagged-watch.json"
@@ -1292,14 +1289,11 @@ class TestLoadSimulation:
         assert restored is not None
         assert len(restored.world.event_records) == 2
         assert {record.kind for record in restored.world.event_records} == {"battle", "legacy_event_log"}
-        assert len(restored.history) == 2
-        assert {event.event_type for event in restored.history} == {"battle", "legacy_event_log"}
-        battle_event = next(event for event in restored.history if event.event_type == "battle")
-        legacy_log_event = next(event for event in restored.history if event.event_type == "legacy_event_log")
-        assert battle_event.stat_changes == {"char_1": {"strength": -2}}
-        assert battle_event.metadata == {"source": "legacy"}
-        assert legacy_log_event.metadata == {"legacy_event_log_entry": True}
-        assert payload["world"]["event_log"][0] in restored.world.get_compatibility_event_log()
+        assert any(record.primary_actor_id == "char_1" for record in restored.world.event_records)
+        assert any(
+            payload["world"]["event_log"][0] in entry
+            for entry in restored.world.event_log
+        )
 
     def test_migration_merges_existing_canonical_records_with_legacy_adapters(self, tmp_path):
         path = tmp_path / "legacy-mixed-with-canonical.json"
@@ -1366,8 +1360,6 @@ class TestLoadSimulation:
                 location_id=None,
                 primary_actor_id="char_1",
                 severity=1,
-                legacy_event_result=dict(repeated_history_item),
-                legacy_event_log_entry=None,
             ),
             _event_record_payload(
                 record_id="legacy_event_log_000001",
@@ -1376,15 +1368,6 @@ class TestLoadSimulation:
                 location_id=None,
                 severity=1,
                 tags=["legacy_event_log"],
-                legacy_event_result={
-                    "description": repeated_log_entry,
-                    "affected_characters": [],
-                    "stat_changes": {},
-                    "event_type": "legacy_event_log",
-                    "year": 1000,
-                    "metadata": {"legacy_event_log_entry": True},
-                },
-                legacy_event_log_entry=repeated_log_entry,
             ),
         ]
         payload["world"]["event_log"] = [repeated_log_entry, repeated_log_entry]
@@ -1710,7 +1693,6 @@ class TestLoadSimulation:
         restored = load_simulation(str(path))
 
         assert restored is not None
-        assert len(restored.history) == 1
-        assert restored.history[0].affected_characters == ["char_1", "char_2"]
-        assert restored.history[0].stat_changes == {"char_1": {"wisdom": 2}}
-        assert restored.history[0].metadata == {"source": "runtime", "chain": {"step": 1}}
+        assert len(restored.world.event_records) == 1
+        assert restored.world.event_records[0].primary_actor_id == "char_1"
+        assert restored.world.event_records[0].secondary_actor_ids == ["char_2"]

@@ -50,7 +50,6 @@ class WorldActorMixin:
 
         def _repair_location_references(self) -> None: ...
         def _rebuild_location_memorial_ids(self) -> None: ...
-        def rebuild_compatibility_event_log(self) -> None: ...
 
     def _location_ids_for_site_tag(self, tag: str) -> List[str]:
         """Return in-bounds location_ids for bundle site seeds carrying *tag*."""
@@ -142,7 +141,6 @@ class WorldActorMixin:
             rebuild_adventure_index=self.rebuild_adventure_index,
             rebuild_recent_event_ids_fn=self.rebuild_recent_event_ids,
             rebuild_location_memorial_ids_fn=self._rebuild_location_memorial_ids,
-            rebuild_compatibility_event_log=self.rebuild_compatibility_event_log,
         )
 
     def _backfill_watched_actor_tags_after_load(self) -> None:

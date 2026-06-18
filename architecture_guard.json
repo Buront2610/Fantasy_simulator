@@ -231,13 +231,6 @@
         "removal_condition": "Remove when fantasy_simulator/language/phonology.py::default_feature_sets fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
-        "target": "fantasy_simulator/event_models.py::WorldEventRecord",
-        "reason": "Canonical event contract still owns validation, serialization, and legacy adapter projection.",
-        "max_class_lines": 285,
-        "owner": "architecture-maintainers",
-        "removal_condition": "Remove when fantasy_simulator/event_models.py::WorldEventRecord fits the default complexity budgets or is split behind a narrower compatibility adapter."
-      },
-      {
         "target": "fantasy_simulator/events_lifecycle.py::check_dying_resolution",
         "reason": "Lifecycle resolver keeps death-staging compatibility until policy extraction.",
         "max_function_lines": 82,

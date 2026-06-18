@@ -5,7 +5,7 @@ from fantasy_simulator.simulation.engine import Simulator
 from fantasy_simulator.world import World
 
 
-def test_world_record_event_updates_recent_ids_and_compat_event_log() -> None:
+def test_world_record_event_updates_recent_ids_and_event_log_projection() -> None:
     world = World()
     record = WorldEventRecord(
         record_id="r1",
@@ -21,11 +21,11 @@ def test_world_record_event_updates_recent_ids_and_compat_event_log() -> None:
 
     loc = world.get_location_by_id("loc_thornwood")
     assert loc.recent_event_ids[-1] == "r1"
-    compat_log = world.get_compatibility_event_log(last_n=1)
-    assert compat_log and "Battle at Thornwood" in compat_log[0]
+    projected_log = list(world.event_log)[-1:]
+    assert projected_log and "Battle at Thornwood" in projected_log[0]
 
 
-def test_simulator_record_world_event_keeps_world_record_and_compat_paths() -> None:
+def test_simulator_record_world_event_keeps_world_record_and_projection_paths() -> None:
     world = World()
     sim = Simulator(world, seed=42)
 
@@ -37,7 +37,7 @@ def test_simulator_record_world_event_keeps_world_record_and_compat_paths() -> N
     )
 
     assert rec in world.event_records
-    assert any("Discovery happened" in line for line in world.get_compatibility_event_log())
+    assert any("Discovery happened" in line for line in world.event_log)
 
 
 def test_simulator_record_event_from_event_result_preserves_projection() -> None:
@@ -71,7 +71,7 @@ def test_invalid_location_event_roundtrip_through_report_and_save_load() -> None
 
     assert rec.location_id is None
     assert world.event_records[-1].location_id is None
-    assert any("Invalid location event" in line for line in world.get_compatibility_event_log())
+    assert any("Invalid location event" in line for line in world.event_log)
 
     monthly = sim.get_monthly_report(world.year, sim.current_month)
     yearly = sim.get_yearly_report(world.year)
@@ -80,7 +80,7 @@ def test_invalid_location_event_roundtrip_through_report_and_save_load() -> None
 
     restored = Simulator.from_dict(sim.to_dict())
     assert restored.world.event_records[-1].location_id is None
-    assert any("Invalid location event" in line for line in restored.world.get_compatibility_event_log())
+    assert any("Invalid location event" in line for line in restored.world.event_log)
 
 
 def test_seeded_td3_external_outputs_are_reproducible() -> None:
@@ -132,23 +132,8 @@ def test_save_payload_uses_canonical_event_records_without_legacy_duplication() 
     assert any("Canonical only" in line for line in restored.get_event_log())
 
 
-def test_world_log_event_is_ephemeral_display_adapter_not_canonical_history() -> None:
+def test_event_log_is_canonical_projection_not_persisted_buffer() -> None:
     world = World()
-    world.log_event("display-only line")
-    assert any("display-only line" in line for line in world.event_log)
-    assert world.event_records == []
-
-    payload = world.to_dict()
-    assert "event_log" not in payload
-
-    restored = World.from_dict(payload)
-    assert restored.event_records == []
-    assert restored.get_compatibility_event_log() == []
-
-
-def test_world_log_event_line_is_hidden_when_canonical_projection_exists() -> None:
-    world = World()
-    world.log_event("display-only line")
     world.record_event(
         WorldEventRecord(
             record_id="r1",
@@ -160,10 +145,14 @@ def test_world_log_event_line_is_hidden_when_canonical_projection_exists() -> No
             description="canonical line",
         )
     )
+    assert any("canonical line" in line for line in world.event_log)
 
-    projected = world.get_compatibility_event_log()
-    assert any("canonical line" in line for line in projected)
-    assert all("display-only line" not in line for line in projected)
+    payload = world.to_dict()
+    assert "event_log" not in payload
+    assert payload["event_records"]
+
+    restored = World.from_dict(payload)
+    assert any("canonical line" in line for line in restored.event_log)
 
 
 def test_public_wrappers_propagate_and_save_load_keep_map_and_report_contract() -> None:

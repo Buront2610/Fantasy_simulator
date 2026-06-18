@@ -35,12 +35,6 @@ def _combat_log_from_record(record: Any) -> List[dict[str, Any]]:
         combat_log = _dict_list(render_params.get("combat_log"))
         if combat_log:
             return combat_log
-
-    legacy_event_result = getattr(record, "legacy_event_result", None)
-    if isinstance(legacy_event_result, dict):
-        metadata = legacy_event_result.get("metadata", {})
-        if isinstance(metadata, dict):
-            return _dict_list(metadata.get("combat_log"))
     return []
 
 

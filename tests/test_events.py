@@ -235,7 +235,7 @@ class TestEventBattle:
     def test_generated_battle_records_detailed_combat_log(self, es, char_a, char_b, world):
         result = es.event_battle(char_a, char_b, world, rng=random.Random(0))
 
-        combat_log = result.metadata["combat_log"]
+        combat_log = result.metadata["render_params"]["combat_log"]
         assert len(combat_log) >= 1
         assert combat_log[0]["round_number"] == 1
         assert "dice" in combat_log[0]

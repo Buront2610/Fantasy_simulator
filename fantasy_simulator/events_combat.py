@@ -43,6 +43,7 @@ def _battle_render_metadata(
             "loser": resolution.loser.name,
             "loser_injury_status": resolution.loser.injury_status,
             "story_hook_key": story_hook_key,
+            "combat_log": resolution.combat_log_payload(),
         },
     }
 
@@ -59,7 +60,6 @@ def _battle_metadata(
         "relation_tag_updates": relation_tag_updates,
         "record_id": event_source_id,
         "cause_event_ids": cause_event_ids,
-        "combat_log": resolution.combat_log_payload(),
         **_battle_render_metadata(summary_key, resolution, story_hook_key),
     }
 

@@ -364,19 +364,10 @@ def test_character_max_age_reads_stay_in_lifecycle_compatibility_fallback() -> N
         assert accesses == [], f"Character.max_age read escaped lifecycle compatibility fallback in {path}: {accesses}"
 
 
-def test_display_event_log_restore_helper_stays_load_only() -> None:
-    allowed = {
-        PACKAGE_ROOT / "world_persistence_hydrator.py",
-    }
-
+def test_display_event_log_restore_helper_is_removed() -> None:
     for path in _production_files():
         calls = _iter_attribute_calls(path, "_restore_display_event_log_for_load")
-        if path in allowed:
-            assert [base for base, _ in calls] == ["world"], (
-                f"event_log load restore helper moved in {path}: {calls}"
-            )
-            continue
-        assert calls == [], f"event_log load restore helper escaped load path in {path}: {calls}"
+        assert calls == [], f"event_log load restore helper still exists in {path}: {calls}"
 
 
 def test_world_persistence_facade_only_reexports_split_modules() -> None:

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from typing import Any, Dict
 
 from .migration_context import calendar_key_for_data
@@ -31,12 +30,10 @@ def record_from_legacy_history_item(
         "calendar_key": calendar_key,
         "tags": [],
         "impacts": [],
-        "legacy_event_result": dict(item),
-        "legacy_event_log_entry": None,
     }
 
 
-def record_from_legacy_event_log_entry(
+def record_from_legacy_event_log_line(
     entry: str,
     *,
     index: int,
@@ -59,15 +56,6 @@ def record_from_legacy_event_log_entry(
         "calendar_key": calendar_key,
         "tags": ["legacy_event_log"],
         "impacts": [],
-        "legacy_event_result": {
-            "description": entry,
-            "affected_characters": [],
-            "stat_changes": {},
-            "event_type": "legacy_event_log",
-            "year": year,
-            "metadata": {"legacy_event_log_entry": True},
-        },
-        "legacy_event_log_entry": entry,
     }
 
 
@@ -79,19 +67,16 @@ def canonicalize_legacy_event_adapters(data: Dict[str, Any]) -> None:
     calendar_key = calendar_key_for_data(data)
 
     canonical_records = list(event_records)
-    existing_history_payload_counts: Dict[str, int] = {}
+    existing_history_payload_counts: Dict[tuple[Any, ...], int] = {}
     existing_legacy_log_counts: Dict[str, int] = {}
     for record in canonical_records:
         record_id = str(record.get("record_id", ""))
         if record_id.startswith("legacy_history_"):
-            payload = record.get("legacy_event_result")
-            if payload is not None:
-                payload_key = json.dumps(payload, sort_keys=True)
-                existing_history_payload_counts[payload_key] = existing_history_payload_counts.get(payload_key, 0) + 1
+            payload_key = _legacy_history_identity(record)
+            existing_history_payload_counts[payload_key] = existing_history_payload_counts.get(payload_key, 0) + 1
         elif record_id.startswith("legacy_event_log_"):
-            entry = record.get("legacy_event_log_entry")
-            if entry is not None:
-                existing_legacy_log_counts[entry] = existing_legacy_log_counts.get(entry, 0) + 1
+            entry = str(record.get("description", ""))
+            existing_legacy_log_counts[entry] = existing_legacy_log_counts.get(entry, 0) + 1
 
     history_index = sum(
         1 for record in canonical_records if str(record.get("record_id", "")).startswith("legacy_history_")
@@ -101,7 +86,11 @@ def canonicalize_legacy_event_adapters(data: Dict[str, Any]) -> None:
     )
 
     for item in history:
-        payload_key = json.dumps(item, sort_keys=True)
+        payload_key = _legacy_history_identity(record_from_legacy_history_item(
+            item,
+            index=0,
+            calendar_key=calendar_key,
+        ))
         if existing_history_payload_counts.get(payload_key, 0) > 0:
             existing_history_payload_counts[payload_key] -= 1
             continue
@@ -117,8 +106,18 @@ def canonicalize_legacy_event_adapters(data: Dict[str, Any]) -> None:
             continue
         event_log_index += 1
         canonical_records.append(
-            record_from_legacy_event_log_entry(entry, index=event_log_index, year=year, calendar_key=calendar_key)
+            record_from_legacy_event_log_line(entry, index=event_log_index, year=year, calendar_key=calendar_key)
         )
 
     if canonical_records:
         world_data["event_records"] = canonical_records
+
+
+def _legacy_history_identity(record: Dict[str, Any]) -> tuple[Any, ...]:
+    return (
+        record.get("kind", "generic"),
+        record.get("year", 0),
+        record.get("description", ""),
+        tuple(record.get("secondary_actor_ids", [])),
+        record.get("primary_actor_id"),
+    )

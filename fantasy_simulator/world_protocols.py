@@ -9,21 +9,11 @@ from .event_models import WorldEventRecord
 from .terrain import AtlasLayout, RouteEdge, Site, TerrainMap
 
 
-class EventLogWorld(Protocol):
-    """World attributes needed by the compatibility event-log facade."""
+class MutableEventLogWorld(Protocol):
+    """World attributes needed by the event-log facade."""
 
     MAX_EVENT_LOG: int
-    year: int
-    _display_event_log: List[str]
-
-    @property
-    def event_records(self) -> Sequence[WorldEventRecord]: ...
-
-
-class MutableEventLogWorld(EventLogWorld, Protocol):
-    """Event-log facade contract for helpers that update display entries."""
-
-    _display_event_log: List[str]
+    event_records: Sequence[WorldEventRecord]
 
 
 class TopologyRuntimeWorld(Protocol):

@@ -171,14 +171,6 @@ def _combat_log_from_record(record: Any) -> list[dict[str, Any]]:
             entry for entry in render_params["combat_log"]
             if isinstance(entry, dict)
         ]
-    legacy = getattr(record, "legacy_event_result", None)
-    if isinstance(legacy, dict):
-        metadata = legacy.get("metadata", {})
-        if isinstance(metadata, dict) and isinstance(metadata.get("combat_log"), list):
-            return [
-                entry for entry in metadata["combat_log"]
-                if isinstance(entry, dict)
-            ]
     return []
 
 

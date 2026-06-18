@@ -145,7 +145,7 @@ class TestEventIndexPerformanceGuards:
         sim = Simulator(world, events_per_year=0, seed=121)
         hero = world.characters[0]
         result = EventResult(
-            description="A localized compatibility line.",
+            description="A localized event-log line.",
             affected_characters=[hero.char_id],
             event_type="meeting",
             year=world.year,

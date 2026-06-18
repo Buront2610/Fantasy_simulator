@@ -123,9 +123,7 @@ class World(
         self._location_id_index: Dict[str, LocationState] = {}
         # Event storage contract:
         # - event_records is the canonical structured history for all new reads.
-        # - _display_event_log holds only display-only legacy lines.
-        # - event_log projects from canonical history when records exist.
-        self._display_event_log: List[str] = []
+        # - event_log is a read-only projection from canonical history.
         self.event_records: List[WorldEventRecord] = []
         self.world_arcs: List[Any] = []
         self._event_index = EventHistoryIndex()

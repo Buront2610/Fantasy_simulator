@@ -22,16 +22,13 @@
   - canonical write: `World.record_event()`
   - canonical read: `simulation/queries.py` (`get_summary`, `events_by_kind`), `reports.py`
 - `event_log`
-  - compatibility adapter: `World.get_compatibility_event_log()`
+  - read-only projection: `World.event_log`
   - UI read path: `simulation/queries.py#get_event_log()` 経由のみ
-- `history`
-  - compatibility projection: `Simulator.history` (`world.event_records -> EventResult`)
-  - legacy adapter call: `QueryMixin.events_by_type()`
-
 ### Current debt status
 
 - なし（保存フォーマットは canonical `event_records` を正規保持し、
-  `event_log` / `history` は runtime projection へ縮退済み）。
+  `event_log` は runtime projection へ縮退済み。`Simulator.history` と
+  `events_by_type()` は削除済み）。
 
 ## TD-2 SettingBundle Externalization
 
@@ -55,13 +52,13 @@
 
 - `events.py` から純粋データ契約（`EventResult` / `WorldEventRecord` / `generate_record_id`）を
   `event_models.py` へ抽出し、イベント生成の副作用ロジックと分離した。
-- `world.py` の event log adapter は `world_event_log.py` へ抽出し、互換ログ整形/投影を純関数化した。
+- `world.py` の event log projection は `world_event_log.py` へ抽出し、ログ整形/投影を純関数化した。
 - event-driven な location state mutation / canonical record append を `world_event_state.py`
   へ抽出し、`World` は orchestration と互換API維持に集中する構造へ再配置した。
 - decay / propagation（設計書 §5.6）を `world_state_propagation.py` へ抽出し、
   `World.propagate_state()` は orchestrator に縮約した。
-- 既存互換API（`from fantasy_simulator.events import ...`, `World.log_event()`, `World.record_event()`）は維持。
-- legacy field の扱い / import 正規ルート / mutable copy 方針は `docs/td3_design_decisions.md` に記録。
+- 既存 facade（`from fantasy_simulator.events import ...`, `World.record_event()`）は維持。
+- legacy field 削除 / import 正規ルート / mutable copy 方針は `docs/td3_design_decisions.md` に記録。
 
 ### Current debt status
 

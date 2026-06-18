@@ -84,15 +84,15 @@ class TestSimulatorConstruction:
     def test_world_attached(self, sim_small, small_world):
         assert sim_small.world is small_world
 
-    def test_history_empty_at_start(self, sim_small):
-        assert sim_small.history == []
+    def test_event_records_empty_at_start(self, sim_small):
+        assert sim_small.world.event_records == []
 
     def test_custom_events_per_year(self, small_world):
         s = Simulator(small_world, events_per_year=15)
         assert s.events_per_year == 15
 
     def test_seed_reproducibility(self, small_world):
-        """Two simulators with the same seed should produce the same history."""
+        """Two simulators with the same seed should produce the same canonical event records."""
         w1 = _make_world(n_chars=4)
         w2 = _make_world(n_chars=4)
         # Ensure same starting state by syncing char IDs
@@ -104,7 +104,7 @@ class TestSimulatorConstruction:
         s2 = Simulator(w2, events_per_year=4, seed=99)
         s1.run(years=3)
         s2.run(years=3)
-        assert [ev.description for ev in s1.history] == [ev.description for ev in s2.history]
+        assert [ev.description for ev in s1.world.event_records] == [ev.description for ev in s2.world.event_records]
         assert s1.world.event_log == s2.world.event_log
 
     def test_initial_generation_reproducibility_with_rng(self):
@@ -141,7 +141,7 @@ class TestSimulatorConstruction:
         s2 = Simulator(w2, events_per_year=4, seed=99)
         s1.run(years=3)
         s2.run(years=3)
-        assert [ev.description for ev in s1.history] == [ev.description for ev in s2.history]
+        assert [ev.description for ev in s1.world.event_records] == [ev.description for ev in s2.world.event_records]
 
     def test_seed_fixed_world_generation_is_deterministic(self):
         import random as _random
@@ -273,9 +273,9 @@ class TestSimulatorRun:
         sim_small.run(years=5)
         assert small_world.year == start_year + 5
 
-    def test_history_populated(self, sim_small):
+    def test_event_records_populated(self, sim_small):
         sim_small.run(years=3)
-        assert len(sim_small.history) > 0
+        assert len(sim_small.world.event_records) > 0
 
     def test_event_log_populated(self, sim_small, small_world):
         sim_small.run(years=3)
@@ -285,7 +285,7 @@ class TestSimulatorRun:
         start_year = small_world.year
         sim_small.run(years=0)
         assert small_world.year == start_year
-        assert sim_small.history == []
+        assert sim_small.world.event_records == []
 
     def test_characters_age_during_run(self, sim_small, small_world):
         """Aging events should increment character ages over time."""
@@ -667,23 +667,23 @@ class TestGetEventLog:
 
 
 # ---------------------------------------------------------------------------
-# events_by_type()
+# events_by_kind()
 # ---------------------------------------------------------------------------
 
-class TestEventsByType:
+class TestEventsByKind:
     def test_returns_list(self, sim_small):
         sim_small.run(years=5)
-        results = sim_small.events_by_type("meeting")
+        results = sim_small.events_by_kind("meeting")
         assert isinstance(results, list)
 
     def test_all_results_match_type(self, sim_small):
         sim_small.run(years=5)
-        battles = sim_small.events_by_type("battle")
-        assert all(e.event_type == "battle" for e in battles)
+        battles = sim_small.events_by_kind("battle")
+        assert all(e.kind == "battle" for e in battles)
 
     def test_unknown_type_empty_list(self, sim_small):
         sim_small.run(years=3)
-        results = sim_small.events_by_type("dragon_attack")
+        results = sim_small.events_by_kind("dragon_attack")
         assert results == []
 
 
@@ -704,7 +704,7 @@ class TestFullIntegration:
 
         s = Simulator(world, events_per_year=5, seed=42)
         s.run(years=10)
-        assert len(s.history) > 0
+        assert len(s.world.event_records) > 0
         # World year advanced
         assert world.year == 1010
 
@@ -734,7 +734,7 @@ class TestSimulatorSerialization:
         assert len(restored.world.characters) == len(sim.world.characters)
         assert restored.events_per_year == sim.events_per_year
         assert restored.adventure_steps_per_year == sim.adventure_steps_per_year
-        assert len(restored.history) == len(sim.history)
+        assert len(restored.world.event_records) == len(sim.world.event_records)
         assert len(restored.world.completed_adventures) == len(sim.world.completed_adventures)
 
     def test_save_and_load_snapshot_file(self, tmp_path):
@@ -774,7 +774,9 @@ class TestSimulatorSerialization:
 
         assert restored.world.year == sim_b.world.year
         assert restored.world.event_log == sim_b.world.event_log
-        assert [ev.description for ev in restored.history] == [ev.description for ev in sim_b.history]
+        assert [ev.description for ev in restored.world.event_records] == [
+            ev.description for ev in sim_b.world.event_records
+        ]
 
     def test_save_and_load_preserves_locale(self, tmp_path):
         set_locale("ja")
@@ -1174,12 +1176,7 @@ class TestWorldEventRecordIntegration:
             (record.year, record.kind, record.description)
             for record in sim.world.event_records
         }
-        legacy_keys = {
-            (event.year, event.event_type, event.description)
-            for event in sim.history
-        }
-
-        assert legacy_keys <= structured_keys
+        assert structured_keys
 
     def test_simulator_log_entries_are_mirrored_into_event_records(self):
         world = _make_world(n_chars=1)

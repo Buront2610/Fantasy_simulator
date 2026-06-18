@@ -93,7 +93,6 @@ def _hydrate_world_bundle_and_grid(world: Any, data: Dict[str, Any], serialized_
 
 def _hydrate_event_records(world: Any, data: Dict[str, Any], world_event_record_cls: Type[Any]) -> None:
     """Restore canonical event records and normalize location references."""
-    world._restore_display_event_log_for_load(list(data.get("event_log", [])))
     world.event_records = [
         world_event_record_cls.from_dict(r) for r in data.get("event_records", [])
     ]

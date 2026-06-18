@@ -1554,18 +1554,22 @@ class TestWorld:
         location = world.random_location(rng=FixedRng())
         assert location == list(world.grid.values())[-1]
 
-    def test_log_event_uses_localized_year_prefix_english(self):
+    def test_event_log_uses_localized_year_prefix_english(self):
+        from fantasy_simulator.events import WorldEventRecord
+
         set_locale("en")
         world = World(year=1042)
-        world.log_event("Something happened.")
-        assert world.event_log[-1] == "[Year 1042] Something happened."
+        world.record_event(WorldEventRecord(kind="meeting", year=1042, description="Something happened."))
+        assert world.event_log[-1] == "[Year 1042, Month 1, Day 1] Something happened."
 
-    def test_log_event_uses_localized_year_prefix_japanese(self):
+    def test_event_log_uses_localized_year_prefix_japanese(self):
+        from fantasy_simulator.events import WorldEventRecord
+
         set_locale("ja")
         world = World(year=1042)
-        world.log_event("何かが起きた。")
+        world.record_event(WorldEventRecord(kind="meeting", year=1042, description="何かが起きた。"))
         entry = world.event_log[-1]
-        assert "[1042年]" in entry
+        assert "[1042年1月1日]" in entry
         assert "何かが起きた。" in entry
         assert "[Year" not in entry
         set_locale("en")
@@ -2167,7 +2171,7 @@ class TestWorld:
         assert thornwood is not None
         assert thornwood.recent_event_ids == ["r1", "r2"]
 
-    def test_from_dict_rebuilds_compatibility_event_log_from_event_records_even_when_stale(self):
+    def test_from_dict_projects_event_log_from_event_records_even_when_stale_input_exists(self):
         from fantasy_simulator.events import WorldEventRecord
 
         world = World()
@@ -2179,31 +2183,9 @@ class TestWorld:
 
         restored = World.from_dict(payload)
 
-        assert restored.get_compatibility_event_log() == ["[Year 1001, Month 2, Day 3] A clash"]
+        assert restored.event_log == ["[Year 1001, Month 2, Day 3] A clash"]
 
-    def test_compatibility_event_log_prefers_canonical_projection_over_stale_cache(self):
-        from fantasy_simulator.events import WorldEventRecord
-
-        world = World()
-        with pytest.warns(DeprecationWarning, match="compatibility path"):
-            world.event_log = ["stale cache entry"]
-        world.record_event(
-            WorldEventRecord(
-                record_id="r1",
-                kind="battle",
-                year=1001,
-                month=2,
-                day=3,
-                description="Canonical clash",
-            )
-        )
-        world._restore_display_event_log_for_load(["stale cache entry"])
-
-        with pytest.raises(RuntimeError, match="canonical event_records"):
-            world.event_log = ["stale cache entry"]
-        assert world.get_compatibility_event_log() == ["[Year 1001, Month 2, Day 3] Canonical clash"]
-
-    def test_event_log_property_projects_canonical_history_over_stale_cache(self):
+    def test_event_log_projects_canonical_history(self):
         from fantasy_simulator.events import WorldEventRecord
 
         world = World()
@@ -2217,7 +2199,6 @@ class TestWorld:
                 description="Canonical clash",
             )
         )
-        world._restore_display_event_log_for_load(["stale cache entry"])
 
         assert world.event_log == ["[Year 1001, Month 2, Day 3] Canonical clash"]
 
@@ -2225,11 +2206,6 @@ class TestWorld:
         from fantasy_simulator.events import WorldEventRecord
 
         world = World()
-        world.log_event("display-only line")
-        with pytest.raises(TypeError):
-            world.event_log.append("mutated")
-        assert any("display-only line" in line for line in world.event_log)
-
         world.record_event(
             WorldEventRecord(
                 record_id="r1",
@@ -2240,43 +2216,6 @@ class TestWorld:
         )
         with pytest.raises(TypeError):
             world.event_log.append("mutated again")
-        assert world.event_log == ["[Year 1001, Month 1, Day 1] Canonical clash"]
-
-    def test_record_event_clears_display_adapter_through_world_facade(self):
-        from fantasy_simulator.events import WorldEventRecord
-
-        world = World()
-        world.log_event("display-only line")
-
-        world.record_event(
-            WorldEventRecord(
-                record_id="r1",
-                kind="battle",
-                year=1001,
-                month=1,
-                day=1,
-                description="canonical line",
-            )
-        )
-
-        assert all("display-only line" not in line for line in world.get_compatibility_event_log())
-
-    def test_log_event_rejects_display_only_write_after_canonical_history_exists(self):
-        from fantasy_simulator.events import WorldEventRecord
-
-        world = World()
-        world.record_event(
-            WorldEventRecord(
-                record_id="r1",
-                kind="battle",
-                year=1001,
-                description="Canonical clash",
-            )
-        )
-
-        with pytest.raises(RuntimeError, match="canonical event_records"):
-            world.log_event("display-only line")
-
         assert world.event_log == ["[Year 1001, Month 1, Day 1] Canonical clash"]
 
     def test_trimming_event_records_removes_dangling_recent_event_ids(self):

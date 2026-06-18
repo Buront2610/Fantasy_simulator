@@ -19,8 +19,9 @@ this precedence:
 
 - World events: `world.event_records` beats top-level `history` and
   `world.event_log`.
-- Display event log: project from `world.event_records`; use `world.event_log`
-  only when no records exist.
+- Display event log: project from `world.event_records`. Legacy
+  `world.event_log` input is migration-only and is lifted into event records
+  before hydration.
 - Event rendering: `WorldEventRecord.summary_key` plus JSON-compatible
   `render_params` is the locale-aware display source when present.
   `description` remains the compatibility fallback text.
@@ -41,8 +42,9 @@ this precedence:
   metadata, including `location_id`, `location:*` tags, `render_params`
   location IDs (`location_id`, `from_location_id`, `to_location_id`,
   `endpoint_location_ids`), and location-targeted impacts.
-- Legacy event log entries: `legacy_event_log_entry` is exact preserved text
-  from older saves. It is intentionally not retranslated after locale changes.
+- Removed legacy event payloads: `legacy_event_result` and
+  `legacy_event_log_entry` may appear in older saves, but current hydration
+  ignores them and current serialization never writes them.
 - Language evolution: `world.language_evolution_history` beats
   `world.language_runtime_states`.
 - Bundle-backed world structure: embedded `world.setting_bundle` site/route
@@ -92,14 +94,12 @@ this precedence:
   `reason_key`, and `cause_event_id`. Impacts target `terrain_cell` with target
   ID `terrain:<x>:<y>` for each changed attribute. Location-linked mutations
   must also include a `location:<location_id>` tag.
-- Compatibility `EventResult` projections may expose `render_params` in
-  metadata for legacy readers. That metadata is adapter output, not an
-  additional durable source of truth. If legacy metadata and top-level
-  `WorldEventRecord.summary_key` / `render_params` both exist, the top-level
-  canonical fields win.
+- Compatibility `EventResult` projections may expose canonical `render_params`
+  in metadata for legacy readers. Removed legacy metadata is not preserved.
 - Migrating pre-current saves may lift legacy `history` and `world.event_log`
   entries into `world.event_records`. Already-migrated legacy records are
-  skipped by payload identity so repeated migrations do not duplicate them.
+  skipped by canonical field identity so repeated migrations do not duplicate
+  them.
 - If both `language_evolution_history` and `language_runtime_states` are
   present, history wins. Runtime states are a convenience cache and must be
   rebuilt from history when history exists.

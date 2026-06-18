@@ -41,16 +41,10 @@ form that tests can enforce.
 ## Canonical Event Data
 
 - `World.event_records` is the canonical structured event store.
-- `WorldEventRecord` is canonical-first; optional compatibility payloads
-  (`legacy_event_result` / `legacy_event_log_entry`) may still be persisted
-  in-record only to preserve backward-load behavior and exact legacy
-  `EventResult` adapter projection while those compatibility APIs exist.
-- `World.event_log` is a compatibility display buffer derived from canonical
-  events.
-- `Simulator.history` is a legacy `EventResult` adapter projected from
-  canonical records for compatibility.
-- `World.get_compatibility_event_log()` and `QueryMixin.events_by_type()` are
-  the explicit adapter paths for legacy reads.
+- Removed legacy event payloads are migration-only inputs. Current
+  `WorldEventRecord` serialization must not persist `legacy_event_result` or
+  `legacy_event_log_entry`.
+- `World.event_log` is a read-only projection derived from canonical events.
 - Legacy world mutation helpers such as `rename_location()`,
   `set_route_blocked()`, and `set_location_controlling_faction()` are
   compatibility paths. New production write paths should use canonical
@@ -60,20 +54,14 @@ form that tests can enforce.
 
 - New reporting, rumor, presenter, and view-model code must read from
   `event_records`.
-- `events_by_type()` is legacy. New production code must not call it.
-- Direct `event_log` reads should stay inside compatibility-oriented query/UI
-  paths, not spread into new gameplay or reporting logic.
+- Direct `event_log` reads should stay inside text-log query/UI paths, not
+  spread into new gameplay or reporting logic.
 
-## Compatibility Adapter Inventory
+## Event Projection Inventory
 
-- `World.get_compatibility_event_log()`: read adapter for CLI/event-log
-  compatibility consumers while canonical reads migrate to `event_records`.
-- `QueryMixin.events_by_type()`: legacy adapter returning `EventResult`
-  projections for callers not yet migrated to `events_by_kind()`.
-- `Simulator.history`: runtime compatibility projection retained for staged
-  migration away from legacy `EventResult` pathways.
-- `World.event_log`: runtime compatibility display projection/cache rebuilt from
-  canonical records; load paths still accept older snapshots that stored it.
+- `World.event_log`: read-only runtime projection from canonical records; load
+  paths still accept older snapshots that stored `world.event_log` by migrating
+  those lines into records.
 
 ## Sunset Conditions
 

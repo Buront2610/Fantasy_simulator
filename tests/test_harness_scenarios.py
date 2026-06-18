@@ -82,7 +82,6 @@ def _capture_bundle_cached(locale: str) -> dict[str, object]:
         "month": sim.current_month,
         "event_record_count": len(sim.world.event_records),
         "event_log_count": len(sim.world.event_log),
-        "history_count": len(sim.history),
         "kind_counts": dict(sorted(Counter(r.kind for r in sim.world.event_records).items())),
         "summary_lines": content_lines(sim.get_summary()),
         "yearly_overview": _extract_section(yearly_report, yearly_overview_header),
@@ -509,7 +508,6 @@ def _assert_seeded_acceptance_bundle(bundle: dict[str, Any], *, locale: str) -> 
     assert bundle["month"] == 1
     assert bundle["event_record_count"] == 11
     assert bundle["event_log_count"] == 11
-    assert bundle["history_count"] == 11
     assert bundle["kind_counts"] == {
         "aging": 2,
         "discovery": 2,

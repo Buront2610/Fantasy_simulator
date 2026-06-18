@@ -58,7 +58,6 @@ class WorldStructureMixin:
         def ensure_valid_character_locations(self) -> None: ...
         def rebuild_adventure_index(self) -> None: ...
         def rebuild_recent_event_ids(self) -> None: ...
-        def rebuild_compatibility_event_log(self) -> None: ...
 
     def _fallback_location_id(self, name: str) -> str:
         """Resolve legacy fallback location IDs through this world instance."""
@@ -241,7 +240,6 @@ class WorldStructureMixin:
             ensure_valid_character_locations=self.ensure_valid_character_locations,
             rebuild_adventure_index=self.rebuild_adventure_index,
             rebuild_recent_event_ids=self.rebuild_recent_event_ids,
-            rebuild_compatibility_event_log=self.rebuild_compatibility_event_log,
             has_event_records=bool(self.event_records),
         )
 

@@ -11,8 +11,7 @@ The Simulator is composed from several mixins that separate concerns:
 - :class:`~.adventure_coordinator.AdventureMixin`: adventure management
 - :class:`~.queries.QueryMixin`: summary / report / story access
 
-This module contains only Simulator assembly, initialisation, and the legacy
-``history`` adapter.
+This module contains only Simulator assembly and initialisation.
 """
 
 from __future__ import annotations
@@ -21,7 +20,7 @@ import random
 from typing import TYPE_CHECKING, List, Optional
 
 from ..adventure import AdventureRun
-from ..event_models import EventResult, WorldEventRecord
+from ..event_models import WorldEventRecord
 from ..events import EventSystem
 from ..narrative.template_history import TemplateHistory
 
@@ -102,14 +101,3 @@ class Simulator(
         # PR-I: deterministic cooldown history for world-memory text selection.
         self.memorial_template_history = TemplateHistory(cooldown_size=4)
         self.alias_template_history = TemplateHistory(cooldown_size=4)
-
-    @property
-    def history(self) -> List[EventResult]:
-        """Project the legacy EventResult adapter from canonical world records.
-
-        Compatibility note:
-        This property intentionally survives until save/load and legacy callers
-        no longer require `EventResult` snapshots. New logic must consume
-        `world.event_records` instead of this adapter.
-        """
-        return [record.to_event_result() for record in self.world.event_records]
