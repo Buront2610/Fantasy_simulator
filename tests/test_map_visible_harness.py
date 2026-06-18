@@ -133,25 +133,34 @@ def _assert_seeded_map_visible_bundle(bundle: dict[str, list[str]]) -> None:
         "    | o-----o----#C#----D-----o |",
         "    | ^     |    #=#    |     | |",
         "    | ^     |    ###    |    ###|",
-        "    | o^^^^^o----#C#----D----#C#|",
-        "    | ^     |    #=#    |    #=#|",
-        "    | ^     |     |     |    ###|",
-        "    | o-----o-----@-----D----#C#|",
+        "    | o     o-   #C#   /D-   #C#|",
+        "    | ^^^ ^^| \\--#=#\\-- | \\--#=#|",
+        "    | ^ /-- |     | /-- |    ###|",
+        "    | o-   \\o-----@-   \\D----#C#|",
         "    |                        #=#|",
     ]
     assert "  Landmarks & World Memory:" in bundle["region"]
     assert any("Native name: Branthethal" in line for line in bundle["region"])
     assert any("Native name: Branthethal" in line for line in bundle["region"])
 
-    assert bundle["detail"][:32] == [
+    assert bundle["detail"][:33] == [
         "  | V The Verdant Vale (Village)                     |",
-        "  | Local site sketch                                |",
-        "  |         _       _          B                     |",
-        "  |    ____/ \\__ __/ \\____    []                     |",
-        "  |   | []  []  |  []  [] |                          |",
-        "  |   |   o     |   ..    |====                      |",
-        "  |   |____   __|__   ____|                          |",
-        "  |        |_|     |_|                               |",
+        "  | Generated local map                              |",
+        "  | ##################+##################            |",
+        "  | #                 =                 #            |",
+        "  | #              T  =                 #            |",
+        "  | #                 =                 #            |",
+        "  | #                 =      ###+       #            |",
+        "  | #                 =      ####    T  #            |",
+        "  | #                o=  T            T #            |",
+        "  | +=================@=================+            |",
+        "  | #  T              |                 #            |",
+        "  | #                 |         ###+#   #            |",
+        "  | #                 |                 #            |",
+        "  | #        T        |  T     T        #            |",
+        "  | #        T        |                 #            |",
+        "  | #                 |                 #            |",
+        "  | #####################################            |",
         "  | Local route sketch                               |",
         "  |  +-------------------------------+               |",
         "  |  |                               |               |",
@@ -165,17 +174,9 @@ def _assert_seeded_map_visible_bundle(bundle: dict[str, list[str]]) -> None:
         "  |  |                               |               |",
         "  |  +-------------------------------+               |",
         "  | Sketch cues: !=High danger                       |",
+        "  | Map legend: @ center, # buildings, = roads, o ...|",
         "  | Terrain: Plains (,)                              |",
         "  | Elev: midland (50%)                              |",
-        "  | Moist: balanced (50%)                            |",
-        "  | Temp: temperate (50%)                            |",
-        "  | Safety: tense                                    |",
-        "  | Danger:  70 (high)                               |",
-        "  | Traffic: ++ (medium)                             |",
-        "  | Pop: 2                                           |",
-        "  | Prosperity: stable (50)                          |",
-        "  | Mood: calm (45)                                  |",
-        "  | Rumor heat: 25 (low)                             |",
     ]
     assert "  | Native name: Branthethal                         |" in bundle["detail"]
     assert "  | Markers: Has alias                               |" not in bundle["detail"]
@@ -191,13 +192,22 @@ def _assert_memory_heavy_bundle(bundle: dict[str, list[str]]) -> None:
 
     assert bundle["detail"][:33] == [
         "  | V The Verdant Vale (Village)                     |",
-        "  | Local site sketch                                |",
-        "  |         _       _          B                     |",
-        "  |    ____/ \\__ __/ \\____    []                     |",
-        "  |   | []  []  |  []  [] |                          |",
-        "  |   |   o     |   ..    |====                      |",
-        "  |   |____   __|__   ____|                          |",
-        "  |        |_|     |_|                               |",
+        "  | Generated local map                              |",
+        "  | ##################+##################            |",
+        "  | #                 =                 #            |",
+        "  | #                 =                 #            |",
+        "  | #        +##      =          T      #            |",
+        "  | #  T    T         =T                #            |",
+        "  | #             T   =               T #            |",
+        "  | #                o=                 #            |",
+        "  | +=================@=================+            |",
+        "  | #    T            |                 #            |",
+        "  | #             T   |      +# +##     #            |",
+        "  | #     #+# #+      |      ## ### T T #            |",
+        "  | #     ### ##      |                 #            |",
+        "  | #                 |                 #            |",
+        "  | #                 |                 #            |",
+        "  | #####################################            |",
         "  | Local route sketch                               |",
         "  |  +-------------------------------+               |",
         "  |  |                               |               |",
@@ -211,18 +221,9 @@ def _assert_memory_heavy_bundle(bundle: dict[str, list[str]]) -> None:
         "  |  |                               |               |",
         "  |  +-------------------------------+               |",
         "  | Sketch cues: M=Memorial                          |",
+        "  | Map legend: @ center, # buildings, = roads, o ...|",
         "  | Terrain: Plains (,)                              |",
         "  | Elev: midland (50%)                              |",
-        "  | Moist: balanced (50%)                            |",
-        "  | Temp: temperate (50%)                            |",
-        "  | Safety: tense                                    |",
-        "  | Danger:  30 (low)                                |",
-        "  | Traffic: + (medium)                              |",
-        "  | Pop: 0                                           |",
-        "  | Local cues: Memory: Memorial, Trace              |",
-        "  | Prosperity: stable (50)                          |",
-        "  | Mood: calm (55)                                  |",
-        "  | Rumor heat: 20 (low)                             |",
     ]
     assert "  | Markers: Memorial present, Has alias, Recent d...|" in bundle["detail"]
     assert "  | Native name: Branthethal                         |" in bundle["detail"]
@@ -279,7 +280,7 @@ def test_map_views_surface_authored_local_cues() -> None:
     assert "  | Local cues: Site: Gate, Market, Notice board     |" in rendered["detail"]
 
 
-def test_location_detail_uses_larger_city_site_sketch() -> None:
+def test_location_detail_uses_generated_city_map() -> None:
     set_locale("en")
     rendered = render_world_map_views_for_location(
         World(),
@@ -288,15 +289,14 @@ def test_location_detail_uses_larger_city_site_sketch() -> None:
     )
 
     detail = rendered["detail"]
-    assert "  | Local site sketch                                |" in detail
-    assert "  |        ____||____        ________                |" in detail
-    assert "  |   ____/ []  []  \\______/ [] []  \\____            |" in detail
-    assert "  |        |  G |===== main road =====| G |          |" in detail
-    assert "  |        /      market square       \\              |" in detail
+    assert "  | Generated local map                              |" in detail
+    assert "  | ##################+##################            |" in detail
+    assert "  | +=================@=================+            |" in detail
     assert "  | Local route sketch                               |" in detail
     assert "  |  |            \\             /--D |               |" in detail
     assert "  |  |            ---@---            |               |" in detail
     assert "  | Sketch cues: G=Gate / $=Market / B=Notice board  |" in detail
+    assert "  | Map legend: @ center, # buildings, = roads, o ...|" in detail
 
 
 def test_region_route_sketch_renders_cities_as_blocks() -> None:
@@ -309,8 +309,9 @@ def test_region_route_sketch_renders_cities_as_blocks() -> None:
 
     route_sketch = rendered["region"].split("  What stands out here:", maxsplit=1)[0]
     assert "    | o-----o----#C#----D-----o |" in route_sketch
-    assert "    | o^^^^^o----#C#----D----#C#|" in route_sketch
-    assert "    | o-----o-----@-----D----#C#|" in route_sketch
+    assert "    | o     o-   #C#   /D-   #C#|" in route_sketch
+    assert "    | ^^^ ^^| \\--#=#\\-- | \\--#=#|" in route_sketch
+    assert "    | o-   \\o-----@-   \\D----#C#|" in route_sketch
     assert "o---o---C---D---C" not in route_sketch
 
 

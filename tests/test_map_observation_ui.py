@@ -543,8 +543,32 @@ class TestRenderLocationDetail(unittest.TestCase):
     def test_basic_detail_output(self) -> None:
         output = render_location_detail(self.info, "loc_test_town")
         self.assertIn("TestTown", output)
+        self.assertIn("Generated local map", output)
+        self.assertIn("Map legend", output)
         self.assertIn("Danger", output)
         self.assertIn("Pop", output)
+
+    def test_dungeon_detail_uses_procedural_floor_plan(self) -> None:
+        info = MapRenderInfo(world_name="DungeonWorld", year=10, width=1, height=1)
+        info.cells[(0, 0)] = MapCellInfo(
+            location_id="loc_dungeon",
+            canonical_name="Shifting Vault",
+            region_type="dungeon",
+            icon="D",
+            safety_label="dangerous",
+            danger=80,
+            traffic_indicator="quiet",
+            population=0,
+            x=0,
+            y=0,
+            danger_band="high",
+        )
+
+        output = render_location_detail(info, "loc_dungeon")
+
+        self.assertIn("Generated local map", output)
+        self.assertIn("@ entrance", output)
+        self.assertIn(">", output)
 
     def test_detail_with_memorials(self) -> None:
         output = render_location_detail(
@@ -1346,10 +1370,10 @@ class TestObservationSnapshots(unittest.TestCase):
             "    +---------------+\n"
             "    |               |\n"
             "    | o             |\n"
-            "    |  -\\           |\n"
-            "    |    -\\###      |\n"
-            "    |      #@#      |\n"
-            "    |      #=#      |\n"
+            "    |  \\            |\n"
+            "    |   |  ###      |\n"
+            "    |   \\  #@#      |\n"
+            "    |    -/#=#      |\n"
             "    |               |\n"
             "    |               |\n"
             "    |               |\n"

@@ -560,7 +560,7 @@ class TestShowResultsUsesBackends(unittest.TestCase):
 
         self.assertIn("Open follow-up", out.text)
         self.assertIn("Location follow-up", out.text)
-        self.assertIn("Local site sketch", out.text)
+        self.assertIn("Generated local map", out.text)
 
     def test_world_map_auto_mode_uses_minimal_on_narrow_terminal(self) -> None:
         from fantasy_simulator.ui.screens import _show_results, _build_default_world

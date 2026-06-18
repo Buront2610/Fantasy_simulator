@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import List, Optional
 
 from ..i18n import tr, tr_term
+from ..local_map_generation import generate_local_map
 from .atlas_canvas import _ROUTE_LINE, _bresenham
 from .map_view_models import LocalMapCue, MapCellInfo, MapRenderInfo, RouteRenderInfo
 from .ui_helpers import fit_display_width
@@ -65,62 +66,6 @@ def _format_local_cue_groups(cues: List[LocalMapCue]) -> str:
         if labels:
             parts.append(f"{tr(f'map_cue_category_{category}')}: {', '.join(labels)}")
     return "; ".join(parts)
-
-
-def _site_ascii_lines(cell: MapCellInfo) -> List[str]:
-    if cell.region_type == "city":
-        return [
-            "       ____||____        ________       ",
-            "  ____/ []  []  \\______/ [] []  \\____  ",
-            " | []  []  []    |  $  []   []   []  | ",
-            " |      ____      |____     ____      | ",
-            " | []  | [] |  o  | [] |   | [] |  []| ",
-            " |_____|____|_____|____|___|____|____| ",
-            "       |  G |===== main road =====| G | ",
-            "  _____|____|_____________________|___|_",
-            "       /      market square       \\    ",
-        ]
-    if cell.region_type == "village":
-        return [
-            "        _       _          B",
-            "   ____/ \\__ __/ \\____    []",
-            "  | []  []  |  []  [] |",
-            "  |   o     |   ..    |====",
-            "  |____   __|__   ____|",
-            "       |_|     |_|",
-        ]
-    if cell.region_type == "dungeon":
-        return [
-            "          /\\",
-            "     ____/  \\____",
-            "    /  []    []   \\",
-            "   /__[]______[]__\\",
-            "      ||  ||  ||",
-            "      xx  ||  xx",
-        ]
-    if cell.region_type == "mountain":
-        return [
-            "          /\\        /\\",
-            "     /\\  /  \\__/\\  /  \\",
-            "    /  \\/  ||  \\/  /\\",
-            "        /__||__\\",
-            "           ||",
-        ]
-    if cell.region_type == "forest":
-        return [
-            "      ^^   ^^   ^^",
-            "    ^^    --     ^^",
-            "      ^^   []   ^^",
-            "    ^^    ..     ^^",
-            "          ||",
-        ]
-    return [
-        "       .     .      .",
-        "    .       --       .",
-        "       .    []    .",
-        "    .______/  \\____.",
-        "          ||",
-    ]
 
 
 def _local_symbol_line(cell: MapCellInfo, width: int) -> List[str]:
@@ -246,12 +191,18 @@ def _append_detail_route_sketch(lines: List[str], info: MapRenderInfo, cell: Map
 
 
 def _append_site_ascii(lines: List[str], info: MapRenderInfo, cell: MapCellInfo, width: int, border: str) -> None:
-    title = f" {tr('map_detail_aa_title')}"
+    title = f" {tr('map_detail_local_map_title')}"
+    connected = _connected_detail_routes(info, cell)
+    generated_map = generate_local_map(cell, [other for _route, other in connected])
     lines.append(f"  |{_fit(title, width)}|")
-    for art_line in _site_ascii_lines(cell):
+    for art_line in generated_map.lines:
         lines.append(f"  |{_fit(f' {art_line}', width)}|")
     _append_detail_route_sketch(lines, info, cell, width)
     lines.extend(_local_symbol_line(cell, width))
+    if generated_map.legend_keys:
+        legend = " / ".join(tr(key) for key in generated_map.legend_keys)
+        legend_label = tr("map_detail_local_map_legend")
+        lines.append(f"  |{_fit(f' {legend_label}: {legend}', width)}|")
     lines.append(border)
 
 
