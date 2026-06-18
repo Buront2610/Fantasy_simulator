@@ -5,6 +5,7 @@ from __future__ import annotations
 import random
 from typing import TYPE_CHECKING, Any, Dict, List
 
+from .event_causality import pair_cause_event_ids
 from .character_creator import CharacterCreator
 from .event_models import EventResult, generate_record_id
 from .i18n import tr
@@ -12,6 +13,9 @@ from .i18n import tr
 if TYPE_CHECKING:
     from .character import Character
     from .world import World
+
+
+BIRTH_PARENT_RELATIONSHIP_DELTA = 6
 
 
 def resolve_birth_event(
@@ -26,6 +30,16 @@ def resolve_birth_event(
 
     birth_source_id = generate_record_id(rng)
     relation_tag_updates = _link_family(parent1, parent2, child, birth_source_id)
+    relation_tag_updates.extend(_link_parent_couple(parent1, parent2, birth_source_id))
+    parent1.update_mutual_relationship(parent2, BIRTH_PARENT_RELATIONSHIP_DELTA)
+    cause_event_ids = pair_cause_event_ids(
+        world,
+        parent1,
+        parent2,
+        relation_tags=("spouse", "co_parent"),
+        event_kinds=("marriage", "birth"),
+        limit=3,
+    )
     desc = tr(
         "birth_happened",
         child=child.name,
@@ -42,6 +56,7 @@ def resolve_birth_event(
         event_type="birth",
         year=world.year,
         metadata={
+            "cause_event_ids": cause_event_ids,
             "relation_tag_updates": relation_tag_updates,
             "record_id": birth_source_id,
             "summary_key": "events.birth.summary",
@@ -85,5 +100,21 @@ def _link_family(
             {"source": parent.char_id, "target": child.char_id, "tag": "family"},
             {"source": child.char_id, "target": parent.char_id, "tag": "parent"},
             {"source": child.char_id, "target": parent.char_id, "tag": "family"},
+        ])
+    return updates
+
+
+def _link_parent_couple(
+    parent1: "Character",
+    parent2: "Character",
+    source_event_id: str,
+) -> List[Dict[str, str]]:
+    updates: List[Dict[str, str]] = []
+    for source, target in ((parent1, parent2), (parent2, parent1)):
+        source.add_relation_tag(target.char_id, "co_parent", source_event_id=source_event_id)
+        source.add_relation_tag(target.char_id, "family", source_event_id=source_event_id)
+        updates.extend([
+            {"source": source.char_id, "target": target.char_id, "tag": "co_parent"},
+            {"source": source.char_id, "target": target.char_id, "tag": "family"},
         ])
     return updates

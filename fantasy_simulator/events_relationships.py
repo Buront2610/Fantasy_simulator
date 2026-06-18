@@ -111,9 +111,13 @@ def _romance_result(
     )
 
 
-def _marriage_relation_tag_updates(char1: "Character", char2: "Character") -> List[Dict[str, str]]:
-    char1.add_relation_tag(char2.char_id, "spouse")
-    char2.add_relation_tag(char1.char_id, "spouse")
+def _marriage_relation_tag_updates(
+    char1: "Character",
+    char2: "Character",
+    source_event_id: str,
+) -> List[Dict[str, str]]:
+    char1.add_relation_tag(char2.char_id, "spouse", source_event_id=source_event_id)
+    char2.add_relation_tag(char1.char_id, "spouse", source_event_id=source_event_id)
     return [
         {"source": char1.char_id, "target": char2.char_id, "tag": "spouse"},
         {"source": char2.char_id, "target": char1.char_id, "tag": "spouse"},
@@ -148,7 +152,7 @@ def _marriage_result(
         event_kinds=("meeting", "romance"),
         limit=3,
     )
-    relation_tag_updates = _marriage_relation_tag_updates(char1, char2)
+    relation_tag_updates = _marriage_relation_tag_updates(char1, char2, marriage_source_id)
     stat_changes = _marriage_stat_changes(char1, char2)
 
     desc = tr(

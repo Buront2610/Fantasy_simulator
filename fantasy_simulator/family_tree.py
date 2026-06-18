@@ -25,6 +25,7 @@ class FamilyCoupleView:
     marriage_years: tuple[int, ...] = ()
     child_ids: tuple[str, ...] = ()
     children: tuple[FamilyMemberView | None, ...] = ()
+    relationship_score: int | None = None
     active_marriage: bool = False
 
     @property
@@ -49,6 +50,7 @@ def build_family_tree(world: Any) -> FamilyTreeView:
     """Build a family tree projection without adding persistent schema fields."""
     characters = list(getattr(world, "characters", []))
     members = {_char_id(character): _member_view(character) for character in characters}
+    characters_by_id = {_char_id(character): character for character in characters}
     marriage_years: dict[tuple[str, str], list[int]] = {}
     active_marriages: set[tuple[str, str]] = set()
     children_by_couple: dict[tuple[str, str], set[str]] = {}
@@ -80,7 +82,7 @@ def build_family_tree(world: Any) -> FamilyTreeView:
         ),
     )
     couples = tuple(
-        _couple_view(key, members, marriage_years, children_by_couple, active_marriages)
+        _couple_view(key, members, characters_by_id, marriage_years, children_by_couple, active_marriages)
         for key in all_couple_keys
     )
     married_couples = [couple for couple in couples if couple.has_marriage]
@@ -98,6 +100,7 @@ def build_family_tree(world: Any) -> FamilyTreeView:
 def _couple_view(
     key: tuple[str, str],
     members: dict[str, FamilyMemberView],
+    characters_by_id: dict[str, Any],
     marriage_years: dict[tuple[str, str], list[int]],
     children_by_couple: dict[tuple[str, str], set[str]],
     active_marriages: set[tuple[str, str]],
@@ -111,6 +114,7 @@ def _couple_view(
         marriage_years=tuple(sorted(dict.fromkeys(marriage_years.get(key, [])))),
         child_ids=child_ids,
         children=tuple(members.get(child_id) for child_id in child_ids),
+        relationship_score=_couple_relationship_score(characters_by_id, key),
         active_marriage=key in active_marriages,
     )
 
@@ -224,6 +228,7 @@ def _render_couple_line(couple: FamilyCoupleView) -> str:
         partner2=_member_label(couple.partners[1]),
         status=status,
         count=couple.child_count,
+        relationship=_relationship_label(couple.relationship_score),
     )
 
 
@@ -239,3 +244,22 @@ def _member_label(member: FamilyMemberView | None) -> str:
         age=member.age,
         status=status,
     )
+
+
+def _couple_relationship_score(characters_by_id: dict[str, Any], key: tuple[str, str]) -> int | None:
+    first = characters_by_id.get(key[0])
+    second = characters_by_id.get(key[1])
+    if first is None or second is None:
+        return None
+    first_score = getattr(first, "relationships", {}).get(key[1])
+    second_score = getattr(second, "relationships", {}).get(key[0])
+    scores = [score for score in (first_score, second_score) if isinstance(score, int)]
+    if not scores:
+        return None
+    return round(sum(scores) / len(scores))
+
+
+def _relationship_label(score: int | None) -> str:
+    if score is None:
+        return tr("family_tree_relationship_unknown")
+    return f"{score:+d}"

@@ -111,13 +111,14 @@ def generate_random_event(
 
     event_types = list(EVENT_WEIGHTS.keys())
     weights = [EVENT_WEIGHTS[event_type] for event_type in event_types]
-    if has_population_capacity(world) and birth_pairs(eligible):
+    eligible_birth_pairs = birth_pairs(eligible) if has_population_capacity(world) else []
+    if eligible_birth_pairs:
         event_types.append("birth")
         weights.append(BIRTH_EVENT_WEIGHT)
     chosen_type = rng.choices(event_types, weights=weights, k=1)[0]
 
     if chosen_type == "birth":
-        pair = find_birth_pair(eligible, rng=rng)
+        pair = rng.choice(eligible_birth_pairs) if eligible_birth_pairs else find_birth_pair(eligible, rng=rng)
         if pair is not None:
             return resolve_birth_event(pair[0], pair[1], world, rng=rng)
         chosen_type = rng.choice(["skill_training", "discovery", "journey"])

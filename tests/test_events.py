@@ -8,6 +8,7 @@ import pytest
 from fantasy_simulator.character import Character
 from fantasy_simulator.content.setting_bundle import RaceDefinition, SettingBundle, SiteSeedDefinition, WorldDefinition
 from fantasy_simulator.events import EventResult, EventSystem
+from fantasy_simulator import events_selection
 from fantasy_simulator.events_family import resolve_birth_event
 from fantasy_simulator.event_models import WorldEventRecord
 from fantasy_simulator.i18n import get_locale, set_locale
@@ -691,6 +692,31 @@ class TestEventBirth:
         assert child.has_relation_tag(char_b.char_id, "parent")
         assert result.metadata["summary_key"] == "events.birth.summary"
 
+    def test_birth_strengthens_couple_as_co_parents_and_cites_marriage(self, es, char_a, char_b, world):
+        char_a.spouse_id = char_b.char_id
+        char_b.spouse_id = char_a.char_id
+        world.event_records = [
+            WorldEventRecord(
+                record_id="marriage_ab",
+                kind="marriage",
+                year=world.year,
+                primary_actor_id=char_a.char_id,
+                secondary_actor_ids=[char_b.char_id],
+            )
+        ]
+
+        result = resolve_birth_event(char_a, char_b, world, rng=random.Random(1))
+        birth_record_id = result.metadata["record_id"]
+
+        assert char_a.get_relationship(char_b.char_id) == 6
+        assert char_b.get_relationship(char_a.char_id) == 6
+        assert char_a.has_relation_tag(char_b.char_id, "co_parent")
+        assert char_b.has_relation_tag(char_a.char_id, "co_parent")
+        assert char_a.has_relation_tag(char_b.char_id, "family")
+        assert char_b.has_relation_tag(char_a.char_id, "family")
+        assert birth_record_id in char_a.relation_tag_sources[f"{char_b.char_id}:co_parent"]
+        assert result.metadata["cause_event_ids"] == ["marriage_ab"]
+
     def test_random_birth_event_uses_married_collocated_pair(self, es, char_a, char_b, world):
         char_a.spouse_id = char_b.char_id
         char_b.spouse_id = char_a.char_id
@@ -718,6 +744,42 @@ class TestEventBirth:
         assert result is not None
         assert result.event_type == "birth"
         assert len(world.characters) == 3
+
+    def test_random_birth_event_reuses_birth_pair_scan(self, es, char_a, char_b, world, monkeypatch):
+        char_a.spouse_id = char_b.char_id
+        char_b.spouse_id = char_a.char_id
+        calls = 0
+
+        def fake_birth_pairs(_alive):
+            nonlocal calls
+            calls += 1
+            return [(char_a, char_b)]
+
+        class BirthRng:
+            def choices(self, population, weights=None, k=1):
+                if "birth" in population:
+                    return ["birth"]
+                return [population[0]]
+
+            def choice(self, options):
+                return options[0]
+
+            def randint(self, lo, hi):
+                return lo
+
+            def sample(self, population, k):
+                return list(population[:k])
+
+            def getrandbits(self, bits):
+                return 2
+
+        monkeypatch.setattr(events_selection, "birth_pairs", fake_birth_pairs)
+
+        result = es.generate_random_event(world.characters, world, rng=BirthRng())
+
+        assert result is not None
+        assert result.event_type == "birth"
+        assert calls == 1
 
 
 # ---------------------------------------------------------------------------

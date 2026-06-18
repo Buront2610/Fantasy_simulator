@@ -30,6 +30,7 @@ def test_family_tree_projects_marriages_births_and_average_children() -> None:
         world.add_character(character)
     parent_a.spouse_id = parent_b.char_id
     parent_b.spouse_id = parent_a.char_id
+    parent_a.update_mutual_relationship(parent_b, 42)
     parent_c.spouse_id = parent_d.char_id
     parent_d.spouse_id = parent_c.char_id
     world.event_records = [
@@ -72,6 +73,7 @@ def test_family_tree_projects_marriages_births_and_average_children() -> None:
     assert tree.children_per_married_couple == 1.0
     assert tree.married_couples_with_children == 1
     assert [couple.child_count for couple in tree.couples] == [2, 0]
+    assert tree.couples[0].relationship_score == 42
 
 
 def test_family_tree_uses_relation_tags_when_birth_record_is_missing() -> None:
@@ -83,6 +85,8 @@ def test_family_tree_uses_relation_tags_when_birth_record_is_missing() -> None:
     child.add_relation_tag(parent_b.char_id, "parent")
     for character in (parent_a, parent_b, child):
         world.add_character(character)
+    parent_a.update_relationship(parent_b.char_id, 8)
+    parent_b.update_relationship(parent_a.char_id, 10)
 
     tree = build_family_tree(world)
 
@@ -98,6 +102,8 @@ def test_render_family_tree_lines_includes_summary_and_children() -> None:
     child = _character("Eli", "child", age=2)
     for character in (parent_a, parent_b, child):
         world.add_character(character)
+    parent_a.update_relationship(parent_b.char_id, 8)
+    parent_b.update_relationship(parent_a.char_id, 10)
     world.event_records = [
         WorldEventRecord(
             record_id="marriage",
@@ -118,5 +124,6 @@ def test_render_family_tree_lines_includes_summary_and_children() -> None:
 
     assert lines[0] == "FAMILY TREE"
     assert "avg children/couple: 1.00" in lines[1]
+    assert "bond=+9" in lines[2]
     assert any("Ari" in line and "Bea" in line for line in lines)
     assert any("Eli" in line for line in lines)
