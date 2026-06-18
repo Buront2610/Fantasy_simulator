@@ -579,6 +579,8 @@ def _relationship_turning_point_reason_key(
     context = set(personality.context_factor_keys)
     catalyst_factors = set(catalyst.factor_keys)
     affinity_factors = set(personality.affinity.factor_keys)
+    if personality.affinity.score < 0 and catalyst.score > 0:
+        return "relationship_turning_point_reason_unlikely_bond"
     if "rescue_debt" in catalyst_factors or "rescued_gratitude" in context:
         return "relationship_turning_point_reason_rescue_debt"
     if context.intersection({"grief", "recent_fear"}):

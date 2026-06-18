@@ -317,6 +317,9 @@ TEXT_JA: Dict[str, str] = {
     'relationship_betrayal': '{name1} と {name2} の信頼は {location} で破れ、苦い痕を残した。{turning_point_reason}（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）',  # noqa: E501
     'relationship_comfort': '{name1} と {name2} は {location} で静かな慰めの時間を分け合った。{turning_point_reason}（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）',  # noqa: E501
     'relationship_turning_point_reason_rescue_debt': '救助の恩が、互いを見る目をまだ変えていた。',
+    'relationship_turning_point_reason_unlikely_bond': (
+        '気質は噛み合わないが、共に越えた出来事がその例外を意味あるものにした。'
+    ),
     'relationship_turning_point_reason_vulnerability': '直近の恐怖が、古い防御を保ちにくくしていた。',
     'relationship_turning_point_reason_combat_tension': '暴力の記憶が、すべての言葉を鋭くしていた。',
     'relationship_turning_point_reason_shared_curiosity': '近い好奇心が、その教えを信じる理由になった。',

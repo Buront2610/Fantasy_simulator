@@ -302,6 +302,14 @@ class TestEventMeeting:
     def test_relationship_turning_point_reconciles_bad_history_with_causal_record(self, es, world):
         saved = _make_char("Saved")
         rescuer = _make_char("Rescuer")
+        saved.personality = {
+            "openness": 50,
+            "discipline": 50,
+            "extraversion": 50,
+            "agreeableness": 50,
+            "stability": 50,
+        }
+        rescuer.personality = dict(saved.personality)
         saved.update_mutual_relationship(rescuer, -50)
         world.add_character(saved)
         world.add_character(rescuer)
@@ -334,6 +342,47 @@ class TestEventMeeting:
             record, locale="en", world=world
         )
         assert "救助の恩が、互いを見る目をまだ変えていた。" in render_event_record(record, locale="ja", world=world)
+
+    def test_relationship_turning_point_marks_unlikely_bond_when_catalyst_overcomes_bad_fit(self, es, world):
+        saved = _make_char("Saved")
+        rescuer = _make_char("Rescuer")
+        saved.personality = {
+            "openness": 100,
+            "discipline": 0,
+            "extraversion": 100,
+            "agreeableness": 20,
+            "stability": 20,
+        }
+        rescuer.personality = {
+            "openness": 0,
+            "discipline": 100,
+            "extraversion": 0,
+            "agreeableness": 20,
+            "stability": 20,
+        }
+        saved.update_mutual_relationship(rescuer, -50)
+        world.add_character(saved)
+        world.add_character(rescuer)
+        rescue = world.record_event(WorldEventRecord(
+            record_id="rescue_unlikely",
+            kind="dying_rescued",
+            year=world.year,
+            primary_actor_id=saved.char_id,
+            secondary_actor_ids=[rescuer.char_id],
+            description="Rescuer saved Saved despite their differences.",
+        ))
+
+        result = resolve_relationship_turning_point_event(saved, rescuer, world, rng=random.Random(4))
+
+        assert result.event_type == "relationship_reconciliation"
+        assert rescue.record_id in result.metadata["cause_event_ids"]
+        assert result.metadata["personality_affinity"] < 0
+        assert result.metadata["relationship_catalyst_bonus"] > 0
+        assert (
+            result.metadata["render_params"]["turning_point_reason_key"]
+            == "relationship_turning_point_reason_unlikely_bond"
+        )
+        assert "Their temperaments did not fit" in result.description
 
     def test_relationship_turning_point_can_create_mentor_or_betrayer_tags(self, es, world):
         elder = _make_char("Elder", age=54)

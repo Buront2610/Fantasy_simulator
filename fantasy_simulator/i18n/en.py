@@ -319,6 +319,9 @@ TEXT_EN: Dict[str, str] = {
     'relationship_betrayal': '{name1} and {name2} broke trust at {location}, leaving a bitter mark. {turning_point_reason} ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
     'relationship_comfort': '{name1} and {name2} found a quiet moment of comfort at {location}. {turning_point_reason} ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
     'relationship_turning_point_reason_rescue_debt': 'A rescue debt still shaped how they saw each other.',
+    'relationship_turning_point_reason_unlikely_bond': (
+        'Their temperaments did not fit, but a shared ordeal made the exception matter.'
+    ),
     'relationship_turning_point_reason_vulnerability': 'Recent fear made old defenses harder to keep raised.',
     'relationship_turning_point_reason_combat_tension': 'The memory of violence kept every word sharp.',
     'relationship_turning_point_reason_shared_curiosity': 'Shared curiosity made the lesson worth trusting.',
