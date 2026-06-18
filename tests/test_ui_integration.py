@@ -685,6 +685,82 @@ class TestShowRosterUsesBackends(unittest.TestCase):
         self.assertTrue(any(c[0] == "print_heading" for c in out.calls))
         self.assertTrue(any("Alice" in c[1] for c in out.calls if len(c) > 1))
 
+    def test_roster_profile_groups_background_family_history_and_combat(self) -> None:
+        from fantasy_simulator.event_models import WorldEventRecord
+        from fantasy_simulator.ui.screens import _show_roster
+
+        world = World()
+        hero = Character(
+            "Aldric",
+            25,
+            "Male",
+            "Human",
+            "Warrior",
+            char_id="hero",
+            location_id="loc_aethoria_capital",
+            founder_background={
+                "family_origin": "minor_noble",
+                "family_status": "fallen",
+                "upbringing": "strict_training",
+                "pre_adventure": "local_guard",
+                "reputation": "promising",
+            },
+            history=["Year 1000: Took up the sword.", "Year 1001: Guarded the north road."],
+        )
+        spouse = Character("Mira", 24, "Female", "Human", "Mage", char_id="spouse")
+        child = Character("Lio", 3, "Male", "Human", "Warrior", char_id="child")
+        hero.spouse_id = spouse.char_id
+        hero.add_relation_tag(child.char_id, "child")
+        hero.add_relation_tag(spouse.char_id, "spouse")
+        hero.update_relationship(spouse.char_id, 72)
+        for character in (hero, spouse, child):
+            world.add_character(character)
+        world.record_event(
+            WorldEventRecord(
+                record_id="battle_1",
+                kind="battle",
+                year=1002,
+                primary_actor_id=hero.char_id,
+                secondary_actor_ids=["rival"],
+                description="Aldric fought a rival.",
+                render_params={
+                    "combat_log": [{
+                        "round_number": 1,
+                        "actor_id": hero.char_id,
+                        "actor_name": hero.name,
+                        "target_id": "rival",
+                        "target_name": "Rival",
+                        "action_kind": "weapon_attack",
+                        "skill_key": "Swordsmanship",
+                        "dice": 12,
+                        "modifier": 5,
+                        "attack_total": 17,
+                        "defense_total": 11,
+                        "damage": 4,
+                        "outcome": "decisive",
+                    }],
+                },
+            )
+        )
+
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(answers=["1"])
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_roster(world, ctx=ctx)
+
+        self.assertIn("Aldric profile", out.text)
+        self.assertIn("Background", out.text)
+        self.assertIn("Family", out.text)
+        self.assertIn("Spouse: Mira", out.text)
+        self.assertIn("Children: Lio", out.text)
+        self.assertIn("Relationships", out.text)
+        self.assertIn("Mira: +72", out.text)
+        self.assertIn("Recent history", out.text)
+        self.assertIn("Guarded the north road", out.text)
+        self.assertIn("Recent combat", out.text)
+        self.assertIn("Aldric fought a rival.", out.text)
+
 
 class TestSelectLanguageUsesBackends(unittest.TestCase):
     """_select_language routes through UIContext."""

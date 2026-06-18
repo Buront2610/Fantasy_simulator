@@ -119,6 +119,9 @@ class TestRosterRendering(unittest.TestCase):
 
         # Build a context with a no-op pause
         class NoopInputBackend(StdInputBackend):
+            def read_line(self, prompt: str = "") -> str:
+                return ""
+
             def pause(self, message: str = "") -> None:
                 pass
         ctx = UIContext(inp=NoopInputBackend(), out=PrintRenderBackend())
