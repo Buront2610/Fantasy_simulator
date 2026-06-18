@@ -80,6 +80,9 @@ def _show_event_log(sim: Simulator, ctx: UIContext, last_n: int | None = None) -
         cause_text = _event_log_cause_text(sim, record)
         if cause_text:
             ctx.out.print_dim(f"      {cause_text}")
+        relationship_text = _event_log_relationship_text(record)
+        if relationship_text:
+            ctx.out.print_dim(f"      {relationship_text}")
         combat_rounds = combat_round_count_for_event(record)
         if combat_rounds:
             ctx.out.print_dim(f"      {tr('event_log_combat_summary', rounds=combat_rounds)}")
@@ -108,6 +111,34 @@ def _event_log_cause_text(sim: Simulator, record: object) -> str:
     if not causes:
         return tr("event_log_causes_unavailable")
     return tr("event_log_caused_by", events=" | ".join(causes))
+
+
+def _event_log_relationship_text(record: object) -> str:
+    render_params = getattr(record, "render_params", {})
+    if not isinstance(render_params, dict):
+        return ""
+    parts = []
+    if "personality_affinity" in render_params:
+        parts.append(
+            tr(
+                "event_log_personality_reason",
+                affinity=render_params.get("personality_affinity", 0),
+                factors=render_params.get("personality_factors", tr("event_log_no_personality_factors")),
+                delta=render_params.get("relationship_delta", 0),
+            )
+        )
+    catalyst_bonus = int(render_params.get("relationship_catalyst_bonus", 0) or 0)
+    if catalyst_bonus:
+        parts.append(
+            tr(
+                "event_log_catalyst_reason",
+                bonus=catalyst_bonus,
+                factors=render_params.get("relationship_catalyst_factors", tr("event_log_no_catalyst_factors")),
+            )
+        )
+    if not parts:
+        return ""
+    return tr("event_log_relationship_reason", reasons=" / ".join(parts))
 
 
 def _update_dirty_state_for_action(action: str, sim: Simulator, ctx: UIContext) -> bool | None:

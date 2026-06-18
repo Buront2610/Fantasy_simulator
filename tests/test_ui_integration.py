@@ -297,6 +297,54 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         self.assertIn("Because: The northern houses declared war.", out.text)
         self.assertIsNone(re.search(r"\b[0-9a-f]{32}\b", out.text))
 
+    def test_event_log_renders_relationship_personality_and_catalyst_factors(self) -> None:
+        import random
+        from types import SimpleNamespace
+        from fantasy_simulator.event_models import WorldEventRecord
+        from fantasy_simulator.events import EventSystem
+        from fantasy_simulator.ui.screens import _show_results
+
+        world = World()
+        saved = Character("Saved", 25, "Female", "Human", "Warrior", char_id="saved")
+        rescuer = Character("Rescuer", 25, "Male", "Human", "Warrior", char_id="rescuer")
+        saved.personality = {
+            "openness": 100,
+            "discipline": 0,
+            "extraversion": 100,
+            "agreeableness": 20,
+            "stability": 20,
+        }
+        rescuer.personality = {
+            "openness": 0,
+            "discipline": 100,
+            "extraversion": 0,
+            "agreeableness": 20,
+            "stability": 20,
+        }
+        for character in (saved, rescuer):
+            world.add_character(character)
+        world.record_event(WorldEventRecord(
+            record_id="rescue_cause",
+            kind="dying_rescued",
+            year=world.year,
+            primary_actor_id=saved.char_id,
+            secondary_actor_ids=[rescuer.char_id],
+            description="Rescuer saved Saved.",
+        ))
+        result = EventSystem().event_marriage(saved, rescuer, world, rng=random.Random(1))
+        world.record_event(WorldEventRecord.from_event_result(result, rng=random.Random(2)))
+        sim = SimpleNamespace(world=world)
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(menu_keys=["event_log_last_30", "back_to_main", "exit"])
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_results(sim, ctx=ctx)
+
+        self.assertIn("Because: Rescuer saved Saved.", out.text)
+        self.assertIn("Relationship factors:", out.text)
+        self.assertIn("personality", out.text)
+        self.assertIn("catalyst a rescue debt", out.text)
+
     def test_event_log_summarizes_combat_rounds_without_expanding_details(self) -> None:
         from types import SimpleNamespace
         from fantasy_simulator.event_models import WorldEventRecord
