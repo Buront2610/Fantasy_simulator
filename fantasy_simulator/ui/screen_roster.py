@@ -38,6 +38,8 @@ PROFILE_RELATION_EVENT_KINDS = {
     "relationship_mentorship",
     "relationship_betrayal",
     "relationship_comfort",
+    "relationship_value_alignment",
+    "relationship_value_clash",
 }
 
 

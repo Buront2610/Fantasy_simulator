@@ -44,6 +44,7 @@ class EventRecorderMixin:
         "relationship_reconciliation": 3, "relationship_conflict": 2,
         "relationship_mentorship": 3, "relationship_betrayal": 4,
         "relationship_comfort": 2,
+        "relationship_value_alignment": 3, "relationship_value_clash": 3,
     }
 
     if TYPE_CHECKING:

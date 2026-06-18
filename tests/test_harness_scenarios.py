@@ -517,7 +517,7 @@ def _assert_seeded_acceptance_bundle(bundle: dict[str, Any], *, locale: str) -> 
         "discovery": 1,
         "journey": 1,
         "meeting": 3,
-        "relationship_betrayal": 1,
+        "relationship_value_clash": 1,
         "skill_training": 2,
     }
     if locale == "en":
@@ -530,10 +530,10 @@ def _assert_seeded_acceptance_bundle(bundle: dict[str, Any], *, locale: str) -> 
         assert bundle["summary_lines"][1] == "  Final year: 1002"
         assert bundle["yearly_overview"] == ["    Total events recorded: 9"]
         assert bundle["yearly_regions"] == [
-            "    The Verdant Vale: Mokrar Zugufang and Brynvalra Brynuwood broke trust at The Verdant Vale, "
-            "leaving a bitter mark. The memory of violence kept every word sharp. "
-            "(Mokrar Zugufang->Brynvalra Brynuwood: -15 / Brynvalra Brynuwood->Mokrar Zugufang: -26 / "
-            "Avg: -20)",
+            "    The Verdant Vale: Mokrar Zugufang and Brynvalra Brynuwood found that their values cut "
+            "against each other at The Verdant Vale. The memory of violence kept every word sharp. "
+            "(Mokrar Zugufang->Brynvalra Brynuwood: -7 / Brynvalra Brynuwood->Mokrar Zugufang: -18 / "
+            "Avg: -12)",
             "    The Verdant Vale: An old grudge finally surfaced. Mokrar Zugufang defeated Brynvalra "
             "Brynuwood. Brynvalra Brynuwood suffered serious wounds in the fight.",
             "    Ironvein Mine: Goraga Gorufang was injured during the expedition and pulled back.",
@@ -555,10 +555,10 @@ def _assert_seeded_acceptance_bundle(bundle: dict[str, Any], *, locale: str) -> 
         assert bundle["summary_lines"][1] == "  最終年: 1002"
         assert bundle["yearly_overview"] == ["    記録イベント数: 9"]
         assert bundle["yearly_regions"] == [
-            "    The Verdant Vale: Mokrar Zugufang と Brynvalra Brynuwood の信頼は The Verdant Vale "
-            "で破れ、苦い痕を残した。暴力の記憶が、すべての言葉を鋭くしていた。"
-            "（Mokrar Zugufang->Brynvalra Brynuwood: -15 / Brynvalra Brynuwood->Mokrar Zugufang: -26 / "
-            "平均: -20）",
+            "    The Verdant Vale: Mokrar Zugufang と Brynvalra Brynuwood は The Verdant Vale "
+            "で価値観の食い違いを露わにした。暴力の記憶が、すべての言葉を鋭くしていた。"
+            "（Mokrar Zugufang->Brynvalra Brynuwood: -7 / Brynvalra Brynuwood->Mokrar Zugufang: -18 / "
+            "平均: -12）",
             "    The Verdant Vale: 古い遺恨がついに表に出た。 Mokrar Zugufang は Brynvalra Brynuwood "
             "に勝利した。 Brynvalra Brynuwood は戦いで重傷を負った。",
             "    Ironvein Mine: Goraga Gorufang は遠征中に負傷し、引き返した。",
@@ -587,9 +587,9 @@ def _assert_projection_contract(contract: dict[str, Any]) -> None:
             "discovery": 2,
             "journey": 7,
             "meeting": 4,
-            "relationship_betrayal": 1,
+            "relationship_value_clash": 1,
             "skill_training": 7,
-        },
+        }
     }
     assert len(contract["topology"]["site_ids"]) == 25
     assert "loc_the_verdant_vale" in contract["topology"]["site_ids"]
@@ -600,10 +600,10 @@ def _assert_projection_contract(contract: dict[str, Any]) -> None:
     assert ("aging",) in contract["event_tags"]
     assert ("discovery",) in contract["event_tags"]
     assert ("journey",) in contract["event_tags"]
-    assert ("relationship_betrayal",) in contract["event_tags"]
+    assert ("relationship_value_clash",) in contract["event_tags"]
     assert contract["relation_tags"] == [
         ("1e27a1c0", "7f26144b", ("rival",)),
-        ("7f26144b", "1e27a1c0", ("rival", "betrayer")),
+        ("7f26144b", "1e27a1c0", ("rival",)),
     ]
     assert contract["detail_projection"] == {
         "location_id": "loc_elderroot_forest",

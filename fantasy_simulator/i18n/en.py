@@ -319,6 +319,8 @@ TEXT_EN: Dict[str, str] = {
     'relationship_mentorship': '{name1} and {name2} settled into a mentor bond at {location}. {turning_point_reason} ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
     'relationship_betrayal': '{name1} and {name2} broke trust at {location}, leaving a bitter mark. {turning_point_reason} ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
     'relationship_comfort': '{name1} and {name2} found a quiet moment of comfort at {location}. {turning_point_reason} ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
+    'relationship_value_alignment': '{name1} and {name2} recognized a shared value at {location}. {turning_point_reason} ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
+    'relationship_value_clash': '{name1} and {name2} found that their values cut against each other at {location}. {turning_point_reason} ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
     'relationship_turning_point_reason_rescue_debt': 'A rescue debt still shaped how they saw each other.',
     'relationship_turning_point_reason_unlikely_bond': (
         'Their temperaments did not fit, but a shared ordeal made the exception matter.'
@@ -332,6 +334,10 @@ TEXT_EN: Dict[str, str] = {
     'relationship_turning_point_reason_mismatch': 'Their temperaments pulled the moment in opposite directions.',
     'relationship_turning_point_reason_trust': 'Steady warmth gave them enough trust to risk honesty.',
     'relationship_turning_point_reason_shared_history': 'Shared history mattered more than the immediate quarrel.',
+    'relationship_turning_point_reason_shared_features': 'Their defining features pointed toward the same promise.',
+    'relationship_turning_point_reason_shared_values': 'Their values lined up clearly enough to become a bond.',
+    'relationship_turning_point_reason_feature_clash': 'Their defining habits made the disagreement personal.',
+    'relationship_turning_point_reason_value_clash': 'What each of them valued made compromise difficult.',
     'relationship_moment_unlikely_catalyst': (
         'Their temperaments resisted each other, but the shared ordeal left a door open.'
     ),
@@ -350,6 +356,8 @@ TEXT_EN: Dict[str, str] = {
     'history_relationship_mentorship': 'Year {year}: Entered a mentor bond with {name} in {location}.',
     'history_relationship_betrayal': 'Year {year}: Trust broke with {name} in {location}.',
     'history_relationship_comfort': 'Year {year}: Shared comfort with {name} in {location}.',
+    'history_relationship_value_alignment': 'Year {year}: Recognized a shared value with {name} in {location}.',
+    'history_relationship_value_clash': 'Year {year}: Clashed over values with {name} in {location}.',
     'birth_happened': '{child}, child of {parent1} and {parent2}, was born in {location}.',
     'history_child_born': 'Year {year}: {child}, child with {partner}, was born.',
     'history_born_to_parents': 'Year {year}: Born to {parent1} and {parent2}.',
@@ -607,6 +615,8 @@ TEXT_EN: Dict[str, str] = {
     'event_type_relationship_mentorship': 'Mentorship',
     'event_type_relationship_betrayal': 'Betrayal',
     'event_type_relationship_comfort': 'Comfort',
+    'event_type_relationship_value_alignment': 'Value alignment',
+    'event_type_relationship_value_clash': 'Value clash',
     'event_type_immigration': 'Immigration',
     'event_type_generic': 'Other',
     'event_type_injury_recovery': 'Injury recovery',
@@ -734,6 +744,16 @@ TEXT_EN: Dict[str, str] = {
         '{name1} and {name2} found a quiet moment of comfort at {location}. {turning_point_reason} '
         '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         'Avg: {relationship_avg:+d})'
+    ),
+    'events.relationship_value_alignment.summary': (
+        '{name1} and {name2} recognized a shared value at {location}. {turning_point_reason} '
+        '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        'Avg: {relationship_avg:+d})'
+    ),
+    'events.relationship_value_clash.summary': (
+        '{name1} and {name2} found that their values cut against each other at {location}. '
+        '{turning_point_reason} ({name1}->{name2}: {relationship_a:+d} / '
+        '{name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})'
     ),
     'events.location_renamed.summary': '{old_name} was renamed {new_name}.',
     'events.route_blocked.summary': 'The route from {from_location} to {to_location} was blocked.',

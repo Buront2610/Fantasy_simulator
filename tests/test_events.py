@@ -437,6 +437,54 @@ class TestEventMeeting:
         assert rival.has_relation_tag(target.char_id, "betrayer")
         assert target.has_relation_tag(rival.char_id, "rival")
 
+    def test_relationship_turning_point_can_follow_shared_values(self, es, world):
+        first = _make_char("First")
+        second = _make_char("Second")
+        first.personality_feats = ["oathbound"]
+        second.personality_feats = ["oathbound"]
+        world.add_character(first)
+        world.add_character(second)
+
+        result = resolve_relationship_turning_point_event(first, second, world, rng=random.Random(7))
+
+        assert result.event_type == "relationship_value_alignment"
+        assert first.get_relationship(second.char_id) > 0
+        assert first.has_relation_tag(second.char_id, "friend")
+        assert result.metadata["personality_feature_factor_keys"] == ["shared_features"]
+        assert (
+            result.metadata["render_params"]["turning_point_reason_key"]
+            == "relationship_turning_point_reason_shared_features"
+        )
+        assert "recognized a shared value" in render_event_record(
+            WorldEventRecord.from_event_result(result),
+            locale="en",
+            world=world,
+        )
+
+    def test_relationship_turning_point_can_clash_over_values(self, es, world):
+        first = _make_char("First")
+        second = _make_char("Second")
+        first.personality_feats = ["oathbound"]
+        second.personality_feats = ["reckless"]
+        world.add_character(first)
+        world.add_character(second)
+
+        result = resolve_relationship_turning_point_event(first, second, world, rng=random.Random(8))
+
+        assert result.event_type == "relationship_value_clash"
+        assert first.get_relationship(second.char_id) < 0
+        assert first.has_relation_tag(second.char_id, "rival")
+        assert result.metadata["personality_feature_factor_keys"] == ["vow_vs_impulse"]
+        assert (
+            result.metadata["render_params"]["turning_point_reason_key"]
+            == "relationship_turning_point_reason_feature_clash"
+        )
+        assert "values cut against each other" in render_event_record(
+            WorldEventRecord.from_event_result(result),
+            locale="en",
+            world=world,
+        )
+
 
 # ---------------------------------------------------------------------------
 # event_battle

@@ -47,6 +47,8 @@ PERSONALITY_TURNING_POINT_KINDS: tuple[str, ...] = (
     "relationship_mentorship",
     "relationship_betrayal",
     "relationship_comfort",
+    "relationship_value_alignment",
+    "relationship_value_clash",
 )
 
 
@@ -591,10 +593,19 @@ def _relationship_turning_point_key(
     rel2 = char2.get_relationship(char1.char_id)
     avg_rel = round((rel1 + rel2) / 2)
     context = set(personality.context_factor_keys)
+    feature_factors = set(personality.feature_affinity.factor_keys)
+    affinity_factors = set(personality.affinity.factor_keys)
     first_profile = personality.first_context.profile
     second_profile = personality.second_context.profile
     if avg_rel <= -35 and catalyst.score >= 5:
         return "reconciliation"
+    if feature_factors.intersection({"vow_vs_impulse", "home_vs_distance"}) and avg_rel < 30:
+        return "value_clash"
+    if (
+        feature_factors.intersection({"shared_features", "hard_won_courage"})
+        or affinity_factors.intersection({"shared_curiosity", "shared_discipline"})
+    ) and avg_rel >= -10:
+        return "value_alignment"
     if avg_rel >= 35 and (
         abs(char1.age - char2.age) >= 10
         or max(first_profile["discipline"], second_profile["discipline"]) >= 68
@@ -624,6 +635,10 @@ def _relationship_turning_point_delta(
         return -24 + min(0, personality.affinity.score // 2)
     if key == "comfort":
         return 9 + max(0, personality.affinity.score // 4)
+    if key == "value_alignment":
+        return 12 + max(0, personality.feature_affinity.score)
+    if key == "value_clash":
+        return -14 + min(0, personality.feature_affinity.score)
     return -10 + min(0, personality.affinity.score // 3)
 
 
@@ -641,10 +656,14 @@ def _relationship_turning_point_tags(
         _remove_opposed_relation_tag(char1, char2.char_id, "rival")
         _remove_opposed_relation_tag(char2, char1.char_id, "rival")
         return _add_mutual_relation_tag(char1, char2, "betrayer", "rival", source_event_id)
-    if key in {"reconciliation", "comfort"}:
+    if key in {"reconciliation", "comfort", "value_alignment"}:
         _remove_opposed_relation_tag(char1, char2.char_id, "friend")
         _remove_opposed_relation_tag(char2, char1.char_id, "friend")
         return _add_mutual_relation_tag(char1, char2, "friend", "friend", source_event_id)
+    if key == "value_clash":
+        _remove_opposed_relation_tag(char1, char2.char_id, "rival")
+        _remove_opposed_relation_tag(char2, char1.char_id, "rival")
+        return _add_mutual_relation_tag(char1, char2, "rival", "rival", source_event_id)
     return []
 
 
@@ -674,6 +693,14 @@ def _relationship_turning_point_reason_key(
         return "relationship_turning_point_reason_old_grudge"
     if key == "conflict":
         return "relationship_turning_point_reason_mismatch"
+    if key == "value_alignment":
+        if personality.feature_affinity.factor_keys:
+            return "relationship_turning_point_reason_shared_features"
+        return "relationship_turning_point_reason_shared_values"
+    if key == "value_clash":
+        if personality.feature_affinity.factor_keys:
+            return "relationship_turning_point_reason_feature_clash"
+        return "relationship_turning_point_reason_value_clash"
     if affinity_factors.intersection({"shared_kindness", "steady_pair"}):
         return "relationship_turning_point_reason_trust"
     return "relationship_turning_point_reason_shared_history"
