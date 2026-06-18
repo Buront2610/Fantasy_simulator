@@ -195,12 +195,14 @@ def derive_evolution_record(
     language_key: str,
     year: int,
     evolution_history: Sequence[LanguageEvolutionRecord],
+    cause_key: str = "",
 ) -> LanguageEvolutionRecord | None:
     """Ask the language engine for the next historical change event."""
     return language_engine.derive_evolution_record(
         language_key,
         year=year,
         evolution_history=evolution_history,
+        cause_key=cause_key,
     )
 
 
@@ -246,17 +248,19 @@ def apply_language_evolution_from_event(
     )
     if already_applied:
         return None
+    resolved_cause_key = cause_key or _cause_key_for_world_event(record)
     derived = derive_evolution_record(
         world.language_engine,
         language_key=resolved_language_key,
         year=record.year,
         evolution_history=world.language_evolution_history,
+        cause_key=resolved_cause_key,
     )
     if derived is None:
         return None
     caused_record = evolution_record_with_cause(
         derived,
-        cause_key=cause_key or _cause_key_for_world_event(record),
+        cause_key=resolved_cause_key,
         cause_event_id=record.record_id,
     )
     if not world._apply_language_evolution_record(caused_record):

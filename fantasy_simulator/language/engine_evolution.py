@@ -40,6 +40,7 @@ class LanguageEngineEvolutionMixin:
         *,
         year: int,
         evolution_history: Sequence[LanguageEvolutionRecord],
+        cause_key: str = "",
     ) -> LanguageEvolutionRecord | None:
         language = self._language_index.get(language_key)
         if language is None:
@@ -53,6 +54,7 @@ class LanguageEngineEvolutionMixin:
             lexicon=profile.lexicon,
             naming_last_names=profile.naming_rules.last_names,
             runtime_state=runtime_state,
+            cause_key=cause_key,
         )
 
     def apply_evolution_record(self, record: LanguageEvolutionRecord) -> bool:

@@ -6,6 +6,7 @@ import random
 from typing import Callable, Dict, List, Mapping, Sequence
 
 from ..content.setting_bundle import LanguageDefinition
+from .laws import law_candidates_for_cause, lexical_bias_for_cause
 from .naming import shorten_stem, stable_seed
 from .presets import PRESET_EVOLUTION_RULES
 from .schema import SoundChangeRuleDefinition
@@ -58,30 +59,22 @@ class LanguageEvolutionPlanner:
         lexicon: Sequence[str],
         naming_last_names: Sequence[str],
         runtime_state: LanguageRuntimeState,
+        cause_key: str = "",
     ) -> LanguageEvolutionRecord | None:
         language = self._language_index.get(language_key)
         if language is None:
             return None
-        applied_rule_keys = {
-            record.rule_key
-            for record in evolution_history
-            if record.language_key == language_key and record.rule_key
-        }
-        candidates = [
-            rule
-            for rule in self.available_evolution_rules(language_key)
-            if rule.source and rule.rule_key not in applied_rule_keys
-        ]
         rng = random.Random(stable_seed(language_key, str(year), str(len(evolution_history))))
         sample_forms = (language.seed_syllables or []) + list(lexicon)
-        selected_rule = self._select_productive_rule(
-            language_key,
-            candidates,
+        selected_rule = _select_evolution_rule(
+            self,
+            language,
+            language_key=language_key,
+            cause_key=cause_key,
+            evolution_history=evolution_history,
             rng=rng,
             sample_forms=sample_forms,
         )
-        if selected_rule is None:
-            selected_rule = self._fallback_evolution_rule(language, lexicon, rng)
         if selected_rule is None:
             return None
 
@@ -99,12 +92,14 @@ class LanguageEvolutionPlanner:
             language,
             lexicon=lexicon,
             runtime_state=runtime_state,
+            cause_key=cause_key,
         )
         added_toponym_suffix = self._derive_toponym_suffix(
             language,
             lexicon=lexicon,
             naming_last_names=naming_last_names,
             runtime_state=runtime_state,
+            cause_key=cause_key,
         )
 
         return LanguageEvolutionRecord(
@@ -127,10 +122,13 @@ class LanguageEvolutionPlanner:
         *,
         lexicon: Sequence[str],
         runtime_state: LanguageRuntimeState,
+        cause_key: str = "",
     ) -> str:
+        biased_stem, _ = lexical_bias_for_cause(cause_key)
         stem_candidates = list(
             dict.fromkeys(
-                (language.name_stems or [])
+                ([biased_stem] if biased_stem else [])
+                + (language.name_stems or [])
                 + runtime_state.derived_name_stems
                 + list(lexicon)
             )
@@ -151,10 +149,13 @@ class LanguageEvolutionPlanner:
         lexicon: Sequence[str],
         naming_last_names: Sequence[str],
         runtime_state: LanguageRuntimeState,
+        cause_key: str = "",
     ) -> str:
+        _, biased_suffix = lexical_bias_for_cause(cause_key)
         suffix_candidates = list(
             dict.fromkeys(
-                list(language.toponym_suffixes or language.surname_suffixes or naming_last_names)
+                ([biased_suffix] if biased_suffix else [])
+                + list(language.toponym_suffixes or language.surname_suffixes or naming_last_names)
                 + runtime_state.derived_toponym_suffixes
                 + list(lexicon)
             )
@@ -240,3 +241,47 @@ class LanguageEvolutionPlanner:
             ) != self._evolve_surface_form(language_key, form):
                 return True
         return False
+
+
+def _select_evolution_rule(
+    planner: "LanguageEvolutionPlanner",
+    language: LanguageDefinition,
+    *,
+    language_key: str,
+    cause_key: str,
+    evolution_history: Sequence[LanguageEvolutionRecord],
+    rng: random.Random,
+    sample_forms: Sequence[str],
+) -> SoundChangeRuleDefinition | None:
+    applied_rule_keys = {
+        record.rule_key
+        for record in evolution_history
+        if record.language_key == language_key and record.rule_key
+    }
+    law_candidates = law_candidates_for_cause(
+        language,
+        cause_key=cause_key,
+        sequence_index=len(evolution_history),
+    )
+    selected_rule = planner._select_productive_rule(
+        language_key,
+        [rule for rule in law_candidates if rule.source and rule.rule_key not in applied_rule_keys],
+        rng=rng,
+        sample_forms=sample_forms,
+    )
+    if selected_rule is not None:
+        return selected_rule
+    explicit_candidates = [
+        rule
+        for rule in planner.available_evolution_rules(language_key)
+        if rule.source and rule.rule_key not in applied_rule_keys
+    ]
+    selected_rule = planner._select_productive_rule(
+        language_key,
+        explicit_candidates,
+        rng=rng,
+        sample_forms=sample_forms,
+    )
+    if selected_rule is not None:
+        return selected_rule
+    return planner._fallback_evolution_rule(language, sample_forms, rng)
