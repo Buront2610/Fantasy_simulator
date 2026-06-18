@@ -147,26 +147,26 @@ def _assert_seeded_map_visible_bundle(bundle: dict[str, list[str]]) -> None:
         "  | V The Verdant Vale (Village)                     |",
         "  | Generated local map                              |",
         "  |                   +                              |",
-        "  |                   -                              |",
-        "  |   \"\"\"\"\"\"   hh+h   -     +hhh                     |",
-        "  |   \"\"\"\"\"\"   hhhh   -     hhhh\"\"\"                  |",
-        "  |                   -     \"\"\"\"\"\"\" T                |",
-        "  |  ~~~~~~~~~~~~~~~~~=~~~~~~~~~~~~~~~~~             |",
-        "  |                  o-  B            T              |",
+        "  |                !  -                              |",
+        "  |   \"\"\"\"\"\"   hh+h   -     hhhh                     |",
+        "  |   \"\"hhhh   hhhh   -     +hhh\"\"\"!                 |",
+        "  |     +hhh          -     \"\"\"\"\"\"hhhh               |",
+        "  |                   -           hhh+               |",
+        "  |                 To-  B     T                     |",
         "  | +-----------------@-----------------+            |",
-        "  |    T              :         T                    |",
         "  |                   :                              |",
-        "  |      bbb+         :    bbbb\"\"\"\"\"                 |",
-        "  |    \"\"bbbb\"\"       :T T bb+b\"\"\"hh+h               |",
-        "  |    \"\"\"\"\"\"\"\"       :           hhhh               |",
         "  |                   :                              |",
+        "  |   T               :      \"\"\"\"\"\"\"                 |",
+        "  |    \"\"\"\"\"\"\"\"       :T    T\"\"\"\"\"\"\"                 |",
+        "  |  ~~\"\"\"\"\"\"\"\"~~~~~~~=~~~~~~~~~~~~~~~~~             |",
+        "  |     !             :                              |",
         "  |                                                  |",
         "  | Exterior view                                    |",
-        "  |  \"\"\"\" fields        ~~ stream ~~                 |",
+        "  |  \"\"\"\" \"\"\"\"        ~~~~~~~~                       |",
         "  |        /\\       /\\          T T                  |",
         "  |   ____/__\\_____/__\\____   hhh hhh                |",
-        "  |      barn and low roofs      [B]                 |",
-        "  |   road --------- @ --------- road                |",
+        "  |       ___       ___          [B]                 |",
+        "  | --------------- @ -----------------              |",
         "  | Local route sketch                               |",
         "  |  +-------------------------------+               |",
         "  |  |                               |               |",
@@ -202,25 +202,25 @@ def _assert_memory_heavy_bundle(bundle: dict[str, list[str]]) -> None:
         "  | Generated local map                              |",
         "  |                   +                              |",
         "  |                   -                              |",
-        "  |   \"\"\"\"\"\"   +hhh   -     hhh+                     |",
-        "  |   \"\"\"\"\"\"   hhhh   -     hhhh\"\"\"                  |",
-        "  |         T         -     \"\"\"\"\"\"\"                  |",
-        "  |  ~~~~~~~~~~~~~~~~~=~~~~~~~~~~~~~~~~~             |",
-        "  |                  o-  B       T                   |",
+        "  |   \"\"\"\"\"\"   hh+h   -     hhhh                     |",
+        "  |   \"\"hhhh   hhhh   -     +hhh\"\"\"                  |",
+        "  |     +hhh          -     \"\"\"\"\"\"hhhh               |",
+        "  |                   -           hhh+               |",
+        "  |                 To-  B     T                     |",
         "  | +-----------------@-----------------+            |",
-        "  |      T         T  :                              |",
-        "  |               T   :T                             |",
-        "  |      bbb+  T      :      \"\"\"\"\"\"\"T                |",
-        "  |    \"\"bbbb\"\" h+hh  :      \"\"\"\"\"hhhh               |",
-        "  |    \"\"\"\"\"\"\"\" hhhh  :       T   hh+h               |",
+        "  |                   :                              |",
+        "  |                   :                              |",
+        "  |   T               :      \"\"\"\"\"\"\"                 |",
+        "  |    \"\"\"\"\"\"\"\"       :T    T\"\"\"\"\"\"\"                 |",
+        "  |  ~~\"\"\"\"\"\"\"\"~~~~~~~=~~~~~~~~~~~~~~~~~             |",
         "  |                   :                              |",
         "  |                                                  |",
         "  | Exterior view                                    |",
-        "  |  \"\"\"\" fields        ~~ stream ~~                 |",
+        "  |  \"\"\"\" \"\"\"\"        ~~~~~~~~                       |",
         "  |        /\\       /\\          T T                  |",
         "  |   ____/__\\_____/__\\____   hhh hhh                |",
-        "  |      barn and low roofs      [B]                 |",
-        "  |   road --------- @ --------- road                |",
+        "  |       ___       ___          [B]                 |",
+        "  | --------------- @ -----------------              |",
         "  | Local route sketch                               |",
         "  |  +-------------------------------+               |",
         "  |  |                               |               |",
@@ -305,18 +305,19 @@ def test_location_detail_uses_generated_city_map() -> None:
     detail = rendered["detail"]
     assert "  | Generated local map                              |" in detail
     assert "  |             +                                    |" in detail
-    assert "  |    [Gate]   |    [Temple]  garden                |" in detail
-    assert "  |    [Homes]  |    arcade  [Market]                |" in detail
-    assert "  |             |   Grand Avenue                     |" in detail
+    assert "  |    /G\\      |    /S\\       ......                |" in detail
+    assert "  |    /H\\      |    ::::::  /M\\                     |" in detail
+    assert "  |             |   ====                             |" in detail
     assert "  | +=======================@===========+            |" in detail
-    assert "  |    [Inn]    |    [Guild]   [Docks]               |" in detail
+    assert "  |    /I\\      |    /G\\       /D\\                   |" in detail
+    assert "  |    ......   |    /C\\       /W\\                   |" in detail
     assert "  | Exterior view                                    |" in detail
-    assert "  |   | docks |==== avenue ==== market               |" in detail
+    assert "  |   | [] [] |====@====| [] [] || |                 |" in detail
     assert "  | Local route sketch                               |" in detail
     assert "  |  |            \\             /--D |               |" in detail
     assert "  |  |            ---@---            |               |" in detail
     assert "  | Sketch cues: G=Gate / $=Market / B=Notice board  |" in detail
-    assert "  | Map legend: @ civic focus, labels name distric...|" in detail
+    assert "  | Map legend: @ focus, H homes, M market, S shri...|" in detail
     assert "  | Scene: Riverport city with a grand avenue, tem...|" in detail
 
 

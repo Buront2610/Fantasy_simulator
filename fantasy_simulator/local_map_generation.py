@@ -25,41 +25,87 @@ class GeneratedLocalMap:
 def generate_local_map(cell: Any, connected_cells: Iterable[Any] = ()) -> GeneratedLocalMap:
     """Generate a stable local map for one location.
 
-    The generator is deterministic for the location id and broad state, so the
-    same save renders consistently while different towns and dungeons stop
-    looking like clones.
+    The generator keeps land/layout seeds separate from state overlays, so
+    danger or rumor changes can scar the map without moving rivers, roads, or
+    buildings between visits.
     """
     region_type = str(getattr(cell, "region_type", "plains") or "plains")
-    rng = random.Random(_seed_for_cell(cell))
+    topography_rng = random.Random(_topography_seed(cell))
+    settlement_rng = random.Random(_settlement_seed(cell))
+    state_rng = random.Random(_state_overlay_seed(cell))
     route_directions = _route_directions(cell, connected_cells)
     if region_type == "dungeon":
-        return _generate_dungeon_map(rng, route_directions)
+        return _generate_dungeon_map(settlement_rng, route_directions, cell, state_rng)
     if region_type == "city":
-        return _generate_city_map(rng, route_directions)
+        return _generate_city_map(settlement_rng, route_directions, cell, state_rng)
     if region_type == "village":
-        return _generate_settlement_map(rng, route_directions, dense=False)
+        return _generate_settlement_map(topography_rng, settlement_rng, route_directions, cell, state_rng, dense=False)
     if region_type == "forest":
-        return _generate_wild_map(rng, route_directions, tree_char="T", feature_char="^")
+        return _generate_wild_map(topography_rng, route_directions, cell, state_rng, tree_char="T", feature_char="^")
     if region_type == "mountain":
-        return _generate_wild_map(rng, route_directions, tree_char="^", feature_char="*")
-    return _generate_wild_map(rng, route_directions, tree_char=",", feature_char="o")
+        return _generate_wild_map(topography_rng, route_directions, cell, state_rng, tree_char="^", feature_char="*")
+    return _generate_wild_map(topography_rng, route_directions, cell, state_rng, tree_char=",", feature_char="o")
 
 
-def _seed_for_cell(cell: Any) -> int:
-    seed_text = "|".join(
-        str(getattr(cell, name, ""))
-        for name in (
-            "location_id",
-            "region_type",
-            "x",
-            "y",
-            "danger",
-            "terrain_biome",
-            "terrain_elevation",
-            "terrain_moisture",
-        )
-    )
+def _hash_seed(*parts: object) -> int:
+    seed_text = "|".join(str(part) for part in parts)
     return int(hashlib.sha256(seed_text.encode("utf-8")).hexdigest()[:16], 16)
+
+
+def _topography_seed(cell: Any) -> int:
+    return _hash_seed(
+        "topography",
+        getattr(cell, "location_id", ""),
+        getattr(cell, "x", ""),
+        getattr(cell, "y", ""),
+        getattr(cell, "terrain_biome", ""),
+        getattr(cell, "terrain_elevation", ""),
+        getattr(cell, "terrain_moisture", ""),
+        getattr(cell, "terrain_temperature", ""),
+    )
+
+
+def _settlement_seed(cell: Any) -> int:
+    return _hash_seed(
+        "settlement-layout",
+        getattr(cell, "location_id", ""),
+        getattr(cell, "region_type", ""),
+        getattr(cell, "x", ""),
+        getattr(cell, "y", ""),
+    )
+
+
+def _state_overlay_seed(cell: Any) -> int:
+    return _hash_seed(
+        "state-overlay",
+        getattr(cell, "location_id", ""),
+        _value_band(getattr(cell, "danger", 50)),
+        getattr(cell, "danger_band", ""),
+        _value_band(getattr(cell, "rumor_heat", 0)),
+        getattr(cell, "rumor_heat_band", ""),
+        _value_band(getattr(cell, "prosperity", 50)),
+        _value_band(getattr(cell, "mood", 50)),
+        getattr(cell, "controlling_faction_id", ""),
+    )
+
+
+def _value_band(value: Any) -> str:
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        number = 50
+    if number < 34:
+        return "low"
+    if number >= 67:
+        return "high"
+    return "medium"
+
+
+def _cell_band(cell: Any, band_name: str, value_name: str, default: Any) -> str:
+    band = str(getattr(cell, band_name, "") or "")
+    if band in {"low", "medium", "high"}:
+        return band
+    return _value_band(getattr(cell, value_name, default))
 
 
 def _blank_canvas(fill: str = " ") -> list[list[str]]:
@@ -112,7 +158,12 @@ def _apply_route_gates(canvas: list[list[str]], directions: set[str], *, road_ch
             canvas[mid_y][x] = road_char
 
 
-def _generate_city_map(rng: random.Random, route_directions: set[str]) -> GeneratedLocalMap:
+def _generate_city_map(
+    rng: random.Random,
+    route_directions: set[str],
+    cell: Any,
+    state_rng: random.Random,
+) -> GeneratedLocalMap:
     variant = rng.randrange(3)
     if variant == 0:
         canvas = _blank_canvas(" ")
@@ -129,11 +180,13 @@ def _generate_city_map(rng: random.Random, route_directions: set[str]) -> Genera
         _paint_city_citadel_plan(canvas, route_directions or {"north", "south", "east", "west"})
         scene_keys = ("local_map_scene_city_citadel",)
         exterior_lines = _city_exterior_lines()
-    return GeneratedLocalMap(
-        _stringify(canvas),
+    return _finalize_local_map(
+        canvas,
         ("local_map_legend_city", "local_map_legend_route_gate"),
         scene_keys,
         exterior_lines,
+        cell,
+        state_rng,
     )
 
 
@@ -146,20 +199,15 @@ def _paint_city_plaza_plan(canvas: list[list[str]], directions: set[str]) -> Non
         canvas[y][mid_x] = "|"
     _apply_route_gates(canvas, directions, road_char="=")
     canvas[mid_y][mid_x] = "@"
-    _paint_text(canvas, mid_x - 6, mid_y - 1, "Plaza")
-    _paint_text(canvas, 3, 2, "[Homes]")
-    _paint_text(canvas, 3, 3, "row houses")
-    _paint_text(canvas, 22, 2, "[Market]")
-    _paint_text(canvas, 22, 3, "stalls")
-    _paint_text(canvas, 3, 5, "[Guild]")
-    _paint_text(canvas, 22, 5, "[Notice]")
-    _paint_text(canvas, 3, 9, "[Inn]")
-    _paint_text(canvas, 3, 10, "stables")
-    _paint_text(canvas, 22, 9, "[Shrine]")
-    _paint_text(canvas, 22, 10, "garden")
-    _paint_text(canvas, 3, 12, "[Craft]")
-    _paint_text(canvas, 22, 12, "[Homes]")
-    _paint_text(canvas, 22, 13, "lanes")
+    _paint_city_block(canvas, 3, 2, "H")
+    _paint_city_block(canvas, 22, 2, "M")
+    _paint_city_block(canvas, 3, 5, "G")
+    _paint_city_block(canvas, 22, 5, "N")
+    _paint_city_block(canvas, 3, 9, "I")
+    _paint_city_block(canvas, 22, 9, "S")
+    _paint_city_block(canvas, 3, 12, "C")
+    _paint_city_block(canvas, 22, 12, "H")
+    _paint_text(canvas, mid_x - 2, mid_y - 1, "o o")
 
 
 def _paint_city_avenue_plan(canvas: list[list[str]], directions: set[str]) -> None:
@@ -171,20 +219,19 @@ def _paint_city_avenue_plan(canvas: list[list[str]], directions: set[str]) -> No
         canvas[y][side_street_x] = "|"
     _paint_city_gate_stubs(canvas, directions, avenue_y=avenue_y, street_x=side_street_x)
     canvas[avenue_y][24] = "@"
-    _paint_text(canvas, 3, 2, "[Gate]")
-    _paint_text(canvas, 3, 3, "north")
-    _paint_text(canvas, 17, 2, "[Temple]")
-    _paint_text(canvas, 27, 2, "garden")
-    _paint_text(canvas, 3, 5, "[Homes]")
-    _paint_text(canvas, 17, 5, "arcade")
-    _paint_text(canvas, 25, 5, "[Market]")
-    _paint_text(canvas, 16, 7, "Grand Avenue")
-    _paint_text(canvas, 3, 10, "[Inn]")
-    _paint_text(canvas, 17, 10, "[Guild]")
-    _paint_text(canvas, 27, 10, "[Docks]")
-    _paint_text(canvas, 3, 13, "lanes")
-    _paint_text(canvas, 17, 13, "[Craft]")
-    _paint_text(canvas, 27, 13, "warehouse")
+    _paint_city_block(canvas, 3, 2, "G")
+    _paint_city_block(canvas, 17, 2, "S")
+    _paint_rect(canvas, 27, 2, 6, 2, ".")
+    _paint_city_block(canvas, 3, 5, "H")
+    _paint_rect(canvas, 17, 5, 6, 1, ":")
+    _paint_city_block(canvas, 25, 5, "M")
+    _paint_text(canvas, 16, 7, "====")
+    _paint_city_block(canvas, 3, 10, "I")
+    _paint_city_block(canvas, 17, 10, "G")
+    _paint_city_block(canvas, 27, 10, "D")
+    _paint_rect(canvas, 3, 13, 6, 1, ".")
+    _paint_city_block(canvas, 17, 13, "C")
+    _paint_city_block(canvas, 27, 13, "W")
 
 
 def _paint_city_citadel_plan(canvas: list[list[str]], directions: set[str]) -> None:
@@ -196,15 +243,21 @@ def _paint_city_citadel_plan(canvas: list[list[str]], directions: set[str]) -> N
         canvas[y][29] = "|"
     _paint_city_gate_stubs(canvas, directions, avenue_y=10, street_x=18)
     canvas[10][18] = "@"
-    _paint_text(canvas, 13, 6, "Keep")
-    _paint_text(canvas, 13, 7, "court")
-    _paint_text(canvas, 2, 2, "Homes")
-    _paint_text(canvas, 24, 2, "Shrine")
-    _paint_text(canvas, 1, 6, "Market")
-    _paint_text(canvas, 23, 6, "Guild")
-    _paint_text(canvas, 2, 12, "Inn")
-    _paint_text(canvas, 13, 12, "Craft")
-    _paint_text(canvas, 25, 12, "Homes")
+    _paint_city_block(canvas, 13, 6, "K")
+    _paint_text(canvas, 14, 8, "ooo")
+    _paint_city_block(canvas, 2, 2, "H")
+    _paint_city_block(canvas, 24, 2, "S")
+    _paint_city_block(canvas, 1, 6, "M")
+    _paint_city_block(canvas, 23, 6, "G")
+    _paint_city_block(canvas, 2, 12, "I")
+    _paint_city_block(canvas, 13, 12, "C")
+    _paint_city_block(canvas, 25, 12, "H")
+
+
+def _paint_city_block(canvas: list[list[str]], x: int, y: int, marker: str) -> None:
+    rows = (f"/{marker}\\", "###")
+    for dy, row in enumerate(rows):
+        _paint_text(canvas, x, y + dy, row)
 
 
 def _paint_city_gate_stubs(canvas: list[list[str]], directions: set[str], *, avenue_y: int, street_x: int) -> None:
@@ -235,30 +288,40 @@ def _paint_text(canvas: list[list[str]], x: int, y: int, text: str) -> None:
             canvas[y][px] = char
 
 
-def _generate_settlement_map(rng: random.Random, route_directions: set[str], *, dense: bool) -> GeneratedLocalMap:
+def _generate_settlement_map(
+    topography_rng: random.Random,
+    settlement_rng: random.Random,
+    route_directions: set[str],
+    cell: Any,
+    state_rng: random.Random,
+    *,
+    dense: bool,
+) -> GeneratedLocalMap:
     canvas = _bordered_canvas(" ") if dense else _blank_canvas(" ")
     mid_x = LOCAL_MAP_WIDTH // 2
     mid_y = LOCAL_MAP_HEIGHT // 2
     _paint_settlement_roads(canvas, route_directions or {"north", "south", "east", "west"}, dense=dense)
     canvas[mid_y - 1][mid_x - 1] = "o"
     canvas[mid_y][mid_x] = "@"
-    _paint_settlement_scenery(canvas, rng, dense=dense)
+    _paint_settlement_scenery(canvas, topography_rng, dense=dense)
 
     slots = _settlement_building_slots(dense)
-    rng.shuffle(slots)
+    settlement_rng.shuffle(slots)
     for x, y, w, h, fill in slots[: 14 if dense else 8]:
-        _place_building(canvas, x, y, w, h, fill, rng)
+        _place_building(canvas, x, y, w, h, fill, settlement_rng)
 
     for _ in range(6 if dense else 12):
-        x = rng.randint(2, LOCAL_MAP_WIDTH - 3)
-        y = rng.randint(2, LOCAL_MAP_HEIGHT - 3)
+        x = topography_rng.randint(2, LOCAL_MAP_WIDTH - 3)
+        y = topography_rng.randint(2, LOCAL_MAP_HEIGHT - 3)
         if canvas[y][x] == " ":
             canvas[y][x] = "." if dense else "T"
-    return GeneratedLocalMap(
-        _stringify(canvas),
+    return _finalize_local_map(
+        canvas,
         ("local_map_legend_settlement", "local_map_legend_route_gate"),
         ("local_map_scene_village",),
         _village_exterior_lines(),
+        cell,
+        state_rng,
     )
 
 
@@ -336,7 +399,12 @@ def _building_space_is_clear(canvas: list[list[str]], x: int, y: int, w: int, h:
     return True
 
 
-def _generate_dungeon_map(rng: random.Random, route_directions: set[str]) -> GeneratedLocalMap:
+def _generate_dungeon_map(
+    rng: random.Random,
+    route_directions: set[str],
+    cell: Any,
+    state_rng: random.Random,
+) -> GeneratedLocalMap:
     canvas = _blank_canvas(" ")
     rooms: list[tuple[int, int, int, int]] = []
     for _ in range(12):
@@ -376,17 +444,21 @@ def _generate_dungeon_map(rng: random.Random, route_directions: set[str]) -> Gen
     _place_dungeon_features(canvas, rooms, rng)
     _apply_route_gates(canvas, route_directions or {"south"}, road_char=".")
     _outline_dungeon_walls(canvas)
-    return GeneratedLocalMap(
-        _stringify(canvas),
+    return _finalize_local_map(
+        canvas,
         ("local_map_legend_dungeon", "local_map_legend_route_gate"),
         ("local_map_scene_dungeon",),
         _dungeon_exterior_lines(),
+        cell,
+        state_rng,
     )
 
 
 def _generate_wild_map(
     rng: random.Random,
     route_directions: set[str],
+    cell: Any,
+    state_rng: random.Random,
     *,
     tree_char: str,
     feature_char: str,
@@ -404,12 +476,64 @@ def _generate_wild_map(
         for x in range(1, LOCAL_MAP_WIDTH - 1):
             if canvas[y][x] in {" ", tree_char} and rng.random() < 0.75:
                 canvas[y][x] = "."
-    return GeneratedLocalMap(
-        _stringify(canvas),
+    return _finalize_local_map(
+        canvas,
         ("local_map_legend_wild", "local_map_legend_route_gate"),
         ("local_map_scene_wild",),
         _wild_exterior_lines(tree_char),
+        cell,
+        state_rng,
     )
+
+
+def _finalize_local_map(
+    canvas: list[list[str]],
+    legend_keys: tuple[str, ...],
+    scene_keys: tuple[str, ...],
+    exterior_lines: tuple[str, ...],
+    cell: Any,
+    state_rng: random.Random,
+) -> GeneratedLocalMap:
+    overlay_markers = _apply_state_overlay(canvas, cell, state_rng)
+    if overlay_markers:
+        legend_keys = legend_keys + ("local_map_legend_state_overlay",)
+    return GeneratedLocalMap(_stringify(canvas), legend_keys, scene_keys, exterior_lines)
+
+
+def _apply_state_overlay(canvas: list[list[str]], cell: Any, rng: random.Random) -> tuple[str, ...]:
+    markers: list[str] = []
+    if _cell_band(cell, "danger_band", "danger", 50) == "high":
+        markers.extend(_place_overlay_markers(canvas, rng, "!", 3))
+    if _cell_band(cell, "rumor_heat_band", "rumor_heat", 0) == "high":
+        markers.extend(_place_overlay_markers(canvas, rng, "?", 2))
+    if (
+        _cell_band(cell, "prosperity_band", "prosperity", 50) == "low"
+        or _cell_band(cell, "mood_band", "mood", 50) == "low"
+    ):
+        markers.extend(_place_overlay_markers(canvas, rng, "r", 2))
+    return tuple(dict.fromkeys(markers))
+
+
+def _place_overlay_markers(
+    canvas: list[list[str]],
+    rng: random.Random,
+    marker: str,
+    count: int,
+) -> list[str]:
+    candidates = [
+        (x, y)
+        for y, row in enumerate(canvas)
+        for x, char in enumerate(row)
+        if char in {" ", ".", ",", '"', "T", "^", "n", ":", "~"}
+    ]
+    if not candidates:
+        return []
+    rng.shuffle(candidates)
+    placed = 0
+    for x, y in candidates[:count]:
+        canvas[y][x] = marker
+        placed += 1
+    return [marker] if placed else []
 
 
 def _art_lines(*lines: str) -> tuple[str, ...]:
@@ -420,59 +544,59 @@ def _city_exterior_lines() -> tuple[str, ...]:
     return _art_lines(
         "        /\\        /\\        /\\      ",
         "   ____/  \\______/  \\______/  \\____",
-        "  | gate towers |  banners | watch |",
-        "  | [] [] [] [] |  market smoke    |",
-        "==|______/==\\______________________|",
+        "  | [] [] [] |  /\\  | [] [] []    |",
+        "  |__==______|_/  \\_|______==_____|",
+        "======@==============[]=[]=========",
     )
 
 
 def _market_town_exterior_lines() -> tuple[str, ...]:
     return _art_lines(
-        "        open square and cloth awnings ",
-        "   __/\\__     __/\\__      carts     ",
-        "  / market\\___/ inn \\___ stalls     ",
-        " road ======= @ ======= road        ",
-        "        bells, smoke, crowded lanes  ",
+        "        /\\      /\\       /\\         ",
+        "   ____/  \\____/  \\_____/  \\____   ",
+        "  | [] [] |  o o o  | [] [] |      ",
+        "======[]====== @ ======[]==========",
+        "      ~~~        |        ~~~       ",
     )
 
 
 def _riverport_exterior_lines() -> tuple[str, ...]:
     return _art_lines(
-        "        temple roofs over the quay    ",
-        "   ___/\\___    arcade    cranes      ",
-        "  | docks |==== avenue ==== market   ",
-        " ~~ boats ~~ @ ~~ warehouse lights   ",
-        "        river road and busy bridges   ",
+        "        /\\        /\\       ||       ",
+        "   ____/  \\______/  \\______||___   ",
+        "  | [] [] |====@====| [] [] || |   ",
+        " ~~~_/_~~~~~~_|_~~~~~~_/_~~~~~~~   ",
+        "      \\          |          /       ",
     )
 
 
 def _village_exterior_lines() -> tuple[str, ...]:
     return _art_lines(
-        ' """" fields        ~~ stream ~~     ',
+        ' """" """"        ~~~~~~~~          ',
         "       /\\       /\\          T T      ",
         "  ____/__\\_____/__\\____   hhh hhh   ",
-        "     barn and low roofs      [B]     ",
-        "  road --------- @ --------- road    ",
+        "      ___       ___          [B]     ",
+        "--------------- @ -----------------",
     )
 
 
 def _dungeon_exterior_lines() -> tuple[str, ...]:
     return _art_lines(
-        "        broken arch and wet stone    ",
-        "      ___/^^^^^^^^^^^^^^\\___        ",
-        "     /  r  fallen blocks   \\        ",
-        " ___/____      @      ____>_\\___    ",
-        "       mist ~~~   altar shadow       ",
+        "              ___^^^^^^___          ",
+        "         ____/  r    r   \\____      ",
+        "        /  ##   ____   ##    \\      ",
+        " ___/__/____      @      ____\\__\\___",
+        "       ~~~        A        ~~~       ",
     )
 
 
 def _wild_exterior_lines(tree_char: str) -> tuple[str, ...]:
     return _art_lines(
-        f"      {tree_char} {tree_char} ridge line and brush     ",
-        "   ___ path bends through cover ___   ",
-        "      \\__  @  __/      stones       ",
-        "          \\__/     wind and tracks   ",
-        "        distant road fades away       ",
+        f"      {tree_char} {tree_char} {tree_char}      ^^^      {tree_char}       ",
+        "   ___/ \\___        ___/ \\___       ",
+        "      \\__  @  ____/        o       ",
+        "          \\__/     o    ^          ",
+        "     .........             ....     ",
     )
 
 

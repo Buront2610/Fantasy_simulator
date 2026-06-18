@@ -41,10 +41,10 @@ def test_city_map_uses_readable_district_labels() -> None:
     generated = generate_local_map(_cell("loc_capital", "city", x=2, y=2))
     joined = "\n".join(generated.lines)
 
-    assert "Homes" in joined
-    assert "Market" in joined
-    assert "Shrine" in joined
-    assert "Plaza" in joined or "Keep" in joined
+    assert any(marker in joined for marker in ("/H\\", "/K\\"))
+    assert "/M\\" in joined
+    assert "/S\\" in joined
+    assert all(label not in joined for label in ("[Homes]", "[Market]", "[Shrine]", "Grand Avenue"))
     assert any(key.startswith("local_map_scene_city_") for key in generated.scene_keys)
 
 
@@ -79,3 +79,21 @@ def test_route_direction_adds_gate_to_local_map() -> None:
     generated = generate_local_map(origin, [east])
 
     assert any(line.endswith("+") for line in generated.lines)
+
+
+def test_state_changes_overlay_without_rerolling_city_layout() -> None:
+    calm = _cell("loc_same_city", "city", x=2, y=2)
+    dangerous = _cell("loc_same_city", "city", x=2, y=2)
+    dangerous.danger = 90
+    dangerous.danger_band = "high"
+
+    calm_lines = _scrub_state_overlays(generate_local_map(calm).lines)
+    dangerous_map = generate_local_map(dangerous)
+    dangerous_lines = _scrub_state_overlays(dangerous_map.lines)
+
+    assert calm_lines == dangerous_lines
+    assert "local_map_legend_state_overlay" in dangerous_map.legend_keys
+
+
+def _scrub_state_overlays(lines: list[str]) -> list[str]:
+    return [line.replace("!", " ").replace("?", " ").replace("r", " ") for line in lines]
