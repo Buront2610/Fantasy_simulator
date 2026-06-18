@@ -16,6 +16,7 @@ from fantasy_simulator.content.setting_bundle import (
     SiteSeedDefinition,
     WorldDefinition,
 )
+from fantasy_simulator.event_models import WorldEventRecord
 from fantasy_simulator.i18n import set_locale
 from fantasy_simulator.language.schema import SoundChangeRuleDefinition
 from fantasy_simulator.language.state import LanguageEvolutionRecord
@@ -43,6 +44,39 @@ def _display_width(text: str) -> int:
             continue
         width += 2 if unicodedata.east_asian_width(char) in ("F", "W") else 1
     return width
+
+
+def _make_language_law_world(seed_syllables):
+    world = World(name="Custom", year=1000)
+    world.setting_bundle = SettingBundle(
+        schema_version=1,
+        world_definition=WorldDefinition(
+            world_key="custom",
+            display_name="Custom",
+            lore_text="Custom lore",
+            site_seeds=[
+                SiteSeedDefinition(
+                    location_id="loc_custom",
+                    name="Custom",
+                    description="Custom site.",
+                    region_type="city",
+                    x=0,
+                    y=0,
+                    language_key="custom_lang",
+                ),
+            ],
+            languages=[
+                LanguageDefinition(
+                    language_key="custom_lang",
+                    display_name="Custom Lang",
+                    seed_syllables=list(seed_syllables),
+                    lexicon_size=8,
+                )
+            ],
+            naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+        ),
+    )
+    return world
 
 
 class TestWorld:
@@ -916,7 +950,41 @@ class TestWorld:
         restored_evolution = restored.language_evolution_history[0]
         assert restored_evolution.cause_key == "location_renamed"
         assert restored_evolution.cause_event_id == record.record_id
-        assert restored_evolution.rule_key == "custom_lang.t_to_d"
+        assert restored_evolution.rule_key.startswith("law:custom_lang:prestige:")
+        assert "prestige" in restored_evolution.rule_description.lower()
+
+    @pytest.mark.parametrize(
+        ("cause_key", "expected_group", "seed_syllables", "description_fragment"),
+        [
+            ("war_battle", "contact", ["ata", "aka", "asa", "apa"], "contact"),
+            ("route_blocked", "isolation", ["tor", "dan", "ran"], "isolation"),
+            ("era_shifted", "prestige", ["ke", "ge", "sare", "se"], "prestige"),
+        ],
+    )
+    def test_world_event_language_evolution_uses_cause_specific_linguistic_laws(
+        self,
+        cause_key,
+        expected_group,
+        seed_syllables,
+        description_fragment,
+    ):
+        world = _make_language_law_world(seed_syllables)
+        record = WorldEventRecord(
+            record_id=f"evt_{cause_key}",
+            kind=cause_key,
+            year=1005,
+            location_id="loc_custom",
+        )
+
+        evolution = world.apply_language_evolution_from_event(record, cause_key=cause_key)
+
+        assert evolution is not None
+        assert evolution.rule_key.startswith(f"law:custom_lang:{expected_group}:")
+        assert description_fragment in evolution.rule_description.lower()
+        assert evolution.cause_key == cause_key
+        assert evolution.cause_event_id == record.record_id
+        assert evolution.added_name_stem
+        assert evolution.added_toponym_suffix
 
     def test_setting_bundle_rebases_language_origin_year_for_new_language_state(self):
         world = World(name="Custom", year=1010)
