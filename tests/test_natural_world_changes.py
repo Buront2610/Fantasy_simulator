@@ -21,6 +21,7 @@ from fantasy_simulator.simulation.world_change_driver import (
 )
 from fantasy_simulator.simulator import Simulator
 from fantasy_simulator.ui.map_renderer import build_map_info
+from fantasy_simulator.ui.screen_map_payloads import render_world_map_views_for_location
 from fantasy_simulator.ui.view_models import build_monthly_report_card_view, build_world_dashboard_view
 from fantasy_simulator.world import World
 
@@ -327,12 +328,17 @@ def test_natural_rename_world_change_updates_history_report_map_and_save(tmp_pat
     assert location_id == expected_location.id
     assert location.canonical_name == record.render_params["new_name"]
     assert record.render_params["new_name"] in expected_language_names
+    assert record.render_params["name_source"] == "language_generated_rename"
+    assert record.render_params["name_language_key"] == seed.language_key
+    assert record.render_params["name_language_seed_key"].startswith(f"rename:{expected_location.id}:")
     assert projection.rename_history[0].record_id == record.record_id
     assert projection.aliases == (record.render_params["old_name"],)
     assert [(entry.record_id, entry.category) for entry in report.world_change_entries] == [
         (record.record_id, "location")
     ]
     assert cell.recent_world_change_categories == ("location",)
+    detail = render_world_map_views_for_location(world, location_id, include_overview=False)["detail"]
+    assert f"Name origin: {record.render_params['new_name']} <" in detail
 
     path = tmp_path / "natural-rename.json"
     assert save_simulation(Simulator(world, seed=0), str(path)) is True

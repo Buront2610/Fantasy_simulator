@@ -28,6 +28,10 @@ def set_setting_bundle_metadata(
     world._location_reference_resolver = LocationReferenceResolver.from_site_seeds(
         world._setting_bundle.world_definition.site_seeds
     )
+    world._race_lifespan_by_name = {
+        race.name: race.lifespan_years
+        for race in world._setting_bundle.world_definition.races
+    }
     world._language_engine = None
     world._language_runtime_states = prune_runtime_states(
         world._setting_bundle.world_definition,

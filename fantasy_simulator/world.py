@@ -106,6 +106,10 @@ class World(
         self._location_reference_resolver = LocationReferenceResolver.from_site_seeds(
             self._setting_bundle.world_definition.site_seeds
         )
+        self._race_lifespan_by_name: Dict[str, int] = {
+            race.name: race.lifespan_years
+            for race in self._setting_bundle.world_definition.races
+        }
         self._fallback_location_id_resolver = fallback_location_id
         self._location_state_defaults_resolver = get_location_state_defaults
         self._language_engine: LanguageEngine | None = None
@@ -196,7 +200,7 @@ class World(
 
     def race_lifespan_years(self, race_name: str) -> int | None:
         """Return bundle-authored lifespan for a race, if available."""
-        return self._setting_bundle.world_definition.race_lifespan_years(race_name)
+        return self._race_lifespan_by_name.get(race_name)
 
     def _set_setting_bundle_metadata(self, bundle: SettingBundle) -> None:
         set_setting_bundle_metadata(

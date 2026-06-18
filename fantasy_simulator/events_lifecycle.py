@@ -36,6 +36,14 @@ def character_lifespan_years(char: "Character", world: "World") -> int:
     return char.max_age
 
 
+def natural_death_chance(char: "Character", world: "World", *, year_fraction: float = 1.0) -> float:
+    """Return the natural decline chance for the given time slice."""
+    age_ratio = char.age / max(character_lifespan_years(char, world), 1)
+    con_factor = (100 - char.constitution) / 100 * 0.5 + 0.5
+    annual_death_chance = max(0.0, (age_ratio - 0.6) / 0.4) ** 2 * con_factor
+    return annual_probability_to_fraction(annual_death_chance, year_fraction)
+
+
 def should_record_aging_event(char: "Character", world: "World") -> bool:
     """Return whether the latest annual aging tick is notable enough for the event ledger."""
     max_age = max(character_lifespan_years(char, world), 1)
@@ -146,14 +154,13 @@ def check_natural_death(
     event_death: DeathEventCallback,
     rng: Any = random,
     year_fraction: float = 1.0,
+    death_chance: float | None = None,
 ) -> Optional[EventResult]:
     """Resolve natural decline, possibly worsening injury or causing death."""
     if not char.alive:
         return None
-    age_ratio = char.age / max(character_lifespan_years(char, world), 1)
-    con_factor = (100 - char.constitution) / 100 * 0.5 + 0.5
-    annual_death_chance = max(0.0, (age_ratio - 0.6) / 0.4) ** 2 * con_factor
-    death_chance = annual_probability_to_fraction(annual_death_chance, year_fraction)
+    if death_chance is None:
+        death_chance = natural_death_chance(char, world, year_fraction=year_fraction)
 
     if rng.random() < death_chance:
         if char.injury_status == "dying":

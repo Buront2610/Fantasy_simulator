@@ -181,7 +181,7 @@ def _site_language_for_location(world: Any, location_id: str) -> tuple[str, str]
     return (language.language_key if language is not None else "", "")
 
 
-def _language_rename_candidates(world: Any, location: Any) -> list[str]:
+def _language_rename_candidate_payloads(world: Any, location: Any) -> list[dict[str, str]]:
     location_id = str(getattr(location, "id", "")).strip()
     if not location_id:
         return []
@@ -191,21 +191,31 @@ def _language_rename_candidates(world: Any, location: Any) -> list[str]:
     current_name = str(location.canonical_name).strip()
     faction_id = str(getattr(location, "controlling_faction_id", "") or "").strip()
     return [
-        world.language_engine.generate_toponym(
-            language_key,
-            seed_key=f"rename:{location_id}:{current_name}:{faction_id}:{index}",
-            region_type=region_type,
-        )
+        {
+            "new_name": world.language_engine.generate_toponym(
+                language_key,
+                seed_key=f"rename:{location_id}:{current_name}:{faction_id}:{index}",
+                region_type=region_type,
+            ),
+            "name_language_key": language_key,
+            "name_language_seed_key": f"rename:{location_id}:{current_name}:{faction_id}:{index}",
+            "name_language_region_type": region_type,
+            "name_source": "language_generated_rename",
+        }
         for index in range(4)
     ]
 
 
-def _natural_rename_name(world: Any, location: Any) -> str | None:
+def _natural_rename_payload(world: Any, location: Any) -> dict[str, str] | None:
     current_name = str(location.canonical_name).strip()
-    for candidate in _language_rename_candidates(world, location) + _rename_candidates(location):
-        normalized = candidate.strip()
+    fallback_candidates = [
+        {"new_name": candidate, "name_source": "fallback_rename_template"}
+        for candidate in _rename_candidates(location)
+    ]
+    for candidate in _language_rename_candidate_payloads(world, location) + fallback_candidates:
+        normalized = candidate["new_name"].strip()
         if normalized and normalized != current_name and not _location_name_exists(world, normalized):
-            return normalized
+            return {**candidate, "new_name": normalized}
     return None
 
 
@@ -493,19 +503,23 @@ def generate_rename_world_change(world: Any, *, month: int, day: int, rng: Any) 
     candidates = controlled or locations
     while candidates:
         location = rng.choice(candidates)
-        new_name = _natural_rename_name(world, location)
-        if new_name is None:
+        rename_payload = _natural_rename_payload(world, location)
+        if rename_payload is None:
             candidates = [candidate for candidate in candidates if candidate is not location]
             continue
-        return _record_and_track_world_change(
-            world,
-            world.apply_location_rename_change(
-                location.id,
-                new_name,
-                month=month,
-                day=day,
-            ),
+        record = world.apply_location_rename_change(
+            location.id,
+            rename_payload["new_name"],
+            month=month,
+            day=day,
         )
+        if record is not None:
+            record.render_params.update({
+                key: value
+                for key, value in rename_payload.items()
+                if key != "new_name" and value
+            })
+        return _record_and_track_world_change(world, record)
     return None
 
 

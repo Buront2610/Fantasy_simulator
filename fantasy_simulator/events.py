@@ -91,6 +91,7 @@ class EventSystem:
         world: World,
         rng: Any = random,
         year_fraction: float = 1.0,
+        death_chance: float | None = None,
     ) -> Optional[EventResult]:
         return check_natural_death(
             char,
@@ -98,6 +99,7 @@ class EventSystem:
             event_death=self.event_death,
             rng=rng,
             year_fraction=year_fraction,
+            death_chance=death_chance,
         )
 
     def check_dying_resolution(
