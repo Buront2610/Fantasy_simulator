@@ -297,7 +297,7 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         self.assertIn("Because: The northern houses declared war.", out.text)
         self.assertIsNone(re.search(r"\b[0-9a-f]{32}\b", out.text))
 
-    def test_event_log_renders_combat_round_details(self) -> None:
+    def test_event_log_summarizes_combat_rounds_without_expanding_details(self) -> None:
         from types import SimpleNamespace
         from fantasy_simulator.event_models import WorldEventRecord
         from fantasy_simulator.ui.screens import _show_results
@@ -337,9 +337,88 @@ class TestShowResultsUsesBackends(unittest.TestCase):
 
         _show_results(sim, ctx=ctx)
 
-        self.assertIn("Combat log", out.text)
-        self.assertIn("R1: Northern levy used Swordsmanship", out.text)
-        self.assertIn("roll 14+6=20 vs 16, damage 3, advantage.", out.text)
+        self.assertIn("Combat log: 1 rounds.", out.text)
+        self.assertNotIn("R1: Northern levy used Swordsmanship", out.text)
+        self.assertNotIn("roll 14+6=20 vs 16, damage 3, advantage.", out.text)
+
+    def test_combat_log_menu_renders_latest_combat_without_full_event_log(self) -> None:
+        from types import SimpleNamespace
+        from fantasy_simulator.event_models import WorldEventRecord
+        from fantasy_simulator.ui.screens import _show_results
+
+        world = World()
+        world.record_event(
+            WorldEventRecord(
+                record_id="battle-focused",
+                kind="battle",
+                year=world.year,
+                month=2,
+                day=9,
+                description="Aldric fought a rival.",
+                render_params={
+                    "combat_log": [
+                        {
+                            "round_number": 1,
+                            "actor_name": "Aldric",
+                            "target_name": "Rival",
+                            "action_kind": "weapon_attack",
+                            "skill_key": "Swordsmanship",
+                            "dice": 14,
+                            "modifier": 6,
+                            "attack_total": 20,
+                            "defense_total": 16,
+                            "damage": 3,
+                            "outcome": "advantage",
+                        }
+                    ]
+                },
+            )
+        )
+        sim = SimpleNamespace(world=world)
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(answers=["1"], menu_keys=["combat_logs", "latest", "back_to_main", "exit"])
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_results(sim, ctx=ctx)
+
+        self.assertIn("Combat logs", out.text)
+        self.assertIn("Aldric fought a rival.", out.text)
+        self.assertIn("R1: Aldric used Swordsmanship", out.text)
+
+    def test_combat_log_menu_filters_by_character(self) -> None:
+        from types import SimpleNamespace
+        from fantasy_simulator.event_models import WorldEventRecord
+        from fantasy_simulator.ui.screens import _show_results
+
+        world = World()
+        hero = Character("Aldric", 25, "Male", "Human", "Warrior", char_id="hero")
+        rival = Character("Rival", 25, "Male", "Human", "Warrior", char_id="rival")
+        bystander = Character("Mira", 25, "Female", "Human", "Mage", char_id="bystander")
+        for character in (hero, rival, bystander):
+            world.add_character(character)
+        world.record_event(
+            WorldEventRecord(
+                record_id="battle-hero",
+                kind="battle",
+                year=world.year,
+                primary_actor_id=hero.char_id,
+                secondary_actor_ids=[rival.char_id],
+                description="Aldric fought a rival.",
+                render_params={
+                    "combat_log": [{"round_number": 1, "actor_id": hero.char_id, "target_id": rival.char_id}]
+                },
+            )
+        )
+        sim = SimpleNamespace(world=world)
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(answers=["1", "1"], menu_keys=["combat_logs", "character", "back_to_main", "exit"])
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_results(sim, ctx=ctx)
+
+        self.assertIn("Combat logs: Aldric", out.text)
+        self.assertIn("Aldric fought a rival.", out.text)
+        self.assertNotIn("Combat logs: Mira", out.text)
 
     def test_adventure_detail_renders_hazard_combat_rounds(self) -> None:
         from fantasy_simulator.adventure import AdventureRun

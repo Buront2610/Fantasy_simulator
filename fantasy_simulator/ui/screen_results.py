@@ -5,13 +5,14 @@ from __future__ import annotations
 from ..event_rendering import render_event_record
 from ..i18n import tr
 from ..simulator import Simulator
-from .combat_log_presenter import combat_log_lines_for_event
+from .combat_log_presenter import combat_round_count_for_event
 from .screen_adventures import (
     _resolve_pending_adventure_choice,
     _show_adventure_details,
     _show_adventure_summaries,
 )
 from .screen_dashboard import _show_world_dashboard
+from .screen_combat_logs import _show_combat_logs
 from .screen_history import (
     _show_location_history,
     _show_monthly_report,
@@ -51,6 +52,7 @@ def _result_menu_options() -> list[tuple[str, str]]:
         ("world_map", tr("world_map")),
         ("character_roster", tr("character_roster")),
         ("family_tree", tr("family_tree_menu")),
+        ("combat_logs", tr("combat_logs_menu")),
         ("event_log_last_30", tr("event_log_last_30")),
         ("full_event_log", tr("full_event_log")),
         ("adventure_summaries", tr("adventure_summaries")),
@@ -78,8 +80,9 @@ def _show_event_log(sim: Simulator, ctx: UIContext, last_n: int | None = None) -
         cause_text = _event_log_cause_text(sim, record)
         if cause_text:
             ctx.out.print_dim(f"      {cause_text}")
-        for line in combat_log_lines_for_event(record):
-            ctx.out.print_dim(f"      {line}")
+        combat_rounds = combat_round_count_for_event(record)
+        if combat_rounds:
+            ctx.out.print_dim(f"      {tr('event_log_combat_summary', rounds=combat_rounds)}")
     ctx.inp.pause()
 
 
@@ -140,6 +143,8 @@ def _show_result_view(action: str, sim: Simulator, ctx: UIContext) -> bool:
         _show_roster(sim.world, ctx=ctx)
     elif action == "family_tree":
         _show_family_tree(sim, ctx=ctx)
+    elif action == "combat_logs":
+        _show_combat_logs(sim, ctx=ctx)
     elif action == "event_log_last_30":
         _show_event_log(sim, ctx, last_n=30)
     elif action == "full_event_log":

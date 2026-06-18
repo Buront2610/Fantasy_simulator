@@ -15,18 +15,30 @@ def combat_log_lines_for_event(record: Any) -> List[str]:
     return [tr("combat_log_header"), *[_render_combat_round(entry) for entry in combat_log]]
 
 
+def combat_round_count_for_event(record: Any) -> int:
+    """Return stored combat round count without rendering the full log."""
+    return len(_combat_log_from_record(record))
+
+
 def combat_log_lines_for_adventure(run: Any, world: Any) -> List[str]:
     """Return readable combat encounters stored on an adventure run."""
     lines: List[str] = []
     for entry in getattr(run, "combat_logs", []):
-        if not isinstance(entry, dict):
-            continue
-        combat_log = entry.get("combat_log")
-        if not isinstance(combat_log, list) or not combat_log:
-            continue
-        lines.append(_render_adventure_encounter(entry, world))
-        lines.extend(_render_combat_round(round_entry) for round_entry in combat_log if isinstance(round_entry, dict))
+        lines.extend(combat_log_lines_for_adventure_entry(entry, world))
     return lines
+
+
+def combat_log_lines_for_adventure_entry(entry: Any, world: Any) -> List[str]:
+    """Return readable combat rounds for one stored adventure encounter."""
+    if not isinstance(entry, dict):
+        return []
+    combat_log = entry.get("combat_log")
+    if not isinstance(combat_log, list) or not combat_log:
+        return []
+    return [
+        _render_adventure_encounter(entry, world),
+        *[_render_combat_round(round_entry) for round_entry in combat_log if isinstance(round_entry, dict)],
+    ]
 
 
 def _combat_log_from_record(record: Any) -> List[dict[str, Any]]:
