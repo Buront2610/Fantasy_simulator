@@ -12,6 +12,9 @@ from ..world import World
 from .ui_context import UIContext, _default_ctx
 
 
+LIVE_LOG_DELAY_SECONDS = 0.08
+
+
 def _build_default_world(num_characters: int = 12, seed: int | None = None) -> World:
     world = World()
     creator = CharacterCreator()
@@ -87,7 +90,7 @@ def _advance_days(
         new_events = len(sim.world.event_records) - before_events
         if live:
             out.print_line(_daily_progress_line(sim, year, month, day, new_events))
-            _print_daily_event_highlights(sim, before_events, ctx=ctx)
+            _print_daily_event_stream(sim, before_events, ctx=ctx, delay_seconds=delay_seconds)
             if delay_seconds > 0:
                 time.sleep(delay_seconds)
     if not live:
@@ -105,7 +108,7 @@ def _advance_days(
 
 def _advance_daily_live(sim: Simulator, ctx: UIContext | None = None, *, days: int = 30) -> None:
     """Advance a short window one day at a time, printing each tick."""
-    _advance_days(sim, days, ctx=ctx, live=True, delay_seconds=0.03)
+    _advance_days(sim, days, ctx=ctx, live=True, delay_seconds=LIVE_LOG_DELAY_SECONDS)
 
 
 def _daily_progress_line(sim: Simulator, year: int, month: int, day: int, new_events: int) -> str:
@@ -117,12 +120,31 @@ def _daily_progress_line(sim: Simulator, year: int, month: int, day: int, new_ev
     )
 
 
-def _print_daily_event_highlights(sim: Simulator, start_index: int, ctx: UIContext) -> None:
+def _print_daily_event_stream(
+    sim: Simulator,
+    start_index: int,
+    ctx: UIContext,
+    *,
+    delay_seconds: float,
+) -> None:
     from ..event_rendering import render_event_record
 
     new_records = sim.world.event_records[start_index:]
-    for record in new_records[-3:]:
-        ctx.out.print_dim(f"    - {render_event_record(record, world=sim.world)}")
+    for record in new_records:
+        ctx.out.print_dim(f"    {_event_stream_prefix(record)} {render_event_record(record, world=sim.world)}")
+        if delay_seconds > 0:
+            time.sleep(delay_seconds)
+
+
+def _event_stream_prefix(record: object) -> str:
+    year = int(getattr(record, "year", 0) or 0)
+    month = int(getattr(record, "month", 0) or 0)
+    day = int(getattr(record, "day", 0) or 0)
+    if day > 0 and month > 0:
+        return tr("event_log_prefix_day", year=year, month=month, day=day)
+    if month > 0:
+        return tr("event_log_prefix_month", year=year, month=month)
+    return tr("event_log_prefix", year=year)
 
 
 def _simulation_date_label(sim: Simulator, year: int, month: int, day: int) -> str:

@@ -1172,6 +1172,45 @@ class TestNoPrintLeaks(unittest.TestCase):
         self.assertIn("Year 1000, Embermorn 1 | +0 event(s)", out.text)
         self.assertIn("Simulation advanced to Year 1000, Embermorn 3.", out.text)
 
+    def test_advance_days_live_streams_every_new_event(self) -> None:
+        from fantasy_simulator.event_models import WorldEventRecord
+        from fantasy_simulator.simulator import Simulator
+        from fantasy_simulator.ui.screens import _advance_days, _build_default_world
+
+        world = _build_default_world(num_characters=4, seed=42)
+        sim = Simulator(world, events_per_year=0, adventure_steps_per_year=0, seed=1)
+
+        def _record_dense_day(days: int) -> None:
+            self.assertEqual(days, 1)
+            for index in range(5):
+                world.record_event(WorldEventRecord(
+                    record_id=f"dense_{index}",
+                    kind="meeting",
+                    year=world.year,
+                    month=sim.current_month,
+                    day=sim.current_day,
+                    description=f"Dense event {index}.",
+                ))
+            sim.current_month, sim.current_day, year_delta = world.advance_calendar_position(
+                sim.current_month,
+                sim.current_day,
+                days=1,
+            )
+            sim.elapsed_days += 1
+            if year_delta:
+                world.advance_time(year_delta)
+
+        sim.advance_days = _record_dense_day  # type: ignore[method-assign]
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend()
+        ctx = UIContext(inp=inp, out=out)
+
+        _advance_days(sim, 1, ctx=ctx, live=True, delay_seconds=0.0)
+
+        self.assertIn("Year 1000, Embermorn 1 | +5 event(s)", out.text)
+        for index in range(5):
+            self.assertIn(f"[Year 1000, Month 1, Day 1] Dense event {index}.", out.text)
+
     def test_main_exit_produces_no_stdout(self) -> None:
         """main() exit path must not leak to stdout."""
         from fantasy_simulator.main import main
