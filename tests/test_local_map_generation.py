@@ -7,16 +7,30 @@ from types import SimpleNamespace
 from fantasy_simulator.local_map_generation import generate_local_map
 
 
-def _cell(location_id: str, region_type: str, *, x: int = 0, y: int = 0):
+def _cell(
+    location_id: str,
+    region_type: str,
+    *,
+    x: int = 0,
+    y: int = 0,
+    terrain_biome: str = "plains",
+    terrain_elevation: int = 128,
+    terrain_moisture: int = 128,
+):
     return SimpleNamespace(
         location_id=location_id,
         region_type=region_type,
         x=x,
         y=y,
         danger=40,
-        terrain_biome="plains",
-        terrain_elevation=128,
-        terrain_moisture=128,
+        terrain_biome=terrain_biome,
+        terrain_elevation=terrain_elevation,
+        terrain_moisture=terrain_moisture,
+        terrain_temperature=128,
+        rumor_heat=0,
+        prosperity=50,
+        mood=50,
+        controlling_faction_id="",
     )
 
 
@@ -87,13 +101,46 @@ def test_state_changes_overlay_without_rerolling_city_layout() -> None:
     dangerous.danger = 90
     dangerous.danger_band = "high"
 
-    calm_lines = _scrub_state_overlays(generate_local_map(calm).lines)
+    calm_lines = _structure_signature(generate_local_map(calm).lines)
     dangerous_map = generate_local_map(dangerous)
-    dangerous_lines = _scrub_state_overlays(dangerous_map.lines)
+    dangerous_lines = _structure_signature(dangerous_map.lines)
 
     assert calm_lines == dangerous_lines
     assert "local_map_legend_state_overlay" in dangerous_map.legend_keys
 
 
-def _scrub_state_overlays(lines: list[str]) -> list[str]:
-    return [line.replace("!", " ").replace("?", " ").replace("r", " ") for line in lines]
+def test_village_profile_responds_to_terrain_not_fixed_template() -> None:
+    river = generate_local_map(_cell(
+        "loc_river_village",
+        "village",
+        terrain_biome="river",
+        terrain_moisture=220,
+    ))
+    highland = generate_local_map(_cell(
+        "loc_highland_village",
+        "village",
+        terrain_elevation=210,
+    ))
+
+    assert river.scene_keys == ("local_map_scene_village_riverside",)
+    assert highland.scene_keys == ("local_map_scene_village_highland",)
+    assert "~" in "\n".join(river.lines)
+    assert "^" in "\n".join(highland.lines) or "n" in "\n".join(highland.lines)
+
+
+def test_control_state_adds_overlay_without_changing_city_structure() -> None:
+    free = _cell("loc_controlled_city", "city", x=2, y=2)
+    controlled = _cell("loc_controlled_city", "city", x=2, y=2)
+    controlled.controlling_faction_id = "faction_watch"
+
+    free_signature = _structure_signature(generate_local_map(free).lines)
+    controlled_map = generate_local_map(controlled)
+
+    assert "X" in "\n".join(controlled_map.lines)
+    assert "local_map_legend_state_overlay" in controlled_map.legend_keys
+    assert free_signature == _structure_signature(controlled_map.lines)
+
+
+def _structure_signature(lines: list[str]) -> str:
+    structural_chars = set("@+|-=/\\#HMSGNICKDWwhb")
+    return "".join(char for line in lines for char in line if char in structural_chars)

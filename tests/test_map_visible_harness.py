@@ -146,26 +146,26 @@ def _assert_seeded_map_visible_bundle(bundle: dict[str, list[str]]) -> None:
     assert bundle["detail"][:40] == [
         "  | V The Verdant Vale (Village)                     |",
         "  | Generated local map                              |",
-        "  |                   +                              |",
-        "  |                !  -                              |",
-        "  |   \"\"\"\"\"\"   hh+h   -     hhhh                     |",
-        "  |   \"\"hhhh   hhhh   -     +hhh\"\"\"!                 |",
-        "  |     +hhh          -     \"\"\"\"\"\"hhhh               |",
-        "  |                   -           hhh+               |",
-        "  |                 To-  B     T                     |",
-        "  | +-----------------@-----------------+            |",
-        "  |                   :                              |",
-        "  |                   :                              |",
-        "  |   T               :      \"\"\"\"\"\"\"                 |",
-        "  |    \"\"\"\"\"\"\"\"       :T    T\"\"\"\"\"\"\"                 |",
-        "  |  ~~\"\"\"\"\"\"\"\"~~~~~~~=~~~~~~~~~~~~~~~~~             |",
-        "  |     !             :                              |",
-        "  |                                                  |",
+        "  | .,....\"..\"....\"..\"\".\".--+.\"..\".\"\".\"..            |",
+        "  | ..\".....,M\"...........-.\"\".\".\"h......            |",
+        "  | ..,...,..\"\"\"....\"..\".\"-.\",\".....\",...            |",
+        "  | .\".....\"\"..,.\",...\".\"--.\".....,..\"...            |",
+        '  | ...,..."...,.........-"..""""".""....            |',
+        "  | ..h.,\".\"..,.....\"...\"-\"..\"\"\"\"\".\"\"\"\"\".            |",
+        "  | ..\".\".\"...\"\".....\"..\"-.\"....\"..\"\"\"\"\".            |",
+        "  | \"\"------------------@----------\"\"!\"\".            |",
+        "  | +--,\"h\"\"\"\".\".\"......\".\".....\"\".\"\"\"\"\"\"            |",
+        "  | ....\"\"\"N\"\"!.\"...........\"..\".\"\"\"\"\"\"-+            |",
+        "  | ...\"\"...\"...\".....,,.\"...\".\".\"\"\"\"\"...            |",
+        "  | .,\"..,\"..\",.\".....\"......\"\".....\"....            |",
+        "  | ....\"....bbb..\"....\".....\".,..,.\"..\"\"            |",
+        "  | ..\".,,\".!bbb........\".\"......\".\"\"\"...            |",
+        "  | ..........,\".,\"\".....\"..\"..\".......,.            |",
         "  | Exterior view                                    |",
         "  |  \"\"\"\" \"\"\"\"        ~~~~~~~~                       |",
         "  |        /\\       /\\          T T                  |",
         "  |   ____/__\\_____/__\\____   hhh hhh                |",
-        "  |       ___       ___          [B]                 |",
+        "  |       ___       ___           B                  |",
         "  | --------------- @ -----------------              |",
         "  | Local route sketch                               |",
         "  |  +-------------------------------+               |",
@@ -180,8 +180,8 @@ def _assert_seeded_map_visible_bundle(bundle: dict[str, list[str]]) -> None:
         "  |  |                               |               |",
         "  |  +-------------------------------+               |",
         "  | Sketch cues: !=High danger                       |",
-        "  | Map legend: @ center, H/h homes, $ market, S s...|",
-        "  | Scene: Open village with fields, a stream, bar...|",
+        "  | Map legend: @ center, h homes, M market, S shr...|",
+        "  | Scene: Profile: field village / barns / lane     |",
         "  | Terrain: Plains (,)                              |",
         "  | Elev: midland (50%)                              |",
     ]
@@ -200,26 +200,26 @@ def _assert_memory_heavy_bundle(bundle: dict[str, list[str]]) -> None:
     assert bundle["detail"][:40] == [
         "  | V The Verdant Vale (Village)                     |",
         "  | Generated local map                              |",
-        "  |                   +                              |",
-        "  |                   -                              |",
-        "  |   \"\"\"\"\"\"   hh+h   -     hhhh                     |",
-        "  |   \"\"hhhh   hhhh   -     +hhh\"\"\"                  |",
-        "  |     +hhh          -     \"\"\"\"\"\"hhhh               |",
-        "  |                   -           hhh+               |",
-        "  |                 To-  B     T                     |",
-        "  | +-----------------@-----------------+            |",
-        "  |                   :                              |",
-        "  |                   :                              |",
-        "  |   T               :      \"\"\"\"\"\"\"                 |",
-        "  |    \"\"\"\"\"\"\"\"       :T    T\"\"\"\"\"\"\"                 |",
-        "  |  ~~\"\"\"\"\"\"\"\"~~~~~~~=~~~~~~~~~~~~~~~~~             |",
-        "  |                   :                              |",
-        "  |                                                  |",
+        "  | .,....\"..\"....\"..\"\".\".--+.\"..\".\"\".\"..            |",
+        "  | ..\".....,M\"...........-.\"\".\".\"h......            |",
+        "  | ..,...,..\"\"\"....\"..\".\"-.\",\".....\",...            |",
+        "  | .\".....\"\"..,.\",...\".\"--.\".....,..\"...            |",
+        '  | ...,..."...,.........-"..""""".""....            |',
+        "  | ..h.,\".\"..,.....\"...\"-\"..\"\"\"\"\".\"\"\"\"\".            |",
+        "  | ..\".\".\"...\"\".....\"..\"-.\"....\"..\"\"\"\"\".            |",
+        "  | \"\"------------------@----------\"\"\"\"\".            |",
+        "  | +--,\"h\"\"\"\".\".\"......\".\".....\"\".\"\"\"\"\"\"            |",
+        "  | ....\"\"\"N\"\"..\"...........\"..\".\"\"\"\"\"\"-+            |",
+        "  | ...\"\"...\"...\".....,,.\"...\".\".\"\"\"\"\"...            |",
+        "  | .,\"..,\"..\",.\".....\"......\"\".....\"....            |",
+        "  | ....\"....bbb..\"....\".....\".,..,.\"..\"\"            |",
+        "  | ..\".,,\"..bbb........\".\"......\".\"\"\"...            |",
+        "  | ..........,\".,\"\".....\"..\"..\".......,.            |",
         "  | Exterior view                                    |",
         "  |  \"\"\"\" \"\"\"\"        ~~~~~~~~                       |",
         "  |        /\\       /\\          T T                  |",
         "  |   ____/__\\_____/__\\____   hhh hhh                |",
-        "  |       ___       ___          [B]                 |",
+        "  |       ___       ___           B                  |",
         "  | --------------- @ -----------------              |",
         "  | Local route sketch                               |",
         "  |  +-------------------------------+               |",
@@ -234,8 +234,8 @@ def _assert_memory_heavy_bundle(bundle: dict[str, list[str]]) -> None:
         "  |  |                               |               |",
         "  |  +-------------------------------+               |",
         "  | Sketch cues: M=Memorial                          |",
-        "  | Map legend: @ center, H/h homes, $ market, S s...|",
-        "  | Scene: Open village with fields, a stream, bar...|",
+        "  | Map legend: @ center, h homes, M market, S shr...|",
+        "  | Scene: Profile: field village / barns / lane     |",
         "  | Terrain: Plains (,)                              |",
         "  | Elev: midland (50%)                              |",
     ]
@@ -304,21 +304,20 @@ def test_location_detail_uses_generated_city_map() -> None:
 
     detail = rendered["detail"]
     assert "  | Generated local map                              |" in detail
-    assert "  |             +                                    |" in detail
-    assert "  |    /G\\      |    /S\\       ......                |" in detail
-    assert "  |    /H\\      |    ::::::  /M\\                     |" in detail
-    assert "  |             |   ====                             |" in detail
-    assert "  | +=======================@===========+            |" in detail
-    assert "  |    /I\\      |    /G\\       /D\\                   |" in detail
-    assert "  |    ......   |    /C\\       /W\\                   |" in detail
+    assert "  | .X..,.....,.....+....................            |" in detail
+    assert "  | .............../H\\......./N\\.........            |" in detail
+    assert "  | ./G\\........###.=|...................            |" in detail
+    assert "  | .###........./M\\/H\\..................            |" in detail
+    assert "  | ....../S\\.......=|..........###......            |" in detail
+    assert "  | ===/I\\###========@==================+            |" in detail
     assert "  | Exterior view                                    |" in detail
-    assert "  |   | [] [] |====@====| [] [] || |                 |" in detail
+    assert "  |   | [] [] |  o o o  | [] [] |                    |" in detail
     assert "  | Local route sketch                               |" in detail
     assert "  |  |            \\             /--D |               |" in detail
     assert "  |  |            ---@---            |               |" in detail
     assert "  | Sketch cues: G=Gate / $=Market / B=Notice board  |" in detail
     assert "  | Map legend: @ focus, H homes, M market, S shri...|" in detail
-    assert "  | Scene: Riverport city with a grand avenue, tem...|" in detail
+    assert "  | Scene: Profile: open market / plaza / lanes      |" in detail
 
 
 def test_region_route_sketch_renders_cities_as_blocks() -> None:
