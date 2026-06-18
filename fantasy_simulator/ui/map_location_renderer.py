@@ -197,6 +197,11 @@ def _append_site_ascii(lines: List[str], info: MapRenderInfo, cell: MapCellInfo,
     lines.append(f"  |{_fit(title, width)}|")
     for art_line in generated_map.lines:
         lines.append(f"  |{_fit(f' {art_line}', width)}|")
+    if generated_map.exterior_lines:
+        exterior_title = f" {tr('map_detail_local_map_exterior')}"
+        lines.append(f"  |{_fit(exterior_title, width)}|")
+        for art_line in generated_map.exterior_lines:
+            lines.append(f"  |{_fit(f' {art_line}', width)}|")
     _append_detail_route_sketch(lines, info, cell, width)
     lines.extend(_local_symbol_line(cell, width))
     if generated_map.legend_keys:

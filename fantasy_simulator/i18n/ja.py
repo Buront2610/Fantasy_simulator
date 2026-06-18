@@ -1170,6 +1170,7 @@ TEXT_JA: Dict[str, str] = {
     'map_detail_aa_legend': 'スケッチ手がかり',
     'map_detail_local_map_legend': '地図凡例',
     'map_detail_local_map_scene': '情景',
+    'map_detail_local_map_exterior': '外観AA',
     'local_map_legend_city': '@ 広場、地図内ラベルは地区名、= 大通り',
     'local_map_legend_settlement': '@ 中心、H/h 家、$ 市場、S 祠、I 宿、b 納屋、" 畑、~ 小川',
     'local_map_legend_dungeon': '@ 入口、# 壁、. 床、> 階段、! 脅威、? 宝、A 祭壇、~ 水場、r 瓦礫',

@@ -19,6 +19,7 @@ class GeneratedLocalMap:
     lines: list[str]
     legend_keys: tuple[str, ...]
     scene_keys: tuple[str, ...] = ()
+    exterior_lines: tuple[str, ...] = ()
 
 
 def generate_local_map(cell: Any, connected_cells: Iterable[Any] = ()) -> GeneratedLocalMap:
@@ -135,6 +136,7 @@ def _generate_city_map(route_directions: set[str]) -> GeneratedLocalMap:
         _stringify(canvas),
         ("local_map_legend_city", "local_map_legend_route_gate"),
         ("local_map_scene_city",),
+        _city_exterior_lines(),
     )
 
 
@@ -180,6 +182,7 @@ def _generate_settlement_map(rng: random.Random, route_directions: set[str], *, 
         _stringify(canvas),
         ("local_map_legend_settlement", "local_map_legend_route_gate"),
         ("local_map_scene_village",),
+        _village_exterior_lines(),
     )
 
 
@@ -301,6 +304,7 @@ def _generate_dungeon_map(rng: random.Random, route_directions: set[str]) -> Gen
         _stringify(canvas),
         ("local_map_legend_dungeon", "local_map_legend_route_gate"),
         ("local_map_scene_dungeon",),
+        _dungeon_exterior_lines(),
     )
 
 
@@ -328,6 +332,51 @@ def _generate_wild_map(
         _stringify(canvas),
         ("local_map_legend_wild", "local_map_legend_route_gate"),
         ("local_map_scene_wild",),
+        _wild_exterior_lines(tree_char),
+    )
+
+
+def _art_lines(*lines: str) -> tuple[str, ...]:
+    return tuple(line[:LOCAL_MAP_WIDTH].ljust(LOCAL_MAP_WIDTH) for line in lines)
+
+
+def _city_exterior_lines() -> tuple[str, ...]:
+    return _art_lines(
+        "        /\\        /\\        /\\      ",
+        "   ____/  \\______/  \\______/  \\____",
+        "  | gate towers |  banners | watch |",
+        "  | [] [] [] [] |  market smoke    |",
+        "==|______/==\\______________________|",
+    )
+
+
+def _village_exterior_lines() -> tuple[str, ...]:
+    return _art_lines(
+        ' """" fields        ~~ stream ~~     ',
+        "       /\\       /\\          T T      ",
+        "  ____/__\\_____/__\\____   hhh hhh   ",
+        "     barn and low roofs      [B]     ",
+        "  road --------- @ --------- road    ",
+    )
+
+
+def _dungeon_exterior_lines() -> tuple[str, ...]:
+    return _art_lines(
+        "        broken arch and wet stone    ",
+        "      ___/^^^^^^^^^^^^^^\\___        ",
+        "     /  r  fallen blocks   \\        ",
+        " ___/____      @      ____>_\\___    ",
+        "       mist ~~~   altar shadow       ",
+    )
+
+
+def _wild_exterior_lines(tree_char: str) -> tuple[str, ...]:
+    return _art_lines(
+        f"      {tree_char} {tree_char} ridge line and brush     ",
+        "   ___ path bends through cover ___   ",
+        "      \\__  @  __/      stones       ",
+        "          \\__/     wind and tracks   ",
+        "        distant road fades away       ",
     )
 
 

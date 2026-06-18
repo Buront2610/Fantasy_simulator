@@ -143,7 +143,7 @@ def _assert_seeded_map_visible_bundle(bundle: dict[str, list[str]]) -> None:
     assert any("Native name: Branthethal" in line for line in bundle["region"])
     assert any("Native name: Branthethal" in line for line in bundle["region"])
 
-    assert bundle["detail"][:34] == [
+    assert bundle["detail"][:40] == [
         "  | V The Verdant Vale (Village)                     |",
         "  | Generated local map                              |",
         "  |                   +                              |",
@@ -161,6 +161,12 @@ def _assert_seeded_map_visible_bundle(bundle: dict[str, list[str]]) -> None:
         "  |    \"\"\"\"\"\"\"\"       :           hhhh               |",
         "  |                   :                              |",
         "  |                                                  |",
+        "  | Exterior view                                    |",
+        "  |  \"\"\"\" fields        ~~ stream ~~                 |",
+        "  |        /\\       /\\          T T                  |",
+        "  |   ____/__\\_____/__\\____   hhh hhh                |",
+        "  |      barn and low roofs      [B]                 |",
+        "  |   road --------- @ --------- road                |",
         "  | Local route sketch                               |",
         "  |  +-------------------------------+               |",
         "  |  |                               |               |",
@@ -191,7 +197,7 @@ def _assert_memory_heavy_bundle(bundle: dict[str, list[str]]) -> None:
     assert "      Recent: Lysara passed through at dawn" in bundle["region"]
     assert "    The Verdant Vale: Memory: Memorial, Trace" in bundle["region"]
 
-    assert bundle["detail"][:34] == [
+    assert bundle["detail"][:40] == [
         "  | V The Verdant Vale (Village)                     |",
         "  | Generated local map                              |",
         "  |                   +                              |",
@@ -209,6 +215,12 @@ def _assert_memory_heavy_bundle(bundle: dict[str, list[str]]) -> None:
         "  |    \"\"\"\"\"\"\"\" hhhh  :       T   hh+h               |",
         "  |                   :                              |",
         "  |                                                  |",
+        "  | Exterior view                                    |",
+        "  |  \"\"\"\" fields        ~~ stream ~~                 |",
+        "  |        /\\       /\\          T T                  |",
+        "  |   ____/__\\_____/__\\____   hhh hhh                |",
+        "  |      barn and low roofs      [B]                 |",
+        "  |   road --------- @ --------- road                |",
         "  | Local route sketch                               |",
         "  |  +-------------------------------+               |",
         "  |  |                               |               |",
@@ -297,6 +309,8 @@ def test_location_detail_uses_generated_city_map() -> None:
     assert "  | #           Plaza =                 #            |" in detail
     assert "  | #  [Inn]          =   [Shrine]      #            |" in detail
     assert "  | +=================@=================+            |" in detail
+    assert "  | Exterior view                                    |" in detail
+    assert "  |   | gate towers |  banners | watch |             |" in detail
     assert "  | Local route sketch                               |" in detail
     assert "  |  |            \\             /--D |               |" in detail
     assert "  |  |            ---@---            |               |" in detail

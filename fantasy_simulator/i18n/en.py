@@ -1181,6 +1181,7 @@ TEXT_EN: Dict[str, str] = {
     'map_detail_aa_legend': 'Sketch cues',
     'map_detail_local_map_legend': 'Map legend',
     'map_detail_local_map_scene': 'Scene',
+    'map_detail_local_map_exterior': 'Exterior view',
     'local_map_legend_city': '@ plaza, labels name districts directly, = main roads',
     'local_map_legend_settlement': '@ center, H/h homes, $ market, S shrine, I inn, b barn, " fields, ~ stream',
     'local_map_legend_dungeon': '@ entrance, # walls, . floors, > stairs, ! threat, ? cache, A altar, ~ pool, r rubble',
