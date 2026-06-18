@@ -407,6 +407,7 @@ TEXT_EN: Dict[str, str] = {
         'WIS {wisdom} / CHA {charisma} / CON {constitution}'
     ),
     'roster_profile_personality': 'Personality: {summary}',
+    'roster_profile_current_personality': 'Current demeanor: {summary} (shaped by {factors})',
     'roster_profile_background': 'Background',
     'roster_profile_family': 'Family',
     'roster_profile_relationships': 'Relationships',

@@ -403,6 +403,7 @@ TEXT_JA: Dict[str, str] = {
         'WIS {wisdom} / CHA {charisma} / CON {constitution}'
     ),
     'roster_profile_personality': '性格: {summary}',
+    'roster_profile_current_personality': '現在の気質: {summary}（影響: {factors}）',
     'roster_profile_background': '経歴',
     'roster_profile_family': '家族',
     'roster_profile_relationships': '関係',

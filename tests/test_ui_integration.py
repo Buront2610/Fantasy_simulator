@@ -826,6 +826,9 @@ class TestShowRosterUsesBackends(unittest.TestCase):
 
         self.assertIn("Aldric profile", out.text)
         self.assertIn("Personality", out.text)
+        self.assertIn("Current demeanor", out.text)
+        self.assertIn("gratitude after being rescued", out.text)
+        self.assertIn("combat tension", out.text)
         self.assertIn("Background", out.text)
         self.assertIn("Family", out.text)
         self.assertIn("Spouse: Mira", out.text)

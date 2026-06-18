@@ -5,7 +5,11 @@ from __future__ import annotations
 from typing import Any
 
 from ..character_founder_background import render_founder_summary
-from ..character_personality import render_personality_summary
+from ..character_personality import (
+    personality_context_from_events,
+    render_personality_context_factors,
+    render_personality_summary,
+)
 from ..combat_log_index import CombatLogEntryView, build_combat_log_index
 from ..event_rendering import render_event_record
 from ..i18n import tr, tr_term
@@ -101,7 +105,7 @@ def _show_character_profile(world: World, character: Any, ctx: UIContext) -> Non
 def _profile_summary_lines(world: World, character: Any) -> list[str]:
     status = tr("status_alive") if getattr(character, "alive", True) else tr("status_dead")
     injury = tr(f"injury_status_{getattr(character, 'injury_status', 'none')}")
-    return [
+    lines = [
         tr(
             "roster_profile_identity",
             race=tr_term(getattr(character, "race", "")),
@@ -122,6 +126,16 @@ def _profile_summary_lines(world: World, character: Any) -> list[str]:
         ),
         tr("roster_profile_personality", summary=render_personality_summary(character.personality)),
     ]
+    context = personality_context_from_events(character, getattr(world, "event_records", []))
+    if context.factor_keys:
+        lines.append(
+            tr(
+                "roster_profile_current_personality",
+                summary=render_personality_summary(context.profile),
+                factors=render_personality_context_factors(context.factor_keys),
+            )
+        )
+    return lines
 
 
 def _background_lines(character: Any) -> list[str]:
