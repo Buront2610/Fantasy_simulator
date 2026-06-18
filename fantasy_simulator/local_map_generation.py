@@ -113,19 +113,27 @@ def _apply_route_gates(canvas: list[list[str]], directions: set[str], *, road_ch
 
 
 def _generate_city_map(rng: random.Random, route_directions: set[str]) -> GeneratedLocalMap:
-    canvas = _bordered_canvas(" ")
     variant = rng.randrange(3)
     if variant == 0:
+        canvas = _blank_canvas(" ")
         _paint_city_plaza_plan(canvas, route_directions or {"north", "south", "east", "west"})
+        scene_keys = ("local_map_scene_city_open_market",)
+        exterior_lines = _market_town_exterior_lines()
     elif variant == 1:
+        canvas = _blank_canvas(" ")
         _paint_city_avenue_plan(canvas, route_directions or {"north", "south", "east", "west"})
+        scene_keys = ("local_map_scene_city_riverport",)
+        exterior_lines = _riverport_exterior_lines()
     else:
+        canvas = _bordered_canvas(" ")
         _paint_city_citadel_plan(canvas, route_directions or {"north", "south", "east", "west"})
+        scene_keys = ("local_map_scene_city_citadel",)
+        exterior_lines = _city_exterior_lines()
     return GeneratedLocalMap(
         _stringify(canvas),
         ("local_map_legend_city", "local_map_legend_route_gate"),
-        ("local_map_scene_city",),
-        _city_exterior_lines(),
+        scene_keys,
+        exterior_lines,
     )
 
 
@@ -415,6 +423,26 @@ def _city_exterior_lines() -> tuple[str, ...]:
         "  | gate towers |  banners | watch |",
         "  | [] [] [] [] |  market smoke    |",
         "==|______/==\\______________________|",
+    )
+
+
+def _market_town_exterior_lines() -> tuple[str, ...]:
+    return _art_lines(
+        "        open square and cloth awnings ",
+        "   __/\\__     __/\\__      carts     ",
+        "  / market\\___/ inn \\___ stalls     ",
+        " road ======= @ ======= road        ",
+        "        bells, smoke, crowded lanes  ",
+    )
+
+
+def _riverport_exterior_lines() -> tuple[str, ...]:
+    return _art_lines(
+        "        temple roofs over the quay    ",
+        "   ___/\\___    arcade    cranes      ",
+        "  | docks |==== avenue ==== market   ",
+        " ~~ boats ~~ @ ~~ warehouse lights   ",
+        "        river road and busy bridges   ",
     )
 
 

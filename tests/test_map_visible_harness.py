@@ -304,20 +304,20 @@ def test_location_detail_uses_generated_city_map() -> None:
 
     detail = rendered["detail"]
     assert "  | Generated local map                              |" in detail
-    assert "  | ############+########################            |" in detail
-    assert "  | #  [Gate]   |    [Temple]  garden   #            |" in detail
-    assert "  | #  [Homes]  |    arcade  [Market]   #            |" in detail
-    assert "  | #           |   Grand Avenue        #            |" in detail
+    assert "  |             +                                    |" in detail
+    assert "  |    [Gate]   |    [Temple]  garden                |" in detail
+    assert "  |    [Homes]  |    arcade  [Market]                |" in detail
+    assert "  |             |   Grand Avenue                     |" in detail
     assert "  | +=======================@===========+            |" in detail
-    assert "  | #  [Inn]    |    [Guild]   [Docks]  #            |" in detail
+    assert "  |    [Inn]    |    [Guild]   [Docks]               |" in detail
     assert "  | Exterior view                                    |" in detail
-    assert "  |   | gate towers |  banners | watch |             |" in detail
+    assert "  |   | docks |==== avenue ==== market               |" in detail
     assert "  | Local route sketch                               |" in detail
     assert "  |  |            \\             /--D |               |" in detail
     assert "  |  |            ---@---            |               |" in detail
     assert "  | Sketch cues: G=Gate / $=Market / B=Notice board  |" in detail
     assert "  | Map legend: @ civic focus, labels name distric...|" in detail
-    assert "  | Scene: Walled city with named districts and a ...|" in detail
+    assert "  | Scene: Riverport city with a grand avenue, tem...|" in detail
 
 
 def test_region_route_sketch_renders_cities_as_blocks() -> None:
