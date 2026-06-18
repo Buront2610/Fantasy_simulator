@@ -273,6 +273,30 @@ class TestEventMeeting:
         assert "rescue_debt" in catalyzed.metadata["relationship_catalyst_factor_keys"]
         assert rescue.record_id in catalyzed.metadata["cause_event_ids"]
 
+    def test_recent_experiences_temper_personality_in_relationship_events(self, es, world):
+        plain_a = _make_char("Plain A")
+        plain_b = _make_char("Plain B")
+        changed_a = _make_char("Changed A")
+        changed_b = _make_char("Changed B")
+        for char in (plain_a, plain_b, changed_a, changed_b):
+            world.add_character(char)
+        discovery = world.record_event(WorldEventRecord(
+            record_id="shared_wonder",
+            kind="adventure_discovery",
+            year=world.year,
+            primary_actor_id=changed_a.char_id,
+            secondary_actor_ids=[changed_b.char_id],
+            description="Changed A and Changed B found a buried hall.",
+        ))
+
+        plain = es.event_meeting(plain_a, plain_b, world, rng=random.Random(0))
+        changed = es.event_meeting(changed_a, changed_b, world, rng=random.Random(0))
+
+        assert changed.metadata["relationship_delta"] > plain.metadata["relationship_delta"]
+        assert "recent_wonder" in changed.metadata["personality_context_factor_keys"]
+        assert discovery.record_id in changed.metadata["cause_event_ids"]
+        assert "recent wonder" in changed.metadata["render_params"]["personality_factors"]
+
 
 # ---------------------------------------------------------------------------
 # event_battle

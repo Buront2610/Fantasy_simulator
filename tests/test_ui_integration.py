@@ -343,6 +343,7 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         self.assertIn("Because: Rescuer saved Saved.", out.text)
         self.assertIn("Relationship factors:", out.text)
         self.assertIn("personality", out.text)
+        self.assertIn("gratitude after being rescued", out.text)
         self.assertIn("catalyst a rescue debt", out.text)
 
     def test_event_log_summarizes_combat_rounds_without_expanding_details(self) -> None:

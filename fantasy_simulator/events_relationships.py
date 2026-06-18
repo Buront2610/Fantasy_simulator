@@ -7,10 +7,14 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, List
 
 from .character_personality import (
+    PersonalityAffinity,
+    PersonalityContext,
     marriage_threshold_adjustment,
     personality_affinity,
+    personality_context_from_events,
     relationship_delta_from_personality,
     render_affinity_factors,
+    render_personality_context_factors,
     romance_delta_from_personality,
 )
 from .event_causality import latest_pair_event_ids, pair_cause_event_ids
@@ -41,6 +45,35 @@ class RelationshipCatalyst:
     score: int = 0
     factor_keys: tuple[str, ...] = ()
     cause_event_ids: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class RelationshipPersonality:
+    first_context: PersonalityContext
+    second_context: PersonalityContext
+    affinity: PersonalityAffinity
+    factor_text: str
+    context_factor_keys: tuple[str, ...]
+    cause_event_ids: tuple[str, ...]
+
+
+def _relationship_personality(world: "World", char1: "Character", char2: "Character") -> RelationshipPersonality:
+    event_records = getattr(world, "event_records", [])
+    first_context = personality_context_from_events(char1, event_records)
+    second_context = personality_context_from_events(char2, event_records)
+    affinity = personality_affinity(first_context.profile, second_context.profile)
+    context_factor_keys = tuple(dict.fromkeys([*first_context.factor_keys, *second_context.factor_keys]))
+    factor_parts = [render_affinity_factors(affinity.factor_keys)]
+    if context_factor_keys:
+        factor_parts.append(render_personality_context_factors(context_factor_keys))
+    return RelationshipPersonality(
+        first_context=first_context,
+        second_context=second_context,
+        affinity=affinity,
+        factor_text="; ".join(part for part in factor_parts if part),
+        context_factor_keys=context_factor_keys,
+        cause_event_ids=tuple(dict.fromkeys([*first_context.cause_event_ids, *second_context.cause_event_ids])),
+    )
 
 
 def _pair_history_cause_ids(
@@ -150,6 +183,19 @@ def _catalyst_metadata(catalyst: RelationshipCatalyst, catalyst_delta: int) -> d
     }
 
 
+def _personality_metadata(personality: RelationshipPersonality, relationship_delta: int) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "personality_affinity": personality.affinity.score,
+        "personality_factor_keys": list(personality.affinity.factor_keys),
+        "personality_factors": personality.factor_text,
+        "relationship_delta": relationship_delta,
+    }
+    if personality.context_factor_keys:
+        payload["personality_context_factor_keys"] = list(personality.context_factor_keys)
+        payload["personality_context_factors"] = render_personality_context_factors(personality.context_factor_keys)
+    return payload
+
+
 def _relationship_metadata(
     summary_key: str,
     render_params: Dict[str, Any],
@@ -202,13 +248,17 @@ def _romance_result(
     relationship_delta: int,
 ) -> EventResult:
     cause_event_ids = _pair_history_cause_ids(world, char1, char2, event_kinds=("meeting", "romance"))
-    affinity = personality_affinity(char1.personality, char2.personality)
-    personality_delta = romance_delta_from_personality(char1.personality, char2.personality)
+    personality = _relationship_personality(world, char1, char2)
+    personality_delta = romance_delta_from_personality(
+        personality.first_context.profile,
+        personality.second_context.profile,
+    )
     catalyst = _relationship_catalyst(world, char1, char2)
-    catalyst_delta = _catalyst_delta(affinity.score, catalyst)
+    catalyst_delta = _catalyst_delta(personality.affinity.score, catalyst)
     applied_delta = relationship_delta + personality_delta + catalyst_delta
     char1.update_mutual_relationship(char2, applied_delta)
     catalyst_payload = _catalyst_metadata(catalyst, catalyst_delta)
+    personality_payload = _personality_metadata(personality, applied_delta)
     desc = tr(
         description_key,
         name1=char1.name,
@@ -227,15 +277,11 @@ def _romance_result(
                 "name1": char1.name,
                 "name2": char2.name,
                 "location_id": char1.location_id,
-                "personality_affinity": affinity.score,
-                "personality_factors": render_affinity_factors(affinity.factor_keys),
-                "relationship_delta": applied_delta,
+                **personality_payload,
                 **catalyst_payload,
             },
-            [*cause_event_ids, *catalyst.cause_event_ids],
-            personality_affinity=affinity.score,
-            personality_factor_keys=list(affinity.factor_keys),
-            relationship_delta=applied_delta,
+            [*cause_event_ids, *personality.cause_event_ids, *catalyst.cause_event_ids],
+            **personality_payload,
             **catalyst_payload,
         ),
     )
@@ -274,10 +320,12 @@ def _marriage_result(
     char2.spouse_id = char1.char_id
     char1.update_mutual_relationship(char2, 20)
     catalyst = _relationship_catalyst(world, char1, char2)
+    personality = _relationship_personality(world, char1, char2)
     catalyst_payload = _catalyst_metadata(catalyst, _catalyst_delta(
-        personality_affinity(char1.personality, char2.personality).score,
+        personality.affinity.score,
         catalyst,
     ))
+    personality_payload = _personality_metadata(personality, 20)
     marriage_source_id = generate_record_id(rng)
     cause_event_ids = _pair_history_cause_ids(
         world,
@@ -324,11 +372,13 @@ def _marriage_result(
                 "race2": char2.race,
                 "job2": char2.job,
                 "location_id": char1.location_id,
+                **personality_payload,
                 **catalyst_payload,
             },
-            [*cause_event_ids, *catalyst.cause_event_ids],
+            [*cause_event_ids, *personality.cause_event_ids, *catalyst.cause_event_ids],
             relation_tag_updates=relation_tag_updates,
             record_id=marriage_source_id,
+            **personality_payload,
             **catalyst_payload,
         ),
     )
@@ -345,9 +395,12 @@ def resolve_marriage_event(
     rel2 = char2.get_relationship(char1.char_id)
     avg_rel = (rel1 + rel2) / 2
     catalyst = _relationship_catalyst(world, char1, char2)
-    affinity = personality_affinity(char1.personality, char2.personality)
-    threshold_adjustment = marriage_threshold_adjustment(char1.personality, char2.personality)
-    threshold_adjustment -= _catalyst_delta(affinity.score, catalyst)
+    personality = _relationship_personality(world, char1, char2)
+    threshold_adjustment = marriage_threshold_adjustment(
+        personality.first_context.profile,
+        personality.second_context.profile,
+    )
+    threshold_adjustment -= _catalyst_delta(personality.affinity.score, catalyst)
     required_single = 35 + threshold_adjustment
     required_average = 40 + threshold_adjustment
 
@@ -437,10 +490,13 @@ def resolve_meeting_event(
 ) -> EventResult:
     """Resolve a meeting and its relationship-tag side effects."""
     base_delta = rng.randint(-15, 25)
-    affinity = personality_affinity(char1.personality, char2.personality)
-    personality_delta = relationship_delta_from_personality(char1.personality, char2.personality)
+    personality = _relationship_personality(world, char1, char2)
+    personality_delta = relationship_delta_from_personality(
+        personality.first_context.profile,
+        personality.second_context.profile,
+    )
     catalyst = _relationship_catalyst(world, char1, char2)
-    catalyst_delta = _catalyst_delta(affinity.score, catalyst)
+    catalyst_delta = _catalyst_delta(personality.affinity.score, catalyst)
     delta = base_delta + personality_delta + catalyst_delta
     char1.update_relationship(char2.char_id, delta)
     char2.update_relationship(char1.char_id, delta + rng.randint(-5, 5))
@@ -452,6 +508,7 @@ def resolve_meeting_event(
     relation_tag_updates, meeting_source_id = _meeting_relation_tag_updates(char1, char2, avg_after, rng)
     description_key = _meeting_description_key(avg_after)
     catalyst_payload = _catalyst_metadata(catalyst, catalyst_delta)
+    personality_payload = _personality_metadata(personality, delta)
     desc = tr(
         description_key,
         name1=char1.name,
@@ -493,16 +550,12 @@ def resolve_meeting_event(
                 "relationship_a": rel1_after,
                 "relationship_b": rel2_after,
                 "relationship_avg": avg_after,
-                "personality_affinity": affinity.score,
-                "personality_factors": render_affinity_factors(affinity.factor_keys),
-                "relationship_delta": delta,
+                **personality_payload,
                 **catalyst_payload,
                 "story_hook_key": story_hook_key,
             },
-            "personality_affinity": affinity.score,
-            "personality_factor_keys": list(affinity.factor_keys),
-            "relationship_delta": delta,
-            "cause_event_ids": list(catalyst.cause_event_ids),
+            **personality_payload,
+            "cause_event_ids": list(dict.fromkeys([*personality.cause_event_ids, *catalyst.cause_event_ids])),
             **catalyst_payload,
             **({"record_id": meeting_source_id} if meeting_source_id is not None else {}),
         },

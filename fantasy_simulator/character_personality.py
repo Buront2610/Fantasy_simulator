@@ -26,6 +26,13 @@ class PersonalityAffinity:
     factor_keys: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class PersonalityContext:
+    profile: dict[str, int]
+    factor_keys: tuple[str, ...] = ()
+    cause_event_ids: tuple[str, ...] = ()
+
+
 def clamp_personality_score(value: Any) -> int:
     return max(0, min(100, int(value)))
 
@@ -57,6 +64,50 @@ def generate_personality(rng: Any = random) -> dict[str, int]:
 def generate_personality_for_character(character: Any) -> dict[str, int]:
     rng = random.Random(_personality_seed(character))
     return generate_personality(rng)
+
+
+def personality_context_from_events(
+    character: Any,
+    event_records: Any,
+    *,
+    limit: int = 6,
+) -> PersonalityContext:
+    """Return how recent experiences color a character's current temperament."""
+    profile = normalize_personality(getattr(character, "personality", None))
+    char_id = getattr(character, "char_id", "")
+    if not char_id:
+        return PersonalityContext(profile=profile)
+
+    deltas = {trait: 0 for trait in PERSONALITY_TRAITS}
+    factor_keys: list[str] = []
+    cause_event_ids: list[str] = []
+    considered = 0
+    for record in reversed(list(event_records or [])):
+        actor_ids = set(getattr(record, "secondary_actor_ids", []))
+        primary_actor_id = getattr(record, "primary_actor_id", None)
+        if isinstance(primary_actor_id, str) and primary_actor_id:
+            actor_ids.add(primary_actor_id)
+        if char_id not in actor_ids:
+            continue
+        considered += 1
+        _apply_personality_context_record(character, record, deltas, factor_keys)
+        record_id = getattr(record, "record_id", "")
+        if isinstance(record_id, str) and record_id:
+            cause_event_ids.append(record_id)
+        if considered >= limit:
+            break
+
+    if not factor_keys:
+        return PersonalityContext(profile=profile)
+    adjusted = {
+        trait: clamp_personality_score(profile[trait] + max(-12, min(12, deltas[trait])))
+        for trait in PERSONALITY_TRAITS
+    }
+    return PersonalityContext(
+        profile=adjusted,
+        factor_keys=tuple(dict.fromkeys(factor_keys)),
+        cause_event_ids=tuple(dict.fromkeys(cause_event_ids)),
+    )
 
 
 def personality_affinity(first: Mapping[str, int], second: Mapping[str, int]) -> PersonalityAffinity:
@@ -110,6 +161,10 @@ def render_affinity_factors(factor_keys: tuple[str, ...]) -> str:
     return ", ".join(tr(f"personality_affinity_{key}") for key in factor_keys)
 
 
+def render_personality_context_factors(factor_keys: tuple[str, ...]) -> str:
+    return ", ".join(tr(f"personality_context_{key}") for key in factor_keys)
+
+
 def _average_trait(first: Mapping[str, int], second: Mapping[str, int], trait: str) -> float:
     return (first[trait] + second[trait]) / 2
 
@@ -145,6 +200,58 @@ def _affinity_factor_keys(first: Mapping[str, int], second: Mapping[str, int], a
     if average_gap >= 35:
         factors.append("outlook_gap")
     return factors or ["balanced"]
+
+
+def _apply_personality_context_record(
+    character: Any,
+    record: Any,
+    deltas: dict[str, int],
+    factor_keys: list[str],
+) -> None:
+    kind = getattr(record, "kind", "")
+    primary_actor_id = getattr(record, "primary_actor_id", None)
+    secondary_actor_ids = set(getattr(record, "secondary_actor_ids", []))
+    char_id = getattr(character, "char_id", "")
+    if kind == "dying_rescued":
+        if primary_actor_id == char_id:
+            _add_context_delta(
+                deltas,
+                factor_keys,
+                "rescued_gratitude",
+                agreeableness=4,
+                stability=-3,
+            )
+        elif char_id in secondary_actor_ids:
+            _add_context_delta(
+                deltas,
+                factor_keys,
+                "rescuer_responsibility",
+                discipline=3,
+                agreeableness=2,
+                stability=-2,
+            )
+    elif kind in {"condition_worsened", "adventure_injured"}:
+        _add_context_delta(deltas, factor_keys, "recent_fear", stability=-4, extraversion=-2)
+    elif kind == "death":
+        _add_context_delta(deltas, factor_keys, "grief", stability=-5, agreeableness=-2, extraversion=-2)
+    elif kind in {"battle", "battle_fatal"}:
+        _add_context_delta(deltas, factor_keys, "combat_tension", discipline=3, stability=-2)
+    elif kind in {"adventure_returned", "adventure_discovery"}:
+        _add_context_delta(deltas, factor_keys, "recent_wonder", openness=4, extraversion=2)
+    elif kind == "injury_recovery":
+        _add_context_delta(deltas, factor_keys, "relief", stability=3, agreeableness=2)
+
+
+def _add_context_delta(
+    deltas: dict[str, int],
+    factor_keys: list[str],
+    factor_key: str,
+    **trait_deltas: int,
+) -> None:
+    factor_keys.append(factor_key)
+    for trait, delta in trait_deltas.items():
+        if trait in deltas:
+            deltas[trait] += delta
 
 
 def _personality_level_key(value: int) -> str:
