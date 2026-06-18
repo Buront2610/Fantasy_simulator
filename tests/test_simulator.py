@@ -320,6 +320,17 @@ class TestSimulatorRun:
         sim_small.advance_years(2)
         assert small_world.year == start_year + 2
 
+    def test_advance_days_public_api_preserves_partial_month_cursor(self):
+        world = _make_world(n_chars=2)
+        sim = Simulator(world, events_per_year=0, adventure_steps_per_year=0, seed=1)
+
+        sim.advance_days(5)
+
+        assert world.year == 1000
+        assert sim.current_month == 1
+        assert sim.current_day == 6
+        assert sim.elapsed_days == 5
+
 
 # ---------------------------------------------------------------------------
 # get_summary()

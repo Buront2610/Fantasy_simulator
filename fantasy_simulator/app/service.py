@@ -36,6 +36,9 @@ class FantasyAppService:
         snapshot = WorldDashboardSnapshot(
             world_name=world.name,
             year=world.year,
+            month=self._simulator.current_month,
+            day=self._simulator.current_day,
+            elapsed_days=self._simulator.elapsed_days,
             alive_count=alive_count,
             deceased_count=deceased_count,
             active_adventure_count=len(world.active_adventures),
@@ -53,6 +56,10 @@ class FantasyAppService:
         if command_name == "advance_years":
             years = _required_non_negative_int(command, "years")
             self._simulator.advance_years(years)
+            return self._result(command_name, {"dashboard": self.dashboard().to_dict()})
+        if command_name == "advance_days":
+            days = _required_non_negative_int(command, "days")
+            self._simulator.advance_days(days)
             return self._result(command_name, {"dashboard": self.dashboard().to_dict()})
         if command_name == "get_event_causes":
             record_id = _required_string(command, "record_id")

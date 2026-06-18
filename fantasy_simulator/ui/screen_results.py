@@ -24,7 +24,7 @@ from .screen_map import _show_world_map
 from .screen_persistence import _save_simulation_snapshot
 from .screen_roster import _show_roster
 from .screen_rumors import _show_rumor_board
-from .screen_simulation import _advance_auto, _advance_simulation
+from .screen_simulation import _advance_auto, _advance_daily_live, _advance_days, _advance_simulation
 from .ui_context import UIContext, _default_ctx
 
 
@@ -42,6 +42,8 @@ def _confirm_leave_with_unsaved_changes(ctx: UIContext) -> bool:
 
 def _result_menu_options() -> list[tuple[str, str]]:
     return [
+        ("advance_1_day", tr("advance_1_day")),
+        ("advance_daily_live", tr("advance_daily_live")),
         ("advance_1_year", tr("advance_1_year")),
         ("advance_5_years", tr("advance_5_years")),
         ("advance_auto", tr("advance_auto")),
@@ -142,6 +144,12 @@ def _event_log_relationship_text(record: object) -> str:
 
 
 def _update_dirty_state_for_action(action: str, sim: Simulator, ctx: UIContext) -> bool | None:
+    if action == "advance_1_day":
+        _advance_days(sim, 1, ctx=ctx, live=True)
+        return True
+    if action == "advance_daily_live":
+        _advance_daily_live(sim, ctx=ctx)
+        return True
     if action == "advance_1_year":
         _advance_simulation(sim, 1, ctx=ctx)
         return True

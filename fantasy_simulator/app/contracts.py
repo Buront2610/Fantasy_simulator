@@ -27,6 +27,9 @@ class EventSummaryView:
 class WorldDashboardSnapshot:
     world_name: str
     year: int
+    month: int
+    day: int
+    elapsed_days: int
     alive_count: int
     deceased_count: int
     active_adventure_count: int

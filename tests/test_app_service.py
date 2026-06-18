@@ -45,6 +45,22 @@ def test_advance_years_command_returns_updated_dashboard() -> None:
     json.dumps(result, ensure_ascii=False, sort_keys=True)
 
 
+def test_advance_days_command_returns_day_level_dashboard() -> None:
+    world = _world_with_characters()
+    service = FantasyAppService(Simulator(world, events_per_year=0, seed=1))
+
+    result = service.handle_command({"command": "advance_days", "days": 5}).to_dict()
+
+    dashboard = result["data"]["dashboard"]
+    assert result["ok"] is True
+    assert result["command"] == "advance_days"
+    assert dashboard["year"] == 1000
+    assert dashboard["month"] == 1
+    assert dashboard["day"] == 6
+    assert dashboard["elapsed_days"] == 5
+    json.dumps(result, ensure_ascii=False, sort_keys=True)
+
+
 def test_event_cause_command_returns_direct_causes_and_effects() -> None:
     world = _world_with_characters()
     cause = world.record_event(WorldEventRecord(record_id="evt_cause", kind="meeting", description="Cause."))
@@ -72,6 +88,8 @@ def test_event_cause_command_returns_direct_causes_and_effects() -> None:
         {"command": ""},
         {"command": "advance_years", "years": True},
         {"command": "advance_years", "years": -1},
+        {"command": "advance_days", "days": True},
+        {"command": "advance_days", "days": -1},
         {"command": "get_event_causes", "record_id": ""},
     ],
 )

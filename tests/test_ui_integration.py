@@ -1152,6 +1152,26 @@ class TestNoPrintLeaks(unittest.TestCase):
         finally:
             set_locale("en")
 
+    def test_advance_days_live_outputs_daily_ticks_without_stdout(self) -> None:
+        from fantasy_simulator.simulator import Simulator
+        from fantasy_simulator.ui.screens import _advance_days, _build_default_world
+
+        world = _build_default_world(num_characters=4, seed=42)
+        sim = Simulator(world, events_per_year=0, adventure_steps_per_year=0, seed=1)
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend()
+        ctx = UIContext(inp=inp, out=out)
+
+        captured = io.StringIO()
+        with redirect_stdout(captured):
+            _advance_days(sim, 2, ctx=ctx, live=True, delay_seconds=0.0)
+
+        self.assertEqual(captured.getvalue(), "")
+        self.assertEqual(sim.elapsed_days, 2)
+        self.assertIn("Advancing simulation... (+2 day(s))", out.text)
+        self.assertIn("Year 1000, Embermorn 1 | +0 event(s)", out.text)
+        self.assertIn("Simulation advanced to Year 1000, Embermorn 3.", out.text)
+
     def test_main_exit_produces_no_stdout(self) -> None:
         """main() exit path must not leak to stdout."""
         from fantasy_simulator.main import main

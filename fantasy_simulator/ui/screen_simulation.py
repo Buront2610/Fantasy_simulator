@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from ..character_creator import CharacterCreator
@@ -60,6 +61,73 @@ def _advance_simulation(sim: Simulator, years: int, ctx: UIContext | None = None
             f"{pending} {tr('pending_choices')}"
         )
     out.print_success(f"  {tr('simulation_advanced_to_year', year=sim.world.year)}")
+
+
+def _advance_days(
+    sim: Simulator,
+    days: int,
+    ctx: UIContext | None = None,
+    *,
+    live: bool = False,
+    delay_seconds: float = 0.0,
+) -> None:
+    if days <= 0:
+        return
+    ctx = _default_ctx(ctx)
+    out = ctx.out
+
+    out.print_line()
+    out.print_heading(f"  {tr('advancing_simulation_days', days=days)}")
+    for _ in range(days):
+        year = sim.world.year
+        month = sim.current_month
+        day = sim.current_day
+        before_events = len(sim.world.event_records)
+        sim.advance_days(1)
+        new_events = len(sim.world.event_records) - before_events
+        if live:
+            out.print_line(_daily_progress_line(sim, year, month, day, new_events))
+            _print_daily_event_highlights(sim, before_events, ctx=ctx)
+            if delay_seconds > 0:
+                time.sleep(delay_seconds)
+    if not live:
+        alive = sum(1 for c in sim.world.characters if c.alive)
+        pending = len(sim.get_pending_adventure_choices())
+        out.print_line(
+            f"  {_simulation_date_label(sim, sim.world.year, sim.current_month, sim.current_day)}  |  "
+            f"{out.format_status(str(alive), True)} {tr('alive')}  |  "
+            f"{pending} {tr('pending_choices')}"
+        )
+    out.print_success(
+        f"  {tr('simulation_advanced_to_date', date=_simulation_date_label(sim, sim.world.year, sim.current_month, sim.current_day))}"  # noqa: E501
+    )
+
+
+def _advance_daily_live(sim: Simulator, ctx: UIContext | None = None, *, days: int = 30) -> None:
+    """Advance a short window one day at a time, printing each tick."""
+    _advance_days(sim, days, ctx=ctx, live=True, delay_seconds=0.03)
+
+
+def _daily_progress_line(sim: Simulator, year: int, month: int, day: int, new_events: int) -> str:
+    alive = sum(1 for c in sim.world.characters if c.alive)
+    pending = len(sim.get_pending_adventure_choices())
+    return (
+        f"  {tr('daily_tick_line', date=_simulation_date_label(sim, year, month, day), events=new_events)}  |  "
+        f"{sim.world.name}  |  {alive} {tr('alive')}  |  {pending} {tr('pending_choices')}"
+    )
+
+
+def _print_daily_event_highlights(sim: Simulator, start_index: int, ctx: UIContext) -> None:
+    from ..event_rendering import render_event_record
+
+    new_records = sim.world.event_records[start_index:]
+    for record in new_records[-3:]:
+        ctx.out.print_dim(f"    - {render_event_record(record, world=sim.world)}")
+
+
+def _simulation_date_label(sim: Simulator, year: int, month: int, day: int) -> str:
+    month_name = sim.world.month_display_name_for_date(year, month, day)
+    return tr("simulation_date_label", year=year, month=month_name, day=day)
 
 
 def _format_auto_pause_context(pause_context: dict[str, Any]) -> str:
