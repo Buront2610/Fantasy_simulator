@@ -38,6 +38,13 @@ CATALYST_EVENT_KINDS: tuple[str, ...] = (
     "romance",
 )
 CATALYST_RELATION_TAGS: tuple[str, ...] = ("savior", "rescued", "co_parent", "family")
+PERSONALITY_TURNING_POINT_KINDS: tuple[str, ...] = (
+    "relationship_reconciliation",
+    "relationship_conflict",
+    "relationship_mentorship",
+    "relationship_betrayal",
+    "relationship_comfort",
+)
 
 
 @dataclass(frozen=True)
@@ -460,6 +467,21 @@ def _meeting_relation_tag_updates(
     ], meeting_source_id
 
 
+def _add_mutual_relation_tag(
+    char1: "Character",
+    char2: "Character",
+    tag1: str,
+    tag2: str,
+    source_event_id: str,
+) -> List[Dict[str, str]]:
+    char1.add_relation_tag(char2.char_id, tag1, source_event_id=source_event_id)
+    char2.add_relation_tag(char1.char_id, tag2, source_event_id=source_event_id)
+    return [
+        {"source": char1.char_id, "target": char2.char_id, "tag": tag1},
+        {"source": char2.char_id, "target": char1.char_id, "tag": tag2},
+    ]
+
+
 def _remove_opposed_relation_tag(character: "Character", target_id: str, tag: str) -> None:
     opposed = {"friend": "rival", "rival": "friend"}.get(tag)
     if opposed is None:
@@ -480,6 +502,146 @@ def _meeting_description_key(avg_after: int) -> str:
     if avg_after == 0:
         return "meeting_neutral"
     return "meeting_negative"
+
+
+def _relationship_turning_point_key(
+    char1: "Character",
+    char2: "Character",
+    personality: RelationshipPersonality,
+    catalyst: RelationshipCatalyst,
+) -> str:
+    rel1 = char1.get_relationship(char2.char_id)
+    rel2 = char2.get_relationship(char1.char_id)
+    avg_rel = round((rel1 + rel2) / 2)
+    context = set(personality.context_factor_keys)
+    first_profile = personality.first_context.profile
+    second_profile = personality.second_context.profile
+    if avg_rel <= -35 and catalyst.score >= 5:
+        return "reconciliation"
+    if avg_rel >= 35 and (
+        abs(char1.age - char2.age) >= 10
+        or max(first_profile["discipline"], second_profile["discipline"]) >= 68
+        or max(first_profile["openness"], second_profile["openness"]) >= 72
+    ):
+        return "mentorship"
+    if avg_rel <= -45 or (
+        "combat_tension" in context
+        and min(first_profile["agreeableness"], second_profile["agreeableness"]) <= 35
+    ):
+        return "betrayal"
+    if context.intersection({"grief", "recent_fear", "rescued_gratitude", "relief"}):
+        return "comfort"
+    return "conflict" if personality.affinity.score < 0 else "comfort"
+
+
+def _relationship_turning_point_delta(
+    key: str,
+    personality: RelationshipPersonality,
+    catalyst: RelationshipCatalyst,
+) -> int:
+    if key == "reconciliation":
+        return 16 + max(0, catalyst.score // 2)
+    if key == "mentorship":
+        return 10 + max(0, personality.affinity.score // 3)
+    if key == "betrayal":
+        return -24 + min(0, personality.affinity.score // 2)
+    if key == "comfort":
+        return 9 + max(0, personality.affinity.score // 4)
+    return -10 + min(0, personality.affinity.score // 3)
+
+
+def _relationship_turning_point_tags(
+    key: str,
+    char1: "Character",
+    char2: "Character",
+    source_event_id: str,
+) -> List[Dict[str, str]]:
+    if key == "mentorship":
+        if char1.age >= char2.age:
+            return _add_mutual_relation_tag(char1, char2, "mentor", "disciple", source_event_id)
+        return _add_mutual_relation_tag(char1, char2, "disciple", "mentor", source_event_id)
+    if key == "betrayal":
+        _remove_opposed_relation_tag(char1, char2.char_id, "rival")
+        _remove_opposed_relation_tag(char2, char1.char_id, "rival")
+        return _add_mutual_relation_tag(char1, char2, "betrayer", "rival", source_event_id)
+    if key in {"reconciliation", "comfort"}:
+        _remove_opposed_relation_tag(char1, char2.char_id, "friend")
+        _remove_opposed_relation_tag(char2, char1.char_id, "friend")
+        return _add_mutual_relation_tag(char1, char2, "friend", "friend", source_event_id)
+    return []
+
+
+def resolve_relationship_turning_point_event(
+    char1: "Character",
+    char2: "Character",
+    world: "World",
+    rng: Any = random,
+) -> EventResult:
+    """Resolve a personality-driven turning point between two characters."""
+    personality = _relationship_personality(world, char1, char2)
+    catalyst = _relationship_catalyst(world, char1, char2)
+    key = _relationship_turning_point_key(char1, char2, personality, catalyst)
+    delta = _relationship_turning_point_delta(key, personality, catalyst)
+    char1.update_mutual_relationship(char2, delta, delta + rng.randint(-3, 3))
+    rel1_after = char1.get_relationship(char2.char_id)
+    rel2_after = char2.get_relationship(char1.char_id)
+    avg_after = round((rel1_after + rel2_after) / 2)
+    source_event_id = generate_record_id(rng)
+    relation_tag_updates = _relationship_turning_point_tags(key, char1, char2, source_event_id)
+    personality_payload = _personality_metadata(personality, delta)
+    catalyst_payload = _catalyst_metadata(catalyst, _catalyst_delta(personality.affinity.score, catalyst))
+    cause_event_ids = _pair_history_cause_ids(
+        world,
+        char1,
+        char2,
+        relation_tags=("friend", "rival", "mentor", "disciple", "savior", "rescued"),
+        event_kinds=(
+            "meeting",
+            "romance",
+            "battle",
+            "battle_fatal",
+            "dying_rescued",
+            *PERSONALITY_TURNING_POINT_KINDS,
+        ),
+        limit=4,
+    )
+    location = world.location_name(char1.location_id)
+    desc = tr(
+        f"relationship_{key}",
+        name1=char1.name,
+        name2=char2.name,
+        location=location,
+        relationship_a=rel1_after,
+        relationship_b=rel2_after,
+        relationship_avg=avg_after,
+    )
+    char1.add_history(tr(f"history_relationship_{key}", year=world.year, name=char2.name, location=location))
+    char2.add_history(tr(f"history_relationship_{key}", year=world.year, name=char1.name, location=location))
+    render_params = {
+        "name1": char1.name,
+        "name2": char2.name,
+        "location_id": char1.location_id,
+        "relationship_a": rel1_after,
+        "relationship_b": rel2_after,
+        "relationship_avg": avg_after,
+        **personality_payload,
+        **catalyst_payload,
+    }
+    return EventResult(
+        description=desc,
+        affected_characters=[char1.char_id, char2.char_id],
+        event_type=f"relationship_{key}",
+        year=world.year,
+        metadata=_relationship_metadata(
+            f"events.relationship_{key}.summary",
+            render_params,
+            [*cause_event_ids, *personality.cause_event_ids, *catalyst.cause_event_ids],
+            relation_tag_updates=relation_tag_updates,
+            record_id=source_event_id,
+            **personality_payload,
+            **catalyst_payload,
+        ),
+    )
 
 
 def resolve_meeting_event(

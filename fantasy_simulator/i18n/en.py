@@ -313,6 +313,16 @@ TEXT_EN: Dict[str, str] = {
     'history_anniversary': 'Year {year}: Celebrated marriage anniversary with {name}.',
     'marriage_happened': '{name1} ({race1} {job1}) and {name2} ({race2} {job2}) were married in {location} amid great celebration!',  # noqa: E501
     'history_married': 'Year {year}: Married {name} in {location}.',
+    'relationship_reconciliation': '{name1} and {name2} faced old hurt at {location} and chose to make peace. ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
+    'relationship_conflict': '{name1} and {name2} clashed at {location}, and the strain between them sharpened. ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
+    'relationship_mentorship': '{name1} and {name2} settled into a mentor bond at {location}. ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
+    'relationship_betrayal': '{name1} and {name2} broke trust at {location}, leaving a bitter mark. ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
+    'relationship_comfort': '{name1} and {name2} found a quiet moment of comfort at {location}. ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
+    'history_relationship_reconciliation': 'Year {year}: Made peace with {name} in {location}.',
+    'history_relationship_conflict': 'Year {year}: Clashed with {name} in {location}.',
+    'history_relationship_mentorship': 'Year {year}: Entered a mentor bond with {name} in {location}.',
+    'history_relationship_betrayal': 'Year {year}: Trust broke with {name} in {location}.',
+    'history_relationship_comfort': 'Year {year}: Shared comfort with {name} in {location}.',
     'birth_happened': '{child}, child of {parent1} and {parent2}, was born in {location}.',
     'history_child_born': 'Year {year}: {child}, child with {partner}, was born.',
     'history_born_to_parents': 'Year {year}: Born to {parent1} and {parent2}.',
@@ -530,6 +540,11 @@ TEXT_EN: Dict[str, str] = {
     'event_type_death': 'Death',
     'event_type_anniversary': 'Anniversary',
     'event_type_romance': 'Romance',
+    'event_type_relationship_reconciliation': 'Reconciliation',
+    'event_type_relationship_conflict': 'Relationship conflict',
+    'event_type_relationship_mentorship': 'Mentorship',
+    'event_type_relationship_betrayal': 'Betrayal',
+    'event_type_relationship_comfort': 'Comfort',
     'event_type_immigration': 'Immigration',
     'event_type_generic': 'Other',
     'event_type_injury_recovery': 'Injury recovery',
@@ -631,6 +646,31 @@ TEXT_EN: Dict[str, str] = {
     'events.romance_commitments_blocked.summary': (
         '{name1} and {name2} shared a meaningful moment at {location}, but existing commitments kept the '
         'relationship from deepening.'
+    ),
+    'events.relationship_reconciliation.summary': (
+        '{name1} and {name2} faced old hurt at {location} and chose to make peace. '
+        '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        'Avg: {relationship_avg:+d})'
+    ),
+    'events.relationship_conflict.summary': (
+        '{name1} and {name2} clashed at {location}, and the strain between them sharpened. '
+        '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        'Avg: {relationship_avg:+d})'
+    ),
+    'events.relationship_mentorship.summary': (
+        '{name1} and {name2} settled into a mentor bond at {location}. '
+        '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        'Avg: {relationship_avg:+d})'
+    ),
+    'events.relationship_betrayal.summary': (
+        '{name1} and {name2} broke trust at {location}, leaving a bitter mark. '
+        '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        'Avg: {relationship_avg:+d})'
+    ),
+    'events.relationship_comfort.summary': (
+        '{name1} and {name2} found a quiet moment of comfort at {location}. '
+        '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        'Avg: {relationship_avg:+d})'
     ),
     'events.location_renamed.summary': '{old_name} was renamed {new_name}.',
     'events.route_blocked.summary': 'The route from {from_location} to {to_location} was blocked.',

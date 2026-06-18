@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from .event_models import EventResult
 from .events_family import resolve_birth_event
+from .events_relationships import resolve_relationship_turning_point_event
 from .simulation.population import has_population_capacity
 
 if TYPE_CHECKING:
@@ -22,6 +23,7 @@ EVENT_WEIGHTS: Dict[str, int] = {
     "discovery": 10,
     "battle": 15,
     "marriage": 5,
+    "relationship_turning_point": 7,
 }
 BIRTH_EVENT_WEIGHT = 3
 
@@ -123,7 +125,7 @@ def generate_random_event(
             return resolve_birth_event(pair[0], pair[1], world, rng=rng)
         chosen_type = rng.choice(["skill_training", "discovery", "journey"])
 
-    if chosen_type in ("marriage", "battle", "meeting"):
+    if chosen_type in ("marriage", "battle", "meeting", "relationship_turning_point"):
         pair = (
             find_romance_pair(eligible, rng=rng)
             if chosen_type == "marriage"
@@ -137,6 +139,8 @@ def generate_random_event(
                 return event_system.event_marriage(char1, char2, world, rng=rng)
             if chosen_type == "battle":
                 return event_system.event_battle(char1, char2, world, rng=rng)
+            if chosen_type == "relationship_turning_point":
+                return resolve_relationship_turning_point_event(char1, char2, world, rng=rng)
             return event_system.event_meeting(char1, char2, world, rng=rng)
 
     char = rng.choice(eligible)

@@ -10,6 +10,7 @@ from fantasy_simulator.content.setting_bundle import RaceDefinition, SettingBund
 from fantasy_simulator.events import EventResult, EventSystem
 from fantasy_simulator import events_selection
 from fantasy_simulator.events_family import resolve_birth_event
+from fantasy_simulator.events_relationships import resolve_relationship_turning_point_event
 from fantasy_simulator.event_models import WorldEventRecord
 from fantasy_simulator.i18n import get_locale, set_locale
 from fantasy_simulator.world import World
@@ -296,6 +297,51 @@ class TestEventMeeting:
         assert "recent_wonder" in changed.metadata["personality_context_factor_keys"]
         assert discovery.record_id in changed.metadata["cause_event_ids"]
         assert "recent wonder" in changed.metadata["render_params"]["personality_factors"]
+
+    def test_relationship_turning_point_reconciles_bad_history_with_causal_record(self, es, world):
+        saved = _make_char("Saved")
+        rescuer = _make_char("Rescuer")
+        saved.update_mutual_relationship(rescuer, -50)
+        world.add_character(saved)
+        world.add_character(rescuer)
+        rescue = world.record_event(WorldEventRecord(
+            record_id="rescue_turn",
+            kind="dying_rescued",
+            year=world.year,
+            primary_actor_id=saved.char_id,
+            secondary_actor_ids=[rescuer.char_id],
+            description="Rescuer saved Saved.",
+        ))
+
+        result = resolve_relationship_turning_point_event(saved, rescuer, world, rng=random.Random(4))
+
+        assert result.event_type == "relationship_reconciliation"
+        assert saved.get_relationship(rescuer.char_id) > -50
+        assert saved.has_relation_tag(rescuer.char_id, "friend")
+        assert rescuer.has_relation_tag(saved.char_id, "friend")
+        assert rescue.record_id in result.metadata["cause_event_ids"]
+        assert "rescued_gratitude" in result.metadata["personality_context_factor_keys"]
+        _assert_semantic_event_result(result)
+
+    def test_relationship_turning_point_can_create_mentor_or_betrayer_tags(self, es, world):
+        elder = _make_char("Elder", age=54)
+        novice = _make_char("Novice", age=20)
+        elder.update_mutual_relationship(novice, 45)
+        rival = _make_char("Rival")
+        target = _make_char("Target")
+        rival.update_mutual_relationship(target, -55)
+        for char in (elder, novice, rival, target):
+            world.add_character(char)
+
+        mentorship = resolve_relationship_turning_point_event(elder, novice, world, rng=random.Random(5))
+        betrayal = resolve_relationship_turning_point_event(rival, target, world, rng=random.Random(6))
+
+        assert mentorship.event_type == "relationship_mentorship"
+        assert elder.has_relation_tag(novice.char_id, "mentor")
+        assert novice.has_relation_tag(elder.char_id, "disciple")
+        assert betrayal.event_type == "relationship_betrayal"
+        assert rival.has_relation_tag(target.char_id, "betrayer")
+        assert target.has_relation_tag(rival.char_id, "rival")
 
 
 # ---------------------------------------------------------------------------
@@ -1062,6 +1108,29 @@ class TestGenerateRandomEvent:
         for _ in range(10):
             result = es.generate_random_event([c], world)
             assert result is None or isinstance(result, EventResult)
+
+    def test_random_event_table_can_choose_relationship_turning_point(self, es, world):
+        class TurningPointRng(random.Random):
+            def choices(self, population, weights=None, k=1):  # noqa: ANN001, D401
+                if "relationship_turning_point" in population:
+                    return ["relationship_turning_point"]
+                return [population[0]]
+
+            def choice(self, sequence):  # noqa: ANN001
+                return sequence[0]
+
+            def sample(self, population, k):  # noqa: ANN001
+                return list(population)[:k]
+
+        first = _make_char("First", location_id="loc_aethoria_capital")
+        second = _make_char("Second", location_id="loc_aethoria_capital")
+        world.add_character(first)
+        world.add_character(second)
+
+        result = es.generate_random_event(world.characters, world, rng=TurningPointRng(7))
+
+        assert result is not None
+        assert result.event_type.startswith("relationship_")
 
     def test_random_event_table_excludes_direct_death(self, es):
         assert "death" not in es._EVENT_WEIGHTS
