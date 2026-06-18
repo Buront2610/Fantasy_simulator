@@ -148,17 +148,17 @@ def _assert_seeded_map_visible_bundle(bundle: dict[str, list[str]]) -> None:
         "  | Generated local map                              |",
         "  |                   +                              |",
         "  |                   -                              |",
-        "  |            ###+T  -     ####                     |",
-        "  |     ##+#   ####   -     ##+#                     |",
-        "  |     ####          -                              |",
-        "  |        T          -              T               |",
-        "  |                  o-  T            T              |",
+        "  |   \"\"\"\"\"\"   hh+h   -     +hhh                     |",
+        "  |   \"\"\"\"\"\"   hhhh   -     hhhh\"\"\"                  |",
+        "  |                   -     \"\"\"\"\"\"\" T                |",
+        "  |  ~~~~~~~~~~~~~~~~~=~~~~~~~~~~~~~~~~~             |",
+        "  |                  o-  B            T              |",
         "  | +-----------------@-----------------+            |",
         "  |    T              :         T                    |",
         "  |                   :                              |",
-        "  |      ####         :    ###+                      |",
-        "  |      #+##T  ####  :  T ####   ####               |",
-        "  |          T  ###+  :           ##+#               |",
+        "  |      bbb+         :    bbbb\"\"\"\"\"                 |",
+        "  |    \"\"bbbb\"\"       :T T bb+b\"\"\"hh+h               |",
+        "  |    \"\"\"\"\"\"\"\"       :           hhhh               |",
         "  |                   :                              |",
         "  |                                                  |",
         "  | Local route sketch                               |",
@@ -174,7 +174,7 @@ def _assert_seeded_map_visible_bundle(bundle: dict[str, list[str]]) -> None:
         "  |  |                               |               |",
         "  |  +-------------------------------+               |",
         "  | Sketch cues: !=High danger                       |",
-        "  | Map legend: @ center, # buildings, = roads, o ...|",
+        "  | Map legend: @ center, H/h homes, $ market, S s...|",
         "  | Terrain: Plains (,)                              |",
         "  | Elev: midland (50%)                              |",
     ]
@@ -195,17 +195,17 @@ def _assert_memory_heavy_bundle(bundle: dict[str, list[str]]) -> None:
         "  | Generated local map                              |",
         "  |                   +                              |",
         "  |                   -                              |",
-        "  |                   -     ###+                     |",
-        "  |     +###          -     ####                     |",
-        "  |    T####T         -T          ####               |",
-        "  |       T           -           ##+#T              |",
-        "  |                  o-          T                   |",
+        "  |   \"\"\"\"\"\"   +hhh   -     hhh+                     |",
+        "  |   \"\"\"\"\"\"   hhhh   -     hhhh\"\"\"                  |",
+        "  |         T         -     \"\"\"\"\"\"\"                  |",
+        "  |  ~~~~~~~~~~~~~~~~~=~~~~~~~~~~~~~~~~~             |",
+        "  |                  o-  B       T                   |",
         "  | +-----------------@-----------------+            |",
         "  |      T         T  :                              |",
         "  |               T   :T                             |",
-        "  |      ####  T      :             T                |",
-        "  |      ###+   #+##  :           ###+               |",
-        "  |             ####  :           ####               |",
+        "  |      bbb+  T      :      \"\"\"\"\"\"\"T                |",
+        "  |    \"\"bbbb\"\" h+hh  :      \"\"\"\"\"hhhh               |",
+        "  |    \"\"\"\"\"\"\"\" hhhh  :       T   hh+h               |",
         "  |                   :                              |",
         "  |                                                  |",
         "  | Local route sketch                               |",
@@ -221,7 +221,7 @@ def _assert_memory_heavy_bundle(bundle: dict[str, list[str]]) -> None:
         "  |  |                               |               |",
         "  |  +-------------------------------+               |",
         "  | Sketch cues: M=Memorial                          |",
-        "  | Map legend: @ center, # buildings, = roads, o ...|",
+        "  | Map legend: @ center, H/h homes, $ market, S s...|",
         "  | Terrain: Plains (,)                              |",
         "  | Elev: midland (50%)                              |",
     ]
@@ -296,7 +296,7 @@ def test_location_detail_uses_generated_city_map() -> None:
     assert "  |  |            \\             /--D |               |" in detail
     assert "  |  |            ---@---            |               |" in detail
     assert "  | Sketch cues: G=Gate / $=Market / B=Notice board  |" in detail
-    assert "  | Map legend: @ center, # buildings, = roads, o ...|" in detail
+    assert "  | Map legend: @ center, H/h homes, $ market, S s...|" in detail
 
 
 def test_region_route_sketch_renders_cities_as_blocks() -> None:

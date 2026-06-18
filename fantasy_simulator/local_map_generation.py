@@ -115,11 +115,12 @@ def _generate_settlement_map(rng: random.Random, route_directions: set[str], *, 
     _paint_settlement_roads(canvas, route_directions or {"north", "south", "east", "west"}, dense=dense)
     canvas[mid_y - 1][mid_x - 1] = "o"
     canvas[mid_y][mid_x] = "@"
+    _paint_settlement_scenery(canvas, rng, dense=dense)
 
     slots = _settlement_building_slots(dense)
     rng.shuffle(slots)
-    for x, y, w, h in slots[: 14 if dense else 8]:
-        _place_building(canvas, x, y, w, h, rng)
+    for x, y, w, h, fill in slots[: 14 if dense else 8]:
+        _place_building(canvas, x, y, w, h, fill, rng)
 
     for _ in range(6 if dense else 12):
         x = rng.randint(2, LOCAL_MAP_WIDTH - 3)
@@ -141,27 +142,55 @@ def _paint_settlement_roads(canvas: list[list[str]], directions: set[str], *, de
     _apply_route_gates(canvas, directions, road_char=horizontal)
 
 
-def _settlement_building_slots(dense: bool) -> list[tuple[int, int, int, int]]:
+def _paint_settlement_scenery(canvas: list[list[str]], rng: random.Random, *, dense: bool) -> None:
+    mid_x = LOCAL_MAP_WIDTH // 2
+    mid_y = LOCAL_MAP_HEIGHT // 2
+    if dense:
+        _paint_rect(canvas, mid_x + 3, mid_y - 2, 4, 1, "$")
+        _paint_rect(canvas, mid_x - 6, mid_y + 2, 3, 2, "S")
+        canvas[mid_y - 1][mid_x + 5] = "B"
+        for x, y in ((5, 5), (31, 5), (8, 12), (28, 12)):
+            canvas[y][x] = "T"
+        return
+
+    for x, y, w, h in ((2, 2, 6, 2), (24, 3, 7, 2), (3, 11, 8, 2), (25, 10, 7, 2)):
+        _paint_rect(canvas, x, y, w, h, '"')
+    stream_y = 5 if rng.randrange(2) == 0 else 12
+    for x in range(1, LOCAL_MAP_WIDTH - 1):
+        if canvas[stream_y][x] == " ":
+            canvas[stream_y][x] = "~"
+    canvas[stream_y][mid_x] = "="
+    canvas[mid_y - 1][mid_x + 3] = "B"
+
+
+def _paint_rect(canvas: list[list[str]], x: int, y: int, w: int, h: int, fill: str) -> None:
+    for yy in range(y, min(y + h, LOCAL_MAP_HEIGHT)):
+        for xx in range(x, min(x + w, LOCAL_MAP_WIDTH)):
+            if canvas[yy][xx] == " ":
+                canvas[yy][xx] = fill
+
+
+def _settlement_building_slots(dense: bool) -> list[tuple[int, int, int, int, str]]:
     if dense:
         return [
-            (3, 2, 5, 2), (10, 2, 5, 2), (22, 2, 5, 2), (29, 2, 5, 2),
-            (4, 5, 4, 2), (11, 5, 4, 2), (23, 5, 4, 2), (30, 5, 4, 2),
-            (3, 9, 5, 2), (10, 10, 5, 2), (22, 9, 5, 2), (29, 10, 5, 2),
-            (5, 12, 4, 2), (24, 12, 4, 2), (31, 12, 3, 2),
+            (3, 2, 5, 2, "H"), (10, 2, 5, 2, "H"), (22, 2, 5, 2, "H"), (29, 2, 5, 2, "H"),
+            (4, 5, 4, 2, "$"), (11, 5, 4, 2, "H"), (23, 5, 4, 2, "$"), (30, 5, 4, 2, "H"),
+            (3, 9, 5, 2, "I"), (10, 10, 5, 2, "H"), (22, 9, 5, 2, "H"), (29, 10, 5, 2, "I"),
+            (5, 12, 4, 2, "H"), (24, 12, 4, 2, "H"), (31, 12, 3, 2, "H"),
         ]
     return [
-        (4, 3, 4, 2), (11, 2, 4, 2), (24, 2, 4, 2), (30, 4, 4, 2),
-        (5, 10, 4, 2), (12, 11, 4, 2), (23, 10, 4, 2), (30, 11, 4, 2),
-        (2, 6, 3, 2), (31, 7, 3, 2),
+        (4, 3, 4, 2, "h"), (11, 2, 4, 2, "h"), (24, 2, 4, 2, "h"), (30, 4, 4, 2, "h"),
+        (5, 10, 4, 2, "b"), (12, 11, 4, 2, "h"), (23, 10, 4, 2, "b"), (30, 11, 4, 2, "h"),
+        (2, 6, 3, 2, "h"), (31, 7, 3, 2, "h"),
     ]
 
 
-def _place_building(canvas: list[list[str]], x: int, y: int, w: int, h: int, rng: random.Random) -> None:
+def _place_building(canvas: list[list[str]], x: int, y: int, w: int, h: int, fill: str, rng: random.Random) -> None:
     if not _building_space_is_clear(canvas, x, y, w, h):
         return
     for yy in range(y, y + h):
         for xx in range(x, x + w):
-            canvas[yy][xx] = "#"
+            canvas[yy][xx] = fill
     door_candidates = [(x + rng.randrange(w), y + h - 1), (x + rng.randrange(w), y)]
     door_x, door_y = door_candidates[rng.randrange(len(door_candidates))]
     canvas[door_y][door_x] = "+"
@@ -170,7 +199,7 @@ def _place_building(canvas: list[list[str]], x: int, y: int, w: int, h: int, rng
 def _building_space_is_clear(canvas: list[list[str]], x: int, y: int, w: int, h: int) -> bool:
     for yy in range(max(0, y - 1), min(LOCAL_MAP_HEIGHT, y + h + 1)):
         for xx in range(max(0, x - 1), min(LOCAL_MAP_WIDTH, x + w + 1)):
-            if canvas[yy][xx] not in {" ", "."}:
+            if canvas[yy][xx] not in {" ", ".", '"'}:
                 return False
     return True
 
@@ -212,6 +241,7 @@ def _generate_dungeon_map(rng: random.Random, route_directions: set[str]) -> Gen
         x, y = _random_floor_in_room(rng, room)
         if canvas[y][x] == ".":
             canvas[y][x] = marker
+    _place_dungeon_features(canvas, rooms, rng)
     _apply_route_gates(canvas, route_directions or {"south"}, road_char=".")
     _outline_dungeon_walls(canvas)
     return GeneratedLocalMap(_stringify(canvas), ("local_map_legend_dungeon", "local_map_legend_route_gate"))
@@ -241,7 +271,7 @@ def _generate_wild_map(
 
 
 def _outline_dungeon_walls(canvas: list[list[str]]) -> None:
-    floor_chars = {".", "@", ">", "!", "?", "+"}
+    floor_chars = {".", "@", ">", "!", "?", "+", "A", "~", "r"}
     wall_points: set[tuple[int, int]] = set()
     for y, row in enumerate(canvas):
         for x, char in enumerate(row):
@@ -253,6 +283,21 @@ def _outline_dungeon_walls(canvas: list[list[str]]) -> None:
                         wall_points.add((xx, yy))
     for x, y in wall_points:
         canvas[y][x] = "#"
+
+
+def _place_dungeon_features(
+    canvas: list[list[str]],
+    rooms: list[tuple[int, int, int, int]],
+    rng: random.Random,
+) -> None:
+    feature_marks = ("A", "~", "r")
+    for index, marker in enumerate(feature_marks):
+        if not rooms:
+            return
+        room = rooms[(index + rng.randrange(len(rooms))) % len(rooms)]
+        x, y = _random_floor_in_room(rng, room)
+        if canvas[y][x] == ".":
+            canvas[y][x] = marker
 
 
 def _rooms_overlap(first: tuple[int, int, int, int], second: tuple[int, int, int, int]) -> bool:
