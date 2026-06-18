@@ -143,7 +143,7 @@ def _assert_seeded_map_visible_bundle(bundle: dict[str, list[str]]) -> None:
     assert any("Native name: Branthethal" in line for line in bundle["region"])
     assert any("Native name: Branthethal" in line for line in bundle["region"])
 
-    assert bundle["detail"][:33] == [
+    assert bundle["detail"][:34] == [
         "  | V The Verdant Vale (Village)                     |",
         "  | Generated local map                              |",
         "  |                   +                              |",
@@ -175,6 +175,7 @@ def _assert_seeded_map_visible_bundle(bundle: dict[str, list[str]]) -> None:
         "  |  +-------------------------------+               |",
         "  | Sketch cues: !=High danger                       |",
         "  | Map legend: @ center, H/h homes, $ market, S s...|",
+        "  | Scene: Open village with fields, a stream, bar...|",
         "  | Terrain: Plains (,)                              |",
         "  | Elev: midland (50%)                              |",
     ]
@@ -190,7 +191,7 @@ def _assert_memory_heavy_bundle(bundle: dict[str, list[str]]) -> None:
     assert "      Recent: Lysara passed through at dawn" in bundle["region"]
     assert "    The Verdant Vale: Memory: Memorial, Trace" in bundle["region"]
 
-    assert bundle["detail"][:33] == [
+    assert bundle["detail"][:34] == [
         "  | V The Verdant Vale (Village)                     |",
         "  | Generated local map                              |",
         "  |                   +                              |",
@@ -222,6 +223,7 @@ def _assert_memory_heavy_bundle(bundle: dict[str, list[str]]) -> None:
         "  |  +-------------------------------+               |",
         "  | Sketch cues: M=Memorial                          |",
         "  | Map legend: @ center, H/h homes, $ market, S s...|",
+        "  | Scene: Open village with fields, a stream, bar...|",
         "  | Terrain: Plains (,)                              |",
         "  | Elev: midland (50%)                              |",
     ]
@@ -291,12 +293,16 @@ def test_location_detail_uses_generated_city_map() -> None:
     detail = rendered["detail"]
     assert "  | Generated local map                              |" in detail
     assert "  | ##################+##################            |" in detail
+    assert "  | #  [Homes]        =   [Market]      #            |" in detail
+    assert "  | #           Plaza =                 #            |" in detail
+    assert "  | #  [Inn]          =   [Shrine]      #            |" in detail
     assert "  | +=================@=================+            |" in detail
     assert "  | Local route sketch                               |" in detail
     assert "  |  |            \\             /--D |               |" in detail
     assert "  |  |            ---@---            |               |" in detail
     assert "  | Sketch cues: G=Gate / $=Market / B=Notice board  |" in detail
-    assert "  | Map legend: @ center, H/h homes, $ market, S s...|" in detail
+    assert "  | Map legend: @ plaza, labels name districts dir...|" in detail
+    assert "  | Scene: Walled city with named districts around...|" in detail
 
 
 def test_region_route_sketch_renders_cities_as_blocks() -> None:

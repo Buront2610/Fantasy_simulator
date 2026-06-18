@@ -203,6 +203,10 @@ def _append_site_ascii(lines: List[str], info: MapRenderInfo, cell: MapCellInfo,
         legend = " / ".join(tr(key) for key in generated_map.legend_keys)
         legend_label = tr("map_detail_local_map_legend")
         lines.append(f"  |{_fit(f' {legend_label}: {legend}', width)}|")
+    if generated_map.scene_keys:
+        scene = " / ".join(tr(key) for key in generated_map.scene_keys)
+        scene_label = tr("map_detail_local_map_scene")
+        lines.append(f"  |{_fit(f' {scene_label}: {scene}', width)}|")
     lines.append(border)
 
 

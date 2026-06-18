@@ -30,11 +30,22 @@ def test_local_map_generation_is_deterministic_for_same_location() -> None:
     assert first.legend_keys == second.legend_keys
 
 
-def test_settlement_maps_vary_by_location_seed() -> None:
-    first = generate_local_map(_cell("loc_first_town", "city", x=1, y=1))
-    second = generate_local_map(_cell("loc_second_town", "city", x=4, y=3))
+def test_village_maps_vary_by_location_seed() -> None:
+    first = generate_local_map(_cell("loc_first_village", "village", x=1, y=1))
+    second = generate_local_map(_cell("loc_second_village", "village", x=4, y=3))
 
     assert first.lines != second.lines
+
+
+def test_city_map_uses_readable_district_labels() -> None:
+    generated = generate_local_map(_cell("loc_capital", "city", x=2, y=2))
+    joined = "\n".join(generated.lines)
+
+    assert "[Homes]" in joined
+    assert "[Market]" in joined
+    assert "[Shrine]" in joined
+    assert "Plaza" in joined
+    assert "local_map_scene_city" in generated.scene_keys
 
 
 def test_dungeon_map_has_rooms_corridors_and_depth_marker() -> None:

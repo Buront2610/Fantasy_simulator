@@ -18,6 +18,7 @@ class GeneratedLocalMap:
 
     lines: list[str]
     legend_keys: tuple[str, ...]
+    scene_keys: tuple[str, ...] = ()
 
 
 def generate_local_map(cell: Any, connected_cells: Iterable[Any] = ()) -> GeneratedLocalMap:
@@ -32,8 +33,10 @@ def generate_local_map(cell: Any, connected_cells: Iterable[Any] = ()) -> Genera
     route_directions = _route_directions(cell, connected_cells)
     if region_type == "dungeon":
         return _generate_dungeon_map(rng, route_directions)
-    if region_type in {"city", "village"}:
-        return _generate_settlement_map(rng, route_directions, dense=region_type == "city")
+    if region_type == "city":
+        return _generate_city_map(route_directions)
+    if region_type == "village":
+        return _generate_settlement_map(rng, route_directions, dense=False)
     if region_type == "forest":
         return _generate_wild_map(rng, route_directions, tree_char="T", feature_char="^")
     if region_type == "mountain":
@@ -108,6 +111,52 @@ def _apply_route_gates(canvas: list[list[str]], directions: set[str], *, road_ch
             canvas[mid_y][x] = road_char
 
 
+def _generate_city_map(route_directions: set[str]) -> GeneratedLocalMap:
+    canvas = _bordered_canvas(" ")
+    mid_x = LOCAL_MAP_WIDTH // 2
+    mid_y = LOCAL_MAP_HEIGHT // 2
+    _paint_city_roads(canvas, route_directions or {"north", "south", "east", "west"})
+    canvas[mid_y][mid_x] = "@"
+    _paint_text(canvas, mid_x - 6, mid_y - 1, "Plaza")
+    _paint_text(canvas, 3, 2, "[Homes]")
+    _paint_text(canvas, 3, 3, "row houses")
+    _paint_text(canvas, 22, 2, "[Market]")
+    _paint_text(canvas, 22, 3, "stalls")
+    _paint_text(canvas, 3, 5, "[Guild]")
+    _paint_text(canvas, 22, 5, "[Notice]")
+    _paint_text(canvas, 3, 9, "[Inn]")
+    _paint_text(canvas, 3, 10, "stables")
+    _paint_text(canvas, 22, 9, "[Shrine]")
+    _paint_text(canvas, 22, 10, "garden")
+    _paint_text(canvas, 3, 12, "[Craft]")
+    _paint_text(canvas, 22, 12, "[Homes]")
+    _paint_text(canvas, 22, 13, "lanes")
+    return GeneratedLocalMap(
+        _stringify(canvas),
+        ("local_map_legend_city", "local_map_legend_route_gate"),
+        ("local_map_scene_city",),
+    )
+
+
+def _paint_city_roads(canvas: list[list[str]], directions: set[str]) -> None:
+    mid_x = LOCAL_MAP_WIDTH // 2
+    mid_y = LOCAL_MAP_HEIGHT // 2
+    for x in range(1, LOCAL_MAP_WIDTH - 1):
+        canvas[mid_y][x] = "="
+    for y in range(1, LOCAL_MAP_HEIGHT - 1):
+        canvas[y][mid_x] = "|"
+    _apply_route_gates(canvas, directions, road_char="=")
+
+
+def _paint_text(canvas: list[list[str]], x: int, y: int, text: str) -> None:
+    if not (0 <= y < LOCAL_MAP_HEIGHT):
+        return
+    for offset, char in enumerate(text):
+        px = x + offset
+        if 0 <= px < LOCAL_MAP_WIDTH - 1 and canvas[y][px] == " ":
+            canvas[y][px] = char
+
+
 def _generate_settlement_map(rng: random.Random, route_directions: set[str], *, dense: bool) -> GeneratedLocalMap:
     canvas = _bordered_canvas(" ") if dense else _blank_canvas(" ")
     mid_x = LOCAL_MAP_WIDTH // 2
@@ -127,7 +176,11 @@ def _generate_settlement_map(rng: random.Random, route_directions: set[str], *, 
         y = rng.randint(2, LOCAL_MAP_HEIGHT - 3)
         if canvas[y][x] == " ":
             canvas[y][x] = "." if dense else "T"
-    return GeneratedLocalMap(_stringify(canvas), ("local_map_legend_settlement", "local_map_legend_route_gate"))
+    return GeneratedLocalMap(
+        _stringify(canvas),
+        ("local_map_legend_settlement", "local_map_legend_route_gate"),
+        ("local_map_scene_village",),
+    )
 
 
 def _paint_settlement_roads(canvas: list[list[str]], directions: set[str], *, dense: bool) -> None:
@@ -244,7 +297,11 @@ def _generate_dungeon_map(rng: random.Random, route_directions: set[str]) -> Gen
     _place_dungeon_features(canvas, rooms, rng)
     _apply_route_gates(canvas, route_directions or {"south"}, road_char=".")
     _outline_dungeon_walls(canvas)
-    return GeneratedLocalMap(_stringify(canvas), ("local_map_legend_dungeon", "local_map_legend_route_gate"))
+    return GeneratedLocalMap(
+        _stringify(canvas),
+        ("local_map_legend_dungeon", "local_map_legend_route_gate"),
+        ("local_map_scene_dungeon",),
+    )
 
 
 def _generate_wild_map(
@@ -267,7 +324,11 @@ def _generate_wild_map(
         for x in range(1, LOCAL_MAP_WIDTH - 1):
             if canvas[y][x] in {" ", tree_char} and rng.random() < 0.75:
                 canvas[y][x] = "."
-    return GeneratedLocalMap(_stringify(canvas), ("local_map_legend_wild", "local_map_legend_route_gate"))
+    return GeneratedLocalMap(
+        _stringify(canvas),
+        ("local_map_legend_wild", "local_map_legend_route_gate"),
+        ("local_map_scene_wild",),
+    )
 
 
 def _outline_dungeon_walls(canvas: list[list[str]]) -> None:
