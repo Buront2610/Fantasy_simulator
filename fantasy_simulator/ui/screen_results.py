@@ -5,6 +5,7 @@ from __future__ import annotations
 from ..event_rendering import render_event_record
 from ..i18n import tr
 from ..simulator import Simulator
+from .combat_log_presenter import combat_log_lines_for_event
 from .screen_adventures import (
     _resolve_pending_adventure_choice,
     _show_adventure_details,
@@ -75,6 +76,8 @@ def _show_event_log(sim: Simulator, ctx: UIContext, last_n: int | None = None) -
         cause_text = _event_log_cause_text(sim, record)
         if cause_text:
             ctx.out.print_dim(f"      {cause_text}")
+        for line in combat_log_lines_for_event(record):
+            ctx.out.print_dim(f"      {line}")
     ctx.inp.pause()
 
 

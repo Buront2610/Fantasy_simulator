@@ -297,6 +297,103 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         self.assertIn("Because: The northern houses declared war.", out.text)
         self.assertIsNone(re.search(r"\b[0-9a-f]{32}\b", out.text))
 
+    def test_event_log_renders_combat_round_details(self) -> None:
+        from types import SimpleNamespace
+        from fantasy_simulator.event_models import WorldEventRecord
+        from fantasy_simulator.ui.screens import _show_results
+
+        world = World()
+        world.record_event(
+            WorldEventRecord(
+                record_id="battle-round-visible",
+                kind="war_battle",
+                year=world.year,
+                month=2,
+                day=9,
+                description="The armies clashed at the old bridge.",
+                render_params={
+                    "combat_log": [
+                        {
+                            "round_number": 1,
+                            "actor_name": "Northern levy",
+                            "target_name": "Bridge guard",
+                            "action_kind": "weapon_attack",
+                            "skill_key": "Swordsmanship",
+                            "dice": 14,
+                            "modifier": 6,
+                            "attack_total": 20,
+                            "defense_total": 16,
+                            "damage": 3,
+                            "outcome": "advantage",
+                        }
+                    ]
+                },
+            )
+        )
+        sim = SimpleNamespace(world=world)
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(menu_keys=["event_log_last_30", "back_to_main", "exit"])
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_results(sim, ctx=ctx)
+
+        self.assertIn("Combat log", out.text)
+        self.assertIn("R1: Northern levy used Swordsmanship", out.text)
+        self.assertIn("roll 14+6=20 vs 16, damage 3, advantage.", out.text)
+
+    def test_adventure_detail_renders_hazard_combat_rounds(self) -> None:
+        from fantasy_simulator.adventure import AdventureRun
+        from fantasy_simulator.simulator import Simulator
+        from fantasy_simulator.ui.screens import _show_results
+
+        world = World()
+        hero = Character("Aldric", 25, "Male", "Human", "Warrior", location_id="loc_aethoria_capital")
+        world.add_character(hero)
+        run = AdventureRun(
+            character_id=hero.char_id,
+            character_name=hero.name,
+            origin="loc_aethoria_capital",
+            destination="loc_thornwood",
+            year_started=world.year,
+        )
+        run.detail_log.append("Aldric entered the thornwood.")
+        run.combat_logs.append({
+            "step": 2,
+            "location_id": "loc_thornwood",
+            "member_id": hero.char_id,
+            "member_name": hero.name,
+            "hazard_id": "hazard:adv:2",
+            "hazard_name": "forest warden",
+            "winner_id": hero.char_id,
+            "loser_id": "hazard:adv:2",
+            "combat_log": [
+                {
+                    "round_number": 1,
+                    "actor_name": hero.name,
+                    "target_name": "forest warden",
+                    "action_kind": "weapon_attack",
+                    "skill_key": "Swordsmanship",
+                    "dice": 12,
+                    "modifier": 5,
+                    "attack_total": 17,
+                    "defense_total": 11,
+                    "damage": 4,
+                    "outcome": "decisive",
+                }
+            ],
+        })
+        world.add_adventure(run)
+        sim = Simulator(world, events_per_year=0, seed=1)
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(answers=["1"], menu_keys=["adventure_details", "back_to_main", "exit"])
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_results(sim, ctx=ctx)
+
+        self.assertIn("Combat encounter: Aldric vs forest warden", out.text)
+        self.assertIn("R1: Aldric used Swordsmanship", out.text)
+        self.assertIn("damage 4, decisive.", out.text)
+
     def test_world_dashboard_follow_up_opens_character_story(self) -> None:
         from fantasy_simulator.simulator import Simulator
         from fantasy_simulator.ui.screens import _show_results
