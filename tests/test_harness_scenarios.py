@@ -531,8 +531,9 @@ def _assert_seeded_acceptance_bundle(bundle: dict[str, Any], *, locale: str) -> 
         assert bundle["yearly_overview"] == ["    Total events recorded: 9"]
         assert bundle["yearly_regions"] == [
             "    The Verdant Vale: Mokrar Zugufang and Brynvalra Brynuwood broke trust at The Verdant Vale, "
-            "leaving a bitter mark. (Mokrar Zugufang->Brynvalra Brynuwood: -11 / Brynvalra "
-            "Brynuwood->Mokrar Zugufang: -22 / Avg: -16)",
+            "leaving a bitter mark. The memory of violence kept every word sharp. "
+            "(Mokrar Zugufang->Brynvalra Brynuwood: -11 / Brynvalra Brynuwood->Mokrar Zugufang: -22 / "
+            "Avg: -16)",
             "    The Verdant Vale: An old grudge finally surfaced. Mokrar Zugufang defeated Brynvalra "
             "Brynuwood. Brynvalra Brynuwood suffered serious wounds in the fight.",
             "    Ironvein Mine: Goraga Gorufang was injured during the expedition and pulled back.",
@@ -555,8 +556,9 @@ def _assert_seeded_acceptance_bundle(bundle: dict[str, Any], *, locale: str) -> 
         assert bundle["yearly_overview"] == ["    記録イベント数: 9"]
         assert bundle["yearly_regions"] == [
             "    The Verdant Vale: Mokrar Zugufang と Brynvalra Brynuwood の信頼は The Verdant Vale "
-            "で破れ、苦い痕を残した。（Mokrar Zugufang->Brynvalra Brynuwood: -11 / Brynvalra "
-            "Brynuwood->Mokrar Zugufang: -22 / 平均: -16）",
+            "で破れ、苦い痕を残した。暴力の記憶が、すべての言葉を鋭くしていた。"
+            "（Mokrar Zugufang->Brynvalra Brynuwood: -11 / Brynvalra Brynuwood->Mokrar Zugufang: -22 / "
+            "平均: -16）",
             "    The Verdant Vale: 古い遺恨がついに表に出た。 Mokrar Zugufang は Brynvalra Brynuwood "
             "に勝利した。 Brynvalra Brynuwood は戦いで重傷を負った。",
             "    Ironvein Mine: Goraga Gorufang は遠征中に負傷し、引き返した。",

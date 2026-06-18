@@ -12,6 +12,7 @@ from fantasy_simulator import events_selection
 from fantasy_simulator.events_family import resolve_birth_event
 from fantasy_simulator.events_relationships import resolve_relationship_turning_point_event
 from fantasy_simulator.event_models import WorldEventRecord
+from fantasy_simulator.event_rendering import render_event_record
 from fantasy_simulator.i18n import get_locale, set_locale
 from fantasy_simulator.world import World
 
@@ -321,7 +322,18 @@ class TestEventMeeting:
         assert rescuer.has_relation_tag(saved.char_id, "friend")
         assert rescue.record_id in result.metadata["cause_event_ids"]
         assert "rescued_gratitude" in result.metadata["personality_context_factor_keys"]
+        assert "A rescue debt still shaped how they saw each other." in result.description
+        assert (
+            result.metadata["render_params"]["turning_point_reason_key"]
+            == "relationship_turning_point_reason_rescue_debt"
+        )
         _assert_semantic_event_result(result)
+
+        record = WorldEventRecord.from_event_result(result)
+        assert "A rescue debt still shaped how they saw each other." in render_event_record(
+            record, locale="en", world=world
+        )
+        assert "救助の恩が、互いを見る目をまだ変えていた。" in render_event_record(record, locale="ja", world=world)
 
     def test_relationship_turning_point_can_create_mentor_or_betrayer_tags(self, es, world):
         elder = _make_char("Elder", age=54)

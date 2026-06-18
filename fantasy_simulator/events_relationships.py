@@ -571,6 +571,35 @@ def _relationship_turning_point_tags(
     return []
 
 
+def _relationship_turning_point_reason_key(
+    key: str,
+    personality: RelationshipPersonality,
+    catalyst: RelationshipCatalyst,
+) -> str:
+    context = set(personality.context_factor_keys)
+    catalyst_factors = set(catalyst.factor_keys)
+    affinity_factors = set(personality.affinity.factor_keys)
+    if "rescue_debt" in catalyst_factors or "rescued_gratitude" in context:
+        return "relationship_turning_point_reason_rescue_debt"
+    if context.intersection({"grief", "recent_fear"}):
+        return "relationship_turning_point_reason_vulnerability"
+    if "combat_tension" in context:
+        return "relationship_turning_point_reason_combat_tension"
+    if key == "mentorship":
+        if "shared_curiosity" in affinity_factors:
+            return "relationship_turning_point_reason_shared_curiosity"
+        return "relationship_turning_point_reason_guidance"
+    if key == "betrayal":
+        if affinity_factors.intersection({"low_trust", "outlook_gap", "social_mismatch"}):
+            return "relationship_turning_point_reason_mistrust"
+        return "relationship_turning_point_reason_old_grudge"
+    if key == "conflict":
+        return "relationship_turning_point_reason_mismatch"
+    if affinity_factors.intersection({"shared_kindness", "steady_pair"}):
+        return "relationship_turning_point_reason_trust"
+    return "relationship_turning_point_reason_shared_history"
+
+
 def resolve_relationship_turning_point_event(
     char1: "Character",
     char2: "Character",
@@ -590,6 +619,7 @@ def resolve_relationship_turning_point_event(
     relation_tag_updates = _relationship_turning_point_tags(key, char1, char2, source_event_id)
     personality_payload = _personality_metadata(personality, delta)
     catalyst_payload = _catalyst_metadata(catalyst, _catalyst_delta(personality.affinity.score, catalyst))
+    reason_key = _relationship_turning_point_reason_key(key, personality, catalyst)
     cause_event_ids = _pair_history_cause_ids(
         world,
         char1,
@@ -614,6 +644,7 @@ def resolve_relationship_turning_point_event(
         relationship_a=rel1_after,
         relationship_b=rel2_after,
         relationship_avg=avg_after,
+        turning_point_reason=tr(reason_key),
     )
     char1.add_history(tr(f"history_relationship_{key}", year=world.year, name=char2.name, location=location))
     char2.add_history(tr(f"history_relationship_{key}", year=world.year, name=char1.name, location=location))
@@ -624,6 +655,7 @@ def resolve_relationship_turning_point_event(
         "relationship_a": rel1_after,
         "relationship_b": rel2_after,
         "relationship_avg": avg_after,
+        "turning_point_reason_key": reason_key,
         **personality_payload,
         **catalyst_payload,
     }

@@ -313,11 +313,21 @@ TEXT_EN: Dict[str, str] = {
     'history_anniversary': 'Year {year}: Celebrated marriage anniversary with {name}.',
     'marriage_happened': '{name1} ({race1} {job1}) and {name2} ({race2} {job2}) were married in {location} amid great celebration!',  # noqa: E501
     'history_married': 'Year {year}: Married {name} in {location}.',
-    'relationship_reconciliation': '{name1} and {name2} faced old hurt at {location} and chose to make peace. ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
-    'relationship_conflict': '{name1} and {name2} clashed at {location}, and the strain between them sharpened. ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
-    'relationship_mentorship': '{name1} and {name2} settled into a mentor bond at {location}. ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
-    'relationship_betrayal': '{name1} and {name2} broke trust at {location}, leaving a bitter mark. ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
-    'relationship_comfort': '{name1} and {name2} found a quiet moment of comfort at {location}. ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
+    'relationship_reconciliation': '{name1} and {name2} faced old hurt at {location} and chose to make peace. {turning_point_reason} ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
+    'relationship_conflict': '{name1} and {name2} clashed at {location}, and the strain between them sharpened. {turning_point_reason} ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
+    'relationship_mentorship': '{name1} and {name2} settled into a mentor bond at {location}. {turning_point_reason} ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
+    'relationship_betrayal': '{name1} and {name2} broke trust at {location}, leaving a bitter mark. {turning_point_reason} ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
+    'relationship_comfort': '{name1} and {name2} found a quiet moment of comfort at {location}. {turning_point_reason} ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
+    'relationship_turning_point_reason_rescue_debt': 'A rescue debt still shaped how they saw each other.',
+    'relationship_turning_point_reason_vulnerability': 'Recent fear made old defenses harder to keep raised.',
+    'relationship_turning_point_reason_combat_tension': 'The memory of violence kept every word sharp.',
+    'relationship_turning_point_reason_shared_curiosity': 'Shared curiosity made the lesson worth trusting.',
+    'relationship_turning_point_reason_guidance': 'Discipline and experience gave the bond a clear shape.',
+    'relationship_turning_point_reason_mistrust': 'Low trust and clashing outlooks left little room for grace.',
+    'relationship_turning_point_reason_old_grudge': 'An older grievance finally found a voice.',
+    'relationship_turning_point_reason_mismatch': 'Their temperaments pulled the moment in opposite directions.',
+    'relationship_turning_point_reason_trust': 'Steady warmth gave them enough trust to risk honesty.',
+    'relationship_turning_point_reason_shared_history': 'Shared history mattered more than the immediate quarrel.',
     'history_relationship_reconciliation': 'Year {year}: Made peace with {name} in {location}.',
     'history_relationship_conflict': 'Year {year}: Clashed with {name} in {location}.',
     'history_relationship_mentorship': 'Year {year}: Entered a mentor bond with {name} in {location}.',
@@ -655,27 +665,28 @@ TEXT_EN: Dict[str, str] = {
         'relationship from deepening.'
     ),
     'events.relationship_reconciliation.summary': (
-        '{name1} and {name2} faced old hurt at {location} and chose to make peace. '
+        '{name1} and {name2} faced old hurt at {location} and chose to make peace. {turning_point_reason} '
         '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         'Avg: {relationship_avg:+d})'
     ),
     'events.relationship_conflict.summary': (
         '{name1} and {name2} clashed at {location}, and the strain between them sharpened. '
+        '{turning_point_reason} '
         '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         'Avg: {relationship_avg:+d})'
     ),
     'events.relationship_mentorship.summary': (
-        '{name1} and {name2} settled into a mentor bond at {location}. '
+        '{name1} and {name2} settled into a mentor bond at {location}. {turning_point_reason} '
         '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         'Avg: {relationship_avg:+d})'
     ),
     'events.relationship_betrayal.summary': (
-        '{name1} and {name2} broke trust at {location}, leaving a bitter mark. '
+        '{name1} and {name2} broke trust at {location}, leaving a bitter mark. {turning_point_reason} '
         '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         'Avg: {relationship_avg:+d})'
     ),
     'events.relationship_comfort.summary': (
-        '{name1} and {name2} found a quiet moment of comfort at {location}. '
+        '{name1} and {name2} found a quiet moment of comfort at {location}. {turning_point_reason} '
         '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         'Avg: {relationship_avg:+d})'
     ),

@@ -311,11 +311,21 @@ TEXT_JA: Dict[str, str] = {
     'history_anniversary': '{year}年: {name} と結婚記念日を祝った。',
     'marriage_happened': '{name1}（{race1} {job1}）と {name2}（{race2} {job2}）は {location} で盛大に結婚した。',
     'history_married': '{year}年: {name} と {location} で結婚した。',
-    'relationship_reconciliation': '{name1} と {name2} は {location} で古い傷に向き合い、和解を選んだ。（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）',  # noqa: E501
-    'relationship_conflict': '{name1} と {name2} は {location} で衝突し、間の緊張が鋭くなった。（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）',  # noqa: E501
-    'relationship_mentorship': '{name1} と {name2} は {location} で師弟に近い絆を結んだ。（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）',  # noqa: E501
-    'relationship_betrayal': '{name1} と {name2} の信頼は {location} で破れ、苦い痕を残した。（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）',  # noqa: E501
-    'relationship_comfort': '{name1} と {name2} は {location} で静かな慰めの時間を分け合った。（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）',  # noqa: E501
+    'relationship_reconciliation': '{name1} と {name2} は {location} で古い傷に向き合い、和解を選んだ。{turning_point_reason}（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）',  # noqa: E501
+    'relationship_conflict': '{name1} と {name2} は {location} で衝突し、間の緊張が鋭くなった。{turning_point_reason}（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）',  # noqa: E501
+    'relationship_mentorship': '{name1} と {name2} は {location} で師弟に近い絆を結んだ。{turning_point_reason}（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）',  # noqa: E501
+    'relationship_betrayal': '{name1} と {name2} の信頼は {location} で破れ、苦い痕を残した。{turning_point_reason}（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）',  # noqa: E501
+    'relationship_comfort': '{name1} と {name2} は {location} で静かな慰めの時間を分け合った。{turning_point_reason}（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）',  # noqa: E501
+    'relationship_turning_point_reason_rescue_debt': '救助の恩が、互いを見る目をまだ変えていた。',
+    'relationship_turning_point_reason_vulnerability': '直近の恐怖が、古い防御を保ちにくくしていた。',
+    'relationship_turning_point_reason_combat_tension': '暴力の記憶が、すべての言葉を鋭くしていた。',
+    'relationship_turning_point_reason_shared_curiosity': '近い好奇心が、その教えを信じる理由になった。',
+    'relationship_turning_point_reason_guidance': '規律と経験が、その絆に明確な形を与えた。',
+    'relationship_turning_point_reason_mistrust': '低い信頼と違うものの見方が、歩み寄りの余地を狭めた。',
+    'relationship_turning_point_reason_old_grudge': '古い遺恨が、ついに言葉を得た。',
+    'relationship_turning_point_reason_mismatch': '互いの気質が、その瞬間を反対方向へ引いた。',
+    'relationship_turning_point_reason_trust': '穏やかな信頼が、本音を出すだけの余地を作った。',
+    'relationship_turning_point_reason_shared_history': '目の前の諍いより、積み重ねた時間の方が重かった。',
     'history_relationship_reconciliation': '{year}年: {location} で {name} と和解した。',
     'history_relationship_conflict': '{year}年: {location} で {name} と衝突した。',
     'history_relationship_mentorship': '{year}年: {location} で {name} と師弟に近い絆を結んだ。',
@@ -645,27 +655,27 @@ TEXT_JA: Dict[str, str] = {
         '{name1} と {name2} は {location} で特別な時間を過ごしたが、既存の関係がそれ以上の進展を妨げた。'
     ),
     'events.relationship_reconciliation.summary': (
-        '{name1} と {name2} は {location} で古い傷に向き合い、和解を選んだ。'
+        '{name1} と {name2} は {location} で古い傷に向き合い、和解を選んだ。{turning_point_reason}'
         '（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         '平均: {relationship_avg:+d}）'
     ),
     'events.relationship_conflict.summary': (
-        '{name1} と {name2} は {location} で衝突し、間の緊張が鋭くなった。'
+        '{name1} と {name2} は {location} で衝突し、間の緊張が鋭くなった。{turning_point_reason}'
         '（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         '平均: {relationship_avg:+d}）'
     ),
     'events.relationship_mentorship.summary': (
-        '{name1} と {name2} は {location} で師弟に近い絆を結んだ。'
+        '{name1} と {name2} は {location} で師弟に近い絆を結んだ。{turning_point_reason}'
         '（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         '平均: {relationship_avg:+d}）'
     ),
     'events.relationship_betrayal.summary': (
-        '{name1} と {name2} の信頼は {location} で破れ、苦い痕を残した。'
+        '{name1} と {name2} の信頼は {location} で破れ、苦い痕を残した。{turning_point_reason}'
         '（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         '平均: {relationship_avg:+d}）'
     ),
     'events.relationship_comfort.summary': (
-        '{name1} と {name2} は {location} で静かな慰めの時間を分け合った。'
+        '{name1} と {name2} は {location} で静かな慰めの時間を分け合った。{turning_point_reason}'
         '（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         '平均: {relationship_avg:+d}）'
     ),

@@ -246,6 +246,11 @@ def _apply_battle_params(record: WorldEventRecord, params: dict[str, Any], *, tr
             params["injury"] = ""
 
 
+def _apply_relationship_turning_point_params(params: dict[str, Any], *, translate: Translator) -> None:
+    if "turning_point_reason_key" in params and "turning_point_reason" not in params:
+        params["turning_point_reason"] = translate(str(params["turning_point_reason_key"]))
+
+
 def _apply_ordinary_event_params(record: WorldEventRecord, params: dict[str, Any], *, translate: Translator) -> None:
     if "story_hook_key" in params and "story_hook" not in params:
         params["story_hook"] = translate(str(params["story_hook_key"]), **params)
@@ -291,6 +296,7 @@ def _render_params(
     _apply_location_params(params, world=world)
     _apply_world_change_params(record, params, world=world, translate=translate)
     _apply_battle_params(record, params, translate=translate)
+    _apply_relationship_turning_point_params(params, translate=translate)
     _apply_ordinary_event_params(record, params, translate=translate)
     return params
 
