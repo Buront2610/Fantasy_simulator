@@ -450,6 +450,8 @@ class TestEventMeeting:
         assert result.event_type == "relationship_value_alignment"
         assert first.get_relationship(second.char_id) > 0
         assert first.has_relation_tag(second.char_id, "friend")
+        assert first.has_relation_tag(second.char_id, "shared_values")
+        assert result.metadata["record_id"] in first.relation_tag_sources[f"{second.char_id}:shared_values"]
         assert result.metadata["personality_feature_factor_keys"] == ["shared_features"]
         assert (
             result.metadata["render_params"]["turning_point_reason_key"]
@@ -460,6 +462,21 @@ class TestEventMeeting:
             locale="en",
             world=world,
         )
+
+    def test_shared_values_become_later_relationship_cause(self, es, world):
+        first = _make_char("First")
+        second = _make_char("Second")
+        first.personality_feats = ["oathbound"]
+        second.personality_feats = ["oathbound"]
+        world.add_character(first)
+        world.add_character(second)
+        alignment = resolve_relationship_turning_point_event(first, second, world, rng=random.Random(7))
+        alignment_record = world.record_event(WorldEventRecord.from_event_result(alignment))
+
+        followup = es.event_marriage(first, second, world, rng=random.Random(1))
+
+        assert alignment_record.record_id in followup.metadata["cause_event_ids"]
+        assert "shared_values" in followup.metadata["relationship_catalyst_factor_keys"]
 
     def test_relationship_turning_point_can_clash_over_values(self, es, world):
         first = _make_char("First")
@@ -474,6 +491,8 @@ class TestEventMeeting:
         assert result.event_type == "relationship_value_clash"
         assert first.get_relationship(second.char_id) < 0
         assert first.has_relation_tag(second.char_id, "rival")
+        assert first.has_relation_tag(second.char_id, "value_rift")
+        assert result.metadata["record_id"] in first.relation_tag_sources[f"{second.char_id}:value_rift"]
         assert result.metadata["personality_feature_factor_keys"] == ["vow_vs_impulse"]
         assert (
             result.metadata["render_params"]["turning_point_reason_key"]
@@ -483,6 +502,27 @@ class TestEventMeeting:
             WorldEventRecord.from_event_result(result),
             locale="en",
             world=world,
+        )
+
+    def test_value_rift_becomes_later_relationship_cause(self, es, world):
+        first = _make_char("First")
+        second = _make_char("Second")
+        first.personality_feats = ["oathbound"]
+        second.personality_feats = ["reckless"]
+        world.add_character(first)
+        world.add_character(second)
+        clash = resolve_relationship_turning_point_event(first, second, world, rng=random.Random(8))
+        clash_record = world.record_event(WorldEventRecord.from_event_result(clash))
+        first.personality_feats = []
+        second.personality_feats = []
+
+        followup = resolve_relationship_turning_point_event(first, second, world, rng=random.Random(9))
+
+        assert followup.event_type == "relationship_value_clash"
+        assert clash_record.record_id in followup.metadata["cause_event_ids"]
+        assert (
+            followup.metadata["render_params"]["turning_point_reason_key"]
+            == "relationship_turning_point_reason_value_clash"
         )
 
 

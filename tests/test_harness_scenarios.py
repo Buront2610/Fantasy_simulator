@@ -602,8 +602,8 @@ def _assert_projection_contract(contract: dict[str, Any]) -> None:
     assert ("journey",) in contract["event_tags"]
     assert ("relationship_value_clash",) in contract["event_tags"]
     assert contract["relation_tags"] == [
-        ("1e27a1c0", "7f26144b", ("rival",)),
-        ("7f26144b", "1e27a1c0", ("rival",)),
+        ("1e27a1c0", "7f26144b", ("rival", "value_rift")),
+        ("7f26144b", "1e27a1c0", ("rival", "value_rift")),
     ]
     assert contract["detail_projection"] == {
         "location_id": "loc_elderroot_forest",

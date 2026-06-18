@@ -39,8 +39,9 @@ CATALYST_EVENT_KINDS: tuple[str, ...] = (
     "battle",
     "battle_fatal",
     "romance",
+    "relationship_value_alignment",
 )
-CATALYST_RELATION_TAGS: tuple[str, ...] = ("savior", "rescued", "co_parent", "family")
+CATALYST_RELATION_TAGS: tuple[str, ...] = ("savior", "rescued", "co_parent", "family", "shared_values")
 PERSONALITY_TURNING_POINT_KINDS: tuple[str, ...] = (
     "relationship_reconciliation",
     "relationship_conflict",
@@ -121,6 +122,8 @@ def _relationship_catalyst(world: "World", char1: "Character", char2: "Character
         factor_scores["rescue_debt"] = 8
     if _has_any_pair_tag(char1, char2, ("co_parent", "family")):
         factor_scores["family_bond"] = 6
+    if _has_any_pair_tag(char1, char2, ("shared_values",)):
+        factor_scores["shared_values"] = 5
 
     event_records = getattr(world, "event_records", [])
     pair_ids = (char1.char_id, char2.char_id)
@@ -145,6 +148,8 @@ def _relationship_catalyst(world: "World", char1: "Character", char2: "Character
         factor_scores["prior_romance"] = max(factor_scores.get("prior_romance", 0), 4)
     if "battle" in recent_kinds or "battle_fatal" in recent_kinds:
         factor_scores["hard_won_respect"] = max(factor_scores.get("hard_won_respect", 0), 3)
+    if "relationship_value_alignment" in recent_kinds:
+        factor_scores["shared_values"] = max(factor_scores.get("shared_values", 0), 5)
 
     if not factor_scores:
         return RelationshipCatalyst()
@@ -599,6 +604,8 @@ def _relationship_turning_point_key(
     second_profile = personality.second_context.profile
     if avg_rel <= -35 and catalyst.score >= 5:
         return "reconciliation"
+    if _has_any_pair_tag(char1, char2, ("value_rift",)) and avg_rel < 20:
+        return "value_clash"
     if feature_factors.intersection({"vow_vs_impulse", "home_vs_distance"}) and avg_rel < 30:
         return "value_clash"
     if (
@@ -659,11 +666,16 @@ def _relationship_turning_point_tags(
     if key in {"reconciliation", "comfort", "value_alignment"}:
         _remove_opposed_relation_tag(char1, char2.char_id, "friend")
         _remove_opposed_relation_tag(char2, char1.char_id, "friend")
-        return _add_mutual_relation_tag(char1, char2, "friend", "friend", source_event_id)
+        updates = _add_mutual_relation_tag(char1, char2, "friend", "friend", source_event_id)
+        if key == "value_alignment":
+            updates.extend(_add_mutual_relation_tag(char1, char2, "shared_values", "shared_values", source_event_id))
+        return updates
     if key == "value_clash":
         _remove_opposed_relation_tag(char1, char2.char_id, "rival")
         _remove_opposed_relation_tag(char2, char1.char_id, "rival")
-        return _add_mutual_relation_tag(char1, char2, "rival", "rival", source_event_id)
+        updates = _add_mutual_relation_tag(char1, char2, "rival", "rival", source_event_id)
+        updates.extend(_add_mutual_relation_tag(char1, char2, "value_rift", "value_rift", source_event_id))
+        return updates
     return []
 
 
@@ -730,7 +742,7 @@ def resolve_relationship_turning_point_event(
         world,
         char1,
         char2,
-        relation_tags=("friend", "rival", "mentor", "disciple", "savior", "rescued"),
+        relation_tags=("friend", "rival", "mentor", "disciple", "savior", "rescued", "shared_values", "value_rift"),
         event_kinds=(
             "meeting",
             "romance",
