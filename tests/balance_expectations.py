@@ -15,3 +15,9 @@ MIN_TOTAL_ADVENTURE_DEATHS = 1
 MIN_TOTAL_COMBAT_EVENTS = 10
 MIN_TOTAL_COMBAT_ROUNDS = 30
 MIN_TOTAL_MAGIC_COMBAT_ACTIONS = 1
+
+# Save-footprint guard for the 30y/20-character world-health smoke. This is a
+# tripwire, not a compression target: the review measured multi-MB growth over
+# much longer runs, so this band only catches sudden runaway history growth.
+MAX_WORLD_HEALTH_SAVE_JSON_BYTES = 1_500_000
+MAX_WORLD_HEALTH_EVENT_RECORDS = 1_500

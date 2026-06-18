@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from ..world_persistence_serializer import serialize_world_state
+
 
 def all_characters(world: Any) -> list[Any]:
     """Return world characters regardless of legacy list/dict storage shape."""
@@ -56,6 +58,7 @@ def collect_world_health_metrics(world: Any) -> dict[str, Any]:
     combat_logs = _combat_logs(event_records) + adventure_logs
     combat_metrics = _combat_metrics(combat_logs, event_records, adventure_logs)
     cause_metrics = _cause_metrics(event_records)
+    footprint_metrics = _history_footprint_metrics(world, event_records)
     return {
         "year": getattr(world, "year", None),
         "characters": len(characters),
@@ -65,6 +68,7 @@ def collect_world_health_metrics(world: Any) -> dict[str, Any]:
         "marriage_count": sum(1 for record in event_records if getattr(record, "kind", "") == "marriage"),
         "birth_count": sum(1 for record in event_records if getattr(record, "kind", "") == "birth"),
         "immigration_count": sum(1 for record in event_records if getattr(record, "kind", "") == "immigration"),
+        **footprint_metrics,
         **combat_metrics,
         **cause_metrics,
         "adventure_outcomes": {
@@ -83,6 +87,37 @@ def collect_world_health_metrics(world: Any) -> dict[str, Any]:
             {"adventure_id": adventure_id, "member_id": member_id}
             for adventure_id, member_id in dangling_members
         ],
+    }
+
+
+def _json_size_bytes(payload: Any) -> int:
+    text = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    return len(text.encode("utf-8"))
+
+
+def _history_footprint_metrics(world: Any, event_records: list[Any]) -> dict[str, Any]:
+    event_payloads = [record.to_dict() for record in event_records if hasattr(record, "to_dict")]
+    active_rumors = [
+        rumor.to_dict() for rumor in getattr(world, "rumors", [])
+        if hasattr(rumor, "to_dict")
+    ]
+    archived_rumors = [
+        rumor.to_dict() for rumor in getattr(world, "rumor_archive", [])
+        if hasattr(rumor, "to_dict")
+    ]
+    event_bytes = _json_size_bytes(event_payloads)
+    archive_bytes = _json_size_bytes(archived_rumors)
+    world_bytes = _json_size_bytes(serialize_world_state(world))
+    return {
+        "event_record_count": len(event_payloads),
+        "event_records_json_bytes": event_bytes,
+        "event_record_average_bytes": round(event_bytes / len(event_payloads), 2) if event_payloads else 0.0,
+        "active_rumor_count": len(active_rumors),
+        "active_rumors_json_bytes": _json_size_bytes(active_rumors),
+        "rumor_archive_count": len(archived_rumors),
+        "rumor_archive_json_bytes": archive_bytes,
+        "rumor_archive_average_bytes": round(archive_bytes / len(archived_rumors), 2) if archived_rumors else 0.0,
+        "estimated_world_save_json_bytes": world_bytes,
     }
 
 

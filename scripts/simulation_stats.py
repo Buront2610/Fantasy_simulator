@@ -45,6 +45,9 @@ class SimulationStats:
     final_month: int
     events: int
     rumors: int
+    event_records_json_bytes: int
+    rumor_archive_json_bytes: int
+    save_json_bytes: int
     alive: int
     population_series: list[PopulationSnapshot]
 
@@ -126,6 +129,8 @@ def collect_simulation_stats(
         simulator.advance_months(months)
         elapsed_months += months
         population_series.append(collect_population_snapshot(simulator, elapsed_months=elapsed_months))
+    event_payloads = [record.to_dict() for record in world.event_records]
+    rumor_archive_payloads = [rumor.to_dict() for rumor in world.rumor_archive]
 
     return SimulationStats(
         world_seed=world_seed,
@@ -140,9 +145,17 @@ def collect_simulation_stats(
         final_month=simulator.current_month,
         events=len(world.event_records),
         rumors=len(world.rumors),
+        event_records_json_bytes=_json_size_bytes(event_payloads),
+        rumor_archive_json_bytes=_json_size_bytes(rumor_archive_payloads),
+        save_json_bytes=_json_size_bytes(simulator.to_dict()),
         alive=sum(1 for character in world.characters if character.alive),
         population_series=population_series,
     )
+
+
+def _json_size_bytes(payload: Any) -> int:
+    text = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    return len(text.encode("utf-8"))
 
 
 def format_stats(stats: SimulationStats) -> str:

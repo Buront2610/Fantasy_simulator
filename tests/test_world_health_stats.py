@@ -18,6 +18,8 @@ from .balance_expectations import (
     MIN_TOTAL_MAGIC_COMBAT_ACTIONS,
     MIN_TOTAL_MARRIAGES,
     MIN_TOTAL_ADVENTURE_DEATHS,
+    MAX_WORLD_HEALTH_EVENT_RECORDS,
+    MAX_WORLD_HEALTH_SAVE_JSON_BYTES,
     WORLD_HEALTH_SEEDS,
     WORLD_HEALTH_STARTING_POPULATION,
     WORLD_HEALTH_YEARS,
@@ -96,6 +98,8 @@ def test_world_health_stats_keep_world_alive_and_social(tmp_path) -> None:
     total_combat_events = 0
     total_combat_rounds = 0
     total_magic_actions = 0
+    max_event_records = 0
+    max_save_bytes = 0
     for seed in WORLD_HEALTH_SEEDS:
         sim = Simulator(
             _build_health_world(seed),
@@ -113,6 +117,8 @@ def test_world_health_stats_keep_world_alive_and_social(tmp_path) -> None:
         total_combat_events += metrics["combat_event_count"]
         total_combat_rounds += metrics["combat_round_count"]
         total_magic_actions += metrics["magic_combat_action_count"]
+        max_event_records = max(max_event_records, metrics["event_record_count"])
+        max_save_bytes = max(max_save_bytes, metrics["estimated_world_save_json_bytes"])
 
         assert metrics["alive"] >= MIN_ALIVE_AFTER_HEALTH_RUN, (
             f"[world-health] seed={seed} alive={metrics['alive']} "
@@ -150,6 +156,16 @@ def test_world_health_stats_keep_world_alive_and_social(tmp_path) -> None:
         f"[world-health] magic_combat_action_count={total_magic_actions} "
         f"(expected >= {MIN_TOTAL_MAGIC_COMBAT_ACTIONS} across seeds {WORLD_HEALTH_SEEDS}). "
         "Meaning: magic skills are no longer connected to combat outcomes."
+    )
+    assert max_event_records <= MAX_WORLD_HEALTH_EVENT_RECORDS, (
+        f"[world-health] event_record_count={max_event_records} "
+        f"(expected <= {MAX_WORLD_HEALTH_EVENT_RECORDS} for {WORLD_HEALTH_YEARS}y smoke). "
+        "Meaning: canonical history growth may be running away and long saves will bloat."
+    )
+    assert max_save_bytes <= MAX_WORLD_HEALTH_SAVE_JSON_BYTES, (
+        f"[world-health] estimated_world_save_json_bytes={max_save_bytes} "
+        f"(expected <= {MAX_WORLD_HEALTH_SAVE_JSON_BYTES} for {WORLD_HEALTH_YEARS}y smoke). "
+        "Meaning: save footprint growth needs investigation before longer playtests."
     )
 
 

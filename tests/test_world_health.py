@@ -63,6 +63,10 @@ def test_world_health_metrics_are_headless_and_serializable() -> None:
     assert metrics["marriage_count"] == 0
     assert metrics["birth_count"] == 0
     assert metrics["combat_event_count"] == 0
+    assert metrics["event_record_count"] == 0
+    assert metrics["event_records_json_bytes"] > 0
+    assert metrics["rumor_archive_count"] == 0
+    assert metrics["estimated_world_save_json_bytes"] > 0
 
 
 def test_world_health_metrics_include_combat_statistics() -> None:
@@ -98,6 +102,8 @@ def test_world_health_metrics_include_combat_statistics() -> None:
     assert metrics["birth_count"] == 1
     assert metrics["causal_event_count"] == 1
     assert metrics["dangling_cause_event_ids"] == []
+    assert metrics["event_record_count"] == 3
+    assert metrics["event_records_json_bytes"] > metrics["active_rumors_json_bytes"]
 
 
 def test_world_health_metrics_report_dangling_cause_event_ids() -> None:
