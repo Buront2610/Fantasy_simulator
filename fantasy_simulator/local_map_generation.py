@@ -109,42 +109,76 @@ def _apply_route_gates(canvas: list[list[str]], directions: set[str], *, road_ch
 
 
 def _generate_settlement_map(rng: random.Random, route_directions: set[str], *, dense: bool) -> GeneratedLocalMap:
-    canvas = _bordered_canvas(" ")
+    canvas = _bordered_canvas(" ") if dense else _blank_canvas(" ")
     mid_x = LOCAL_MAP_WIDTH // 2
     mid_y = LOCAL_MAP_HEIGHT // 2
-    for x in range(1, LOCAL_MAP_WIDTH - 1):
-        canvas[mid_y][x] = "="
-    for y in range(1, LOCAL_MAP_HEIGHT - 1):
-        canvas[y][mid_x] = "|"
-    _apply_route_gates(canvas, route_directions or {"north", "south", "east", "west"}, road_char="=")
+    _paint_settlement_roads(canvas, route_directions or {"north", "south", "east", "west"}, dense=dense)
+    canvas[mid_y - 1][mid_x - 1] = "o"
     canvas[mid_y][mid_x] = "@"
 
-    building_count = 18 if dense else 10
-    for _ in range(building_count):
-        w = rng.randint(2, 4)
-        h = rng.randint(1, 2)
-        x = rng.randint(2, LOCAL_MAP_WIDTH - w - 3)
-        y = rng.randint(2, LOCAL_MAP_HEIGHT - h - 3)
-        if abs(x - mid_x) <= 2 or abs(y - mid_y) <= 1:
-            continue
-        for yy in range(y, y + h):
-            for xx in range(x, x + w):
-                canvas[yy][xx] = "#"
-        canvas[y][x + rng.randrange(w)] = "+"
+    slots = _settlement_building_slots(dense)
+    rng.shuffle(slots)
+    for x, y, w, h in slots[: 14 if dense else 8]:
+        _place_building(canvas, x, y, w, h, rng)
 
-    for _ in range(6 if dense else 10):
+    for _ in range(6 if dense else 12):
         x = rng.randint(2, LOCAL_MAP_WIDTH - 3)
         y = rng.randint(2, LOCAL_MAP_HEIGHT - 3)
         if canvas[y][x] == " ":
-            canvas[y][x] = "T" if not dense else "."
-    canvas[mid_y - 1][mid_x - 1] = "o"
+            canvas[y][x] = "." if dense else "T"
     return GeneratedLocalMap(_stringify(canvas), ("local_map_legend_settlement", "local_map_legend_route_gate"))
 
 
+def _paint_settlement_roads(canvas: list[list[str]], directions: set[str], *, dense: bool) -> None:
+    mid_x = LOCAL_MAP_WIDTH // 2
+    mid_y = LOCAL_MAP_HEIGHT // 2
+    horizontal = "=" if dense else "-"
+    vertical = "|" if dense else ":"
+    for x in range(1, LOCAL_MAP_WIDTH - 1):
+        canvas[mid_y][x] = horizontal
+    for y in range(1, LOCAL_MAP_HEIGHT - 1):
+        canvas[y][mid_x] = vertical
+    _apply_route_gates(canvas, directions, road_char=horizontal)
+
+
+def _settlement_building_slots(dense: bool) -> list[tuple[int, int, int, int]]:
+    if dense:
+        return [
+            (3, 2, 5, 2), (10, 2, 5, 2), (22, 2, 5, 2), (29, 2, 5, 2),
+            (4, 5, 4, 2), (11, 5, 4, 2), (23, 5, 4, 2), (30, 5, 4, 2),
+            (3, 9, 5, 2), (10, 10, 5, 2), (22, 9, 5, 2), (29, 10, 5, 2),
+            (5, 12, 4, 2), (24, 12, 4, 2), (31, 12, 3, 2),
+        ]
+    return [
+        (4, 3, 4, 2), (11, 2, 4, 2), (24, 2, 4, 2), (30, 4, 4, 2),
+        (5, 10, 4, 2), (12, 11, 4, 2), (23, 10, 4, 2), (30, 11, 4, 2),
+        (2, 6, 3, 2), (31, 7, 3, 2),
+    ]
+
+
+def _place_building(canvas: list[list[str]], x: int, y: int, w: int, h: int, rng: random.Random) -> None:
+    if not _building_space_is_clear(canvas, x, y, w, h):
+        return
+    for yy in range(y, y + h):
+        for xx in range(x, x + w):
+            canvas[yy][xx] = "#"
+    door_candidates = [(x + rng.randrange(w), y + h - 1), (x + rng.randrange(w), y)]
+    door_x, door_y = door_candidates[rng.randrange(len(door_candidates))]
+    canvas[door_y][door_x] = "+"
+
+
+def _building_space_is_clear(canvas: list[list[str]], x: int, y: int, w: int, h: int) -> bool:
+    for yy in range(max(0, y - 1), min(LOCAL_MAP_HEIGHT, y + h + 1)):
+        for xx in range(max(0, x - 1), min(LOCAL_MAP_WIDTH, x + w + 1)):
+            if canvas[yy][xx] not in {" ", "."}:
+                return False
+    return True
+
+
 def _generate_dungeon_map(rng: random.Random, route_directions: set[str]) -> GeneratedLocalMap:
-    canvas = _bordered_canvas("#")
+    canvas = _blank_canvas(" ")
     rooms: list[tuple[int, int, int, int]] = []
-    for _ in range(9):
+    for _ in range(12):
         w = rng.randint(4, 8)
         h = rng.randint(3, 5)
         x = rng.randint(1, LOCAL_MAP_WIDTH - w - 2)
@@ -179,6 +213,7 @@ def _generate_dungeon_map(rng: random.Random, route_directions: set[str]) -> Gen
         if canvas[y][x] == ".":
             canvas[y][x] = marker
     _apply_route_gates(canvas, route_directions or {"south"}, road_char=".")
+    _outline_dungeon_walls(canvas)
     return GeneratedLocalMap(_stringify(canvas), ("local_map_legend_dungeon", "local_map_legend_route_gate"))
 
 
@@ -203,6 +238,21 @@ def _generate_wild_map(
             if canvas[y][x] in {" ", tree_char} and rng.random() < 0.75:
                 canvas[y][x] = "."
     return GeneratedLocalMap(_stringify(canvas), ("local_map_legend_wild", "local_map_legend_route_gate"))
+
+
+def _outline_dungeon_walls(canvas: list[list[str]]) -> None:
+    floor_chars = {".", "@", ">", "!", "?", "+"}
+    wall_points: set[tuple[int, int]] = set()
+    for y, row in enumerate(canvas):
+        for x, char in enumerate(row):
+            if char not in floor_chars:
+                continue
+            for yy in range(max(0, y - 1), min(LOCAL_MAP_HEIGHT, y + 2)):
+                for xx in range(max(0, x - 1), min(LOCAL_MAP_WIDTH, x + 2)):
+                    if canvas[yy][xx] == " ":
+                        wall_points.add((xx, yy))
+    for x, y in wall_points:
+        canvas[y][x] = "#"
 
 
 def _rooms_overlap(first: tuple[int, int, int, int], second: tuple[int, int, int, int]) -> bool:
