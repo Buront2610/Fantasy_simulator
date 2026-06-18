@@ -17,12 +17,10 @@ def latest_absolute_day_before_or_on(
     month: int,
 ) -> int:
     """Return the latest known absolute day on or before a report period."""
-    matching_days = [
-        record.absolute_day
-        for record in event_records
-        if record.absolute_day > 0 and (record.year, record.month) <= (year, month)
-    ]
-    return max(matching_days, default=0)
+    for record in reversed(event_records):
+        if record.absolute_day > 0 and (record.year, record.month) <= (year, month):
+            return record.absolute_day
+    return 0
 
 
 def watched_actor_tags_for_record(

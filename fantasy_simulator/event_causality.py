@@ -71,11 +71,15 @@ def pair_cause_event_ids(
             limit=limit,
         )
     )
-    known_record_ids = {
-        record_id for record in getattr(world, "event_records", [])
-        for record_id in [getattr(record, "record_id", "")]
-        if isinstance(record_id, str) and record_id
-    }
+    event_records = getattr(world, "event_records", [])
+    event_index = getattr(world, "_event_index", None)
+    known_record_ids = getattr(event_index, "record_ids", set())
+    if len(known_record_ids) != len(event_records):
+        known_record_ids = {
+            record_id for record in event_records
+            for record_id in [getattr(record, "record_id", "")]
+            if isinstance(record_id, str) and record_id
+        }
     return [
         event_id for event_id in dict.fromkeys(event_ids)
         if event_id in known_record_ids

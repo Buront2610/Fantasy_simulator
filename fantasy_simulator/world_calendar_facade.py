@@ -31,20 +31,42 @@ def base_calendar_ref(world: Any) -> CalendarDefinition:
     return world._setting_bundle.world_definition.calendar
 
 
+def invalidate_calendar_metrics_cache(world: Any) -> None:
+    if hasattr(world, "_calendar_metrics_cache"):
+        world._calendar_metrics_cache = None
+
+
+def _calendar_metrics(world: Any) -> tuple[int, int, tuple[int, ...]]:
+    calendar = base_calendar_ref(world)
+    cache_key = id(calendar)
+    cached = getattr(world, "_calendar_metrics_cache", None)
+    if cached is not None and cached[0] == cache_key:
+        return cached[1]
+    if calendar.months:
+        month_days = tuple(max(1, month.days) for month in calendar.months)
+    else:
+        month_days = (30,)
+    metrics = (max(1, len(month_days)), sum(month_days), month_days)
+    world._calendar_metrics_cache = (cache_key, metrics)
+    return metrics
+
+
 def calendar_definition(world: Any, *, clone_calendar: CloneCalendar) -> CalendarDefinition:
     return clone_calendar(base_calendar_ref(world))
 
 
 def months_per_year(world: Any) -> int:
-    return base_calendar_ref(world).months_per_year
+    return _calendar_metrics(world)[0]
 
 
 def days_per_year(world: Any) -> int:
-    return base_calendar_ref(world).days_per_year
+    return _calendar_metrics(world)[1]
 
 
 def days_in_month(world: Any, month: int) -> int:
-    return base_calendar_ref(world).days_in_month(month)
+    month_days = _calendar_metrics(world)[2]
+    month_index = max(1, min(len(month_days), int(month))) - 1
+    return month_days[month_index]
 
 
 def month_display_name(world: Any, month: int) -> str:
@@ -204,6 +226,7 @@ def apply_calendar_definition(
     changed_day: int = 1,
 ) -> None:
     world._setting_bundle.world_definition.calendar = clone_calendar(calendar)
+    invalidate_calendar_metrics_cache(world)
     world.calendar_history = apply_calendar_definition_history(
         calendar=calendar,
         current_year=world.year,
