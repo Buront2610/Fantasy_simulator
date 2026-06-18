@@ -34,6 +34,7 @@ TEXT_JA: Dict[str, str] = {
     'dashboard_menu': '世界ダッシュボード',
     'rumor_board_menu': '噂一覧',
     'character_roster': 'キャラクター一覧',
+    'family_tree_menu': '家系図',
     'event_log_last_30': 'イベントログ（最新30件）',
     'full_event_log': 'イベントログ（全件）',
     'adventure_summaries': '冒険サマリー',
@@ -138,6 +139,20 @@ TEXT_JA: Dict[str, str] = {
     'language_evolution_count_label': '変化イベント数',
     'load_language_prompt': '言語を選んでください',
     'language_set_ja': '表示言語を日本語に変更しました。',
+    'family_tree_header': '家系図',
+    'family_tree_summary': (
+        '結婚組数: {couples} | 結婚夫婦の子供数: {children} | '
+        '平均子供数/夫婦: {average} | 子あり夫婦: {couples_with_children}'
+    ),
+    'family_tree_empty': '結婚または親子関係はまだ記録されていません。',
+    'family_tree_no_children': '子供: 記録なし',
+    'family_tree_child_prefix': '子',
+    'family_tree_married_years': '{years}年に結婚',
+    'family_tree_active_marriage': '現在婚姻中',
+    'family_tree_family_pair': '家族ペア',
+    'family_tree_couple_line': '{partner1} + {partner2} [{status}] 子供={count}',
+    'family_tree_unknown_member': '不明',
+    'family_tree_member_label': '{name}（{race} {job}, 年齢{age}, {status}）',
     'language_set_en': '表示言語を英語に変更しました。',
     'language_option_ja': '日本語',
     'language_option_en': 'English',

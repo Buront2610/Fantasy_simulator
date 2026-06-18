@@ -18,6 +18,7 @@ from .screen_history import (
     _show_single_story,
     _show_yearly_report,
 )
+from .screen_family_tree import _show_family_tree
 from .screen_map import _show_world_map
 from .screen_persistence import _save_simulation_snapshot
 from .screen_roster import _show_roster
@@ -49,6 +50,7 @@ def _result_menu_options() -> list[tuple[str, str]]:
         ("rumor_board", tr("rumor_board_menu")),
         ("world_map", tr("world_map")),
         ("character_roster", tr("character_roster")),
+        ("family_tree", tr("family_tree_menu")),
         ("event_log_last_30", tr("event_log_last_30")),
         ("full_event_log", tr("full_event_log")),
         ("adventure_summaries", tr("adventure_summaries")),
@@ -136,6 +138,8 @@ def _show_result_view(action: str, sim: Simulator, ctx: UIContext) -> bool:
         _show_world_map(sim, ctx=ctx)
     elif action == "character_roster":
         _show_roster(sim.world, ctx=ctx)
+    elif action == "family_tree":
+        _show_family_tree(sim, ctx=ctx)
     elif action == "event_log_last_30":
         _show_event_log(sim, ctx, last_n=30)
     elif action == "full_event_log":

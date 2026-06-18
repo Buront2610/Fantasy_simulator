@@ -34,6 +34,7 @@ TEXT_EN: Dict[str, str] = {
     'dashboard_menu': 'World dashboard',
     'rumor_board_menu': 'Rumor board',
     'character_roster': 'Character roster',
+    'family_tree_menu': 'Family tree',
     'event_log_last_30': 'Event log (last 30)',
     'full_event_log': 'Full event log',
     'adventure_summaries': 'Adventure summaries',
@@ -138,6 +139,20 @@ TEXT_EN: Dict[str, str] = {
     'language_evolution_count_label': 'Evolution events',
     'load_language_prompt': 'Choose a language',
     'language_set_ja': '表示言語を日本語に変更しました。',
+    'family_tree_header': 'FAMILY TREE',
+    'family_tree_summary': (
+        'Married couples: {couples} | children from married couples: {children} | '
+        'avg children/couple: {average} | couples with children: {couples_with_children}'
+    ),
+    'family_tree_empty': 'No marriages or parent-child links have been recorded yet.',
+    'family_tree_no_children': 'Children: none recorded',
+    'family_tree_child_prefix': 'Child',
+    'family_tree_married_years': 'married in {years}',
+    'family_tree_active_marriage': 'currently married',
+    'family_tree_family_pair': 'family pair',
+    'family_tree_couple_line': '{partner1} + {partner2} [{status}] children={count}',
+    'family_tree_unknown_member': 'Unknown',
+    'family_tree_member_label': '{name} ({race} {job}, age {age}, {status})',
     'language_set_en': 'Switched display language to English.',
     'language_option_ja': '日本語',
     'language_option_en': 'English',
