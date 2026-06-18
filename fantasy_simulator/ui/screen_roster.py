@@ -7,6 +7,7 @@ from typing import Any
 from ..character_founder_background import render_founder_summary
 from ..character_personality import (
     personality_context_from_events,
+    render_personality_archetype,
     render_personality_context_factors,
     render_personality_summary,
 )
@@ -125,12 +126,14 @@ def _profile_summary_lines(world: World, character: Any) -> list[str]:
             constitution=getattr(character, "constitution", 0),
         ),
         tr("roster_profile_personality", summary=render_personality_summary(character.personality)),
+        tr("roster_profile_temperament", archetype=render_personality_archetype(character.personality)),
     ]
     context = personality_context_from_events(character, getattr(world, "event_records", []))
     if context.factor_keys:
         lines.append(
             tr(
                 "roster_profile_current_personality",
+                archetype=render_personality_archetype(context.profile),
                 summary=render_personality_summary(context.profile),
                 factors=render_personality_context_factors(context.factor_keys),
             )

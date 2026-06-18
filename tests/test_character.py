@@ -13,6 +13,7 @@ from fantasy_simulator.character import (
     random_stats,
 )
 from fantasy_simulator.character_lifespan import legacy_lifespan_years
+from fantasy_simulator.character_personality import personality_archetype_key, render_personality_archetype
 from fantasy_simulator.i18n import get_locale, set_locale
 
 
@@ -175,6 +176,33 @@ class TestCharacterProperties:
         assert relationship.score == 25
         assert relationship.tags == ["friend"]
         assert relationship.tag_sources == {"friend": ["evt_001"]}
+
+
+class TestCharacterPersonality:
+    def test_archetype_uses_trait_combinations(self):
+        assert personality_archetype_key({
+            "openness": 75,
+            "discipline": 40,
+            "extraversion": 25,
+            "agreeableness": 45,
+            "stability": 50,
+        }) == "quiet_scholar"
+        assert personality_archetype_key({
+            "openness": 20,
+            "discipline": 75,
+            "extraversion": 45,
+            "agreeableness": 40,
+            "stability": 75,
+        }) == "steadfast_guardian"
+
+    def test_archetype_renders_translated_label(self):
+        assert render_personality_archetype({
+            "openness": 50,
+            "discipline": 50,
+            "extraversion": 50,
+            "agreeableness": 50,
+            "stability": 50,
+        }) == "balanced adventurer"
 
 
 # ---------------------------------------------------------------------------

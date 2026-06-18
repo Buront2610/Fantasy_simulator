@@ -157,6 +157,34 @@ def render_personality_summary(personality: Mapping[str, int]) -> str:
     return tr("personality_summary", traits=" / ".join(parts))
 
 
+def personality_archetype_key(personality: Mapping[str, int]) -> str:
+    """Return a readable temperament type inferred from several personality axes."""
+    profile = normalize_personality(personality)
+    if profile["agreeableness"] >= 65 and profile["stability"] >= 65:
+        return "steady_mediator"
+    if profile["discipline"] >= 65 and profile["stability"] >= 65:
+        return "steadfast_guardian"
+    if profile["openness"] >= 65 and profile["extraversion"] >= 65:
+        return "restless_seeker"
+    if profile["openness"] >= 65 and profile["extraversion"] <= 35:
+        return "quiet_scholar"
+    if profile["discipline"] >= 65 and profile["openness"] <= 35:
+        return "pragmatic_traditionalist"
+    if profile["stability"] <= 35 and profile["agreeableness"] <= 35:
+        return "volatile_maverick"
+    if profile["extraversion"] <= 35 and profile["discipline"] >= 65:
+        return "reserved_planner"
+    if profile["agreeableness"] >= 65:
+        return "gentle_neighbor"
+    if profile["openness"] >= 65:
+        return "curious_wanderer"
+    return "balanced_adventurer"
+
+
+def render_personality_archetype(personality: Mapping[str, int]) -> str:
+    return tr(f"personality_archetype_{personality_archetype_key(personality)}")
+
+
 def render_affinity_factors(factor_keys: tuple[str, ...]) -> str:
     return ", ".join(tr(f"personality_affinity_{key}") for key in factor_keys)
 
