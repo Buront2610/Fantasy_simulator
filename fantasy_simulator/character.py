@@ -24,6 +24,21 @@ from .content.world_data import NAME_TO_LOCATION_ID, fallback_location_id
 from .i18n import tr
 
 
+MAX_CHARACTER_HISTORY = 120
+MAX_RELATION_TAG_SOURCE_EVENTS = 3
+
+
+def _tail(values: List[str], limit: int) -> List[str]:
+    return list(values)[-limit:]
+
+
+def _append_unique_tail(values: List[str], value: str, limit: int) -> None:
+    if value in values:
+        return
+    values.append(value)
+    del values[:-limit]
+
+
 class Character:
     """Represents a living (or deceased) inhabitant of the world."""
 
@@ -94,7 +109,7 @@ class Character:
         self.favorite = favorite
         self.spotlighted = spotlighted
         self.playable = playable
-        self.history: List[str] = list(history or [])
+        self.history: List[str] = list(history or [])[-MAX_CHARACTER_HISTORY:]
         self.spouse_id = spouse_id
         self.injury_status = injury_status if injury_status in self.VALID_INJURY_STATUSES else "none"
         self.active_adventure_id = active_adventure_id
@@ -103,7 +118,7 @@ class Character:
             for target_id, tags in (relation_tags or {}).items()
         }
         self.relation_tag_sources: Dict[str, List[str]] = {
-            key: list(values)
+            key: _tail(values, MAX_RELATION_TAG_SOURCE_EVENTS)
             for key, values in (relation_tag_sources or {}).items()
         }
 
@@ -228,8 +243,7 @@ class Character:
         if source_event_id:
             key = f"{other_id}:{tag}"
             sources = self.relation_tag_sources.setdefault(key, [])
-            if source_event_id not in sources:
-                sources.append(source_event_id)
+            _append_unique_tail(sources, source_event_id, MAX_RELATION_TAG_SOURCE_EVENTS)
 
     def has_relation_tag(self, other_id: str, tag: str) -> bool:
         return tag in self.relation_tags.get(other_id, [])
@@ -247,6 +261,7 @@ class Character:
 
     def add_history(self, event: str) -> None:
         self.history.append(event)
+        del self.history[:-MAX_CHARACTER_HISTORY]
 
     def get_relationship(self, other_id: str) -> int:
         return self.relationships.get(other_id, 0)

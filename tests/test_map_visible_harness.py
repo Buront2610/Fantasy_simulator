@@ -170,11 +170,11 @@ def _assert_seeded_map_visible_bundle(bundle: dict[str, list[str]]) -> None:
         "  | Moist: balanced (50%)                            |",
         "  | Temp: temperate (50%)                            |",
         "  | Safety: tense                                    |",
-        "  | Danger:  68 (high)                               |",
+        "  | Danger:  69 (high)                               |",
         "  | Traffic: ++ (medium)                             |",
-        "  | Pop: 0                                           |",
+        "  | Pop: 2                                           |",
         "  | Prosperity: stable (50)                          |",
-        "  | Mood: calm (51)                                  |",
+        "  | Mood: calm (49)                                  |",
         "  | Rumor heat: 20 (low)                             |",
     ]
     assert "  | Native name: Branthethal                         |" in bundle["detail"]

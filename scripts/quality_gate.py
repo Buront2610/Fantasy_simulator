@@ -71,6 +71,9 @@ DEFAULT_EXCLUDES = [
 WORLD_TYPECHECK_EXCLUSIONS: dict[str, str] = {
     "fantasy_simulator/world_arc.py": "New v9 data model; add to CI mypy targets with the next approved CI update.",
     "fantasy_simulator/world_arcs.py": "New v9 arc helpers; add to CI mypy targets with the next approved CI update.",
+    "fantasy_simulator/world_history_retention.py": (
+        "New long-run retention policy; add to CI mypy targets with the next approved CI update."
+    ),
 }
 
 

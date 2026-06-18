@@ -7,6 +7,8 @@ from fantasy_simulator.character import (
     Character,
     CharacterAbilities,
     CharacterNarrativeState,
+    MAX_CHARACTER_HISTORY,
+    MAX_RELATION_TAG_SOURCE_EVENTS,
     Relationship,
     random_stats,
 )
@@ -246,6 +248,23 @@ class TestAddHistory:
         hero.add_history("Event B")
         assert hero.history[-1] == "Event B"
         assert hero.history[-2] == "Event A"
+
+    def test_history_is_bounded_for_long_running_worlds(self, hero):
+        for index in range(MAX_CHARACTER_HISTORY + 5):
+            hero.add_history(f"Event {index}")
+
+        assert len(hero.history) == MAX_CHARACTER_HISTORY
+        assert hero.history[0] == "Event 5"
+        assert hero.history[-1] == f"Event {MAX_CHARACTER_HISTORY + 4}"
+
+    def test_relation_tag_sources_are_bounded_for_long_running_worlds(self, hero, mage):
+        for index in range(MAX_RELATION_TAG_SOURCE_EVENTS + 4):
+            hero.add_relation_tag(mage.char_id, "friend", source_event_id=f"evt_{index}")
+
+        key = f"{mage.char_id}:friend"
+        assert hero.relation_tag_sources[key] == [
+            f"evt_{index}" for index in range(4, MAX_RELATION_TAG_SOURCE_EVENTS + 4)
+        ]
 
 
 class TestApplyStatDelta:

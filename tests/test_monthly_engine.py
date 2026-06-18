@@ -20,7 +20,11 @@ from fantasy_simulator.character import Character
 from fantasy_simulator.character_creator import CharacterCreator
 from fantasy_simulator.event_models import EventResult
 from fantasy_simulator.events import WorldEventRecord
-from fantasy_simulator.simulation.population import population_pressure_factor
+from fantasy_simulator.simulation.population import (
+    has_population_capacity,
+    population_capacity,
+    population_pressure_factor,
+)
 from fantasy_simulator.simulator import Simulator
 from fantasy_simulator.world import World
 
@@ -73,6 +77,34 @@ class TestPopulationMaintenance:
         world = _build_seeded_world(7, n_chars=40)
 
         assert population_pressure_factor(world) == 2.0
+
+    def test_population_pressure_is_capped_for_long_running_worlds(self):
+        world = _build_seeded_world(7, n_chars=200)
+
+        assert population_pressure_factor(world) == 4.0
+
+    def test_population_capacity_is_based_on_habitable_locations(self):
+        world = _build_seeded_world(7, n_chars=2)
+
+        assert population_capacity(world) >= 20
+        assert has_population_capacity(world) is True
+
+    def test_population_capacity_closes_when_living_population_reaches_limit(self):
+        world = _build_seeded_world(7, n_chars=0)
+        cap = population_capacity(world)
+        for index in range(cap):
+            world.add_character(
+                Character(
+                    name=f"Resident {index}",
+                    age=25,
+                    gender="Male",
+                    race="Human",
+                    job="Warrior",
+                    location_id="loc_aethoria_capital",
+                )
+            )
+
+        assert has_population_capacity(world) is False
 
     def test_year_end_population_maintenance_adds_migrants_when_population_low(self):
         world = _build_seeded_world(7, n_chars=2)
@@ -183,6 +215,67 @@ class TestEventIndexPerformanceGuards:
 
         assert world.event_records
         assert rebuilds == 0
+
+
+class CountingRng:
+    def __init__(self) -> None:
+        self.random_calls = 0
+
+    def random(self) -> float:
+        self.random_calls += 1
+        return 0.99
+
+
+class TestNaturalHealthPerformanceGuards:
+    def test_zero_risk_characters_skip_event_system_path(self, monkeypatch):
+        world = World()
+        char = Character(
+            name="Young",
+            age=20,
+            gender="Male",
+            race="Human",
+            job="Warrior",
+            location_id="loc_aethoria_capital",
+        )
+        world.add_character(char)
+        sim = Simulator(world, seed=1)
+        sim.rng = CountingRng()
+        calls = []
+
+        def fake_check(*args, **kwargs):
+            calls.append((args, kwargs))
+            return None
+
+        monkeypatch.setattr(sim.event_system, "check_natural_death", fake_check)
+
+        sim._process_natural_health_check(char, 1.0 / world.days_per_year)
+
+        assert calls == []
+        assert sim.rng.random_calls == 0
+
+    def test_old_characters_keep_event_system_path(self, monkeypatch):
+        world = World()
+        char = Character(
+            name="Elder",
+            age=70,
+            gender="Male",
+            race="Human",
+            job="Warrior",
+            location_id="loc_aethoria_capital",
+        )
+        world.add_character(char)
+        sim = Simulator(world, seed=1)
+        calls = []
+
+        def fake_check(*args, **kwargs):
+            calls.append((args, kwargs))
+            return None
+
+        monkeypatch.setattr(sim.event_system, "check_natural_death", fake_check)
+
+        sim._process_natural_health_check(char, 1.0 / world.days_per_year)
+
+        assert len(calls) == 1
 
 
 # ---------------------------------------------------------------------------

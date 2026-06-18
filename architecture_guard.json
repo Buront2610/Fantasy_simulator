@@ -357,8 +357,8 @@
       },
       {
         "target": "fantasy_simulator/simulation/timeline.py::TimelineMixin",
-        "reason": "Timeline mixin remains a compatibility adapter for month/year advancement behavior.",
-        "max_class_lines": 268,
+        "reason": "Timeline mixin remains a compatibility adapter for month/year advancement and annual retention behavior.",
+        "max_class_lines": 271,
         "owner": "architecture-maintainers",
         "removal_condition": "Remove when fantasy_simulator/simulation/timeline.py::TimelineMixin fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },

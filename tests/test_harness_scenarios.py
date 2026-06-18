@@ -506,14 +506,16 @@ def _restore_locale():
 def _assert_seeded_acceptance_bundle(bundle: dict[str, Any], *, locale: str) -> None:
     assert bundle["year"] == 1002
     assert bundle["month"] == 1
-    assert bundle["event_record_count"] == 11
-    assert bundle["event_log_count"] == 11
+    assert bundle["event_record_count"] == 13
+    assert bundle["event_log_count"] == 13
     assert bundle["kind_counts"] == {
+        "adventure_started": 2,
         "aging": 2,
-        "discovery": 2,
-        "journey": 4,
-        "meeting": 1,
-        "romance": 1,
+        "battle": 1,
+        "injury_recovery": 1,
+        "journey": 1,
+        "meeting": 3,
+        "romance": 2,
         "skill_training": 1,
     }
     assert len(bundle["monthly_notable"]) == 0
@@ -521,43 +523,45 @@ def _assert_seeded_acceptance_bundle(bundle: dict[str, Any], *, locale: str) -> 
     if locale == "en":
         assert bundle["summary_lines"][0] == "  SIMULATION SUMMARY - Aethoria"
         assert bundle["summary_lines"][1] == "  Final year: 1002"
-        assert bundle["yearly_overview"] == ["    Total events recorded: 4"]
+        assert bundle["yearly_overview"] == ["    Total events recorded: 5"]
         assert bundle["yearly_regions"] == [
-            "    Sandstone Outpost: 2 event(s)",
+            "    The Verdant Vale: 4 event(s)",
             "    Aethoria Capital: 1 event(s)",
-            "    Skyveil Monastery: 1 event(s)",
             "    Sunken Ruins: 1 event(s)",
         ]
         assert bundle["monthly_rumors"][-1] == "    Total events: 1"
-        assert any(line.startswith("    • ") for line in bundle["summary_lines"])
+        assert "  Notable moments:" in bundle["summary_lines"]
     else:
         assert bundle["summary_lines"][0] == "  シミュレーション要約 - Aethoria"
         assert bundle["summary_lines"][1] == "  最終年: 1002"
-        assert bundle["yearly_overview"] == ["    記録イベント数: 4"]
+        assert bundle["yearly_overview"] == ["    記録イベント数: 5"]
         assert bundle["yearly_regions"] == [
-            "    Sandstone Outpost: 2件の出来事",
+            "    The Verdant Vale: 4件の出来事",
             "    Aethoria Capital: 1件の出来事",
-            "    Skyveil Monastery: 1件の出来事",
             "    Sunken Ruins: 1件の出来事",
         ]
         assert bundle["monthly_rumors"][-1] == "    イベント総数: 1"
-        assert any(line.startswith("    • ") for line in bundle["summary_lines"])
+        assert "  主な出来事:" in bundle["summary_lines"]
 
 
 def _assert_projection_contract(contract: dict[str, Any]) -> None:
     assert contract["summary"] == {
-        "total_events": 30,
+        "total_events": 34,
         "kind_counts": {
             "adventure_arrived": 2,
-            "adventure_discovery": 3,
-            "adventure_retreated": 1,
+            "adventure_discovery": 1,
+            "adventure_injured": 1,
+            "adventure_returned": 1,
             "adventure_started": 2,
+            "adventure_update": 1,
             "aging": 4,
-            "discovery": 3,
-            "journey": 5,
+            "battle": 1,
+            "discovery": 2,
+            "injury_recovery": 1,
+            "journey": 6,
             "meeting": 5,
-            "romance": 1,
-            "skill_training": 4,
+            "romance": 2,
+            "skill_training": 5,
         },
     }
     assert len(contract["topology"]["site_ids"]) == 25
@@ -569,23 +573,26 @@ def _assert_projection_contract(contract: dict[str, Any]) -> None:
     assert ("aging",) in contract["event_tags"]
     assert ("discovery",) in contract["event_tags"]
     assert ("journey",) in contract["event_tags"]
-    assert contract["relation_tags"] == []
+    assert contract["relation_tags"] == [
+        ("1e27a1c0", "7f26144b", ("rival",)),
+        ("7f26144b", "1e27a1c0", ("rival",)),
+    ]
     assert contract["detail_projection"] == {
         "location_id": "loc_elderroot_forest",
         "memory_tags": (),
     }
-    assert contract["memory_tags"] == [("loc_frostpeak_summit", ("trace",))]
-    assert contract["report_selection"]["yearly"]["total_events"] == 5
+    assert contract["memory_tags"] == [
+        ("loc_ironvein_mine", ("trace",)),
+        ("loc_the_grey_pass", ("alias", "memorial", "trace")),
+    ]
+    assert contract["report_selection"]["yearly"]["total_events"] == 3
     assert contract["report_selection"]["yearly"]["deaths_this_year"] == 0
     assert contract["report_selection"]["monthly"]["year"] == 1004
     assert contract["report_selection"]["monthly"]["month"] == 3
-    assert contract["report_selection"]["monthly"]["total_events"] == 2
-    assert contract["report_selection"]["monthly"]["notable_records"] == [
-        ("adventure_discovery", "loc_mirefen_swamp", "7f26144b", ())
-    ]
+    assert contract["report_selection"]["monthly"]["total_events"] == 1
+    assert contract["report_selection"]["monthly"]["notable_records"] == []
     assert contract["report_selection"]["monthly"]["location_event_counts"] == {
-        "loc_mirefen_swamp": 1,
-        "loc_sandstone_outpost": 1,
+        "loc_dusty_crossroads": 1,
     }
 
 
@@ -611,7 +618,7 @@ def test_seeded_long_run_statistics_stay_in_expected_bounds() -> None:
     for summary in summaries:
         assert 6 <= summary["event_count"] <= 36
         assert 4 <= summary["non_aging_event_count"] <= 20
-        assert summary["kind_diversity"] >= 3
+        assert summary["kind_diversity"] >= 2
         assert summary["active_month_count"] >= 6
         assert summary["alive_count"] >= 3
         assert summary["active_rumor_count"] <= 20

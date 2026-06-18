@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from .event_models import EventResult
 from .events_family import resolve_birth_event
+from .simulation.population import has_population_capacity
 
 if TYPE_CHECKING:
     from .character import Character
@@ -110,7 +111,7 @@ def generate_random_event(
 
     event_types = list(EVENT_WEIGHTS.keys())
     weights = [EVENT_WEIGHTS[event_type] for event_type in event_types]
-    if birth_pairs(eligible):
+    if has_population_capacity(world) and birth_pairs(eligible):
         event_types.append("birth")
         weights.append(BIRTH_EVENT_WEIGHT)
     chosen_type = rng.choices(event_types, weights=weights, k=1)[0]

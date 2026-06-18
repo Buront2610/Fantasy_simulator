@@ -71,4 +71,12 @@ def pair_cause_event_ids(
             limit=limit,
         )
     )
-    return list(dict.fromkeys(event_ids))[:limit]
+    known_record_ids = {
+        record_id for record in getattr(world, "event_records", [])
+        for record_id in [getattr(record, "record_id", "")]
+        if isinstance(record_id, str) and record_id
+    }
+    return [
+        event_id for event_id in dict.fromkeys(event_ids)
+        if event_id in known_record_ids
+    ][:limit]

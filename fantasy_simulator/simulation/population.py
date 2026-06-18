@@ -14,6 +14,8 @@ if TYPE_CHECKING:
 
 
 BASELINE_POPULATION = 20
+MAX_POPULATION_PRESSURE_FACTOR = 4.0
+LOCATION_POPULATION_CAPACITY = 6
 MAX_MIGRANTS_PER_YEAR = 3
 BACKGROUND_MIGRATION_INTERVAL_YEARS = 25
 
@@ -24,7 +26,20 @@ def living_characters(world: "World") -> list["Character"]:
 
 def population_pressure_factor(world: "World") -> float:
     """Scale yearly activity by living population without starving small worlds."""
-    return max(1.0, len(living_characters(world)) / BASELINE_POPULATION)
+    return min(MAX_POPULATION_PRESSURE_FACTOR, max(1.0, len(living_characters(world)) / BASELINE_POPULATION))
+
+
+def population_capacity(world: "World") -> int:
+    """Return a soft population capacity for long-run simulation throughput."""
+    habitable_locations = [
+        location for location in world.grid.values()
+        if getattr(location, "region_type", "") != "dungeon"
+    ]
+    return max(BASELINE_POPULATION, len(habitable_locations) * LOCATION_POPULATION_CAPACITY)
+
+
+def has_population_capacity(world: "World") -> bool:
+    return len(living_characters(world)) < population_capacity(world)
 
 
 def _location_pull_score(location: "LocationState") -> float:
@@ -60,6 +75,8 @@ def yearly_migrant_budget(
 ) -> int:
     """Return how many migrant adventurers should enter this year."""
     living_count = len(living_characters(world))
+    if living_count >= population_capacity(world):
+        return 0
     population_floor = minimum_living_population(starting_population)
     shortfall = max(0, population_floor - living_count)
     if shortfall > 0:
