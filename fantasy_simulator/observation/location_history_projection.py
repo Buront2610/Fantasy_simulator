@@ -24,6 +24,7 @@ class SupportsLocationHistory(Protocol):
     id: str
     canonical_name: str
     aliases: list[str]
+    generated_endonym: str
     recent_event_ids: list[str]
 
 
@@ -59,6 +60,25 @@ class LocationControlHistoryEntry:
 
 
 @dataclass(frozen=True)
+class LocationNameRecord:
+    """Projected location-name record assembled from canonical events and location state."""
+
+    name_id: str
+    location_id: str
+    surface: str
+    normalized_surface: str
+    name_kind: str
+    language_key: str = ""
+    community_key: str | None = None
+    faction_id: str | None = None
+    valid_from_year: int = 0
+    valid_to_year: int | None = None
+    source_event_id: str | None = None
+    etymology_id: str | None = None
+    is_primary: bool = False
+
+
+@dataclass(frozen=True)
 class LocationHistoryProjection:
     """Read model for one location's current name, aliases, and change history."""
 
@@ -68,6 +88,7 @@ class LocationHistoryProjection:
     rename_history: tuple[LocationRenameHistoryEntry, ...]
     recent_event_ids: tuple[str, ...]
     control_history: tuple[LocationControlHistoryEntry, ...] = ()
+    name_records: tuple[LocationNameRecord, ...] = ()
 
 
 def _location_by_id(
@@ -212,6 +233,121 @@ def _control_history_entries(
     return tuple(entries)
 
 
+def _normalized_surface(surface: str) -> str:
+    return surface.casefold().strip()
+
+
+def _source_language_key(entry: LocationRenameHistoryEntry) -> str:
+    value = entry.render_params.get("name_language_key")
+    return value if isinstance(value, str) else ""
+
+
+def _source_faction_id(entry: LocationRenameHistoryEntry) -> str | None:
+    for key in ("faction_id", "new_faction_id", "controlling_faction_id", "occupying_faction_id"):
+        value = entry.render_params.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
+def _append_name_record(
+    records: list[LocationNameRecord],
+    *,
+    location_id: str,
+    surface: str,
+    name_kind: str,
+    index: int,
+    language_key: str = "",
+    faction_id: str | None = None,
+    valid_from_year: int = 0,
+    valid_to_year: int | None = None,
+    source_event_id: str | None = None,
+    is_primary: bool = False,
+) -> None:
+    if not surface:
+        return
+    normalized = _normalized_surface(surface)
+    if any(record.normalized_surface == normalized and record.name_kind == name_kind for record in records):
+        return
+    records.append(
+        LocationNameRecord(
+            name_id=f"name:{location_id}:{name_kind}:{index}",
+            location_id=location_id,
+            surface=surface,
+            normalized_surface=normalized,
+            name_kind=name_kind,
+            language_key=language_key,
+            faction_id=faction_id,
+            valid_from_year=valid_from_year,
+            valid_to_year=valid_to_year,
+            source_event_id=source_event_id,
+            is_primary=is_primary,
+        )
+    )
+
+
+def _name_records(
+    location: SupportsLocationHistory,
+    rename_history: tuple[LocationRenameHistoryEntry, ...],
+) -> tuple[LocationNameRecord, ...]:
+    records: list[LocationNameRecord] = []
+    if not rename_history:
+        _append_name_record(
+            records,
+            location_id=location.id,
+            surface=location.canonical_name,
+            name_kind="canonical",
+            index=0,
+            is_primary=True,
+        )
+    else:
+        _append_name_record(
+            records,
+            location_id=location.id,
+            surface=rename_history[0].old_name,
+            name_kind="historical",
+            index=0,
+            valid_to_year=rename_history[0].year,
+            source_event_id=rename_history[0].record_id,
+        )
+        for index, entry in enumerate(rename_history, start=1):
+            next_entry = rename_history[index] if index < len(rename_history) else None
+            is_primary = next_entry is None and entry.new_name == location.canonical_name
+            _append_name_record(
+                records,
+                location_id=location.id,
+                surface=entry.new_name,
+                name_kind="canonical" if is_primary else "historical",
+                index=index,
+                language_key=_source_language_key(entry),
+                faction_id=_source_faction_id(entry),
+                valid_from_year=entry.year,
+                valid_to_year=next_entry.year if next_entry else None,
+                source_event_id=entry.record_id,
+                is_primary=is_primary,
+            )
+    generated_endonym = getattr(location, "generated_endonym", "")
+    if generated_endonym and _normalized_surface(generated_endonym) != _normalized_surface(location.canonical_name):
+        _append_name_record(
+            records,
+            location_id=location.id,
+            surface=generated_endonym,
+            name_kind="generated_endonym",
+            index=len(records),
+        )
+    for alias in location.aliases:
+        is_rename_alias = any(alias in {entry.old_name, entry.new_name} for entry in rename_history)
+        kind = "historical" if is_rename_alias else "nickname"
+        _append_name_record(
+            records,
+            location_id=location.id,
+            surface=alias,
+            name_kind=kind,
+            index=len(records),
+        )
+    return tuple(records)
+
+
 def build_location_history_projection(
     *,
     locations: Iterable[SupportsLocationHistory],
@@ -220,11 +356,13 @@ def build_location_history_projection(
 ) -> LocationHistoryProjection:
     """Build the observation read model for a single location."""
     location = _location_by_id(locations, location_id)
+    rename_history = _rename_history_entries(event_records, location.id)
     return LocationHistoryProjection(
         location_id=location.id,
         official_name=location.canonical_name,
         aliases=tuple(location.aliases),
-        rename_history=_rename_history_entries(event_records, location.id),
+        rename_history=rename_history,
         recent_event_ids=tuple(location.recent_event_ids),
         control_history=_control_history_entries(event_records, location.id),
+        name_records=_name_records(location, rename_history),
     )
