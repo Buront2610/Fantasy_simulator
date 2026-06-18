@@ -750,6 +750,7 @@ class TestShowRosterUsesBackends(unittest.TestCase):
         _show_roster(world, ctx=ctx)
 
         self.assertIn("Aldric profile", out.text)
+        self.assertIn("Personality", out.text)
         self.assertIn("Background", out.text)
         self.assertIn("Family", out.text)
         self.assertIn("Spouse: Mira", out.text)

@@ -5,6 +5,13 @@ from __future__ import annotations
 import random
 from typing import TYPE_CHECKING, Any, Dict, List
 
+from .character_personality import (
+    marriage_threshold_adjustment,
+    personality_affinity,
+    relationship_delta_from_personality,
+    render_affinity_factors,
+    romance_delta_from_personality,
+)
 from .event_causality import pair_cause_event_ids
 from .event_models import EventResult, generate_record_id
 from .event_story import prefix_description_with_story_hook
@@ -86,7 +93,10 @@ def _romance_result(
     relationship_delta: int,
 ) -> EventResult:
     cause_event_ids = _pair_history_cause_ids(world, char1, char2, event_kinds=("meeting", "romance"))
-    char1.update_mutual_relationship(char2, relationship_delta)
+    affinity = personality_affinity(char1.personality, char2.personality)
+    personality_delta = romance_delta_from_personality(char1.personality, char2.personality)
+    applied_delta = relationship_delta + personality_delta
+    char1.update_mutual_relationship(char2, applied_delta)
     desc = tr(
         description_key,
         name1=char1.name,
@@ -105,8 +115,14 @@ def _romance_result(
                 "name1": char1.name,
                 "name2": char2.name,
                 "location_id": char1.location_id,
+                "personality_affinity": affinity.score,
+                "personality_factors": render_affinity_factors(affinity.factor_keys),
+                "relationship_delta": applied_delta,
             },
             cause_event_ids,
+            personality_affinity=affinity.score,
+            personality_factor_keys=list(affinity.factor_keys),
+            relationship_delta=applied_delta,
         ),
     )
 
@@ -207,6 +223,9 @@ def resolve_marriage_event(
     rel1 = char1.get_relationship(char2.char_id)
     rel2 = char2.get_relationship(char1.char_id)
     avg_rel = (rel1 + rel2) / 2
+    threshold_adjustment = marriage_threshold_adjustment(char1.personality, char2.personality)
+    required_single = 35 + threshold_adjustment
+    required_average = 40 + threshold_adjustment
 
     if char1.spouse_id == char2.char_id and char2.spouse_id == char1.char_id:
         return _anniversary_result(char1, char2, world)
@@ -221,7 +240,13 @@ def resolve_marriage_event(
             relationship_delta=3,
         )
 
-    if char1.age < 18 or char2.age < 18 or rel1 < 35 or rel2 < 35 or avg_rel < 40:
+    if (
+        char1.age < 18
+        or char2.age < 18
+        or rel1 < required_single
+        or rel2 < required_single
+        or avg_rel < required_average
+    ):
         return _romance_result(
             char1=char1,
             char2=char2,
@@ -248,12 +273,26 @@ def _meeting_relation_tag_updates(
         tag = "rival"
     else:
         return relation_tag_updates, meeting_source_id
+    _remove_opposed_relation_tag(char1, char2.char_id, tag)
+    _remove_opposed_relation_tag(char2, char1.char_id, tag)
     char1.add_relation_tag(char2.char_id, tag)
     char2.add_relation_tag(char1.char_id, tag)
     return [
         {"source": char1.char_id, "target": char2.char_id, "tag": tag},
         {"source": char2.char_id, "target": char1.char_id, "tag": tag},
     ], meeting_source_id
+
+
+def _remove_opposed_relation_tag(character: "Character", target_id: str, tag: str) -> None:
+    opposed = {"friend": "rival", "rival": "friend"}.get(tag)
+    if opposed is None:
+        return
+    tags = character.relation_tags.get(target_id)
+    if tags is None:
+        return
+    character.relation_tags[target_id] = [current for current in tags if current != opposed]
+    if not character.relation_tags[target_id]:
+        del character.relation_tags[target_id]
 
 
 def _meeting_description_key(avg_after: int) -> str:
@@ -273,7 +312,10 @@ def resolve_meeting_event(
     rng: Any = random,
 ) -> EventResult:
     """Resolve a meeting and its relationship-tag side effects."""
-    delta = rng.randint(-15, 25)
+    base_delta = rng.randint(-15, 25)
+    affinity = personality_affinity(char1.personality, char2.personality)
+    personality_delta = relationship_delta_from_personality(char1.personality, char2.personality)
+    delta = base_delta + personality_delta
     char1.update_relationship(char2.char_id, delta)
     char2.update_relationship(char1.char_id, delta + rng.randint(-5, 5))
 
@@ -324,8 +366,14 @@ def resolve_meeting_event(
                 "relationship_a": rel1_after,
                 "relationship_b": rel2_after,
                 "relationship_avg": avg_after,
+                "personality_affinity": affinity.score,
+                "personality_factors": render_affinity_factors(affinity.factor_keys),
+                "relationship_delta": delta,
                 "story_hook_key": story_hook_key,
             },
+            "personality_affinity": affinity.score,
+            "personality_factor_keys": list(affinity.factor_keys),
+            "relationship_delta": delta,
             **({"record_id": meeting_source_id} if meeting_source_id is not None else {}),
         },
     )

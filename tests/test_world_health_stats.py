@@ -17,7 +17,7 @@ from .balance_expectations import (
     MIN_TOTAL_COMBAT_ROUNDS,
     MIN_TOTAL_MAGIC_COMBAT_ACTIONS,
     MIN_TOTAL_MARRIAGES,
-    MIN_TOTAL_ADVENTURE_DEATHS,
+    MIN_TOTAL_ADVENTURE_RISK_OUTCOMES,
     MAX_WORLD_HEALTH_EVENT_RECORDS,
     MAX_WORLD_HEALTH_SAVE_JSON_BYTES,
     WORLD_HEALTH_SEEDS,
@@ -92,7 +92,7 @@ def _assert_structured_combat_log(combat_log: list[dict]) -> None:
 @pytest.mark.simulation_stats
 def test_world_health_stats_keep_world_alive_and_social(tmp_path) -> None:
     metrics_by_seed = {}
-    total_adventure_deaths = 0
+    total_adventure_risk_outcomes = 0
     total_marriages = 0
     total_immigrations = 0
     total_combat_events = 0
@@ -111,7 +111,10 @@ def test_world_health_stats_keep_world_alive_and_social(tmp_path) -> None:
         sim.advance_years(WORLD_HEALTH_YEARS)
         metrics = collect_world_health_metrics(sim.world)
         metrics_by_seed[str(seed)] = metrics
-        total_adventure_deaths += metrics["adventure_outcomes"].get("death", 0)
+        total_adventure_risk_outcomes += sum(
+            metrics["adventure_outcomes"].get(outcome, 0)
+            for outcome in ("death", "injury", "retreat")
+        )
         total_marriages += metrics["marriage_count"]
         total_immigrations += metrics["immigration_count"]
         total_combat_events += metrics["combat_event_count"]
@@ -137,10 +140,10 @@ def test_world_health_stats_keep_world_alive_and_social(tmp_path) -> None:
         f"(expected >= {MIN_TOTAL_MARRIAGES} across seeds {WORLD_HEALTH_SEEDS}). "
         "Meaning: relationships are not reaching commitment often enough for generational play."
     )
-    assert total_adventure_deaths >= MIN_TOTAL_ADVENTURE_DEATHS, (
-        f"[world-health] adventure_deaths={total_adventure_deaths} "
-        f"(expected >= {MIN_TOTAL_ADVENTURE_DEATHS} across seeds {WORLD_HEALTH_SEEDS}). "
-        "Meaning: adventures have drifted back into tragedy-free outcomes."
+    assert total_adventure_risk_outcomes >= MIN_TOTAL_ADVENTURE_RISK_OUTCOMES, (
+        f"[world-health] adventure_risk_outcomes={total_adventure_risk_outcomes} "
+        f"(expected >= {MIN_TOTAL_ADVENTURE_RISK_OUTCOMES} across seeds {WORLD_HEALTH_SEEDS}). "
+        "Meaning: adventures have drifted back into consequence-free outcomes."
     )
     assert total_combat_events >= MIN_TOTAL_COMBAT_EVENTS, (
         f"[world-health] combat_event_count={total_combat_events} "

@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..character_founder_background import render_founder_summary
+from ..character_personality import render_personality_summary
 from ..combat_log_index import CombatLogEntryView, build_combat_log_index
 from ..i18n import tr, tr_term
 from ..world import World
@@ -98,6 +99,7 @@ def _profile_summary_lines(world: World, character: Any) -> list[str]:
             charisma=getattr(character, "charisma", 0),
             constitution=getattr(character, "constitution", 0),
         ),
+        tr("roster_profile_personality", summary=render_personality_summary(character.personality)),
     ]
 
 

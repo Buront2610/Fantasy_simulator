@@ -7,6 +7,7 @@ from typing import Any, Callable, Dict, Sequence
 
 from .character import Character, random_stats
 from .character_founder_background import attach_founder_background
+from .character_personality import generate_personality_for_character
 from .character_creator_naming import GENDERS, random_name
 from .character_templates import TEMPLATES
 from .content.setting_bundle import NamingRulesDefinition
@@ -77,6 +78,7 @@ def create_random_character(
         charisma=stats["charisma"],
         constitution=stats["constitution"],
     )
+    char.personality = generate_personality_for_character(char)
     add_origin_history(char, founder_background=founder_background)
     return char
 
@@ -126,5 +128,6 @@ def create_template_character(
         charisma=stats["charisma"],
         constitution=stats["constitution"],
     )
+    char.personality = generate_personality_for_character(char)
     add_origin_history(char, founder_background=founder_background)
     return char

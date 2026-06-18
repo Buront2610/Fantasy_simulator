@@ -18,6 +18,7 @@ from .character_domain import (
     clamp_skill_level,
 )
 from .character_lifespan import legacy_lifespan_years
+from .character_personality import normalize_personality
 from .character_presentation import character_stat_block, random_stats as roll_random_stats
 from .character_serialization import deserialize_character, serialize_character
 from .content.world_data import NAME_TO_LOCATION_ID, fallback_location_id
@@ -71,6 +72,7 @@ class Character:
         injury_status: str = "none",
         active_adventure_id: Optional[str] = None,
         founder_background: Optional[Dict[str, str]] = None,
+        personality: Optional[Dict[str, int]] = None,
         relation_tags: Optional[Dict[str, List[str]]] = None,
         relation_tag_sources: Optional[Dict[str, List[str]]] = None,
         rng: Any = None,
@@ -82,11 +84,7 @@ class Character:
         else:
             self.char_id = uuid.uuid4().hex[:8]
 
-        self.name = name
-        self.age = age
-        self.gender = gender
-        self.race = race
-        self.job = job
+        self.name, self.age, self.gender, self.race, self.job = name, age, gender, race, job
 
         self._abilities = CharacterAbilities(
             strength=strength,
@@ -115,6 +113,7 @@ class Character:
         self.injury_status = injury_status if injury_status in self.VALID_INJURY_STATUSES else "none"
         self.active_adventure_id = active_adventure_id
         self.founder_background: Optional[Dict[str, str]] = dict(founder_background) if founder_background else None
+        self.personality: Dict[str, int] = normalize_personality(personality)
         self.relation_tags: Dict[str, List[str]] = {
             target_id: list(tags)
             for target_id, tags in (relation_tags or {}).items()

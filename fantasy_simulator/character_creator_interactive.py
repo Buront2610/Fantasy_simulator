@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Protocol
+from typing import Any, Dict, List, Protocol
 
 from .character import Character
 from .character_creator_builders import add_origin_history
 from .character_creator_naming import GENDERS, random_name
+from .character_personality import PERSONALITY_TRAITS, generate_personality, normalize_personality
 from .i18n import tr
 
 
@@ -45,6 +46,9 @@ class _StdOutput:
 
 
 class _StdInteractiveContext:
+    inp: _InteractiveInput
+    out: _InteractiveOutput
+
     def __init__(self) -> None:
         self.inp = _StdInput()
         self.out = _StdOutput()
@@ -57,6 +61,8 @@ def _default_interactive_ctx(ctx: InteractiveContext | None) -> InteractiveConte
 
 
 class CharacterCreatorInteractiveMixin:
+    naming_rules: Any
+
     def _require_race_and_job_entries(
         self,
     ) -> tuple[List[tuple[str, str, Dict[str, int]]], List[tuple[str, str, List[str]]]]:
@@ -109,7 +115,23 @@ class CharacterCreatorInteractiveMixin:
         job_skills = next((entry[2] for entry in job_entries if entry[0] == job), [])
         skills = {skill: 1 for skill in job_skills}
 
-        char = Character(name=name, age=age, gender=gender, race=race, job=job, skills=skills, **stats)
+        personality = self._allocate_personality(ctx=ctx)
+
+        char = Character(
+            name=name,
+            age=age,
+            gender=gender,
+            race=race,
+            job=job,
+            skills=skills,
+            personality=personality,
+            strength=stats["strength"],
+            intelligence=stats["intelligence"],
+            dexterity=stats["dexterity"],
+            wisdom=stats["wisdom"],
+            charisma=stats["charisma"],
+            constitution=stats["constitution"],
+        )
         add_origin_history(char, founder_background=True)
         out.print_line(f"\n  {tr('character_created')}")
         out.print_line(char.stat_block())
@@ -184,3 +206,28 @@ class CharacterCreatorInteractiveMixin:
                 allocated[stat] = val
                 break
         return allocated
+
+    @staticmethod
+    def _allocate_personality(ctx: InteractiveContext | None = None) -> Dict[str, int]:
+        ctx = _default_interactive_ctx(ctx)
+        raw = ctx.inp.read_line(f"  > {tr('customize_personality')}: ").strip().lower()
+        if raw != "y":
+            return generate_personality()
+
+        values: Dict[str, int] = {}
+        for trait in PERSONALITY_TRAITS:
+            label = tr(f"personality_trait_name_{trait}")
+            while True:
+                raw_val = ctx.inp.read_line(
+                    f"  > {label:15s} (0-100, default 50): "
+                ).strip()
+                if not raw_val:
+                    values[trait] = 50
+                    break
+                try:
+                    values[trait] = int(raw_val)
+                except ValueError:
+                    ctx.out.print_line(f"  {tr('please_enter_number')}")
+                    continue
+                break
+        return normalize_personality(values)

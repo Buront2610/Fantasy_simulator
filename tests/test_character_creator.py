@@ -94,6 +94,19 @@ class TestCharacterCreator:
 
         assert rng_with_background.random() == rng_without_background.random()
 
+    def test_random_character_gets_personality_profile(self):
+        creator = CharacterCreator()
+        char = creator.create_random(name="Aldric", rng=random.Random(42))
+
+        assert set(char.personality) == {
+            "openness",
+            "discipline",
+            "extraversion",
+            "agreeableness",
+            "stability",
+        }
+        assert all(0 <= value <= 100 for value in char.personality.values())
+
 
 class TestCreateRandomReproducibility:
     def test_same_seed_produces_same_character(self):
@@ -393,3 +406,32 @@ class TestInteractiveStatAllocation:
 
         assert stats["strength"] == 20
         assert sum(stats.values()) == 70
+
+    def test_manual_personality_allocation_clamps_values(self):
+        creator = CharacterCreator()
+
+        class ScriptedInput:
+            def __init__(self, responses):
+                self._responses = iter(responses)
+
+            def read_line(self, prompt: str = "") -> str:
+                return next(self._responses)
+
+        class BufferOut:
+            def print_line(self, text: str = "") -> None:
+                pass
+
+        ctx = SimpleNamespace(
+            inp=ScriptedInput(["y", "120", "-5", "70", "65", "40"]),
+            out=BufferOut(),
+        )
+
+        personality = creator._allocate_personality(ctx=ctx)
+
+        assert personality == {
+            "openness": 100,
+            "discipline": 0,
+            "extraversion": 70,
+            "agreeableness": 65,
+            "stability": 40,
+        }

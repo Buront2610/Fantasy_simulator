@@ -198,6 +198,35 @@ class TestEventMeeting:
         assert "pleasant exchange" in result.description
         assert "polite nod" not in result.description
 
+    def test_personality_affinity_changes_meeting_relationship_delta(self, es, world):
+        neutral_a = _make_char("Neutral A")
+        neutral_b = _make_char("Neutral B")
+        warm_a = _make_char("Warm A")
+        warm_b = _make_char("Warm B")
+        warm_profile = {
+            "openness": 75,
+            "discipline": 70,
+            "extraversion": 65,
+            "agreeableness": 90,
+            "stability": 80,
+        }
+        warm_a.personality = dict(warm_profile)
+        warm_b.personality = dict(warm_profile)
+        for char in (neutral_a, neutral_b, warm_a, warm_b):
+            world.add_character(char)
+
+        neutral = es.event_meeting(neutral_a, neutral_b, world, rng=random.Random(0))
+        warm = es.event_meeting(warm_a, warm_b, world, rng=random.Random(0))
+
+        neutral_avg = round(
+            (neutral_a.get_relationship(neutral_b.char_id) + neutral_b.get_relationship(neutral_a.char_id)) / 2
+        )
+        warm_avg = round((warm_a.get_relationship(warm_b.char_id) + warm_b.get_relationship(warm_a.char_id)) / 2)
+        assert warm_avg > neutral_avg
+        assert warm.metadata["personality_affinity"] > neutral.metadata["personality_affinity"]
+        assert "shared_kindness" in warm.metadata["personality_factor_keys"]
+        assert warm.metadata["relationship_delta"] > neutral.metadata["relationship_delta"]
+
 
 # ---------------------------------------------------------------------------
 # event_battle
@@ -671,6 +700,32 @@ class TestEventMarriage:
         assert result.event_type == "romance"
         assert char_a.spouse_id == outsider.char_id
         assert char_b.spouse_id is None
+
+    def test_personality_affinity_lowers_marriage_threshold(self, es, world):
+        neutral_a = _make_char("Neutral A")
+        neutral_b = _make_char("Neutral B")
+        warm_a = _make_char("Warm A")
+        warm_b = _make_char("Warm B")
+        warm_profile = {
+            "openness": 75,
+            "discipline": 70,
+            "extraversion": 65,
+            "agreeableness": 90,
+            "stability": 80,
+        }
+        warm_a.personality = dict(warm_profile)
+        warm_b.personality = dict(warm_profile)
+        for first, second in ((neutral_a, neutral_b), (warm_a, warm_b)):
+            first.update_relationship(second.char_id, 36)
+            second.update_relationship(first.char_id, 36)
+            world.add_character(first)
+            world.add_character(second)
+
+        neutral = es.event_marriage(neutral_a, neutral_b, world, rng=random.Random(1))
+        warm = es.event_marriage(warm_a, warm_b, world, rng=random.Random(1))
+
+        assert neutral.event_type == "romance"
+        assert warm.event_type == "marriage"
 
 
 class TestEventBirth:

@@ -506,39 +506,43 @@ def _restore_locale():
 def _assert_seeded_acceptance_bundle(bundle: dict[str, Any], *, locale: str) -> None:
     assert bundle["year"] == 1002
     assert bundle["month"] == 1
-    assert bundle["event_record_count"] == 13
-    assert bundle["event_log_count"] == 13
+    assert bundle["event_record_count"] == 16
+    assert bundle["event_log_count"] == 16
     assert bundle["kind_counts"] == {
-        "adventure_started": 2,
+        "adventure_started": 3,
         "aging": 2,
         "battle": 1,
         "injury_recovery": 1,
-        "journey": 1,
+        "journey": 3,
         "meeting": 3,
-        "romance": 2,
-        "skill_training": 1,
+        "romance": 1,
+        "skill_training": 2,
     }
     assert len(bundle["monthly_notable"]) == 0
 
     if locale == "en":
         assert bundle["summary_lines"][0] == "  SIMULATION SUMMARY - Aethoria"
         assert bundle["summary_lines"][1] == "  Final year: 1002"
-        assert bundle["yearly_overview"] == ["    Total events recorded: 5"]
+        assert bundle["yearly_overview"] == ["    Total events recorded: 8"]
         assert bundle["yearly_regions"] == [
-            "    The Verdant Vale: 4 event(s)",
+            "    The Verdant Vale: 7 event(s)",
             "    Aethoria Capital: 1 event(s)",
-            "    Sunken Ruins: 1 event(s)",
+            "    Hearthglow Town: 1 event(s)",
+            "    Obsidian Crater: 1 event(s)",
+            "    Sandstone Outpost: 1 event(s)",
         ]
         assert bundle["monthly_rumors"][-1] == "    Total events: 1"
         assert "  Notable moments:" in bundle["summary_lines"]
     else:
         assert bundle["summary_lines"][0] == "  シミュレーション要約 - Aethoria"
         assert bundle["summary_lines"][1] == "  最終年: 1002"
-        assert bundle["yearly_overview"] == ["    記録イベント数: 5"]
+        assert bundle["yearly_overview"] == ["    記録イベント数: 8"]
         assert bundle["yearly_regions"] == [
-            "    The Verdant Vale: 4件の出来事",
+            "    The Verdant Vale: 7件の出来事",
             "    Aethoria Capital: 1件の出来事",
-            "    Sunken Ruins: 1件の出来事",
+            "    Hearthglow Town: 1件の出来事",
+            "    Obsidian Crater: 1件の出来事",
+            "    Sandstone Outpost: 1件の出来事",
         ]
         assert bundle["monthly_rumors"][-1] == "    イベント総数: 1"
         assert "  主な出来事:" in bundle["summary_lines"]
@@ -546,22 +550,21 @@ def _assert_seeded_acceptance_bundle(bundle: dict[str, Any], *, locale: str) -> 
 
 def _assert_projection_contract(contract: dict[str, Any]) -> None:
     assert contract["summary"] == {
-        "total_events": 34,
+        "total_events": 39,
         "kind_counts": {
-            "adventure_arrived": 2,
-            "adventure_discovery": 1,
-            "adventure_injured": 1,
-            "adventure_returned": 1,
-            "adventure_started": 2,
-            "adventure_update": 1,
+            "adventure_arrived": 4,
+            "adventure_choice": 1,
+            "adventure_discovery": 4,
+            "adventure_returned": 3,
+            "adventure_started": 4,
             "aging": 4,
             "battle": 1,
-            "discovery": 2,
+            "discovery": 3,
             "injury_recovery": 1,
-            "journey": 6,
-            "meeting": 5,
-            "romance": 2,
-            "skill_training": 5,
+            "journey": 7,
+            "meeting": 3,
+            "romance": 1,
+            "skill_training": 3,
         },
     }
     assert len(contract["topology"]["site_ids"]) == 25
@@ -574,8 +577,8 @@ def _assert_projection_contract(contract: dict[str, Any]) -> None:
     assert ("discovery",) in contract["event_tags"]
     assert ("journey",) in contract["event_tags"]
     assert contract["relation_tags"] == [
-        ("1e27a1c0", "7f26144b", ("rival",)),
-        ("7f26144b", "1e27a1c0", ("rival",)),
+        ("1e27a1c0", "7f26144b", ("friend",)),
+        ("7f26144b", "1e27a1c0", ("friend",)),
     ]
     assert contract["detail_projection"] == {
         "location_id": "loc_elderroot_forest",
@@ -583,17 +586,16 @@ def _assert_projection_contract(contract: dict[str, Any]) -> None:
     }
     assert contract["memory_tags"] == [
         ("loc_ironvein_mine", ("trace",)),
-        ("loc_the_grey_pass", ("alias", "memorial", "trace")),
+        ("loc_obsidian_crater", ("trace",)),
+        ("loc_the_grey_pass", ("trace",)),
     ]
-    assert contract["report_selection"]["yearly"]["total_events"] == 3
+    assert contract["report_selection"]["yearly"]["total_events"] == 8
     assert contract["report_selection"]["yearly"]["deaths_this_year"] == 0
     assert contract["report_selection"]["monthly"]["year"] == 1004
     assert contract["report_selection"]["monthly"]["month"] == 3
-    assert contract["report_selection"]["monthly"]["total_events"] == 1
+    assert contract["report_selection"]["monthly"]["total_events"] == 0
     assert contract["report_selection"]["monthly"]["notable_records"] == []
-    assert contract["report_selection"]["monthly"]["location_event_counts"] == {
-        "loc_dusty_crossroads": 1,
-    }
+    assert contract["report_selection"]["monthly"]["location_event_counts"] == {}
 
 
 def test_seeded_acceptance_bundle_matches_english_projection() -> None:

@@ -322,10 +322,38 @@ class TestSerialization:
             "strength", "intelligence", "dexterity", "wisdom",
             "charisma", "constitution", "skills", "relationships",
             "alive", "location_id", "favorite", "spotlighted", "playable",
-            "history", "spouse_id",
+            "history", "spouse_id", "personality",
             "injury_status", "active_adventure_id", "founder_background",
         }
         assert expected_keys.issubset(set(d.keys()))
+
+    def test_default_personality_is_neutral(self):
+        c = Character("Test", 20, "Male", "Human", "Warrior")
+
+        assert c.personality == {
+            "openness": 50,
+            "discipline": 50,
+            "extraversion": 50,
+            "agreeableness": 50,
+            "stability": 50,
+        }
+
+    def test_personality_round_trip_and_clamping(self):
+        char = Character(
+            "Test",
+            20,
+            "Male",
+            "Human",
+            "Warrior",
+            personality={"openness": 120, "discipline": -5, "extraversion": 70},
+        )
+
+        restored = Character.from_dict(char.to_dict())
+
+        assert restored.personality["openness"] == 100
+        assert restored.personality["discipline"] == 0
+        assert restored.personality["extraversion"] == 70
+        assert restored.personality["agreeableness"] == 50
 
     def test_round_trip(self, hero):
         d = hero.to_dict()
