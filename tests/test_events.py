@@ -227,6 +227,52 @@ class TestEventMeeting:
         assert "shared_kindness" in warm.metadata["personality_factor_keys"]
         assert warm.metadata["relationship_delta"] > neutral.metadata["relationship_delta"]
 
+    def test_shared_catalyst_can_soften_bad_personality_affinity(self, es, world):
+        plain_a = _make_char("Plain A")
+        plain_b = _make_char("Plain B")
+        saved_a = _make_char("Saved A")
+        rescuer_b = _make_char("Rescuer B")
+        difficult_a = {
+            "openness": 100,
+            "discipline": 0,
+            "extraversion": 100,
+            "agreeableness": 20,
+            "stability": 20,
+        }
+        difficult_b = {
+            "openness": 0,
+            "discipline": 100,
+            "extraversion": 0,
+            "agreeableness": 20,
+            "stability": 20,
+        }
+        for character, personality in (
+            (plain_a, difficult_a),
+            (saved_a, difficult_a),
+            (plain_b, difficult_b),
+            (rescuer_b, difficult_b),
+        ):
+            character.personality = dict(personality)
+            world.add_character(character)
+        rescue = world.record_event(WorldEventRecord(
+            record_id="rescue_ab",
+            kind="dying_rescued",
+            year=world.year,
+            primary_actor_id=saved_a.char_id,
+            secondary_actor_ids=[rescuer_b.char_id],
+            description="Rescuer B saved Saved A.",
+        ))
+
+        plain = es.event_marriage(plain_a, plain_b, world, rng=random.Random(1))
+        catalyzed = es.event_marriage(saved_a, rescuer_b, world, rng=random.Random(1))
+
+        assert plain.event_type == "romance"
+        assert catalyzed.event_type == "romance"
+        assert catalyzed.metadata["relationship_delta"] > plain.metadata["relationship_delta"]
+        assert catalyzed.metadata["relationship_catalyst_bonus"] > 0
+        assert "rescue_debt" in catalyzed.metadata["relationship_catalyst_factor_keys"]
+        assert rescue.record_id in catalyzed.metadata["cause_event_ids"]
+
 
 # ---------------------------------------------------------------------------
 # event_battle
@@ -726,6 +772,49 @@ class TestEventMarriage:
 
         assert neutral.event_type == "romance"
         assert warm.event_type == "marriage"
+
+    def test_shared_catalyst_can_bridge_bad_affinity_to_marriage(self, es, world):
+        plain_a = _make_char("Plain A")
+        plain_b = _make_char("Plain B")
+        saved_a = _make_char("Saved A")
+        rescuer_b = _make_char("Rescuer B")
+        difficult_a = {
+            "openness": 100,
+            "discipline": 0,
+            "extraversion": 100,
+            "agreeableness": 20,
+            "stability": 20,
+        }
+        difficult_b = {
+            "openness": 0,
+            "discipline": 100,
+            "extraversion": 0,
+            "agreeableness": 20,
+            "stability": 20,
+        }
+        for first, second in ((plain_a, plain_b), (saved_a, rescuer_b)):
+            first.personality = dict(difficult_a)
+            second.personality = dict(difficult_b)
+            first.update_relationship(second.char_id, 40)
+            second.update_relationship(first.char_id, 40)
+            world.add_character(first)
+            world.add_character(second)
+        rescue = world.record_event(WorldEventRecord(
+            record_id="rescue_for_marriage",
+            kind="dying_rescued",
+            year=world.year,
+            primary_actor_id=saved_a.char_id,
+            secondary_actor_ids=[rescuer_b.char_id],
+            description="Rescuer B saved Saved A.",
+        ))
+
+        plain = es.event_marriage(plain_a, plain_b, world, rng=random.Random(1))
+        catalyzed = es.event_marriage(saved_a, rescuer_b, world, rng=random.Random(1))
+
+        assert plain.event_type == "romance"
+        assert catalyzed.event_type == "marriage"
+        assert rescue.record_id in catalyzed.metadata["cause_event_ids"]
+        assert catalyzed.metadata["relationship_catalyst_bonus"] > 0
 
 
 class TestEventBirth:
