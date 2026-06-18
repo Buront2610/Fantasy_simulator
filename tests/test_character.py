@@ -323,7 +323,7 @@ class TestSerialization:
             "charisma", "constitution", "skills", "relationships",
             "alive", "location_id", "favorite", "spotlighted", "playable",
             "history", "spouse_id",
-            "injury_status", "active_adventure_id",
+            "injury_status", "active_adventure_id", "founder_background",
         }
         assert expected_keys.issubset(set(d.keys()))
 
@@ -415,6 +415,7 @@ class TestSerialization:
                 "spouse_id": "ally_001",
                 "injury_status": "injured",
                 "active_adventure_id": "adv_001",
+                "founder_background": {"family_origin": "minor_noble"},
             },
             "relationship_details": {
                 "ally_001": {
@@ -430,6 +431,7 @@ class TestSerialization:
         assert restored.strength == 70
         assert restored.favorite is True
         assert restored.history == ["Nested history"]
+        assert restored.founder_background == {"family_origin": "minor_noble"}
         assert restored.relationships == {"ally_001": 33}
         assert restored.relation_tags == {"ally_001": ["friend", "savior"]}
         assert restored.relation_tag_sources["ally_001:friend"] == ["evt_001"]

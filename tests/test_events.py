@@ -685,6 +685,7 @@ class TestEventBirth:
         assert result.event_type == "birth"
         assert child is not None
         assert child.age == 0
+        assert child.founder_background is None
         assert child.location_id == char_a.location_id
         assert char_a.has_relation_tag(child.char_id, "child")
         assert char_b.has_relation_tag(child.char_id, "child")

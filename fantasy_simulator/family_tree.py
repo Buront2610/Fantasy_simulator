@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Iterable
 
+from .character_founder_background import render_founder_summary
 from .i18n import tr, tr_term
 
 
@@ -38,8 +39,15 @@ class FamilyCoupleView:
 
 
 @dataclass(frozen=True)
+class FamilyFounderView:
+    member: FamilyMemberView
+    summary: str
+
+
+@dataclass(frozen=True)
 class FamilyTreeView:
     couples: tuple[FamilyCoupleView, ...]
+    founders: tuple[FamilyFounderView, ...]
     married_couple_count: int
     child_count: int
     children_per_married_couple: float
@@ -85,11 +93,13 @@ def build_family_tree(world: Any) -> FamilyTreeView:
         _couple_view(key, members, characters_by_id, marriage_years, children_by_couple, active_marriages)
         for key in all_couple_keys
     )
+    founders = _founder_views(characters, members)
     married_couples = [couple for couple in couples if couple.has_marriage]
     total_children = sum(couple.child_count for couple in married_couples)
     average = total_children / len(married_couples) if married_couples else 0.0
     return FamilyTreeView(
         couples=couples,
+        founders=founders,
         married_couple_count=len(married_couples),
         child_count=total_children,
         children_per_married_couple=round(average, 2),
@@ -131,9 +141,19 @@ def render_family_tree_lines(world: Any) -> list[str]:
             couples_with_children=view.married_couples_with_children,
         ),
     ]
-    if not view.couples:
+    if not view.couples and not view.founders:
         lines.append(tr("family_tree_empty"))
         return lines
+    if view.founders:
+        lines.append(tr("family_tree_founders_header"))
+        for founder in view.founders:
+            lines.append(
+                tr(
+                    "family_tree_founder_line",
+                    member=_member_label(founder.member),
+                    summary=founder.summary,
+                )
+            )
     for couple in view.couples:
         lines.append(_render_couple_line(couple))
         if not couple.children:
@@ -203,6 +223,29 @@ def _add_relation_tag_children(characters: Iterable[Any], children_by_couple: di
         ]
         if len(parent_ids) >= 2:
             children_by_couple.setdefault(_couple_key(parent_ids[0], parent_ids[1]), set()).add(_char_id(child))
+
+
+def _founder_views(
+    characters: Iterable[Any],
+    members: dict[str, FamilyMemberView],
+) -> tuple[FamilyFounderView, ...]:
+    founders: list[FamilyFounderView] = []
+    for character in characters:
+        background = getattr(character, "founder_background", None)
+        member = members.get(_char_id(character))
+        if not isinstance(background, dict) or member is None:
+            continue
+        if _has_parent_tag(character):
+            continue
+        founders.append(FamilyFounderView(member=member, summary=render_founder_summary(background)))
+    return tuple(sorted(founders, key=lambda founder: founder.member.name))
+
+
+def _has_parent_tag(character: Any) -> bool:
+    return any(
+        isinstance(tags, list) and "parent" in tags
+        for tags in getattr(character, "relation_tags", {}).values()
+    )
 
 
 def _member_name(member: FamilyMemberView | None, fallback_id: str) -> str:

@@ -110,7 +110,7 @@ class CharacterCreatorInteractiveMixin:
         skills = {skill: 1 for skill in job_skills}
 
         char = Character(name=name, age=age, gender=gender, race=race, job=job, skills=skills, **stats)
-        add_origin_history(char)
+        add_origin_history(char, founder_background=True)
         out.print_line(f"\n  {tr('character_created')}")
         out.print_line(char.stat_block())
         return char

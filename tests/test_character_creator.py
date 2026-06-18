@@ -61,6 +61,39 @@ class TestCharacterCreator:
             job=tr_term(char.job),
         )
 
+    def test_random_character_gets_founder_background_and_history(self):
+        set_locale("en")
+        creator = CharacterCreator()
+        char = creator.create_random(name="Aldric", rng=random.Random(42))
+
+        assert char.founder_background is not None
+        assert {
+            "family_origin",
+            "family_status",
+            "upbringing",
+            "pre_adventure",
+            "reputation",
+        } <= set(char.founder_background)
+        assert any(entry.startswith("Family background:") for entry in char.history)
+        assert any(entry.startswith("Before adventuring:") for entry in char.history)
+
+    def test_founder_background_can_be_disabled_for_non_founders(self):
+        creator = CharacterCreator()
+        char = creator.create_random(name="Child", rng=random.Random(42), founder_background=False)
+
+        assert char.founder_background is None
+        assert len(char.history) == 1
+
+    def test_founder_background_does_not_consume_caller_rng(self):
+        creator = CharacterCreator()
+        rng_with_background = random.Random(42)
+        rng_without_background = random.Random(42)
+
+        creator.create_random(rng=rng_with_background, founder_background=True)
+        creator.create_random(rng=rng_without_background, founder_background=False)
+
+        assert rng_with_background.random() == rng_without_background.random()
+
 
 class TestCreateRandomReproducibility:
     def test_same_seed_produces_same_character(self):

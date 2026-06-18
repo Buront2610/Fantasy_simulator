@@ -127,3 +127,33 @@ def test_render_family_tree_lines_includes_summary_and_children() -> None:
     assert "bond=+9" in lines[2]
     assert any("Ari" in line and "Bea" in line for line in lines)
     assert any("Eli" in line for line in lines)
+
+
+def test_family_tree_renders_founder_backgrounds() -> None:
+    world = World()
+    founder = _character("Ari", "founder")
+    founder.founder_background = {
+        "family_origin": "minor_noble",
+        "family_status": "fallen",
+        "upbringing": "strict_training",
+        "pre_adventure": "local_guard",
+        "reputation": "promising",
+    }
+    child = _character("Eli", "child", age=2)
+    child.add_relation_tag(founder.char_id, "parent")
+    child.founder_background = {
+        "family_origin": "farmstead",
+        "family_status": "ordinary",
+        "upbringing": "quiet_village",
+        "pre_adventure": "quiet_departure",
+        "reputation": "unproven",
+    }
+    for character in (founder, child):
+        world.add_character(character)
+
+    tree = build_family_tree(world)
+    lines = render_family_tree_lines(world)
+
+    assert [item.member.char_id for item in tree.founders] == ["founder"]
+    assert any("Founder generation" in line for line in lines)
+    assert any("minor noble line" in line for line in lines)

@@ -104,6 +104,7 @@ def deserialize_character(
             "active_adventure_id",
             data.get("active_adventure_id"),
         ),
+        founder_background=narrative_payload.get("founder_background", data.get("founder_background")),
         relation_tags=relation_tags,
         relation_tag_sources=relation_tag_sources,
     )

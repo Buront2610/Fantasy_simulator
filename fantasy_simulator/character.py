@@ -70,6 +70,7 @@ class Character:
         spouse_id: Optional[str] = None,
         injury_status: str = "none",
         active_adventure_id: Optional[str] = None,
+        founder_background: Optional[Dict[str, str]] = None,
         relation_tags: Optional[Dict[str, List[str]]] = None,
         relation_tag_sources: Optional[Dict[str, List[str]]] = None,
         rng: Any = None,
@@ -113,6 +114,7 @@ class Character:
         self.spouse_id = spouse_id
         self.injury_status = injury_status if injury_status in self.VALID_INJURY_STATUSES else "none"
         self.active_adventure_id = active_adventure_id
+        self.founder_background: Optional[Dict[str, str]] = dict(founder_background) if founder_background else None
         self.relation_tags: Dict[str, List[str]] = {
             target_id: list(tags)
             for target_id, tags in (relation_tags or {}).items()
@@ -147,6 +149,7 @@ class Character:
             spouse_id=self.spouse_id,
             injury_status=self.injury_status,
             active_adventure_id=self.active_adventure_id,
+            founder_background=dict(self.founder_background) if self.founder_background is not None else None,
         )
 
     @property
@@ -307,11 +310,7 @@ class Character:
         char_name_lookup: Optional[Dict[str, str]] = None,
         location_resolver: Callable[[str], str] | None = None,
     ) -> str:
-        return character_stat_block(
-            self,
-            char_name_lookup=char_name_lookup,
-            location_resolver=location_resolver,
-        )
+        return character_stat_block(self, char_name_lookup=char_name_lookup, location_resolver=location_resolver)
 
 
 def random_stats(

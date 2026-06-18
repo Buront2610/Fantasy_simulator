@@ -58,6 +58,19 @@ def _string_list_mapping_payload(payload: Any, *, field_name: str) -> Dict[str, 
     }
 
 
+def _optional_string_mapping_payload(payload: Any, *, field_name: str) -> Optional[Dict[str, str]]:
+    if payload is None:
+        return None
+    if not isinstance(payload, Mapping):
+        raise ValueError(f"{field_name} must be a mapping of strings when provided")
+    normalized: Dict[str, str] = {}
+    for key, value in payload.items():
+        if not isinstance(value, str):
+            raise ValueError(f"{field_name}.{key} must be a string")
+        normalized[str(key)] = value
+    return normalized
+
+
 @dataclass(frozen=True)
 class CharacterAbilities:
     strength: int = 10
@@ -106,12 +119,15 @@ class CharacterNarrativeState:
     spouse_id: Optional[str] = None
     injury_status: str = "none"
     active_adventure_id: Optional[str] = None
+    founder_background: Optional[Dict[str, str]] = None
 
     def __post_init__(self) -> None:
         history = [str(entry) for entry in self.history]
         object.__setattr__(self, "history", history)
         injury_status = self.injury_status if self.injury_status in VALID_INJURY_STATUSES else "none"
         object.__setattr__(self, "injury_status", injury_status)
+        if self.founder_background is not None:
+            object.__setattr__(self, "founder_background", dict(self.founder_background))
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -122,6 +138,7 @@ class CharacterNarrativeState:
             "spouse_id": self.spouse_id,
             "injury_status": self.injury_status,
             "active_adventure_id": self.active_adventure_id,
+            "founder_background": dict(self.founder_background) if self.founder_background is not None else None,
         }
 
     @classmethod
@@ -136,6 +153,10 @@ class CharacterNarrativeState:
             active_adventure_id=_optional_string_payload(
                 data.get("active_adventure_id"),
                 field_name="active_adventure_id",
+            ),
+            founder_background=_optional_string_mapping_payload(
+                data.get("founder_background"),
+                field_name="founder_background",
             ),
         )
 

@@ -75,7 +75,7 @@ def resolve_birth_event(
 def _create_child(parent1: "Character", parent2: "Character", world: "World", rng: Any) -> "Character":
     creator = CharacterCreator(setting_bundle=world.setting_bundle)
     region = parent1.location_id or parent2.location_id or None
-    child = creator.create_random(rng=rng, region=region)
+    child = creator.create_random(rng=rng, region=region, founder_background=False)
     child.age = 0
     child.location_id = parent1.location_id or parent2.location_id
     child.race = rng.choice([parent1.race, parent2.race])
