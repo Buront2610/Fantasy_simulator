@@ -478,7 +478,104 @@ class TestGetCharacterStory:
 
         assert "Canonical story event" in story
         assert "Born beneath a comet." in story
-        assert story.index("Canonical story event") < story.index("Born beneath a comet.")
+        assert story.index("Born beneath a comet.") < story.index("Canonical story event")
+
+    def test_story_hides_legacy_year_lines_when_canonical_records_exist(self):
+        world = World()
+        hero = Character("Hero", 25, "Male", "Human", "Warrior", location_id="loc_aethoria_capital")
+        world.add_character(hero)
+        hero.history.extend([
+            "Born beneath a comet.",
+            "Year 1000: Turned 26.",
+            "1001年: 修行した。",
+        ])
+        world.record_event(
+            WorldEventRecord(
+                record_id="story_canonical_1",
+                kind="meeting",
+                year=world.year,
+                month=1,
+                primary_actor_id=hero.char_id,
+                description="Canonical story event",
+                severity=2,
+            )
+        )
+        sim = Simulator(world, events_per_year=0, seed=1)
+
+        story = sim.get_character_story(hero.char_id)
+
+        assert "Canonical story event" in story
+        assert "Born beneath a comet." in story
+        assert "Turned 26" not in story
+        assert "修行した" not in story
+
+    def test_story_hides_mechanical_relationship_deltas(self):
+        world = World()
+        hero = Character("Hero", 25, "Male", "Human", "Warrior", location_id="loc_aethoria_capital")
+        friend = Character("Friend", 24, "Female", "Elf", "Mage", location_id="loc_aethoria_capital")
+        world.add_character(hero)
+        world.add_character(friend)
+        world.record_event(
+            WorldEventRecord(
+                record_id="story_meeting_1",
+                kind="meeting",
+                year=world.year,
+                month=1,
+                primary_actor_id=hero.char_id,
+                secondary_actor_ids=[friend.char_id],
+                description=(
+                    "Hero and Friend had a pleasant exchange at Aethoria Capital. "
+                    "(Hero->Friend: +12 / Friend->Hero: +8 / Avg: +10)"
+                ),
+                severity=2,
+            )
+        )
+        sim = Simulator(world, events_per_year=0, seed=1)
+
+        story = sim.get_character_story(hero.char_id)
+
+        assert "Hero and Friend had a pleasant exchange" in story
+        assert "Hero->Friend" not in story
+        assert "Avg:" not in story
+
+    def test_story_deduplicates_compacted_entries(self):
+        world = World()
+        hero = Character("Hero", 25, "Male", "Human", "Warrior", location_id="loc_aethoria_capital")
+        friend = Character("Friend", 24, "Female", "Elf", "Mage", location_id="loc_aethoria_capital")
+        world.add_character(hero)
+        world.add_character(friend)
+        for index, delta in enumerate(("+12", "+8"), start=1):
+            world.record_event(
+                WorldEventRecord(
+                    record_id=f"story_meeting_{index}",
+                    kind="meeting",
+                    year=world.year,
+                    month=index,
+                    primary_actor_id=hero.char_id,
+                    secondary_actor_ids=[friend.char_id],
+                    description=(
+                        "Hero and Friend had a pleasant exchange at Aethoria Capital. "
+                        f"(Hero->Friend: {delta} / Friend->Hero: +8 / Avg: +10)"
+                    ),
+                    severity=2,
+                )
+            )
+        sim = Simulator(world, events_per_year=0, seed=1)
+
+        story = sim.get_character_story(hero.char_id)
+
+        assert story.count("Hero and Friend had a pleasant exchange at Aethoria Capital.") == 1
+
+    def test_story_keeps_legacy_year_lines_without_canonical_records(self):
+        world = World()
+        hero = Character("Hero", 25, "Male", "Human", "Warrior", location_id="loc_aethoria_capital")
+        world.add_character(hero)
+        hero.history.append("Year 1000: Turned 26.")
+        sim = Simulator(world, events_per_year=0, seed=1)
+
+        story = sim.get_character_story(hero.char_id)
+
+        assert "Year 1000: Turned 26." in story
 
     def test_story_renders_canonical_records_with_current_locale(self):
         world = World()

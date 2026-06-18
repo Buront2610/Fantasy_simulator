@@ -10,6 +10,7 @@ legacy fields remain load-compatible.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Dict, List, Optional
 
@@ -153,6 +154,7 @@ class QueryMixin:
         seen_entries = set()
         story_entries: List[str] = []
         if event_history:
+            supplemental_entries: List[str] = []
             for record in event_history:
                 rendered = render_event_record(record, world=self.world)
                 story_entries.append(rendered)
@@ -161,7 +163,10 @@ class QueryMixin:
             for entry in char.history:
                 if entry in seen_entries:
                     continue
-                story_entries.append(entry)
+                if _is_legacy_year_history_entry(entry):
+                    continue
+                supplemental_entries.append(entry)
+            story_entries = supplemental_entries + story_entries
         elif char.history:
             for entry in char.history:
                 story_entries.append(entry)
@@ -217,3 +222,16 @@ class QueryMixin:
         if hasattr(self.world, "get_events_by_kind"):
             return self.world.get_events_by_kind(kind)
         return [rec for rec in self.world.event_records if rec.kind == kind]
+
+
+_LEGACY_YEAR_HISTORY_RE = re.compile(r"^(?:Year\s+\d+|\d+年):")
+
+
+def _is_legacy_year_history_entry(entry: str) -> bool:
+    """Return True for old per-character yearly display lines.
+
+    Canonical event records are richer and already ordered, so showing both
+    canonical records and legacy ``Year ...:`` lines makes character stories
+    noisy.  Non-year-prefixed biography/origin text remains visible.
+    """
+    return bool(_LEGACY_YEAR_HISTORY_RE.match(entry.strip()))
