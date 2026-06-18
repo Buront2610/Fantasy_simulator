@@ -40,6 +40,7 @@ CATALYST_EVENT_KINDS: tuple[str, ...] = (
     "battle_fatal",
     "romance",
     "relationship_value_alignment",
+    "relationship_value_reconsidered",
 )
 CATALYST_RELATION_TAGS: tuple[str, ...] = ("savior", "rescued", "co_parent", "family", "shared_values")
 PERSONALITY_TURNING_POINT_KINDS: tuple[str, ...] = (
@@ -50,6 +51,7 @@ PERSONALITY_TURNING_POINT_KINDS: tuple[str, ...] = (
     "relationship_comfort",
     "relationship_value_alignment",
     "relationship_value_clash",
+    "relationship_value_reconsidered",
 )
 
 
@@ -578,6 +580,15 @@ def _remove_opposed_relation_tag(character: "Character", target_id: str, tag: st
         del character.relation_tags[target_id]
 
 
+def _remove_relation_tag(character: "Character", target_id: str, tag: str) -> None:
+    tags = character.relation_tags.get(target_id)
+    if tags is None:
+        return
+    character.relation_tags[target_id] = [current for current in tags if current != tag]
+    if not character.relation_tags[target_id]:
+        del character.relation_tags[target_id]
+
+
 def _meeting_description_key(avg_after: int) -> str:
     if avg_after > 10:
         return "meeting_positive"
@@ -604,8 +615,9 @@ def _relationship_turning_point_key(
     second_profile = personality.second_context.profile
     if avg_rel <= -35 and catalyst.score >= 5:
         return "reconciliation"
-    if _has_any_pair_tag(char1, char2, ("value_rift",)) and avg_rel < 20:
-        return "value_clash"
+    value_rift_key = _value_rift_turning_point_key(char1, char2, avg_rel, catalyst)
+    if value_rift_key:
+        return value_rift_key
     if feature_factors.intersection({"vow_vs_impulse", "home_vs_distance"}) and avg_rel < 30:
         return "value_clash"
     if (
@@ -629,6 +641,21 @@ def _relationship_turning_point_key(
     return "conflict" if personality.affinity.score < 0 else "comfort"
 
 
+def _value_rift_turning_point_key(
+    char1: "Character",
+    char2: "Character",
+    avg_rel: int,
+    catalyst: RelationshipCatalyst,
+) -> str:
+    if not _has_any_pair_tag(char1, char2, ("value_rift",)):
+        return ""
+    if catalyst.score >= 5:
+        return "value_reconsidered"
+    if avg_rel < 20:
+        return "value_clash"
+    return ""
+
+
 def _relationship_turning_point_delta(
     key: str,
     personality: RelationshipPersonality,
@@ -646,6 +673,8 @@ def _relationship_turning_point_delta(
         return 12 + max(0, personality.feature_affinity.score)
     if key == "value_clash":
         return -14 + min(0, personality.feature_affinity.score)
+    if key == "value_reconsidered":
+        return 8 + max(0, catalyst.score // 2)
     return -10 + min(0, personality.affinity.score // 3)
 
 
@@ -670,6 +699,14 @@ def _relationship_turning_point_tags(
         if key == "value_alignment":
             updates.extend(_add_mutual_relation_tag(char1, char2, "shared_values", "shared_values", source_event_id))
         return updates
+    if key == "value_reconsidered":
+        _remove_opposed_relation_tag(char1, char2.char_id, "friend")
+        _remove_opposed_relation_tag(char2, char1.char_id, "friend")
+        _remove_relation_tag(char1, char2.char_id, "value_rift")
+        _remove_relation_tag(char2, char1.char_id, "value_rift")
+        updates = _add_mutual_relation_tag(char1, char2, "friend", "friend", source_event_id)
+        updates.extend(_add_mutual_relation_tag(char1, char2, "shared_values", "shared_values", source_event_id))
+        return updates
     if key == "value_clash":
         _remove_opposed_relation_tag(char1, char2.char_id, "rival")
         _remove_opposed_relation_tag(char2, char1.char_id, "rival")
@@ -687,6 +724,8 @@ def _relationship_turning_point_reason_key(
     context = set(personality.context_factor_keys)
     catalyst_factors = set(catalyst.factor_keys)
     affinity_factors = set(personality.affinity.factor_keys)
+    if key == "value_reconsidered":
+        return "relationship_turning_point_reason_value_reconsidered"
     if personality.affinity.score < 0 and catalyst.score > 0:
         return "relationship_turning_point_reason_unlikely_bond"
     if "rescue_debt" in catalyst_factors or "rescued_gratitude" in context:

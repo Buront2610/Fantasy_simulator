@@ -322,6 +322,7 @@ TEXT_JA: Dict[str, str] = {
     'relationship_comfort': '{name1} と {name2} は {location} で静かな慰めの時間を分け合った。{turning_point_reason}（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）',  # noqa: E501
     'relationship_value_alignment': '{name1} と {name2} は {location} で同じ価値を見出した。{turning_point_reason}（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）',  # noqa: E501
     'relationship_value_clash': '{name1} と {name2} は {location} で価値観の食い違いを露わにした。{turning_point_reason}（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）',  # noqa: E501
+    'relationship_value_reconsidered': '{name1} と {name2} は {location} で古い価値観の溝を見直した。{turning_point_reason}（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）',  # noqa: E501
     'relationship_turning_point_reason_rescue_debt': '救助の恩が、互いを見る目をまだ変えていた。',
     'relationship_turning_point_reason_unlikely_bond': (
         '気質は噛み合わないが、共に越えた出来事がその例外を意味あるものにした。'
@@ -339,6 +340,9 @@ TEXT_JA: Dict[str, str] = {
     'relationship_turning_point_reason_shared_values': '大事にするものがはっきり重なり、絆として形を持った。',
     'relationship_turning_point_reason_feature_clash': '互いのはっきりした癖が、その対立を個人的なものにした。',
     'relationship_turning_point_reason_value_clash': '大事にするものが違いすぎて、妥協は難しかった。',
+    'relationship_turning_point_reason_value_reconsidered': (
+        '後から生まれた恩義や共通の目的が、古い食い違いを絶対ではないものにした。'
+    ),
     'relationship_moment_unlikely_catalyst': '気質は反発していたが、共に越えた出来事が扉を少し開けていた。',
     'relationship_moment_temper_balanced': '一方の忍耐が、火花になる前の感情を受け止めた。',
     'relationship_moment_feature_clash': '互いのはっきりした癖が、粗い縁のように引っかかった。',
@@ -357,6 +361,7 @@ TEXT_JA: Dict[str, str] = {
     'history_relationship_comfort': '{year}年: {location} で {name} と慰めを分け合った。',
     'history_relationship_value_alignment': '{year}年: {location} で {name} と同じ価値を見出した。',
     'history_relationship_value_clash': '{year}年: {location} で {name} と価値観をめぐって衝突した。',
+    'history_relationship_value_reconsidered': '{year}年: {location} で {name} と古い価値観の溝を見直した。',
     'birth_happened': '{parent1} と {parent2} の子 {child} が {location} で生まれた。',
     'history_child_born': '{year}年: {partner} との子 {child} が生まれた。',
     'history_born_to_parents': '{year}年: {parent1} と {parent2} の子として生まれた。',
@@ -621,6 +626,7 @@ TEXT_JA: Dict[str, str] = {
     'event_type_relationship_comfort': '慰め',
     'event_type_relationship_value_alignment': '価値観の一致',
     'event_type_relationship_value_clash': '価値観の衝突',
+    'event_type_relationship_value_reconsidered': '価値観の再考',
     'event_type_immigration': '流入',
     'event_type_generic': 'その他',
     'event_type_injury_recovery': '負傷回復',
@@ -752,6 +758,11 @@ TEXT_JA: Dict[str, str] = {
     ),
     'events.relationship_value_clash.summary': (
         '{name1} と {name2} は {location} で価値観の食い違いを露わにした。{turning_point_reason}'
+        '（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        '平均: {relationship_avg:+d}）'
+    ),
+    'events.relationship_value_reconsidered.summary': (
+        '{name1} と {name2} は {location} で古い価値観の溝を見直した。{turning_point_reason}'
         '（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         '平均: {relationship_avg:+d}）'
     ),

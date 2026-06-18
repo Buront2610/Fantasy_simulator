@@ -525,6 +525,40 @@ class TestEventMeeting:
             == "relationship_turning_point_reason_value_clash"
         )
 
+    def test_value_rift_can_be_reconsidered_after_later_catalyst(self, es, world):
+        first = _make_char("First")
+        second = _make_char("Second")
+        first.personality_feats = ["oathbound"]
+        second.personality_feats = ["reckless"]
+        world.add_character(first)
+        world.add_character(second)
+        clash = resolve_relationship_turning_point_event(first, second, world, rng=random.Random(8))
+        clash_record = world.record_event(WorldEventRecord.from_event_result(clash))
+        rescue = world.record_event(WorldEventRecord(
+            record_id="rescue_after_rift",
+            kind="dying_rescued",
+            year=world.year,
+            primary_actor_id=first.char_id,
+            secondary_actor_ids=[second.char_id],
+            description="Second pulled First back from the edge after their quarrel.",
+        ))
+
+        followup = resolve_relationship_turning_point_event(first, second, world, rng=random.Random(10))
+
+        assert followup.event_type == "relationship_value_reconsidered"
+        assert first.has_relation_tag(second.char_id, "friend")
+        assert first.has_relation_tag(second.char_id, "shared_values")
+        assert not first.has_relation_tag(second.char_id, "value_rift")
+        assert clash_record.record_id in followup.metadata["cause_event_ids"]
+        assert rescue.record_id in followup.metadata["cause_event_ids"]
+        assert (
+            followup.metadata["render_params"]["turning_point_reason_key"]
+            == "relationship_turning_point_reason_value_reconsidered"
+        )
+        record = WorldEventRecord.from_event_result(followup)
+        assert "reconsidered an old value rift" in render_event_record(record, locale="en", world=world)
+        assert "古い価値観の溝を見直した" in render_event_record(record, locale="ja", world=world)
+
 
 # ---------------------------------------------------------------------------
 # event_battle
