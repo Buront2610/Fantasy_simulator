@@ -24,6 +24,7 @@ from .ui_helpers import fit_display_width
 RECENT_HISTORY_LIMIT = 8
 PROFILE_RELATION_LIMIT = 6
 PROFILE_RELATION_EVENT_LIMIT = 6
+PROFILE_RELATION_MEMORY_LIMIT = 6
 PROFILE_COMBAT_LIMIT = 5
 PROFILE_RELATION_EVENT_KINDS = {
     "meeting",
@@ -96,6 +97,11 @@ def _show_character_profile(world: World, character: Any, ctx: UIContext) -> Non
     _print_profile_section(ctx, tr("roster_profile_background"), _background_lines(character))
     _print_profile_section(ctx, tr("roster_profile_family"), _family_lines(world, character))
     _print_profile_section(ctx, tr("roster_profile_relationships"), _relationship_lines(world, character))
+    _print_profile_section(
+        ctx,
+        tr("roster_profile_relationship_memory"),
+        _relationship_memory_lines(world, character),
+    )
     _print_profile_section(
         ctx,
         tr("roster_profile_relationship_history"),
@@ -203,6 +209,59 @@ def _relationship_history_lines(world: World, character: Any) -> list[str]:
         if len(rows) >= PROFILE_RELATION_EVENT_LIMIT * 3:
             break
     return rows[:PROFILE_RELATION_EVENT_LIMIT * 3] or [tr("roster_profile_no_relationship_history")]
+
+
+def _relationship_memory_lines(world: World, character: Any) -> list[str]:
+    rows: list[tuple[int, str]] = []
+    for key, source_ids in getattr(character, "relation_tag_sources", {}).items():
+        parsed = _parse_relation_source_key(key)
+        if parsed is None:
+            continue
+        target_id, tag = parsed
+        target = world.get_character_by_id(target_id)
+        if target is None:
+            continue
+        for source_id in reversed(source_ids if isinstance(source_ids, list) else []):
+            if not isinstance(source_id, str) or not source_id:
+                continue
+            source = world.get_event_by_id(source_id)
+            description = (
+                render_event_record(source, world=world)
+                if source is not None
+                else tr("roster_profile_relationship_memory_unavailable")
+            )
+            rows.append((
+                _record_sort_key(source),
+                tr(
+                    "roster_profile_relationship_memory_line",
+                    name=target.name,
+                    tag=_relation_tag_label(tag),
+                    description=description,
+                ),
+            ))
+    rows.sort(key=lambda item: item[0], reverse=True)
+    return [line for _, line in rows[:PROFILE_RELATION_MEMORY_LIMIT]] or [
+        tr("roster_profile_no_relationship_memory")
+    ]
+
+
+def _parse_relation_source_key(key: object) -> tuple[str, str] | None:
+    if not isinstance(key, str):
+        return None
+    target_id, separator, tag = key.partition(":")
+    if not separator or not target_id or not tag:
+        return None
+    return target_id, tag
+
+
+def _record_sort_key(record: object | None) -> int:
+    if record is None:
+        return -1
+    return (
+        int(getattr(record, "year", 0) or 0) * 10000
+        + int(getattr(record, "month", 0) or 0) * 100
+        + int(getattr(record, "day", 0) or 0)
+    )
 
 
 def _record_involves_character(record: object, char_id: str) -> bool:

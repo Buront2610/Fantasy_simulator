@@ -791,6 +791,7 @@ class TestShowRosterUsesBackends(unittest.TestCase):
                 },
             )
         )
+        hero.add_relation_tag(spouse.char_id, "shared_values", source_event_id="comfort_1")
         world.record_event(
             WorldEventRecord(
                 record_id="battle_1",
@@ -839,6 +840,8 @@ class TestShowRosterUsesBackends(unittest.TestCase):
         self.assertIn("Children: Lio", out.text)
         self.assertIn("Relationships", out.text)
         self.assertIn("Mira: +72", out.text)
+        self.assertIn("Relationship memory", out.text)
+        self.assertIn("Mira [Shared values]: Aldric and Mira found a quiet moment of comfort.", out.text)
         self.assertIn("Relationship history", out.text)
         self.assertIn("Aldric and Mira found a quiet moment of comfort.", out.text)
         self.assertIn("Because: Mira pulled Aldric from a collapsed bridge.", out.text)
