@@ -253,7 +253,14 @@ class TestEventMeeting:
         assert featured.metadata["relationship_delta"] > plain.metadata["relationship_delta"]
         assert featured.metadata["personality_feature_score"] > 0
         assert "temper_balanced" in featured.metadata["personality_feature_factor_keys"]
+        assert featured.metadata["render_params"]["relationship_moment_key"] == "relationship_moment_temper_balanced"
+        assert "One had the patience to steady the other" in featured.description
         assert "one temper steadied the other" in featured.metadata["render_params"]["personality_factors"]
+        assert "One had the patience to steady the other" in render_event_record(
+            WorldEventRecord.from_event_result(featured),
+            locale="en",
+            world=world,
+        )
 
     def test_shared_catalyst_can_soften_bad_personality_affinity(self, es, world):
         plain_a = _make_char("Plain A")

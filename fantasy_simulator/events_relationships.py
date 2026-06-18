@@ -220,6 +220,38 @@ def _personality_metadata(personality: RelationshipPersonality, relationship_del
     return payload
 
 
+def _relationship_moment_key(
+    personality: RelationshipPersonality,
+    catalyst: RelationshipCatalyst,
+    relationship_delta: int,
+) -> str:
+    feature_factors = set(personality.feature_affinity.factor_keys)
+    affinity_factors = set(personality.affinity.factor_keys)
+    context_factors = set(personality.context_factor_keys)
+    catalyst_factors = set(catalyst.factor_keys)
+    if personality.affinity.score < 0 and catalyst.score > 0:
+        return "relationship_moment_unlikely_catalyst"
+    if "temper_balanced" in feature_factors:
+        return "relationship_moment_temper_balanced"
+    if feature_factors.intersection({"vow_vs_impulse", "home_vs_distance"}):
+        return "relationship_moment_feature_clash"
+    if context_factors.intersection({"grief", "recent_fear", "rescued_gratitude"}):
+        return "relationship_moment_vulnerable"
+    if catalyst_factors.intersection({"rescue_debt", "hard_won_respect"}):
+        return "relationship_moment_shared_ordeal"
+    if affinity_factors.intersection({"shared_curiosity", "shared_discipline"}):
+        return "relationship_moment_shared_pursuit"
+    if affinity_factors.intersection({"social_mismatch", "outlook_gap", "low_trust"}):
+        return "relationship_moment_mismatch"
+    if affinity_factors.intersection({"shared_kindness", "steady_pair"}):
+        return "relationship_moment_trust"
+    if relationship_delta > 10:
+        return "relationship_moment_spark"
+    if relationship_delta < 0:
+        return "relationship_moment_friction"
+    return "relationship_moment_measured"
+
+
 def _relationship_delta_from_personality_state(personality: RelationshipPersonality) -> int:
     return max(
         -9,
@@ -306,11 +338,14 @@ def _romance_result(
     char1.update_mutual_relationship(char2, applied_delta)
     catalyst_payload = _catalyst_metadata(catalyst, catalyst_delta)
     personality_payload = _personality_metadata(personality, applied_delta)
+    relationship_moment_key = _relationship_moment_key(personality, catalyst, applied_delta)
+    relationship_moment = " " + tr(relationship_moment_key)
     desc = tr(
         description_key,
         name1=char1.name,
         name2=char2.name,
         location=world.location_name(char1.location_id),
+        relationship_moment=relationship_moment,
     )
     return EventResult(
         description=desc,
@@ -324,6 +359,7 @@ def _romance_result(
                 "name1": char1.name,
                 "name2": char2.name,
                 "location_id": char1.location_id,
+                "relationship_moment_key": relationship_moment_key,
                 **personality_payload,
                 **catalyst_payload,
             },
@@ -743,6 +779,8 @@ def resolve_meeting_event(
     description_key = _meeting_description_key(avg_after)
     catalyst_payload = _catalyst_metadata(catalyst, catalyst_delta)
     personality_payload = _personality_metadata(personality, delta)
+    relationship_moment_key = _relationship_moment_key(personality, catalyst, delta)
+    relationship_moment = " " + tr(relationship_moment_key)
     desc = tr(
         description_key,
         name1=char1.name,
@@ -751,6 +789,7 @@ def resolve_meeting_event(
         relationship_a=rel1_after,
         relationship_b=rel2_after,
         relationship_avg=avg_after,
+        relationship_moment=relationship_moment,
     )
     desc, story_hook_key = prefix_description_with_story_hook(
         "meeting",
@@ -784,6 +823,7 @@ def resolve_meeting_event(
                 "relationship_a": rel1_after,
                 "relationship_b": rel2_after,
                 "relationship_avg": avg_after,
+                "relationship_moment_key": relationship_moment_key,
                 **personality_payload,
                 **catalyst_payload,
                 "story_hook_key": story_hook_key,

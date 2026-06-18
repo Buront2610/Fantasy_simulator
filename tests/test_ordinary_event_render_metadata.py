@@ -319,11 +319,15 @@ def test_relationship_event_renders_from_metadata_after_cross_locale_save_load(t
         result = EventSystem().event_marriage(char_a, char_b, world, rng=random.Random(3))
         assert result.event_type == "romance"
         assert "関係を深めた" in result.description
+        assert result.metadata["render_params"]["relationship_moment_key"] == "relationship_moment_spark"
 
         summary_key, rendered = _save_load_render(result, world, tmp_path, location_id=char_a.location_id)
 
         assert summary_key == "events.romance_growing_closer.summary"
-        assert rendered == "Alice and Bob spent time together at Aethoria Capital, growing closer."
+        assert rendered == (
+            "Alice and Bob spent time together at Aethoria Capital, growing closer. "
+            "Something in the moment answered quickly between them."
+        )
     finally:
         set_locale(previous_locale)
 
@@ -386,13 +390,15 @@ def test_romance_commitments_blocked_event_renders_from_metadata_after_cross_loc
         world.add_character(char_b)
 
         result = EventSystem().event_marriage(char_a, char_b, world, rng=random.Random(0))
+        assert result.metadata["render_params"]["relationship_moment_key"] == "relationship_moment_measured"
 
         summary_key, rendered = _save_load_render(result, world, tmp_path, location_id=char_a.location_id)
 
         assert summary_key == "events.romance_commitments_blocked.summary"
         assert rendered == (
             "Alice and Bob shared a meaningful moment at Aethoria Capital, "
-            "but existing commitments kept the relationship from deepening."
+            "but existing commitments kept the relationship from deepening. "
+            "Neither fully opened up, but both took the measure of the other."
         )
     finally:
         set_locale(previous_locale)

@@ -303,13 +303,13 @@ TEXT_EN: Dict[str, str] = {
     'event_story_training_deadline': 'A looming trial gave the training a clear purpose.',
     'event_story_training_rival': 'Word of a rival sharpened {name}\'s focus.',
     'event_story_training_failed_attempt': 'A recent failure made practice impossible to ignore.',
-    'meeting_positive': '{name1} and {name2} met in {location} and hit it off splendidly. ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
-    'meeting_pleasant': '{name1} and {name2} met in {location} and had a pleasant exchange. ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
-    'meeting_neutral': '{name1} and {name2} met in {location} and exchanged a polite nod. ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
-    'meeting_negative': '{name1} and {name2} met in {location} and had a tense, uncomfortable encounter. ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
+    'meeting_positive': '{name1} and {name2} met in {location} and hit it off splendidly.{relationship_moment} ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
+    'meeting_pleasant': '{name1} and {name2} met in {location} and had a pleasant exchange.{relationship_moment} ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
+    'meeting_neutral': '{name1} and {name2} met in {location} and exchanged a polite nod.{relationship_moment} ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
+    'meeting_negative': '{name1} and {name2} met in {location} and had a tense, uncomfortable encounter.{relationship_moment} ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
     'history_met': 'Year {year}: Met {name} in {location}.',
-    'romance_growing_closer': '{name1} and {name2} spent time together at {location}, growing closer.',
-    'romance_commitments_blocked': '{name1} and {name2} shared a meaningful moment at {location}, but existing commitments kept the relationship from deepening.',  # noqa: E501
+    'romance_growing_closer': '{name1} and {name2} spent time together at {location}, growing closer.{relationship_moment}',  # noqa: E501
+    'romance_commitments_blocked': '{name1} and {name2} shared a meaningful moment at {location}, but existing commitments kept the relationship from deepening.{relationship_moment}',  # noqa: E501
     'marriage_anniversary': '{name1} and {name2} celebrated another year of their marriage.',
     'history_anniversary': 'Year {year}: Celebrated marriage anniversary with {name}.',
     'marriage_happened': '{name1} ({race1} {job1}) and {name2} ({race2} {job2}) were married in {location} amid great celebration!',  # noqa: E501
@@ -332,6 +332,19 @@ TEXT_EN: Dict[str, str] = {
     'relationship_turning_point_reason_mismatch': 'Their temperaments pulled the moment in opposite directions.',
     'relationship_turning_point_reason_trust': 'Steady warmth gave them enough trust to risk honesty.',
     'relationship_turning_point_reason_shared_history': 'Shared history mattered more than the immediate quarrel.',
+    'relationship_moment_unlikely_catalyst': (
+        'Their temperaments resisted each other, but the shared ordeal left a door open.'
+    ),
+    'relationship_moment_temper_balanced': 'One had the patience to steady the other before sparks became fire.',
+    'relationship_moment_feature_clash': 'Their defining habits caught on each other like rough edges.',
+    'relationship_moment_vulnerable': 'Recent vulnerability made the exchange carry more weight than usual.',
+    'relationship_moment_shared_ordeal': 'What they had endured together spoke before either of them did.',
+    'relationship_moment_shared_pursuit': 'A shared pursuit gave them language for mutual respect.',
+    'relationship_moment_mismatch': 'Different rhythms made even simple words land unevenly.',
+    'relationship_moment_trust': 'Steady trust made the silence between them easier to cross.',
+    'relationship_moment_spark': 'Something in the moment answered quickly between them.',
+    'relationship_moment_friction': 'Old friction showed through before either could hide it.',
+    'relationship_moment_measured': 'Neither fully opened up, but both took the measure of the other.',
     'history_relationship_reconciliation': 'Year {year}: Made peace with {name} in {location}.',
     'history_relationship_conflict': 'Year {year}: Clashed with {name} in {location}.',
     'history_relationship_mentorship': 'Year {year}: Entered a mentor bond with {name} in {location}.',
@@ -617,42 +630,42 @@ TEXT_EN: Dict[str, str] = {
     ),
     'events.meeting.summary': '{actor} met {other} at {location}.',
     'events.meeting_positive.summary': (
-        '{name1} and {name2} met in {location} and hit it off splendidly. '
+        '{name1} and {name2} met in {location} and hit it off splendidly.{relationship_moment} '
         '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         'Avg: {relationship_avg:+d})'
     ),
     'events.meeting_positive.summary.narrative': (
-        '{story_hook} {name1} and {name2} hit it off splendidly at {location}. '
+        '{story_hook} {name1} and {name2} hit it off splendidly at {location}.{relationship_moment} '
         '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         'Avg: {relationship_avg:+d})'
     ),
     'events.meeting_pleasant.summary': (
-        '{name1} and {name2} met in {location} and had a pleasant exchange. '
+        '{name1} and {name2} met in {location} and had a pleasant exchange.{relationship_moment} '
         '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         'Avg: {relationship_avg:+d})'
     ),
     'events.meeting_pleasant.summary.narrative': (
-        '{story_hook} {name1} and {name2} had a pleasant exchange at {location}. '
+        '{story_hook} {name1} and {name2} had a pleasant exchange at {location}.{relationship_moment} '
         '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         'Avg: {relationship_avg:+d})'
     ),
     'events.meeting_neutral.summary': (
-        '{name1} and {name2} met in {location} and exchanged a polite nod. '
+        '{name1} and {name2} met in {location} and exchanged a polite nod.{relationship_moment} '
         '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         'Avg: {relationship_avg:+d})'
     ),
     'events.meeting_neutral.summary.narrative': (
-        '{story_hook} {name1} and {name2} exchanged a polite nod at {location}. '
+        '{story_hook} {name1} and {name2} exchanged a polite nod at {location}.{relationship_moment} '
         '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         'Avg: {relationship_avg:+d})'
     ),
     'events.meeting_negative.summary': (
-        '{name1} and {name2} met in {location} and had a tense, uncomfortable encounter. '
+        '{name1} and {name2} met in {location} and had a tense, uncomfortable encounter.{relationship_moment} '
         '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         'Avg: {relationship_avg:+d})'
     ),
     'events.meeting_negative.summary.narrative': (
-        '{story_hook} {name1} and {name2} had a tense encounter at {location}. '
+        '{story_hook} {name1} and {name2} had a tense encounter at {location}.{relationship_moment} '
         '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         'Avg: {relationship_avg:+d})'
     ),
@@ -690,11 +703,11 @@ TEXT_EN: Dict[str, str] = {
     'events.dying_stabilized.summary': '{name} miraculously stabilized from a dying state at {location}.',
     'events.marriage_anniversary.summary': '{name1} and {name2} celebrated another year of their marriage.',
     'events.romance_growing_closer.summary': (
-        '{name1} and {name2} spent time together at {location}, growing closer.'
+        '{name1} and {name2} spent time together at {location}, growing closer.{relationship_moment}'
     ),
     'events.romance_commitments_blocked.summary': (
         '{name1} and {name2} shared a meaningful moment at {location}, but existing commitments kept the '
-        'relationship from deepening.'
+        'relationship from deepening.{relationship_moment}'
     ),
     'events.relationship_reconciliation.summary': (
         '{name1} and {name2} faced old hurt at {location} and chose to make peace. {turning_point_reason} '

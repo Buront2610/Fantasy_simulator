@@ -301,13 +301,16 @@ TEXT_JA: Dict[str, str] = {
     'event_story_training_deadline': '迫る試練が、その鍛錬に明確な目的を与えていた。',
     'event_story_training_rival': '好敵手の噂が、{name} の集中を鋭くした。',
     'event_story_training_failed_attempt': '直近の失敗が、鍛え直す必要を突きつけていた。',
-    'meeting_positive': '{name1} と {name2} は {location} で出会い、素晴らしい相性を見せた。（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）',  # noqa: E501
-    'meeting_pleasant': '{name1} と {name2} は {location} で気持ちの良い交流をした。（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）',  # noqa: E501
-    'meeting_neutral': '{name1} と {name2} は {location} で軽く会釈を交わした。（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）',  # noqa: E501
-    'meeting_negative': '{name1} と {name2} は {location} でぎこちない出会いをした。（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）',  # noqa: E501
+    'meeting_positive': '{name1} と {name2} は {location} で出会い、素晴らしい相性を見せた。{relationship_moment}（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）',  # noqa: E501
+    'meeting_pleasant': '{name1} と {name2} は {location} で気持ちの良い交流をした。{relationship_moment}（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）',  # noqa: E501
+    'meeting_neutral': '{name1} と {name2} は {location} で軽く会釈を交わした。{relationship_moment}（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）',  # noqa: E501
+    'meeting_negative': '{name1} と {name2} は {location} でぎこちない出会いをした。{relationship_moment}（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / 平均: {relationship_avg:+d}）',  # noqa: E501
     'history_met': '{year}年: {name} と {location} で出会った。',
-    'romance_growing_closer': '{name1} と {name2} は {location} で時を過ごし、関係を深めた。',
-    'romance_commitments_blocked': '{name1} と {name2} は {location} で特別な時間を過ごしたが、既存の関係がそれ以上の進展を妨げた。',
+    'romance_growing_closer': '{name1} と {name2} は {location} で時を過ごし、関係を深めた。{relationship_moment}',
+    'romance_commitments_blocked': (
+        '{name1} と {name2} は {location} で特別な時間を過ごしたが、'
+        '既存の関係がそれ以上の進展を妨げた。{relationship_moment}'
+    ),
     'marriage_anniversary': '{name1} と {name2} は結婚記念日を祝った。',
     'history_anniversary': '{year}年: {name} と結婚記念日を祝った。',
     'marriage_happened': '{name1}（{race1} {job1}）と {name2}（{race2} {job2}）は {location} で盛大に結婚した。',
@@ -330,6 +333,17 @@ TEXT_JA: Dict[str, str] = {
     'relationship_turning_point_reason_mismatch': '互いの気質が、その瞬間を反対方向へ引いた。',
     'relationship_turning_point_reason_trust': '穏やかな信頼が、本音を出すだけの余地を作った。',
     'relationship_turning_point_reason_shared_history': '目の前の諍いより、積み重ねた時間の方が重かった。',
+    'relationship_moment_unlikely_catalyst': '気質は反発していたが、共に越えた出来事が扉を少し開けていた。',
+    'relationship_moment_temper_balanced': '一方の忍耐が、火花になる前の感情を受け止めた。',
+    'relationship_moment_feature_clash': '互いのはっきりした癖が、粗い縁のように引っかかった。',
+    'relationship_moment_vulnerable': '直近の弱さが、そのやり取りをいつもより重くしていた。',
+    'relationship_moment_shared_ordeal': '共に耐えた出来事が、言葉より先にそこへあった。',
+    'relationship_moment_shared_pursuit': '近い目的が、互いを認めるための言葉を与えた。',
+    'relationship_moment_mismatch': '違うリズムのせいで、何気ない言葉さえ均等には届かなかった。',
+    'relationship_moment_trust': '穏やかな信頼が、二人の沈黙を渡りやすくした。',
+    'relationship_moment_spark': 'その瞬間、何かがすばやく噛み合った。',
+    'relationship_moment_friction': '隠しきる前に、古い摩擦が顔を出した。',
+    'relationship_moment_measured': 'どちらも全ては開かなかったが、互いを測るだけの時間はあった。',
     'history_relationship_reconciliation': '{year}年: {location} で {name} と和解した。',
     'history_relationship_conflict': '{year}年: {location} で {name} と衝突した。',
     'history_relationship_mentorship': '{year}年: {location} で {name} と師弟に近い絆を結んだ。',
@@ -613,42 +627,42 @@ TEXT_JA: Dict[str, str] = {
     ),
     'events.meeting.summary': '{actor} は {location} で {other} と出会った。',
     'events.meeting_positive.summary': (
-        '{name1} と {name2} は {location} で出会い、素晴らしい相性を見せた。'
+        '{name1} と {name2} は {location} で出会い、素晴らしい相性を見せた。{relationship_moment}'
         '（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         '平均: {relationship_avg:+d}）'
     ),
     'events.meeting_positive.summary.narrative': (
-        '{story_hook} {name1} と {name2} は {location} で素晴らしい相性を見せた。'
+        '{story_hook} {name1} と {name2} は {location} で素晴らしい相性を見せた。{relationship_moment}'
         '（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         '平均: {relationship_avg:+d}）'
     ),
     'events.meeting_pleasant.summary': (
-        '{name1} と {name2} は {location} で気持ちの良い交流をした。'
+        '{name1} と {name2} は {location} で気持ちの良い交流をした。{relationship_moment}'
         '（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         '平均: {relationship_avg:+d}）'
     ),
     'events.meeting_pleasant.summary.narrative': (
-        '{story_hook} {name1} と {name2} は {location} で気持ちの良い交流をした。'
+        '{story_hook} {name1} と {name2} は {location} で気持ちの良い交流をした。{relationship_moment}'
         '（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         '平均: {relationship_avg:+d}）'
     ),
     'events.meeting_neutral.summary': (
-        '{name1} と {name2} は {location} で軽く会釈を交わした。'
+        '{name1} と {name2} は {location} で軽く会釈を交わした。{relationship_moment}'
         '（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         '平均: {relationship_avg:+d}）'
     ),
     'events.meeting_neutral.summary.narrative': (
-        '{story_hook} {name1} と {name2} は {location} で軽く会釈を交わした。'
+        '{story_hook} {name1} と {name2} は {location} で軽く会釈を交わした。{relationship_moment}'
         '（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         '平均: {relationship_avg:+d}）'
     ),
     'events.meeting_negative.summary': (
-        '{name1} と {name2} は {location} でぎこちない出会いをした。'
+        '{name1} と {name2} は {location} でぎこちない出会いをした。{relationship_moment}'
         '（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         '平均: {relationship_avg:+d}）'
     ),
     'events.meeting_negative.summary.narrative': (
-        '{story_hook} {name1} と {name2} は {location} でぎこちない出会いをした。'
+        '{story_hook} {name1} と {name2} は {location} でぎこちない出会いをした。{relationship_moment}'
         '（{name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         '平均: {relationship_avg:+d}）'
     ),
@@ -682,9 +696,12 @@ TEXT_JA: Dict[str, str] = {
     'events.dying_rescued_by.summary': '{name} は {location} で瀕死の状態に陥ったが、{rescuer} に救われた。',
     'events.dying_stabilized.summary': '{name} は {location} で瀕死の状態から奇跡的に持ち直した。',
     'events.marriage_anniversary.summary': '{name1} と {name2} は結婚記念日を祝った。',
-    'events.romance_growing_closer.summary': '{name1} と {name2} は {location} で時を過ごし、関係を深めた。',
+    'events.romance_growing_closer.summary': (
+        '{name1} と {name2} は {location} で時を過ごし、関係を深めた。{relationship_moment}'
+    ),
     'events.romance_commitments_blocked.summary': (
         '{name1} と {name2} は {location} で特別な時間を過ごしたが、既存の関係がそれ以上の進展を妨げた。'
+        '{relationship_moment}'
     ),
     'events.relationship_reconciliation.summary': (
         '{name1} と {name2} は {location} で古い傷に向き合い、和解を選んだ。{turning_point_reason}'
