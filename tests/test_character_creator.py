@@ -106,6 +106,8 @@ class TestCharacterCreator:
             "stability",
         }
         assert all(0 <= value <= 100 for value in char.personality.values())
+        assert len(char.personality_feats) == 2
+        assert all(isinstance(feat, str) for feat in char.personality_feats)
 
 
 class TestCreateRandomReproducibility:

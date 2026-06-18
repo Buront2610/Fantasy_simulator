@@ -18,10 +18,37 @@ PERSONALITY_TRAITS: tuple[str, ...] = (
     "stability",
 )
 DEFAULT_PERSONALITY_SCORE = 50
+PERSONALITY_FEATS: tuple[str, ...] = (
+    "brave",
+    "patient_listener",
+    "quick_tempered",
+    "oathbound",
+    "curious_mind",
+    "scarred_survivor",
+    "silver_tongue",
+    "lone_wolf",
+    "family_minded",
+    "reckless",
+)
+RACE_PERSONALITY_TENDENCIES: dict[str, dict[str, int]] = {
+    "Human": {"agreeableness": 2, "discipline": 2},
+    "Elf": {"openness": 8, "stability": 3, "extraversion": -2},
+    "Dwarf": {"discipline": 8, "stability": 5, "openness": -3},
+    "Halfling": {"agreeableness": 8, "stability": 4, "extraversion": 3},
+    "Orc": {"extraversion": 6, "discipline": -3, "stability": -4},
+    "Tiefling": {"openness": 7, "agreeableness": -4, "extraversion": -2},
+    "Dragonborn": {"discipline": 6, "stability": 4, "extraversion": 3},
+}
 
 
 @dataclass(frozen=True)
 class PersonalityAffinity:
+    score: int
+    factor_keys: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class PersonalityFeatAffinity:
     score: int
     factor_keys: tuple[str, ...]
 
@@ -54,16 +81,56 @@ def normalize_personality(payload: Mapping[str, Any] | None) -> dict[str, int]:
     return normalized
 
 
-def generate_personality(rng: Any = random) -> dict[str, int]:
-    return {
+def normalize_personality_feats(payload: Any) -> list[str]:
+    if payload is None:
+        return []
+    if isinstance(payload, str):
+        raise ValueError("personality feats must be a sequence")
+    normalized: list[str] = []
+    for feat in payload:
+        if feat not in PERSONALITY_FEATS:
+            raise ValueError(f"unknown personality feat: {feat}")
+        if feat not in normalized:
+            normalized.append(str(feat))
+    return normalized
+
+
+def generate_personality(rng: Any = random, *, race: str | None = None) -> dict[str, int]:
+    profile = {
         trait: clamp_personality_score(round(rng.triangular(10, 90, 50)))
         for trait in PERSONALITY_TRAITS
     }
+    for trait, bias in RACE_PERSONALITY_TENDENCIES.get(str(race or ""), {}).items():
+        profile[trait] = clamp_personality_score(profile[trait] + bias)
+    return profile
 
 
 def generate_personality_for_character(character: Any) -> dict[str, int]:
     rng = random.Random(_personality_seed(character))
-    return generate_personality(rng)
+    return generate_personality(rng, race=getattr(character, "race", None))
+
+
+def generate_personality_feats_for_character(character: Any, count: int = 2) -> list[str]:
+    rng = random.Random(_personality_seed(character) ^ 0x5EEDFEA7)
+    profile = normalize_personality(getattr(character, "personality", None))
+    race = str(getattr(character, "race", ""))
+    weighted = [
+        (feat, _personality_feat_weight(feat, profile, race, character))
+        for feat in PERSONALITY_FEATS
+    ]
+    selected: list[str] = []
+    available = list(weighted)
+    for _ in range(max(0, min(count, len(available)))):
+        total = sum(weight for _feat, weight in available)
+        roll = rng.uniform(0, total)
+        upto = 0.0
+        for index, (feat, weight) in enumerate(available):
+            upto += weight
+            if upto >= roll:
+                selected.append(feat)
+                del available[index]
+                break
+    return selected
 
 
 def personality_context_from_events(
@@ -131,6 +198,45 @@ def personality_affinity(first: Mapping[str, int], second: Mapping[str, int]) ->
     )
 
 
+def personality_feat_affinity(first_feats: Any, second_feats: Any) -> PersonalityFeatAffinity:
+    first = set(normalize_personality_feats(first_feats))
+    second = set(normalize_personality_feats(second_feats))
+    factors: list[str] = []
+    score = 0
+    shared = first.intersection(second)
+    if shared:
+        score += min(3, len(shared) * 2)
+        factors.append("shared_features")
+    if (
+        ("patient_listener" in first and "quick_tempered" in second)
+        or ("quick_tempered" in first and "patient_listener" in second)
+    ):
+        score += 3
+        factors.append("temper_balanced")
+    if (
+        ("brave" in first and "scarred_survivor" in second)
+        or ("scarred_survivor" in first and "brave" in second)
+    ):
+        score += 2
+        factors.append("hard_won_courage")
+    if (
+        ("oathbound" in first and "reckless" in second)
+        or ("reckless" in first and "oathbound" in second)
+    ):
+        score -= 3
+        factors.append("vow_vs_impulse")
+    if (
+        ("family_minded" in first and "lone_wolf" in second)
+        or ("lone_wolf" in first and "family_minded" in second)
+    ):
+        score -= 2
+        factors.append("home_vs_distance")
+    if "silver_tongue" in first.symmetric_difference(second):
+        score += 1
+        factors.append("social_bridge")
+    return PersonalityFeatAffinity(score=max(-6, min(6, score)), factor_keys=tuple(dict.fromkeys(factors)))
+
+
 def relationship_delta_from_personality(first: Mapping[str, int], second: Mapping[str, int]) -> int:
     return round(personality_affinity(first, second).score / 2)
 
@@ -185,6 +291,15 @@ def render_personality_archetype(personality: Mapping[str, int]) -> str:
     return tr(f"personality_archetype_{personality_archetype_key(personality)}")
 
 
+def render_personality_feats(feat_keys: Any) -> str:
+    feats = normalize_personality_feats(feat_keys)
+    return ", ".join(tr(f"personality_feat_{feat}") for feat in feats)
+
+
+def render_personality_feat_factors(factor_keys: tuple[str, ...]) -> str:
+    return ", ".join(tr(f"personality_feat_affinity_{key}") for key in factor_keys)
+
+
 def render_affinity_factors(factor_keys: tuple[str, ...]) -> str:
     return ", ".join(tr(f"personality_affinity_{key}") for key in factor_keys)
 
@@ -207,6 +322,51 @@ def _personality_seed(character: Any) -> int:
     )
     digest = hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
     return int(digest[:16], 16)
+
+
+def _personality_feat_weight(feat: str, profile: Mapping[str, int], race: str, character: Any) -> int:
+    weight = 4
+    if feat == "brave":
+        weight += _high(profile, "stability") + _race_bonus(race, "Orc", "Dragonborn")
+    elif feat == "patient_listener":
+        weight += _high(profile, "agreeableness") + _high(profile, "stability")
+    elif feat == "quick_tempered":
+        weight += _low(profile, "stability") + _low(profile, "discipline") + _race_bonus(race, "Orc", "Tiefling")
+    elif feat == "oathbound":
+        weight += _high(profile, "discipline") + _race_bonus(race, "Dwarf", "Dragonborn")
+    elif feat == "curious_mind":
+        weight += _high(profile, "openness") + _race_bonus(race, "Elf", "Tiefling")
+    elif feat == "scarred_survivor":
+        weight += _low(profile, "stability") + _race_bonus(race, "Orc", "Tiefling")
+    elif feat == "silver_tongue":
+        weight += _high(profile, "extraversion") + _ability_bonus(character, "charisma") + _race_bonus(
+            race,
+            "Halfling",
+            "Tiefling",
+        )
+    elif feat == "lone_wolf":
+        weight += _low(profile, "extraversion") + _low(profile, "agreeableness")
+    elif feat == "family_minded":
+        weight += _high(profile, "agreeableness") + _high(profile, "stability") + _race_bonus(race, "Human", "Halfling")
+    elif feat == "reckless":
+        weight += _low(profile, "discipline") + _high(profile, "openness") + _race_bonus(race, "Orc")
+    return max(1, weight)
+
+
+def _high(profile: Mapping[str, int], trait: str) -> int:
+    return 5 if profile[trait] >= 67 else 2 if profile[trait] >= 58 else 0
+
+
+def _low(profile: Mapping[str, int], trait: str) -> int:
+    return 5 if profile[trait] <= 33 else 2 if profile[trait] <= 42 else 0
+
+
+def _race_bonus(race: str, *matches: str) -> int:
+    return 2 if race in matches else 0
+
+
+def _ability_bonus(character: Any, ability: str) -> int:
+    return 3 if int(getattr(character, ability, 0) or 0) >= 60 else 0
 
 
 def _affinity_factor_keys(first: Mapping[str, int], second: Mapping[str, int], average_gap: float) -> list[str]:

@@ -9,6 +9,7 @@ from ..character_personality import (
     personality_context_from_events,
     render_personality_archetype,
     render_personality_context_factors,
+    render_personality_feats,
     render_personality_summary,
 )
 from ..combat_log_index import CombatLogEntryView, build_combat_log_index
@@ -128,6 +129,8 @@ def _profile_summary_lines(world: World, character: Any) -> list[str]:
         tr("roster_profile_personality", summary=render_personality_summary(character.personality)),
         tr("roster_profile_temperament", archetype=render_personality_archetype(character.personality)),
     ]
+    if getattr(character, "personality_feats", []):
+        lines.append(tr("roster_profile_feats", feats=render_personality_feats(character.personality_feats)))
     context = personality_context_from_events(character, getattr(world, "event_records", []))
     if context.factor_keys:
         lines.append(

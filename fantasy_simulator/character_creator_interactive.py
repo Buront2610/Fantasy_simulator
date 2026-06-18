@@ -7,7 +7,12 @@ from typing import Any, Dict, List, Protocol
 from .character import Character
 from .character_creator_builders import add_origin_history
 from .character_creator_naming import GENDERS, random_name
-from .character_personality import PERSONALITY_TRAITS, generate_personality, normalize_personality
+from .character_personality import (
+    PERSONALITY_TRAITS,
+    generate_personality,
+    generate_personality_feats_for_character,
+    normalize_personality,
+)
 from .i18n import tr
 
 
@@ -115,7 +120,7 @@ class CharacterCreatorInteractiveMixin:
         job_skills = next((entry[2] for entry in job_entries if entry[0] == job), [])
         skills = {skill: 1 for skill in job_skills}
 
-        personality = self._allocate_personality(ctx=ctx)
+        personality = self._allocate_personality(ctx=ctx, race=race)
 
         char = Character(
             name=name,
@@ -132,6 +137,7 @@ class CharacterCreatorInteractiveMixin:
             charisma=stats["charisma"],
             constitution=stats["constitution"],
         )
+        char.personality_feats = generate_personality_feats_for_character(char)
         add_origin_history(char, founder_background=True)
         out.print_line(f"\n  {tr('character_created')}")
         out.print_line(char.stat_block())
@@ -208,11 +214,11 @@ class CharacterCreatorInteractiveMixin:
         return allocated
 
     @staticmethod
-    def _allocate_personality(ctx: InteractiveContext | None = None) -> Dict[str, int]:
+    def _allocate_personality(ctx: InteractiveContext | None = None, race: str | None = None) -> Dict[str, int]:
         ctx = _default_interactive_ctx(ctx)
         raw = ctx.inp.read_line(f"  > {tr('customize_personality')}: ").strip().lower()
         if raw != "y":
-            return generate_personality()
+            return generate_personality(race=race)
 
         values: Dict[str, int] = {}
         for trait in PERSONALITY_TRAITS:

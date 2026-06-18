@@ -755,6 +755,7 @@ class TestShowRosterUsesBackends(unittest.TestCase):
                 "reputation": "promising",
             },
             history=["Year 1000: Took up the sword.", "Year 1001: Guarded the north road."],
+            personality_feats=["brave", "oathbound"],
         )
         spouse = Character("Mira", 24, "Female", "Human", "Mage", char_id="spouse")
         child = Character("Lio", 3, "Male", "Human", "Warrior", char_id="child")
@@ -827,6 +828,8 @@ class TestShowRosterUsesBackends(unittest.TestCase):
         self.assertIn("Aldric profile", out.text)
         self.assertIn("Personality", out.text)
         self.assertIn("Temperament", out.text)
+        self.assertIn("Features", out.text)
+        self.assertIn("brave, oathbound", out.text)
         self.assertIn("Current demeanor", out.text)
         self.assertIn("gratitude after being rescued", out.text)
         self.assertIn("combat tension", out.text)

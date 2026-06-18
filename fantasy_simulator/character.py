@@ -18,7 +18,7 @@ from .character_domain import (
     clamp_skill_level,
 )
 from .character_lifespan import legacy_lifespan_years
-from .character_personality import normalize_personality
+from .character_personality import normalize_personality, normalize_personality_feats
 from .character_presentation import character_stat_block, random_stats as roll_random_stats
 from .character_serialization import deserialize_character, serialize_character
 from .content.world_data import NAME_TO_LOCATION_ID, fallback_location_id
@@ -73,6 +73,7 @@ class Character:
         active_adventure_id: Optional[str] = None,
         founder_background: Optional[Dict[str, str]] = None,
         personality: Optional[Dict[str, int]] = None,
+        personality_feats: Optional[List[str]] = None,
         relation_tags: Optional[Dict[str, List[str]]] = None,
         relation_tag_sources: Optional[Dict[str, List[str]]] = None,
         rng: Any = None,
@@ -114,6 +115,7 @@ class Character:
         self.active_adventure_id = active_adventure_id
         self.founder_background: Optional[Dict[str, str]] = dict(founder_background) if founder_background else None
         self.personality: Dict[str, int] = normalize_personality(personality)
+        self.personality_feats: List[str] = normalize_personality_feats(personality_feats)
         self.relation_tags: Dict[str, List[str]] = {
             target_id: list(tags)
             for target_id, tags in (relation_tags or {}).items()

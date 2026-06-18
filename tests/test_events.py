@@ -229,6 +229,32 @@ class TestEventMeeting:
         assert "shared_kindness" in warm.metadata["personality_factor_keys"]
         assert warm.metadata["relationship_delta"] > neutral.metadata["relationship_delta"]
 
+    def test_personality_feats_change_meeting_relationship_delta(self, es, world):
+        plain_a = _make_char("Plain A")
+        plain_b = _make_char("Plain B")
+        featured_a = _make_char("Featured A")
+        featured_b = _make_char("Featured B")
+        neutral_profile = {
+            "openness": 50,
+            "discipline": 50,
+            "extraversion": 50,
+            "agreeableness": 50,
+            "stability": 50,
+        }
+        for char in (plain_a, plain_b, featured_a, featured_b):
+            char.personality = dict(neutral_profile)
+            world.add_character(char)
+        featured_a.personality_feats = ["patient_listener"]
+        featured_b.personality_feats = ["quick_tempered"]
+
+        plain = es.event_meeting(plain_a, plain_b, world, rng=random.Random(0))
+        featured = es.event_meeting(featured_a, featured_b, world, rng=random.Random(0))
+
+        assert featured.metadata["relationship_delta"] > plain.metadata["relationship_delta"]
+        assert featured.metadata["personality_feature_score"] > 0
+        assert "temper_balanced" in featured.metadata["personality_feature_factor_keys"]
+        assert "one temper steadied the other" in featured.metadata["render_params"]["personality_factors"]
+
     def test_shared_catalyst_can_soften_bad_personality_affinity(self, es, world):
         plain_a = _make_char("Plain A")
         plain_b = _make_char("Plain B")

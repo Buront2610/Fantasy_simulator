@@ -2,6 +2,8 @@
 tests/test_character.py - Unit tests for the Character class.
 """
 
+import random
+
 import pytest
 from fantasy_simulator.character import (
     Character,
@@ -13,7 +15,11 @@ from fantasy_simulator.character import (
     random_stats,
 )
 from fantasy_simulator.character_lifespan import legacy_lifespan_years
-from fantasy_simulator.character_personality import personality_archetype_key, render_personality_archetype
+from fantasy_simulator.character_personality import (
+    generate_personality,
+    personality_archetype_key,
+    render_personality_archetype,
+)
 from fantasy_simulator.i18n import get_locale, set_locale
 
 
@@ -179,6 +185,13 @@ class TestCharacterProperties:
 
 
 class TestCharacterPersonality:
+    def test_race_tendency_biases_generated_personality_without_fixing_it(self):
+        neutral = generate_personality(rng=random.Random(7))
+        dwarf = generate_personality(rng=random.Random(7), race="Dwarf")
+
+        assert dwarf["discipline"] > neutral["discipline"]
+        assert dwarf["openness"] < neutral["openness"]
+
     def test_archetype_uses_trait_combinations(self):
         assert personality_archetype_key({
             "openness": 75,
@@ -203,6 +216,17 @@ class TestCharacterPersonality:
             "agreeableness": 50,
             "stability": 50,
         }) == "balanced adventurer"
+
+    def test_personality_feats_round_trip(self, hero):
+        hero.personality_feats = ["brave", "oathbound"]
+
+        restored = Character.from_dict(hero.to_dict())
+
+        assert restored.personality_feats == ["brave", "oathbound"]
+
+    def test_unknown_personality_feat_is_rejected(self):
+        with pytest.raises(ValueError, match="unknown personality feat"):
+            Character("Test", 20, "Male", "Human", "Warrior", personality_feats=["impossible_feat"])
 
 
 # ---------------------------------------------------------------------------
