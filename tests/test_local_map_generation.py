@@ -41,11 +41,20 @@ def test_city_map_uses_readable_district_labels() -> None:
     generated = generate_local_map(_cell("loc_capital", "city", x=2, y=2))
     joined = "\n".join(generated.lines)
 
-    assert "[Homes]" in joined
-    assert "[Market]" in joined
-    assert "[Shrine]" in joined
-    assert "Plaza" in joined
+    assert "Homes" in joined
+    assert "Market" in joined
+    assert "Shrine" in joined
+    assert "Plaza" in joined or "Keep" in joined
     assert "local_map_scene_city" in generated.scene_keys
+
+
+def test_city_maps_have_multiple_stable_urban_forms() -> None:
+    maps = {
+        tuple(generate_local_map(_cell(f"loc_city_{index}", "city", x=index, y=2)).lines)
+        for index in range(8)
+    }
+
+    assert len(maps) >= 2
 
 
 def test_dungeon_map_has_rooms_corridors_and_depth_marker() -> None:

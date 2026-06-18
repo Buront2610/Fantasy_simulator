@@ -35,7 +35,7 @@ def generate_local_map(cell: Any, connected_cells: Iterable[Any] = ()) -> Genera
     if region_type == "dungeon":
         return _generate_dungeon_map(rng, route_directions)
     if region_type == "city":
-        return _generate_city_map(route_directions)
+        return _generate_city_map(rng, route_directions)
     if region_type == "village":
         return _generate_settlement_map(rng, route_directions, dense=False)
     if region_type == "forest":
@@ -112,11 +112,31 @@ def _apply_route_gates(canvas: list[list[str]], directions: set[str], *, road_ch
             canvas[mid_y][x] = road_char
 
 
-def _generate_city_map(route_directions: set[str]) -> GeneratedLocalMap:
+def _generate_city_map(rng: random.Random, route_directions: set[str]) -> GeneratedLocalMap:
     canvas = _bordered_canvas(" ")
+    variant = rng.randrange(3)
+    if variant == 0:
+        _paint_city_plaza_plan(canvas, route_directions or {"north", "south", "east", "west"})
+    elif variant == 1:
+        _paint_city_avenue_plan(canvas, route_directions or {"north", "south", "east", "west"})
+    else:
+        _paint_city_citadel_plan(canvas, route_directions or {"north", "south", "east", "west"})
+    return GeneratedLocalMap(
+        _stringify(canvas),
+        ("local_map_legend_city", "local_map_legend_route_gate"),
+        ("local_map_scene_city",),
+        _city_exterior_lines(),
+    )
+
+
+def _paint_city_plaza_plan(canvas: list[list[str]], directions: set[str]) -> None:
     mid_x = LOCAL_MAP_WIDTH // 2
     mid_y = LOCAL_MAP_HEIGHT // 2
-    _paint_city_roads(canvas, route_directions or {"north", "south", "east", "west"})
+    for x in range(1, LOCAL_MAP_WIDTH - 1):
+        canvas[mid_y][x] = "="
+    for y in range(1, LOCAL_MAP_HEIGHT - 1):
+        canvas[y][mid_x] = "|"
+    _apply_route_gates(canvas, directions, road_char="=")
     canvas[mid_y][mid_x] = "@"
     _paint_text(canvas, mid_x - 6, mid_y - 1, "Plaza")
     _paint_text(canvas, 3, 2, "[Homes]")
@@ -132,22 +152,70 @@ def _generate_city_map(route_directions: set[str]) -> GeneratedLocalMap:
     _paint_text(canvas, 3, 12, "[Craft]")
     _paint_text(canvas, 22, 12, "[Homes]")
     _paint_text(canvas, 22, 13, "lanes")
-    return GeneratedLocalMap(
-        _stringify(canvas),
-        ("local_map_legend_city", "local_map_legend_route_gate"),
-        ("local_map_scene_city",),
-        _city_exterior_lines(),
-    )
 
 
-def _paint_city_roads(canvas: list[list[str]], directions: set[str]) -> None:
-    mid_x = LOCAL_MAP_WIDTH // 2
-    mid_y = LOCAL_MAP_HEIGHT // 2
+def _paint_city_avenue_plan(canvas: list[list[str]], directions: set[str]) -> None:
+    avenue_y = 8
+    side_street_x = 12
     for x in range(1, LOCAL_MAP_WIDTH - 1):
-        canvas[mid_y][x] = "="
+        canvas[avenue_y][x] = "="
     for y in range(1, LOCAL_MAP_HEIGHT - 1):
-        canvas[y][mid_x] = "|"
-    _apply_route_gates(canvas, directions, road_char="=")
+        canvas[y][side_street_x] = "|"
+    _paint_city_gate_stubs(canvas, directions, avenue_y=avenue_y, street_x=side_street_x)
+    canvas[avenue_y][24] = "@"
+    _paint_text(canvas, 3, 2, "[Gate]")
+    _paint_text(canvas, 3, 3, "north")
+    _paint_text(canvas, 17, 2, "[Temple]")
+    _paint_text(canvas, 27, 2, "garden")
+    _paint_text(canvas, 3, 5, "[Homes]")
+    _paint_text(canvas, 17, 5, "arcade")
+    _paint_text(canvas, 25, 5, "[Market]")
+    _paint_text(canvas, 16, 7, "Grand Avenue")
+    _paint_text(canvas, 3, 10, "[Inn]")
+    _paint_text(canvas, 17, 10, "[Guild]")
+    _paint_text(canvas, 27, 10, "[Docks]")
+    _paint_text(canvas, 3, 13, "lanes")
+    _paint_text(canvas, 17, 13, "[Craft]")
+    _paint_text(canvas, 27, 13, "warehouse")
+
+
+def _paint_city_citadel_plan(canvas: list[list[str]], directions: set[str]) -> None:
+    for x in range(7, 30):
+        canvas[4][x] = "="
+        canvas[10][x] = "="
+    for y in range(4, 11):
+        canvas[y][7] = "|"
+        canvas[y][29] = "|"
+    _paint_city_gate_stubs(canvas, directions, avenue_y=10, street_x=18)
+    canvas[10][18] = "@"
+    _paint_text(canvas, 13, 6, "Keep")
+    _paint_text(canvas, 13, 7, "court")
+    _paint_text(canvas, 2, 2, "Homes")
+    _paint_text(canvas, 24, 2, "Shrine")
+    _paint_text(canvas, 1, 6, "Market")
+    _paint_text(canvas, 23, 6, "Guild")
+    _paint_text(canvas, 2, 12, "Inn")
+    _paint_text(canvas, 13, 12, "Craft")
+    _paint_text(canvas, 25, 12, "Homes")
+
+
+def _paint_city_gate_stubs(canvas: list[list[str]], directions: set[str], *, avenue_y: int, street_x: int) -> None:
+    if "north" in directions:
+        canvas[0][street_x] = "+"
+        for y in range(1, min(avenue_y + 1, LOCAL_MAP_HEIGHT - 1)):
+            canvas[y][street_x] = "|"
+    if "south" in directions:
+        canvas[LOCAL_MAP_HEIGHT - 1][street_x] = "+"
+        for y in range(max(1, avenue_y), LOCAL_MAP_HEIGHT - 1):
+            canvas[y][street_x] = "|"
+    if "west" in directions:
+        canvas[avenue_y][0] = "+"
+        for x in range(1, min(street_x + 1, LOCAL_MAP_WIDTH - 1)):
+            canvas[avenue_y][x] = "="
+    if "east" in directions:
+        canvas[avenue_y][LOCAL_MAP_WIDTH - 1] = "+"
+        for x in range(max(1, street_x), LOCAL_MAP_WIDTH - 1):
+            canvas[avenue_y][x] = "="
 
 
 def _paint_text(canvas: list[list[str]], x: int, y: int, text: str) -> None:
