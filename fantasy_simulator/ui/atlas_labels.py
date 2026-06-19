@@ -8,10 +8,20 @@ if TYPE_CHECKING:
     from .map_renderer import MapCellInfo, MapRenderInfo
 
 
-# Site marker varies by traffic band:
-#   high traffic = 'O' (hub), medium = '@', low = 'o'.
-_SITE_MARKERS: Dict[str, str] = {"high": "O", "medium": "@", "low": "o"}
+# Generic cells keep the legacy traffic markers.  Cells built through the
+# production map pipeline get a shared visual profile marker instead.
+_TRAFFIC_SITE_MARKERS: Dict[str, str] = {"high": "O", "medium": "@", "low": "o"}
 _SITE_MARKER = "@"
+
+
+def _site_marker(cell: "MapCellInfo") -> str:
+    profile = getattr(cell, "visual_profile", None)
+    if getattr(profile, "archetype", "generic") == "generic":
+        return _TRAFFIC_SITE_MARKERS.get(cell.traffic_band, _SITE_MARKER)
+    marker = getattr(profile, "world_marker_primary", "") or ""
+    if marker:
+        return marker[0]
+    return _SITE_MARKER
 
 
 def _overlay_suffix(cell: "MapCellInfo") -> str:
@@ -49,9 +59,8 @@ def _place_labels(
 ) -> Set[str]:
     """Place site markers and name labels on the canvas.
 
-    Site marker glyph varies by traffic band: ``O`` hub (high),
-    ``@`` normal (medium), ``o`` quiet (low).  High-rumor sites
-    get a ``?`` halo in unoccupied adjacent cells.
+    Site marker glyph follows the shared place visual profile.  High-rumor
+    sites get a ``?`` halo in unoccupied adjacent cells.
     """
     occupied: Set[Tuple[int, int]] = {
         (ax, ay)
@@ -71,7 +80,7 @@ def _place_labels(
             continue
         ax, ay = pos
 
-        marker = _SITE_MARKERS.get(cell.traffic_band, _SITE_MARKER)
+        marker = _site_marker(cell)
         if 0 <= ay < h and 0 <= ax < w:
             canvas[ay][ax] = marker
 

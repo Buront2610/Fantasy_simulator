@@ -168,6 +168,22 @@ def _append_control_focus(standout_lines: List[str], center_cell: MapCellInfo) -
     )
 
 
+def _append_profile_focus(standout_lines: List[str], center_cell: MapCellInfo) -> None:
+    profile = getattr(center_cell, "visual_profile", None)
+    if getattr(profile, "archetype", "generic") == "generic":
+        return
+    short_label_key = getattr(profile, "short_label_key", "")
+    if not short_label_key:
+        return
+    standout_lines.append(
+        tr(
+            "map_region_focus_profile",
+            location=center_cell.canonical_name,
+            profile=tr(short_label_key),
+        )
+    )
+
+
 def _append_world_change_focus(standout_lines: List[str], world_change_target: Optional[MapCellInfo]) -> None:
     if world_change_target is None:
         return
@@ -252,4 +268,5 @@ def region_focus_lines(
         landmark_text = _landmark_focus_text(landmark_target, memorials, aliases, traces, endonyms)
         if landmark_text:
             standout_lines.append(landmark_text)
+    _append_profile_focus(standout_lines, center_cell)
     return standout_lines

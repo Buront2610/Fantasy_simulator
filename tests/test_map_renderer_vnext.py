@@ -1,6 +1,8 @@
 """Tests for vNext map render info extensions."""
 
 from fantasy_simulator.ui.map_renderer import build_map_info, render_location_detail
+from fantasy_simulator.ui.atlas_renderer import render_atlas_minimal
+from fantasy_simulator.ui.map_region_focus import region_focus_lines
 from fantasy_simulator.world import World
 
 
@@ -76,6 +78,75 @@ def test_build_map_info_attaches_building_cues_to_culture():
     assert {"forge", "warehouse", "barracks", "workshop"}.issubset(culture_cues)
     assert culture_cues["forge"].culture_key == "khazic"
     assert culture_cues["forge"].culture_label == "Northern Holds"
+
+
+def test_build_map_info_attaches_shared_place_visual_profile():
+    world = World()
+    capital = world.get_location_by_id("loc_aethoria_capital")
+    assert capital is not None
+    capital.traffic = 90
+    capital.prosperity = 90
+
+    info = build_map_info(world)
+    cell = next(c for c in info.cells.values() if c.location_id == "loc_aethoria_capital")
+
+    assert cell.visual_profile.archetype == "market_city"
+    assert cell.visual_profile.world_marker_primary == "C"
+    assert cell.visual_profile.world_marker_suffix == "$"
+    assert cell.visual_profile.short_label_key == "map_profile_market_city_short"
+
+
+def test_atlas_minimal_lists_place_profile_summary():
+    world = World()
+    capital = world.get_location_by_id("loc_aethoria_capital")
+    assert capital is not None
+    capital.traffic = 90
+    capital.prosperity = 90
+    info = build_map_info(world)
+
+    output = render_atlas_minimal(info)
+
+    assert "Aethoria Capital" in output
+    assert "C$" in output
+    assert "market city" in output
+
+
+def test_region_focus_starts_with_place_profile_summary():
+    world = World()
+    capital = world.get_location_by_id("loc_aethoria_capital")
+    assert capital is not None
+    capital.traffic = 90
+    capital.prosperity = 90
+    info = build_map_info(world)
+    center = next(c for c in info.cells.values() if c.location_id == "loc_aethoria_capital")
+
+    lines = region_focus_lines(
+        list(info.cells.values()),
+        center,
+        info.routes,
+        {cell.location_id: cell for cell in info.cells.values()},
+        set(),
+        set(),
+        {},
+        {},
+        {},
+        {},
+    )
+
+    assert "Profile: Aethoria Capital - market city" in lines
+
+
+def test_location_detail_uses_shared_profile_scene():
+    world = World()
+    capital = world.get_location_by_id("loc_aethoria_capital")
+    assert capital is not None
+    capital.traffic = 90
+    capital.prosperity = 90
+    info = build_map_info(world)
+
+    output = render_location_detail(info, "loc_aethoria_capital")
+
+    assert "Profile: open market / plaza / lanes" in output
 
 
 def test_location_detail_shows_cultural_building_causes():

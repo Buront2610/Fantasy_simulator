@@ -14,7 +14,7 @@ from .ui_helpers import fit_display_width
 _DANGER_MARKERS: Dict[str, str] = {"low": " ", "medium": ".", "high": "!"}
 _TRAFFIC_MARKERS: Dict[str, str] = {"low": " ", "medium": "o", "high": "O"}
 _RUMOR_MARKERS: Dict[str, str] = {"low": " ", "medium": "~", "high": "?"}
-_MAX_REGION_STANDOUT_ITEMS = 4
+_MAX_REGION_STANDOUT_ITEMS = 5
 _OPEN_ROUTE_MARKER = "<->"
 _BLOCKED_ROUTE_MARKER = "x->"
 _LOCAL_CUE_CATEGORY_ORDER = ("site", "terrain", "memory", "route")

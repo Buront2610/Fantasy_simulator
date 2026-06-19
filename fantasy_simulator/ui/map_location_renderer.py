@@ -290,7 +290,11 @@ def _append_detail_route_sketch(lines: List[str], info: MapRenderInfo, cell: Map
 def _append_site_ascii(lines: List[str], info: MapRenderInfo, cell: MapCellInfo, width: int, border: str) -> None:
     title = f" {tr('map_detail_local_map_title')}"
     connected = _connected_detail_routes(info, cell)
-    generated_map = generate_local_map(cell, [other for _route, other in connected])
+    generated_map = generate_local_map(
+        cell,
+        [other for _route, other in connected],
+        visual_profile=cell.visual_profile,
+    )
     lines.append(_boxed(title, width))
     for art_line in generated_map.lines:
         lines.append(_boxed(f' {art_line}', width))

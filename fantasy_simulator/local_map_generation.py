@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import heapq
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Iterable
 
 
@@ -72,7 +72,11 @@ class LocalMapSpec:
     settlement_seed: int
 
 
-def generate_local_map(cell: Any, connected_cells: Iterable[Any] = ()) -> GeneratedLocalMap:
+def generate_local_map(
+    cell: Any,
+    connected_cells: Iterable[Any] = (),
+    visual_profile: Any = None,
+) -> GeneratedLocalMap:
     """Generate a stable local map for one location.
 
     The generator keeps land/layout seeds separate from state overlays, so
@@ -84,7 +88,12 @@ def generate_local_map(cell: Any, connected_cells: Iterable[Any] = ()) -> Genera
     settlement_rng = random.Random(spec.settlement_seed)
     state_rng = random.Random(_state_overlay_seed(cell))
     route_directions = _route_directions(cell, connected_cells)
-    return _generate_profile_map(spec, topography_rng, settlement_rng, route_directions, cell, state_rng)
+    generated = _generate_profile_map(spec, topography_rng, settlement_rng, route_directions, cell, state_rng)
+    profile_scene_keys = tuple(getattr(visual_profile, "local_scene_keys", ()) or ())
+    if not profile_scene_keys:
+        return generated
+    scene_keys = tuple(dict.fromkeys(profile_scene_keys + generated.scene_keys))
+    return replace(generated, scene_keys=scene_keys)
 
 
 def _hash_seed(*parts: object) -> int:

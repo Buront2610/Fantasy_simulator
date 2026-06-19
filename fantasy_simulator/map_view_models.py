@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set, Tuple, TYPE_CHECKING
 
 from .content.setting_bundle_inspection import setting_entry_key
+from .map_place_profile import PlaceVisualProfile, build_place_visual_profile
 from .narrative.constants import EVENT_KINDS_FATAL
 from .observation import build_world_change_report_projection
 
@@ -82,6 +83,7 @@ class MapCellInfo:
     local_feature_tags: Tuple[str, ...] = ()
     local_feature_labels: Tuple[str, ...] = ()
     local_feature_cues: Tuple[LocalMapCue, ...] = ()
+    visual_profile: PlaceVisualProfile = field(default_factory=PlaceVisualProfile)
 
 
 @dataclass
@@ -559,7 +561,7 @@ def _build_cell_info(
     )
     local_feature_tags = _ordered_feature_tags(local_feature_derivations)
     local_feature_cues = _local_feature_cues(local_feature_tags, local_feature_derivations)
-    return MapCellInfo(
+    cell = MapCellInfo(
         location_id=loc.id,
         canonical_name=loc.canonical_name,
         region_type=loc.region_type,
@@ -601,6 +603,8 @@ def _build_cell_info(
         local_feature_labels=_local_feature_labels(local_feature_tags),
         local_feature_cues=local_feature_cues,
     )
+    cell.visual_profile = build_place_visual_profile(cell)
+    return cell
 
 
 def build_map_info(
