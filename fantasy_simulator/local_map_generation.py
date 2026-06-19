@@ -79,14 +79,11 @@ def generate_local_map(cell: Any, connected_cells: Iterable[Any] = ()) -> Genera
     danger or rumor changes can scar the map without moving rivers, roads, or
     buildings between visits.
     """
-    region_type = str(getattr(cell, "region_type", "plains") or "plains")
     spec = _local_map_spec(cell)
     topography_rng = random.Random(spec.topography_seed)
     settlement_rng = random.Random(spec.settlement_seed)
     state_rng = random.Random(_state_overlay_seed(cell))
     route_directions = _route_directions(cell, connected_cells)
-    if region_type == "dungeon":
-        return _generate_dungeon_map(settlement_rng, route_directions, cell, state_rng)
     return _generate_profile_map(spec, topography_rng, settlement_rng, route_directions, cell, state_rng)
 
 
@@ -188,6 +185,8 @@ def _profile_for_cell(
         return _city_profile(cell, biome, elevation, moisture)
     if region_type == "village":
         return _village_profile(biome, elevation, moisture)
+    if region_type == "dungeon":
+        return _dungeon_profile(biome, elevation, moisture)
     if region_type == "forest":
         return PlaceVisualProfile(
             archetype="forest_paths",
@@ -222,6 +221,56 @@ def _profile_for_cell(
         density=8,
         local_scene_keys=("local_map_scene_wild",),
         legend_key="local_map_legend_wild",
+    )
+
+
+def _dungeon_profile(biome: str, elevation: int, moisture: int) -> PlaceVisualProfile:
+    if biome == "river" or moisture >= 165:
+        return PlaceVisualProfile(
+            archetype="flooded_ruin",
+            terrain_bias=TerrainBias(water=35, roughness=20),
+            feature_rules=(
+                FeatureRule("pool", required=True),
+                FeatureRule("rubble", weight=3),
+                FeatureRule("cache", weight=1),
+                FeatureRule("threat", weight=2),
+                FeatureRule("altar", weight=1),
+            ),
+            road_style="dungeon",
+            density=48,
+            local_scene_keys=("local_map_scene_dungeon_flooded",),
+            legend_key="local_map_legend_dungeon",
+        )
+    if elevation >= 170:
+        return PlaceVisualProfile(
+            archetype="cavern_ruin",
+            terrain_bias=TerrainBias(hill=45, roughness=45),
+            feature_rules=(
+                FeatureRule("rubble", required=True),
+                FeatureRule("threat", weight=3),
+                FeatureRule("cache", weight=1),
+                FeatureRule("altar", weight=1),
+                FeatureRule("pool", weight=1),
+            ),
+            road_style="dungeon",
+            density=42,
+            local_scene_keys=("local_map_scene_dungeon_cavern",),
+            legend_key="local_map_legend_dungeon",
+        )
+    return PlaceVisualProfile(
+        archetype="buried_vault",
+        terrain_bias=TerrainBias(roughness=25),
+        feature_rules=(
+            FeatureRule("altar", required=True),
+            FeatureRule("cache", weight=2),
+            FeatureRule("threat", weight=2),
+            FeatureRule("rubble", weight=2),
+            FeatureRule("pool", weight=1),
+        ),
+        road_style="dungeon",
+        density=45,
+        local_scene_keys=("local_map_scene_dungeon_vault",),
+        legend_key="local_map_legend_dungeon",
     )
 
 
@@ -353,17 +402,6 @@ def _blank_canvas(fill: str = " ") -> list[list[str]]:
     return [[fill for _ in range(LOCAL_MAP_WIDTH)] for _ in range(LOCAL_MAP_HEIGHT)]
 
 
-def _bordered_canvas(fill: str = " ") -> list[list[str]]:
-    canvas = _blank_canvas(fill)
-    for x in range(LOCAL_MAP_WIDTH):
-        canvas[0][x] = "#"
-        canvas[LOCAL_MAP_HEIGHT - 1][x] = "#"
-    for y in range(LOCAL_MAP_HEIGHT):
-        canvas[y][0] = "#"
-        canvas[y][LOCAL_MAP_WIDTH - 1] = "#"
-    return canvas
-
-
 def _route_directions(cell: Any, connected_cells: Iterable[Any]) -> set[str]:
     directions: set[str] = set()
     origin_x = int(getattr(cell, "x", 0) or 0)
@@ -378,27 +416,6 @@ def _route_directions(cell: Any, connected_cells: Iterable[Any]) -> set[str]:
     return directions
 
 
-def _apply_route_gates(canvas: list[list[str]], directions: set[str], *, road_char: str) -> None:
-    mid_x = LOCAL_MAP_WIDTH // 2
-    mid_y = LOCAL_MAP_HEIGHT // 2
-    if "north" in directions:
-        canvas[0][mid_x] = "+"
-        for y in range(1, mid_y + 1):
-            canvas[y][mid_x] = road_char
-    if "south" in directions:
-        canvas[LOCAL_MAP_HEIGHT - 1][mid_x] = "+"
-        for y in range(mid_y, LOCAL_MAP_HEIGHT - 1):
-            canvas[y][mid_x] = road_char
-    if "west" in directions:
-        canvas[mid_y][0] = "+"
-        for x in range(1, mid_x + 1):
-            canvas[mid_y][x] = road_char
-    if "east" in directions:
-        canvas[mid_y][LOCAL_MAP_WIDTH - 1] = "+"
-        for x in range(mid_x, LOCAL_MAP_WIDTH - 1):
-            canvas[mid_y][x] = road_char
-
-
 def _generate_profile_map(
     spec: LocalMapSpec,
     topography_rng: random.Random,
@@ -407,6 +424,8 @@ def _generate_profile_map(
     cell: Any,
     state_rng: random.Random,
 ) -> GeneratedLocalMap:
+    if spec.region_type == "dungeon":
+        return _generate_profile_dungeon_map(spec, settlement_rng, route_directions, cell, state_rng)
     canvas = _generate_micro_terrain(spec, topography_rng)
     if spec.profile.archetype == "citadel_city":
         _paint_rect_border(canvas, 1, 1, LOCAL_MAP_WIDTH - 2, LOCAL_MAP_HEIGHT - 2, "#")
@@ -888,7 +907,8 @@ def _reinforce_city_gates(canvas: list[list[str]]) -> None:
                         canvas[ny][nx] = "="
 
 
-def _generate_dungeon_map(
+def _generate_profile_dungeon_map(
+    spec: LocalMapSpec,
     rng: random.Random,
     route_directions: set[str],
     cell: Any,
@@ -896,9 +916,10 @@ def _generate_dungeon_map(
 ) -> GeneratedLocalMap:
     canvas = _blank_canvas(" ")
     rooms: list[tuple[int, int, int, int]] = []
-    for _ in range(12):
-        w = rng.randint(4, 8)
-        h = rng.randint(3, 5)
+    target_rooms = max(6, min(14, spec.profile.density // 5))
+    room_attempts = target_rooms * 5
+    for _ in range(room_attempts):
+        w, h = _dungeon_room_size(spec.profile, rng)
         x = rng.randint(1, LOCAL_MAP_WIDTH - w - 2)
         y = rng.randint(1, LOCAL_MAP_HEIGHT - h - 2)
         candidate = (x, y, w, h)
@@ -906,6 +927,8 @@ def _generate_dungeon_map(
             continue
         rooms.append(candidate)
         _carve_room(canvas, candidate)
+        if len(rooms) >= target_rooms:
+            break
 
     if not rooms:
         fallback = (LOCAL_MAP_WIDTH // 2 - 3, LOCAL_MAP_HEIGHT // 2 - 2, 7, 5)
@@ -914,33 +937,123 @@ def _generate_dungeon_map(
 
     centers = [_room_center(room) for room in rooms]
     for start, end in zip(centers, centers[1:]):
-        if rng.random() < 0.5:
-            _carve_h_corridor(canvas, start[0], end[0], start[1])
-            _carve_v_corridor(canvas, start[1], end[1], end[0])
-        else:
-            _carve_v_corridor(canvas, start[1], end[1], start[0])
-            _carve_h_corridor(canvas, start[0], end[0], end[1])
+        _carve_dungeon_corridor(canvas, start, end, spec.profile, rng)
 
     entrance = centers[0]
     exit_pos = centers[-1]
     canvas[entrance[1]][entrance[0]] = "@"
     canvas[exit_pos[1]][exit_pos[0]] = ">"
-    for marker in ("?", "!", "!"):
-        room = rng.choice(rooms)
-        x, y = _random_floor_in_room(rng, room)
-        if canvas[y][x] == ".":
-            canvas[y][x] = marker
-    _place_dungeon_features(canvas, rooms, rng)
-    _apply_route_gates(canvas, route_directions or {"south"}, road_char=".")
+    _place_profile_dungeon_features(canvas, rooms, spec.profile, rng)
+    _paint_dungeon_approaches(canvas, route_directions or {"south"}, entrance, rng)
     _outline_dungeon_walls(canvas)
     return _finalize_local_map(
         canvas,
-        ("local_map_legend_dungeon", "local_map_legend_route_gate"),
-        ("local_map_scene_dungeon",),
+        (spec.profile.legend_key, "local_map_legend_route_gate"),
+        spec.profile.local_scene_keys,
         _dungeon_exterior_lines(),
         cell,
         state_rng,
     )
+
+
+def _dungeon_room_size(profile: PlaceVisualProfile, rng: random.Random) -> tuple[int, int]:
+    if profile.archetype == "cavern_ruin":
+        return rng.randint(5, 9), rng.randint(3, 5)
+    if profile.archetype == "flooded_ruin":
+        return rng.randint(4, 8), rng.randint(3, 4)
+    return rng.randint(4, 7), rng.randint(3, 5)
+
+
+def _carve_dungeon_corridor(
+    canvas: list[list[str]],
+    start: tuple[int, int],
+    end: tuple[int, int],
+    profile: PlaceVisualProfile,
+    rng: random.Random,
+) -> None:
+    if profile.archetype == "cavern_ruin" and rng.random() < 0.65:
+        _carve_bent_dungeon_corridor(canvas, start, end, rng)
+        return
+    if rng.random() < 0.5:
+        _carve_h_corridor(canvas, start[0], end[0], start[1])
+        _carve_v_corridor(canvas, start[1], end[1], end[0])
+    else:
+        _carve_v_corridor(canvas, start[1], end[1], start[0])
+        _carve_h_corridor(canvas, start[0], end[0], end[1])
+
+
+def _carve_bent_dungeon_corridor(
+    canvas: list[list[str]],
+    start: tuple[int, int],
+    end: tuple[int, int],
+    rng: random.Random,
+) -> None:
+    current = start
+    safety = LOCAL_MAP_WIDTH * LOCAL_MAP_HEIGHT
+    while current != end and safety > 0:
+        safety -= 1
+        x, y = current
+        canvas[y][x] = "."
+        choices: list[tuple[int, int]] = []
+        if x != end[0]:
+            choices.append((x + (1 if end[0] > x else -1), y))
+        if y != end[1]:
+            choices.append((x, y + (1 if end[1] > y else -1)))
+        if rng.random() < 0.25:
+            choices.extend(_neighbors(current))
+        current = min(choices, key=lambda point: _manhattan(point, end))
+    canvas[end[1]][end[0]] = "."
+
+
+def _place_profile_dungeon_features(
+    canvas: list[list[str]],
+    rooms: list[tuple[int, int, int, int]],
+    profile: PlaceVisualProfile,
+    rng: random.Random,
+) -> None:
+    for rule in profile.feature_rules:
+        count = _feature_count(rule, profile)
+        for _ in range(count):
+            _place_dungeon_marker(canvas, rooms, _dungeon_feature_marker(rule.tag), rng)
+
+
+def _dungeon_feature_marker(tag: str) -> str:
+    return {
+        "altar": "A",
+        "pool": "~",
+        "rubble": "r",
+        "cache": "?",
+        "threat": "!",
+    }.get(tag, "?")
+
+
+def _place_dungeon_marker(
+    canvas: list[list[str]],
+    rooms: list[tuple[int, int, int, int]],
+    marker: str,
+    rng: random.Random,
+) -> None:
+    if not rooms:
+        return
+    room_order = list(rooms)
+    rng.shuffle(room_order)
+    for room in room_order:
+        x, y = _random_floor_in_room(rng, room)
+        if canvas[y][x] == ".":
+            canvas[y][x] = marker
+            return
+
+
+def _paint_dungeon_approaches(
+    canvas: list[list[str]],
+    directions: set[str],
+    entrance: tuple[int, int],
+    rng: random.Random,
+) -> None:
+    for direction in _ordered_directions(directions):
+        endpoint = _route_endpoint(direction, entrance, rng)
+        _carve_weighted_path(canvas, endpoint, entrance, ".")
+        canvas[endpoint[1]][endpoint[0]] = "+"
 
 
 def _finalize_local_map(
@@ -983,7 +1096,7 @@ def _place_overlay_markers(
         (x, y)
         for y, row in enumerate(canvas)
         for x, char in enumerate(row)
-        if char in {" ", ".", ",", '"', "T", "^", "n", ":", "~"}
+        if char in {".", ",", '"', "T", "^", "n", ":", "~"}
     ]
     if not candidates:
         return []
@@ -1124,21 +1237,6 @@ def _outline_dungeon_walls(canvas: list[list[str]]) -> None:
                         wall_points.add((xx, yy))
     for x, y in wall_points:
         canvas[y][x] = "#"
-
-
-def _place_dungeon_features(
-    canvas: list[list[str]],
-    rooms: list[tuple[int, int, int, int]],
-    rng: random.Random,
-) -> None:
-    feature_marks = ("A", "~", "r")
-    for index, marker in enumerate(feature_marks):
-        if not rooms:
-            return
-        room = rooms[(index + rng.randrange(len(rooms))) % len(rooms)]
-        x, y = _random_floor_in_room(rng, room)
-        if canvas[y][x] == ".":
-            canvas[y][x] = marker
 
 
 def _rooms_overlap(first: tuple[int, int, int, int], second: tuple[int, int, int, int]) -> bool:

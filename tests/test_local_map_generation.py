@@ -84,6 +84,35 @@ def test_dungeon_map_has_rooms_corridors_and_depth_marker() -> None:
     assert "." in joined
     assert "#" in joined
     assert "local_map_legend_dungeon" in generated.legend_keys
+    assert generated.scene_keys == ("local_map_scene_dungeon_vault",)
+
+
+def test_dungeon_profile_responds_to_terrain_not_fixed_template() -> None:
+    flooded = generate_local_map(_cell(
+        "loc_flooded_dungeon",
+        "dungeon",
+        terrain_biome="river",
+        terrain_moisture=220,
+    ))
+    cavern = generate_local_map(_cell(
+        "loc_cavern_dungeon",
+        "dungeon",
+        terrain_elevation=210,
+    ))
+
+    assert flooded.scene_keys == ("local_map_scene_dungeon_flooded",)
+    assert cavern.scene_keys == ("local_map_scene_dungeon_cavern",)
+    assert "~" in "\n".join(flooded.lines)
+    assert "#" in "\n".join(cavern.lines)
+
+
+def test_dungeon_route_direction_adds_gate_to_entrance_path() -> None:
+    origin = _cell("loc_gate_dungeon", "dungeon", x=1, y=1)
+    east = _cell("loc_east", "forest", x=2, y=1)
+
+    generated = generate_local_map(origin, [east])
+
+    assert any(line.endswith("+") for line in generated.lines)
 
 
 def test_route_direction_adds_gate_to_local_map() -> None:
