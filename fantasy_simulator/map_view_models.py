@@ -209,12 +209,44 @@ _LOCAL_FEATURE_DEFINITIONS = (
     ("gate", "site", 10),
     ("market", "site", 20),
     ("tower", "site", 25),
-    ("notice_board", "site", 30),
-    ("river", "terrain", 40),
-    ("accident_site", "memory", 50),
-    ("memorial", "memory", 60),
-    ("trace", "memory", 70),
-    ("blocked_route", "route", 80),
+    ("bridge", "site", 30),
+    ("shrine", "site", 35),
+    ("inn", "site", 40),
+    ("guild", "site", 45),
+    ("mill", "site", 50),
+    ("dock", "site", 55),
+    ("forge", "site", 60),
+    ("warehouse", "site", 65),
+    ("stable", "site", 70),
+    ("barracks", "site", 75),
+    ("graveyard", "site", 80),
+    ("library", "site", 85),
+    ("ruined_house", "site", 90),
+    ("workshop", "site", 95),
+    ("farmstead", "site", 100),
+    ("watch_camp", "site", 105),
+    ("arena", "site", 110),
+    ("notice_board", "site", 115),
+    ("river", "terrain", 130),
+    ("accident_site", "memory", 140),
+    ("memorial", "memory", 150),
+    ("trace", "memory", 160),
+    ("blocked_route", "route", 170),
+)
+_INFERRED_BUILDING_RULES = (
+    ("tower", ("tower", "watch", "keep", "fortress", "outpost")),
+    ("mill", ("mill", "brook")),
+    ("dock", ("port", "harbor", "harbour", "dock", "marsh")),
+    ("forge", ("mine", "iron", "forge")),
+    ("warehouse", ("port", "harbor", "harbour", "crossroads")),
+    ("stable", ("crossroads", "outpost", "keep", "gate")),
+    ("barracks", ("keep", "fortress", "outpost", "watch")),
+    ("graveyard", ("ruin", "warrens", "grave")),
+    ("library", ("monastery", "capital", "library")),
+    ("ruined_house", ("ruin", "ashen")),
+    ("workshop", ("guild", "mine", "town")),
+    ("farmstead", ("farm", "mill", "vale", "plains")),
+    ("watch_camp", ("watch", "outpost", "pass")),
 )
 
 
@@ -238,8 +270,7 @@ def _local_feature_tags(
     site_seed_tags = getattr(world, "_site_seed_tags", None)
     if callable(site_seed_tags):
         values.extend(str(tag).strip() for tag in site_seed_tags(loc.id) if str(tag).strip())
-    if _is_tower_like_site(loc, site_type, values):
-        values.append("tower")
+    values.extend(_inferred_building_tags(loc, site_type, values, terrain_biome))
     if terrain_biome == "river":
         values.append("river")
     if loc.memorial_ids:
@@ -251,11 +282,29 @@ def _local_feature_tags(
     return tuple(tag for tag, _category, _priority in _LOCAL_FEATURE_DEFINITIONS if tag in values)
 
 
-def _is_tower_like_site(loc: "LocationState", site_type: str, tags: list[str]) -> bool:
-    if "tower" in tags:
-        return True
+def _inferred_building_tags(
+    loc: "LocationState",
+    site_type: str,
+    tags: list[str],
+    terrain_biome: str,
+) -> list[str]:
+    tag_set = set(tags)
     site_text = f"{site_type} {loc.region_type} {loc.canonical_name}".lower()
-    return any(token in site_text for token in ("tower", "watch", "keep", "fortress", "outpost"))
+    inferred: list[str] = []
+    if terrain_biome == "river" or "river" in tag_set or any(token in site_text for token in ("brook", "marsh")):
+        inferred.append("bridge")
+    if "market" in tag_set:
+        inferred.append("warehouse")
+    inferred.extend(
+        tag
+        for tag, tokens in _INFERRED_BUILDING_RULES
+        if tag in tag_set or _contains_any(site_text, tokens)
+    )
+    return list(dict.fromkeys(inferred))
+
+
+def _contains_any(text: str, tokens: tuple[str, ...]) -> bool:
+    return any(token in text for token in tokens)
 
 
 def _local_feature_labels(feature_tags: Tuple[str, ...]) -> Tuple[str, ...]:

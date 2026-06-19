@@ -33,3 +33,30 @@ def test_build_map_info_marks_authored_tower_sites():
     assert "tower" in tower.local_feature_tags
     assert "tower" in keep.local_feature_tags
     assert any(cue.tag == "tower" and cue.label == "Tower / keep" for cue in tower.local_feature_cues)
+
+
+def test_build_map_info_exposes_authored_building_cues():
+    world = World()
+
+    info = build_map_info(world)
+    tags = {tag for cell in info.cells.values() for tag in cell.local_feature_tags}
+
+    assert {
+        "bridge",
+        "shrine",
+        "inn",
+        "guild",
+        "mill",
+        "dock",
+        "forge",
+        "warehouse",
+        "stable",
+        "barracks",
+        "graveyard",
+        "library",
+        "ruined_house",
+        "workshop",
+        "farmstead",
+        "watch_camp",
+        "arena",
+    }.issubset(tags)

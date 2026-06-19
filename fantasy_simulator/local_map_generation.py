@@ -287,6 +287,7 @@ def _city_profile(cell: Any, biome: str, elevation: int, moisture: int) -> Place
                 FeatureRule("homes", weight=4, near="road"),
                 FeatureRule("docks", required=True, near="water"),
                 FeatureRule("warehouse", weight=2, near="water"),
+                FeatureRule("stable", weight=1, near="road"),
                 FeatureRule("craft", weight=2, near="road"),
             ),
             road_style="riverport",
@@ -302,10 +303,13 @@ def _city_profile(cell: Any, biome: str, elevation: int, moisture: int) -> Place
                 FeatureRule("walls", required=True),
                 FeatureRule("keep", required=True, near="high_ground"),
                 FeatureRule("gate", required=True, near="gate"),
+                FeatureRule("barracks", weight=2, near="road"),
+                FeatureRule("forge", weight=1, near="road"),
                 FeatureRule("market", weight=2, near="road"),
                 FeatureRule("shrine", weight=1, near="center"),
                 FeatureRule("homes", weight=4, near="road"),
                 FeatureRule("inn", weight=1, near="road"),
+                FeatureRule("library", weight=1, near="center"),
                 FeatureRule("craft", weight=2, near="road"),
             ),
             road_style="controlled_roads",
@@ -322,6 +326,8 @@ def _city_profile(cell: Any, biome: str, elevation: int, moisture: int) -> Place
             FeatureRule("guild", weight=1, near="road"),
             FeatureRule("notice", weight=1, near="center"),
             FeatureRule("inn", weight=2, near="road"),
+            FeatureRule("stable", weight=1, near="road"),
+            FeatureRule("arena", weight=1, near="road"),
             FeatureRule("shrine", weight=1, near="center"),
             FeatureRule("craft", weight=2, near="road"),
         ),
@@ -340,6 +346,7 @@ def _village_profile(biome: str, elevation: int, moisture: int) -> PlaceVisualPr
             feature_rules=(
                 FeatureRule("bridge", required=True, near="water"),
                 FeatureRule("watermill", required=True, near="water"),
+                FeatureRule("farmstead", weight=2, near="field"),
                 FeatureRule("fields", weight=5),
                 FeatureRule("homes", weight=4, near="road"),
                 FeatureRule("barn", weight=2, near="field"),
@@ -357,6 +364,7 @@ def _village_profile(biome: str, elevation: int, moisture: int) -> PlaceVisualPr
             feature_rules=(
                 FeatureRule("trees", weight=4),
                 FeatureRule("homes", weight=4, near="road"),
+                FeatureRule("farmstead", weight=1, near="field"),
                 FeatureRule("barn", weight=1, near="field"),
                 FeatureRule("shrine", weight=1, near="center"),
                 FeatureRule("notice", weight=1, near="center"),
@@ -373,6 +381,7 @@ def _village_profile(biome: str, elevation: int, moisture: int) -> PlaceVisualPr
             feature_rules=(
                 FeatureRule("rocks", weight=3),
                 FeatureRule("homes", weight=3, near="road"),
+                FeatureRule("watch_camp", weight=1, near="high_ground"),
                 FeatureRule("barn", weight=1, near="road"),
                 FeatureRule("shrine", weight=1, near="high_ground"),
             ),
@@ -386,6 +395,7 @@ def _village_profile(biome: str, elevation: int, moisture: int) -> PlaceVisualPr
         terrain_bias=TerrainBias(field=45, forest=10, water=10, roughness=8),
         feature_rules=(
             FeatureRule("fields", weight=5),
+            FeatureRule("farmstead", weight=2, near="field"),
             FeatureRule("homes", weight=4, near="road"),
             FeatureRule("barn", weight=2, near="field"),
             FeatureRule("market", weight=1, near="center"),
@@ -805,7 +815,29 @@ def _paint_feature(
         return True
     if tag == "bridge":
         return _paint_bridge(canvas, x, y)
-    if tag in {"homes", "market", "shrine", "inn", "guild", "craft", "docks", "warehouse", "keep", "gate", "notice"}:
+    if tag in {
+        "homes",
+        "market",
+        "shrine",
+        "inn",
+        "guild",
+        "craft",
+        "docks",
+        "warehouse",
+        "keep",
+        "gate",
+        "notice",
+        "forge",
+        "stable",
+        "barracks",
+        "graveyard",
+        "library",
+        "ruined_house",
+        "workshop",
+        "farmstead",
+        "watch_camp",
+        "arena",
+    }:
         marker = _feature_marker(tag)
         if profile.archetype.endswith("_city"):
             return _paint_city_block_at(canvas, x, y, marker)
@@ -838,6 +870,16 @@ def _feature_marker(tag: str) -> str:
         "keep": "K",
         "gate": "G",
         "notice": "N",
+        "forge": "F",
+        "stable": "E",
+        "barracks": "R",
+        "graveyard": "V",
+        "library": "L",
+        "ruined_house": "U",
+        "workshop": "C",
+        "farmstead": "f",
+        "watch_camp": "p",
+        "arena": "A",
     }.get(tag, "?")
 
 
@@ -1076,11 +1118,9 @@ def _apply_local_cue_markers(
 
 def _local_cue_marker_sequence(cell: Any) -> tuple[str, ...]:
     tags = {str(tag) for tag in getattr(cell, "local_feature_tags", ())}
-    markers: list[str] = []
-    if "notice_board" in tags or _cell_band(cell, "rumor_heat_band", "rumor_heat", 0) == "high":
+    markers = [marker for tag, marker in _LOCAL_CUE_MARKERS if tag in tags]
+    if "notice_board" not in tags and _cell_band(cell, "rumor_heat_band", "rumor_heat", 0) == "high":
         markers.append("B")
-    if "tower" in tags:
-        markers.append("Y")
     if bool(getattr(cell, "has_alias", False)):
         markers.append("a")
     if "memorial" in tags or bool(getattr(cell, "has_memorial", False)):
@@ -1092,6 +1132,31 @@ def _local_cue_marker_sequence(cell: Any) -> tuple[str, ...]:
     if "blocked_route" in tags:
         markers.append("x")
     return tuple(dict.fromkeys(markers))
+
+
+_LOCAL_CUE_MARKERS = (
+    ("gate", "g"),
+    ("market", "M"),
+    ("tower", "Y"),
+    ("bridge", "J"),
+    ("shrine", "S"),
+    ("inn", "I"),
+    ("guild", "G"),
+    ("mill", "w"),
+    ("dock", "D"),
+    ("forge", "F"),
+    ("warehouse", "W"),
+    ("stable", "E"),
+    ("barracks", "R"),
+    ("graveyard", "V"),
+    ("library", "L"),
+    ("ruined_house", "U"),
+    ("workshop", "C"),
+    ("farmstead", "f"),
+    ("watch_camp", "p"),
+    ("arena", "A"),
+    ("notice_board", "B"),
+)
 
 
 def _safe_positive_int(value: Any) -> int:

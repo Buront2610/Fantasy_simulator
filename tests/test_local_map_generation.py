@@ -198,6 +198,44 @@ def test_tower_cue_is_drawn_on_the_map() -> None:
     assert "local_map_legend_local_cues" in generated.legend_keys
 
 
+def test_building_cues_are_drawn_on_the_map() -> None:
+    cell = _cell("loc_building_cues", "city", x=2, y=2)
+    cell.local_feature_tags = (
+        "gate",
+        "market",
+        "tower",
+        "bridge",
+        "shrine",
+        "inn",
+        "guild",
+        "mill",
+        "dock",
+        "forge",
+        "warehouse",
+        "stable",
+        "barracks",
+        "graveyard",
+        "library",
+        "ruined_house",
+        "workshop",
+        "farmstead",
+        "watch_camp",
+        "arena",
+        "notice_board",
+    )
+
+    generated = generate_local_map(cell)
+    joined = "\n".join(generated.lines)
+
+    expected_markers = (
+        "g", "M", "Y", "J", "S", "I", "G", "w", "D", "F", "W",
+        "E", "R", "V", "L", "U", "C", "f", "p", "A", "B",
+    )
+    for marker in expected_markers:
+        assert marker in joined
+    assert "local_map_legend_local_cues" in generated.legend_keys
+
+
 def _structure_signature(lines: list[str]) -> str:
     structural_chars = set("@+|-=/\\#HMSGNICKDWwhb")
     return "".join(char for line in lines for char in line if char in structural_chars)

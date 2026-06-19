@@ -8,6 +8,7 @@ from ..i18n import tr, tr_term
 from .map_overlays import _overlay_suffix
 from .map_route_helpers import route_endpoint_name
 from .map_view_models import LocalMapCue, MapCellInfo, RouteRenderInfo
+from .ui_helpers import fit_display_width
 
 
 _DANGER_MARKERS: Dict[str, str] = {"low": " ", "medium": ".", "high": "!"}
@@ -17,6 +18,7 @@ _MAX_REGION_STANDOUT_ITEMS = 4
 _OPEN_ROUTE_MARKER = "<->"
 _BLOCKED_ROUTE_MARKER = "x->"
 _LOCAL_CUE_CATEGORY_ORDER = ("site", "terrain", "memory", "route")
+_REGION_LINE_WIDTH_BUDGET = 57
 
 
 def append_region_focus(lines: List[str], standout_lines: List[str]) -> None:
@@ -84,8 +86,14 @@ def _format_local_cue_groups(cues: List[LocalMapCue]) -> str:
     for category in _LOCAL_CUE_CATEGORY_ORDER:
         labels = groups.get(category, [])
         if labels:
-            parts.append(f"{tr(f'map_cue_category_{category}')}: {', '.join(labels)}")
+            parts.append(f"{tr(f'map_cue_category_{category}')}: {_format_cue_labels(labels)}")
     return "; ".join(parts)
+
+
+def _format_cue_labels(labels: List[str]) -> str:
+    if len(labels) <= 2:
+        return ", ".join(labels)
+    return f"{labels[0]}, +{len(labels) - 1}"
 
 
 def append_region_local_cues(lines: List[str], visible_cells: List[MapCellInfo]) -> None:
@@ -94,7 +102,8 @@ def append_region_local_cues(lines: List[str], visible_cells: List[MapCellInfo])
         return
     lines.append(f"  {tr('map_region_local_cues')}:")
     for cell in cue_cells:
-        lines.append(f"    {cell.canonical_name}: {_format_local_cue_groups(list(cell.local_feature_cues))}")
+        text = f"    {cell.canonical_name}: {_format_local_cue_groups(list(cell.local_feature_cues))}"
+        lines.append(fit_display_width(text, _REGION_LINE_WIDTH_BUDGET))
 
 
 def append_region_landmarks(

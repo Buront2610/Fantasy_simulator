@@ -147,19 +147,19 @@ def _assert_seeded_map_visible_bundle(bundle: dict[str, list[str]]) -> None:
         "  | V The Verdant Vale (Village)                     |",
         "  | Generated local map                              |",
         "  | .,....\"..\"....\"..\"\".\".--+.\"..\".\"\".\"..            |",
-        "  | ..\".....,M\"...........-.\"\".\".\"h......            |",
+        "  | ..\".....,\"\"...........-.\"\".\".\"h......            |",
         "  | ..,...,..\"\"\"....\"..\".\"-.\",\".....\",...            |",
         "  | .\".....\"\"..,.\",...\".\"--.\".....,..\"...            |",
         '  | ...,..."...,.........-"..""""".""....            |',
-        "  | ..h.,\".\"..,.....\"...\"-\"..\"\"\"\"\".\"\"\"\"\".            |",
+        "  | ..h.,\".\"..,.....\"...\"-\"..\"\"\"N\".\"\"\"\"\".            |",
         "  | ..\".\".\"...\"\".....\"..\"-.\"....\"..\"\"\"\"\".            |",
-        "  | \"\"------------------@----------\"\"!\"\".            |",
-        "  | +--,\"h\"\"\"\".\".\"......\".\".....\"\".\"\"\"\"\"\"            |",
-        "  | ....\"\"\"N\"\"!.\"...........\"..\".\"\"\"\"\"\"-+            |",
-        "  | ...\"\"...\"...\".....,,.\"...\".\".\"\"\"\"\"...            |",
-        "  | .,\"..,\"..\",.\".....\"......\"\".....\"....            |",
-        "  | ....\"....bbb..\"....\".....\".,..,.\"..\"\"            |",
-        "  | ..\".,,\".!bbb........\".\"......\".\"\"\"...            |",
+        "  | \"\"------------------@----------!\"\"\"\".            |",
+        "  | +--,\"f\"\"\"\".\".\"..f..w\".\".....\"\".\"\"\"\"\"\"            |",
+        "  | ....\"\"\"M\"\"..\".........S.\"..\".\"\"\"!\"\"-+            |",
+        "  | ...\"\"...\"...\".....,bbb...\".\".\"\"\"\"\"...            |",
+        "  | .,\"..,\"..\",.\".....\"bbb...\"\".....\"....            |",
+        "  | ....\"....h....\"....\".....\".,..,.\"..\"\"            |",
+        "  | ..\".,,\"....!........\".\"......\".\"\"\"...            |",
         "  | ..........,\".,\"\".....\"..\"..\".......,.            |",
         "  | Exterior view                                    |",
         "  |  \"\"\"\" \"\"\"\"        ~~~~~~~~                       |",
@@ -179,7 +179,7 @@ def _assert_seeded_map_visible_bundle(bundle: dict[str, list[str]]) -> None:
         "  |  |                               |               |",
         "  |  |                               |               |",
         "  |  +-------------------------------+               |",
-        "  | Sketch cues: !=High danger                       |",
+        "  | Sketch cues: !=High danger / S=Shrine / w=Mill...|",
         "  | Map legend: @ center, h homes, M market, S shr...|",
         "  | Scene: Profile: field village / barns / lane     |",
         "  | Terrain: Plains (,)                              |",
@@ -195,25 +195,25 @@ def _assert_memory_heavy_bundle(bundle: dict[str, list[str]]) -> None:
     assert "      Also known as: The Lantern Vale" in bundle["region"]
     assert "      Memorial: [Year 1001] Here rests Aldric." in bundle["region"]
     assert "      Recent: Lysara passed through at dawn" in bundle["region"]
-    assert "    The Verdant Vale: Memory: Memorial, Trace" in bundle["region"]
+    assert any("The Verdant Vale: Site: Shrine, +2; Memory: Memori" in line for line in bundle["region"])
 
     assert bundle["detail"][:40] == [
         "  | V The Verdant Vale (Village)                     |",
         "  | Generated local map                              |",
         "  | .,....\"..\"....\"..\"\".\".--+.\"..\".\"\".\"..            |",
-        "  | ..\".....,M\"...........-.\"\".\".\"h......            |",
+        "  | ..\".....,\"\"...........-.\"\".\".\"h......            |",
         "  | ..,...,..\"\"\"....\"..\".\"-.\",\".....\",...            |",
-        "  | .\".....\"\"..,.\",...\".P--.\".....,..\"...            |",
+        "  | .\".....\"\"..,.\",...\".\"--.\".....,..\"...            |",
         '  | ...,..."...,.........-"..""""".""....            |',
-        "  | ..h.,\".\"..,.....\"...\"-\"..\"\"\"\"\".\"\"\"\"\".            |",
+        "  | ..h.,\".\"..,.....\"...\"-\"*.\"\"\"N\".\"\"\"\"\".            |",
         "  | ..\".\".\"...\"\".....\"..\"-.\"....\"..\"\"\"\"\".            |",
-        "  | \"\"------------------@a---------\"\"\"\"\".            |",
-        "  | +--,\"h\"\"\"\".\".\"....t.\".\".....\"\".\"\"\"\"\"\"            |",
-        "  | ....\"\"\"N\"\"..\"...........\"..\".\"\"\"\"\"\"-+            |",
-        "  | ...\"\"...\"...\".....*,.\"...\".\".\"\"\"\"\"...            |",
-        "  | .,\"..,\"..\",.\".....\"......\"\".....\"....            |",
-        "  | ....\"....bbb..\"....\".....\".,..,.\"..\"\"            |",
-        "  | ..\".,,\"..bbb........\".\"......\".\"\"\"...            |",
+        "  | \"\"-----------------a@---P------\"\"\"\"\".            |",
+        "  | +--,\"f\"\"\"\".\".\"..f..w\".\".....\"\".\"\"\"\"\"\"            |",
+        "  | ....\"\"\"M\"\"..\"....t....S.\"..\".\"\"\"\"\"\"-+            |",
+        "  | ...\"\"...\"...\".....,bbb...\".\".\"\"\"\"\"...            |",
+        "  | .,\"..,\"..\",.\".....\"bbb...\"\".....\"....            |",
+        "  | ....\"....h....\"....\".....\".,..,.\"..\"\"            |",
+        "  | ..\".,,\".............\".\"......\".\"\"\"...            |",
         "  | ..........,\".,\"\".....\"..\"..\".......,.            |",
         "  | Exterior view                                    |",
         "  |  \"\"\"\" \"\"\"\"        ~~~~~~~~                       |",
@@ -233,7 +233,7 @@ def _assert_memory_heavy_bundle(bundle: dict[str, list[str]]) -> None:
         "  |  |                               |               |",
         "  |  |                               |               |",
         "  |  +-------------------------------+               |",
-        "  | Sketch cues: M=Memorial                          |",
+        "  | Sketch cues: a=Has alias / P=Memorial / *=Rece...|",
         "  | Map legend: @ center, h homes, M market, S shr...|",
         "  | Scene: Profile: field village / barns / lane     |",
         "  | Terrain: Plains (,)                              |",
@@ -288,10 +288,10 @@ def test_map_views_surface_authored_local_cues() -> None:
 
     assert "  Local cues:" in rendered["region"]
     assert "    The Grey Pass: Site: Gate" in rendered["region"]
-    assert "    Silverbrook: Site: Market; Terrain: River" in rendered["region"]
-    assert "    Aethoria Capital: Site: Gate, Market, Notice board" in rendered["region"]
-    assert "    Sunken Ruins: Memory: Accident site" in rendered["region"]
-    assert "  | Local cues: Site: Gate, Market, Notice board     |" in rendered["detail"]
+    assert "    Silverbrook: Site: Market, +5; Terrain: River" in rendered["region"]
+    assert "    Aethoria Capital: Site: Gate, +10" in rendered["region"]
+    assert "    Sunken Ruins: Site: Graveyard, Ruined house; Memor..." in rendered["region"]
+    assert "  | Local cues: Site: Gate, Market, Shrine, Inn, G...|" in rendered["detail"]
 
 
 def test_location_detail_uses_generated_city_map() -> None:
@@ -304,18 +304,18 @@ def test_location_detail_uses_generated_city_map() -> None:
 
     detail = rendered["detail"]
     assert "  | Generated local map                              |" in detail
-    assert "  | .X..,.....,.....+....................            |" in detail
-    assert "  | .............../H\\......./N\\.........            |" in detail
-    assert "  | ./G\\........###.=|...................            |" in detail
-    assert "  | .###........./M\\/H\\..................            |" in detail
-    assert "  | ....../S\\.......=|..........###......            |" in detail
-    assert "  | ===/I\\###========@==================+            |" in detail
+    assert "  | ....,...X.,.....+....................            |" in detail
+    assert "  | ........../S\\../H\\......./N\\.........            |" in detail
+    assert "  | ..###......./H\\.=R.................,.            |" in detail
+    assert "  | ./G\\........###.=|.E/C\\..............            |" in detail
+    assert "  | ......../E\\..######W......../A\\......            |" in detail
+    assert "  | ===/I\\=========L=@==================+            |" in detail
     assert "  | Exterior view                                    |" in detail
     assert "  |   | [] [] |  o o o  | [] [] |                    |" in detail
     assert "  | Local route sketch                               |" in detail
     assert "  |  |            \\             /--D |               |" in detail
     assert "  |  |            ---@---            |               |" in detail
-    assert "  | Sketch cues: G=Gate / $=Market / B=Notice board  |" in detail
+    assert "  | Sketch cues: g=Gate / $=Market / S=Shrine / I=...|" in detail
     assert "  | Map legend: @ focus, H homes, M market, S shri...|" in detail
     assert "  | Scene: Profile: open market / plaza / lanes      |" in detail
 
@@ -410,12 +410,8 @@ def test_map_views_surface_runtime_local_cues() -> None:
         include_overview=False,
     )
 
-    assert (
-        "    Aethoria Capital: Site: Gate, Market, Notice board; Memory: Memorial, Trace; "
-        "Route: Blocked route"
-        in rendered["region"]
-    )
-    assert "  | Local cues: Site: Gate, Market, Notice board; ...|" in rendered["detail"]
+    assert "    Aethoria Capital: Site: Gate, +10; Memory: Memoria..." in rendered["region"]
+    assert "  | Local cues: Site: Gate, Market, Shrine, Inn, G...|" in rendered["detail"]
 
 
 def test_map_view_model_structures_local_cues_for_filtering() -> None:
@@ -445,10 +441,18 @@ def test_map_view_model_structures_local_cues_for_filtering() -> None:
     ] == [
         ("site", "gate", "Gate", 10),
         ("site", "market", "Market", 20),
-        ("site", "notice_board", "Notice board", 30),
-        ("memory", "memorial", "Memorial", 60),
-        ("memory", "trace", "Trace", 70),
-        ("route", "blocked_route", "Blocked route", 80),
+        ("site", "shrine", "Shrine", 35),
+        ("site", "inn", "Inn", 40),
+        ("site", "guild", "Guild", 45),
+        ("site", "warehouse", "Warehouse", 65),
+        ("site", "stable", "Stable", 70),
+        ("site", "barracks", "Barracks", 75),
+        ("site", "library", "Library", 85),
+        ("site", "arena", "Arena", 110),
+        ("site", "notice_board", "Notice board", 115),
+        ("memory", "memorial", "Memorial", 150),
+        ("memory", "trace", "Trace", 160),
+        ("route", "blocked_route", "Blocked route", 170),
     ]
 
 

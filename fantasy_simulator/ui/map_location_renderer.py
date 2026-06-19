@@ -54,6 +54,29 @@ _LOCAL_CUE_CATEGORY_ORDER = ("site", "terrain", "memory", "route")
 _DETAIL_ROUTE_SKETCH_WIDTH = 31
 _DETAIL_ROUTE_SKETCH_HEIGHT = 9
 _DETAIL_ROUTE_CENTER = (15, 4)
+_DETAIL_SYMBOL_TAGS = (
+    ("gate", "g"),
+    ("market", "$"),
+    ("tower", "Y"),
+    ("bridge", "J"),
+    ("shrine", "S"),
+    ("inn", "I"),
+    ("guild", "G"),
+    ("mill", "w"),
+    ("dock", "D"),
+    ("forge", "F"),
+    ("warehouse", "W"),
+    ("stable", "E"),
+    ("barracks", "R"),
+    ("graveyard", "V"),
+    ("library", "L"),
+    ("ruined_house", "U"),
+    ("workshop", "C"),
+    ("farmstead", "f"),
+    ("watch_camp", "p"),
+    ("arena", "A"),
+    ("notice_board", "B"),
+)
 
 
 def _format_local_cue_groups(cues: List[LocalMapCue]) -> str:
@@ -71,20 +94,23 @@ def _format_local_cue_groups(cues: List[LocalMapCue]) -> str:
 def _local_symbol_line(cell: MapCellInfo, width: int) -> List[str]:
     symbols: List[str] = []
     tags = set(cell.local_feature_tags)
-    if "gate" in tags:
-        symbols.append(f"G={tr('map_feature_gate')}")
-    if "market" in tags:
-        symbols.append(f"$={tr('map_feature_market')}")
-    if "tower" in tags:
-        symbols.append(f"Y={tr('map_feature_tower')}")
-    if "notice_board" in tags:
-        symbols.append(f"B={tr('map_feature_notice_board')}")
-    if cell.has_memorial or "memorial" in tags:
-        symbols.append(f"M={tr('map_feature_memorial')}")
-    if cell.rumor_heat_band == "high":
-        symbols.append(f"?={tr('map_legend_rumor_high')}")
     if cell.danger_band == "high":
         symbols.append(f"!={tr('map_legend_danger_high')}")
+    if cell.rumor_heat_band == "high":
+        symbols.append(f"?={tr('map_legend_rumor_high')}")
+    if cell.has_alias:
+        symbols.append(f"a={tr('map_legend_alias')}")
+    if cell.has_memorial or "memorial" in tags:
+        symbols.append(f"P={tr('map_feature_memorial')}")
+    if cell.recent_death_site:
+        symbols.append(f"*={tr('map_legend_recent_death')}")
+    if "trace" in tags:
+        symbols.append(f"t={tr('map_feature_trace')}")
+    if "blocked_route" in tags:
+        symbols.append(f"x={tr('map_feature_blocked_route')}")
+    for tag, symbol in _DETAIL_SYMBOL_TAGS:
+        if tag in tags:
+            symbols.append(f"{symbol}={tr(f'map_feature_{tag}')}")
     if not symbols:
         return []
     legend = f" {tr('map_detail_aa_legend')}: {' / '.join(symbols)}"
