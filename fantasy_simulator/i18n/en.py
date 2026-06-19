@@ -1187,6 +1187,7 @@ TEXT_EN: Dict[str, str] = {
     'local_map_legend_dungeon': '@ entrance, # walls, . floors, > stairs, ! threat, ? cache, A altar, ~ pool, r rubble',
     'local_map_legend_wild': '@ focus, . paths, terrain glyphs as cover',
     'local_map_legend_route_gate': '+ route gate',
+    'local_map_legend_local_cues': 'B board, P memorial, * incident, t trace, a old-name sign, x blocked',
     'local_map_legend_state_overlay': '! danger, ? rumor, r strain, X control',
     'local_map_scene_city_open_market': 'Profile: open market / plaza / lanes',
     'local_map_scene_city_riverport': 'Profile: riverport / quay / warehouses',

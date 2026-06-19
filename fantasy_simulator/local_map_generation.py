@@ -436,9 +436,10 @@ def _generate_profile_map(
     _place_profile_features(canvas, spec.profile, center, settlement_rng)
     if spec.profile.archetype == "citadel_city":
         _reinforce_city_gates(canvas)
+    cue_legend = _apply_local_cue_markers(canvas, cell, center, settlement_rng)
     return _finalize_local_map(
         canvas,
-        (spec.profile.legend_key, "local_map_legend_route_gate"),
+        (spec.profile.legend_key, "local_map_legend_route_gate") + cue_legend,
         spec.profile.local_scene_keys,
         _profile_exterior_lines(spec.profile.archetype),
         cell,
@@ -945,10 +946,11 @@ def _generate_profile_dungeon_map(
     canvas[exit_pos[1]][exit_pos[0]] = ">"
     _place_profile_dungeon_features(canvas, rooms, spec.profile, rng)
     _paint_dungeon_approaches(canvas, route_directions or {"south"}, entrance, rng)
+    cue_legend = _apply_local_cue_markers(canvas, cell, entrance, rng)
     _outline_dungeon_walls(canvas)
     return _finalize_local_map(
         canvas,
-        (spec.profile.legend_key, "local_map_legend_route_gate"),
+        (spec.profile.legend_key, "local_map_legend_route_gate") + cue_legend,
         spec.profile.local_scene_keys,
         _dungeon_exterior_lines(),
         cell,
@@ -1054,6 +1056,86 @@ def _paint_dungeon_approaches(
         endpoint = _route_endpoint(direction, entrance, rng)
         _carve_weighted_path(canvas, endpoint, entrance, ".")
         canvas[endpoint[1]][endpoint[0]] = "+"
+
+
+def _apply_local_cue_markers(
+    canvas: list[list[str]],
+    cell: Any,
+    center: tuple[int, int],
+    rng: random.Random,
+) -> tuple[str, ...]:
+    markers = _local_cue_marker_sequence(cell)
+    if not markers:
+        return ()
+    placed = False
+    reserved: set[tuple[int, int]] = {center}
+    for marker in markers:
+        placed = _place_local_cue_marker(canvas, center, marker, rng, reserved) or placed
+    return ("local_map_legend_local_cues",) if placed else ()
+
+
+def _local_cue_marker_sequence(cell: Any) -> tuple[str, ...]:
+    tags = {str(tag) for tag in getattr(cell, "local_feature_tags", ())}
+    markers: list[str] = []
+    if "notice_board" in tags or _cell_band(cell, "rumor_heat_band", "rumor_heat", 0) == "high":
+        markers.append("B")
+    if bool(getattr(cell, "has_alias", False)):
+        markers.append("a")
+    if "memorial" in tags or bool(getattr(cell, "has_memorial", False)):
+        markers.append("P")
+    if "accident_site" in tags or bool(getattr(cell, "recent_death_site", False)):
+        markers.append("*")
+    if "trace" in tags or _safe_positive_int(getattr(cell, "recent_world_change_count", 0)) > 0:
+        markers.append("t")
+    if "blocked_route" in tags:
+        markers.append("x")
+    return tuple(dict.fromkeys(markers))
+
+
+def _safe_positive_int(value: Any) -> int:
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _place_local_cue_marker(
+    canvas: list[list[str]],
+    center: tuple[int, int],
+    marker: str,
+    rng: random.Random,
+    reserved: set[tuple[int, int]],
+) -> bool:
+    candidates = [
+        (x, y)
+        for y, row in enumerate(canvas)
+        for x, char in enumerate(row)
+        if (x, y) not in reserved and _is_local_cue_surface(char)
+    ]
+    if not candidates:
+        return False
+    nearby = sorted(candidates, key=lambda point: _manhattan(point, center))[:60]
+    rng.shuffle(nearby)
+    for x, y in nearby:
+        if _near_duplicate_marker(canvas, (x, y), marker):
+            continue
+        canvas[y][x] = marker
+        reserved.add((x, y))
+        return True
+    return False
+
+
+def _is_local_cue_surface(char: str) -> bool:
+    return char in {".", ",", '"', "T", "^", "n", ":", "~", "-", "=", "|"}
+
+
+def _near_duplicate_marker(canvas: list[list[str]], point: tuple[int, int], marker: str) -> bool:
+    x, y = point
+    for nx in range(max(0, x - 1), min(LOCAL_MAP_WIDTH, x + 2)):
+        for ny in range(max(0, y - 1), min(LOCAL_MAP_HEIGHT, y + 2)):
+            if canvas[ny][nx] == marker:
+                return True
+    return False
 
 
 def _finalize_local_map(

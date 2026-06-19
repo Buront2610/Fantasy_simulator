@@ -170,6 +170,24 @@ def test_control_state_adds_overlay_without_changing_city_structure() -> None:
     assert free_signature == _structure_signature(controlled_map.lines)
 
 
+def test_local_memory_cues_are_drawn_on_the_map() -> None:
+    cell = _cell("loc_memory_city", "city", x=2, y=2)
+    cell.rumor_heat = 90
+    cell.rumor_heat_band = "high"
+    cell.has_alias = True
+    cell.has_memorial = True
+    cell.recent_death_site = True
+    cell.recent_world_change_count = 1
+    cell.local_feature_tags = ("notice_board", "trace", "blocked_route")
+
+    generated = generate_local_map(cell)
+    joined = "\n".join(generated.lines)
+
+    for marker in ("B", "a", "P", "*", "t", "x"):
+        assert marker in joined
+    assert "local_map_legend_local_cues" in generated.legend_keys
+
+
 def _structure_signature(lines: list[str]) -> str:
     structural_chars = set("@+|-=/\\#HMSGNICKDWwhb")
     return "".join(char for line in lines for char in line if char in structural_chars)

@@ -1176,6 +1176,7 @@ TEXT_JA: Dict[str, str] = {
     'local_map_legend_dungeon': '@ 入口、# 壁、. 床、> 階段、! 脅威、? 宝、A 祭壇、~ 水場、r 瓦礫',
     'local_map_legend_wild': '@ 注目地点、. 小道、地形記号は遮蔽物',
     'local_map_legend_route_gate': '+ 経路門',
+    'local_map_legend_local_cues': 'B 掲示板、P 記念碑、* 事故跡、t 痕跡、a 旧名標、x 封鎖',
     'local_map_legend_state_overlay': '! 危険、? 噂、r 荒れ、X 支配',
     'local_map_scene_city_open_market': 'プロファイル: 市場町 / 広場 / 路地',
     'local_map_scene_city_riverport': 'プロファイル: 河港 / 岸壁 / 倉',
