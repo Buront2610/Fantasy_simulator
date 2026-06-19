@@ -1175,6 +1175,7 @@ TEXT_EN: Dict[str, str] = {
     'map_detail_rumor_heat': 'Rumor heat',
     'map_detail_control': 'Control',
     'map_detail_local_cues': 'Local cues',
+    'map_detail_culture_cues': 'Culture-built',
     'map_detail_markers': 'Markers',
     'map_detail_local_map_title': 'Generated local map',
     'map_detail_route_sketch': 'Local route sketch',

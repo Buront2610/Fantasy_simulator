@@ -288,9 +288,9 @@ def test_map_views_surface_authored_local_cues() -> None:
 
     assert "  Local cues:" in rendered["region"]
     assert "    The Grey Pass: Site: Gate" in rendered["region"]
-    assert "    Silverbrook: Site: Market, +5; Terrain: River" in rendered["region"]
+    assert "    Silverbrook: Site: Market, +8; Terrain: River" in rendered["region"]
     assert "    Aethoria Capital: Site: Gate, +10" in rendered["region"]
-    assert "    Sunken Ruins: Site: Graveyard, Ruined house; Memor..." in rendered["region"]
+    assert "    Sunken Ruins: Site: Graveyard, +2; Memory: Acciden..." in rendered["region"]
     assert "  | Local cues: Site: Gate, Market, Shrine, Inn, G...|" in rendered["detail"]
 
 

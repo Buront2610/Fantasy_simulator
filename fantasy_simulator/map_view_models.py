@@ -23,6 +23,19 @@ class LocalMapCue:
     category: str
     label: str
     priority: int
+    causes: Tuple[str, ...] = ()
+    culture_key: str = ""
+    culture_label: str = ""
+
+
+@dataclass(frozen=True)
+class _LocalFeatureDerivation:
+    """Internal cause ledger for a local map feature."""
+
+    tag: str
+    causes: Tuple[str, ...] = ()
+    culture_key: str = ""
+    culture_label: str = ""
 
 
 @dataclass
@@ -248,6 +261,70 @@ _INFERRED_BUILDING_RULES = (
     ("farmstead", ("farm", "mill", "vale", "plains")),
     ("watch_camp", ("watch", "outpost", "pass")),
 )
+_CULTURE_BUILDING_RULES = (
+    (
+        "aethic_common",
+        (
+            ("guild", ("city", "town", "capital", "market", "crossroads", "port")),
+            ("inn", ("city", "town", "crossroads", "road", "port", "harbor", "harbour")),
+            ("stable", ("city", "town", "crossroads", "road", "keep", "gate")),
+            ("warehouse", ("city", "town", "market", "crossroads", "port", "harbor", "harbour")),
+            ("notice_board", ("city", "town", "crossroads", "keep", "gate")),
+        ),
+    ),
+    (
+        "khazic",
+        (
+            ("forge", ("mountain", "mine", "pass", "summit", "iron", "stone")),
+            ("warehouse", ("mine", "pass", "hold", "mountain", "iron")),
+            ("barracks", ("keep", "outpost", "pass", "summit", "mountain")),
+            ("workshop", ("mine", "hold", "mountain", "iron", "stone")),
+        ),
+    ),
+    (
+        "quenic",
+        (
+            ("shrine", ("monastery", "forest", "cove", "ley", "skyveil", "elderroot")),
+            ("library", ("monastery", "court", "skyveil", "elderroot", "cove")),
+            ("tower", ("monastery", "ley", "skyveil", "ridge")),
+        ),
+    ),
+    (
+        "sindral",
+        (
+            ("shrine", ("forest", "vale", "thornwood", "ashen", "verdant")),
+            ("farmstead", ("vale", "forest", "plains", "verdant")),
+            ("mill", ("vale", "river", "brook", "forest")),
+        ),
+    ),
+    (
+        "orcish_steppe",
+        (
+            ("watch_camp", ("plains", "outpost", "warrens", "swamp", "frontier", "pass")),
+            ("barracks", ("outpost", "warrens", "frontier", "plains")),
+            ("stable", ("plains", "steppe", "outpost", "frontier")),
+            ("tower", ("outpost", "watch", "frontier")),
+        ),
+    ),
+    (
+        "proto_quenic",
+        (
+            ("graveyard", ("ruin", "ridge", "crater", "sunken", "dragonbone")),
+            ("ruined_house", ("ruin", "crater", "sunken", "warrens")),
+            ("library", ("ruin", "sunken", "dragonbone", "ancient")),
+            ("shrine", ("ridge", "crater", "dragonbone", "ancient")),
+        ),
+    ),
+    (
+        "elder_speech",
+        (
+            ("library", ("monastery", "ruin", "ley", "ancient")),
+            ("shrine", ("monastery", "ley", "ancient")),
+            ("tower", ("monastery", "sky", "ley")),
+        ),
+    ),
+)
+_LOCAL_FEATURE_TAGS = {tag for tag, _category, _priority in _LOCAL_FEATURE_DEFINITIONS}
 
 
 def _blocked_route_site_ids(world: "World") -> Set[str]:
@@ -259,6 +336,75 @@ def _blocked_route_site_ids(world: "World") -> Set[str]:
     return site_ids
 
 
+def _site_seed(world: "World", location_id: str) -> object | None:
+    bundle = getattr(world, "_setting_bundle", None) or getattr(world, "setting_bundle", None)
+    world_definition = getattr(bundle, "world_definition", None)
+    site_seed_by_id = getattr(world_definition, "site_seed_by_id", None)
+    if callable(site_seed_by_id):
+        return site_seed_by_id(location_id)
+    return None
+
+
+def _language_display_name(world: "World", language_key: str) -> str:
+    if not language_key:
+        return ""
+    bundle = getattr(world, "_setting_bundle", None) or getattr(world, "setting_bundle", None)
+    world_definition = getattr(bundle, "world_definition", None)
+    for language in getattr(world_definition, "languages", ()):
+        if getattr(language, "language_key", "") == language_key:
+            return getattr(language, "display_name", "") or language_key
+    return language_key
+
+
+def _culture_display_name(world: "World", location_id: str, language_key: str) -> str:
+    if not language_key:
+        return ""
+    bundle = getattr(world, "_setting_bundle", None) or getattr(world, "setting_bundle", None)
+    world_definition = getattr(bundle, "world_definition", None)
+    communities = [
+        community for community in getattr(world_definition, "language_communities", ())
+        if getattr(community, "language_key", "") == language_key
+        and location_id in getattr(community, "regions", ())
+    ]
+    if communities:
+        community = max(communities, key=lambda item: getattr(item, "priority", 0))
+        return getattr(community, "display_name", "") or language_key
+    return _language_display_name(world, language_key)
+
+
+def _add_local_feature(
+    features: Dict[str, Dict[str, object]],
+    tag: str,
+    cause: str,
+    *,
+    culture_key: str = "",
+    culture_label: str = "",
+) -> None:
+    if tag not in _LOCAL_FEATURE_TAGS:
+        return
+    entry = features.setdefault(tag, {"causes": [], "culture_key": "", "culture_label": ""})
+    causes = entry["causes"]
+    if isinstance(causes, list) and cause not in causes:
+        causes.append(cause)
+    if culture_key and not entry["culture_key"]:
+        entry["culture_key"] = culture_key
+        entry["culture_label"] = culture_label
+
+
+def _finalize_local_features(features: Dict[str, Dict[str, object]]) -> Dict[str, _LocalFeatureDerivation]:
+    finalized: Dict[str, _LocalFeatureDerivation] = {}
+    for tag, entry in features.items():
+        raw_causes = entry.get("causes", ())
+        causes = tuple(str(cause) for cause in raw_causes) if isinstance(raw_causes, list) else ()
+        finalized[tag] = _LocalFeatureDerivation(
+            tag=tag,
+            causes=causes,
+            culture_key=str(entry.get("culture_key", "")),
+            culture_label=str(entry.get("culture_label", "")),
+        )
+    return finalized
+
+
 def _local_feature_tags(
     world: "World",
     loc: "LocationState",
@@ -266,20 +412,69 @@ def _local_feature_tags(
     terrain_biome: str,
     blocked_route_site_ids: Set[str],
 ) -> Tuple[str, ...]:
+    derivations = _local_feature_derivations(world, loc, site_type, terrain_biome, blocked_route_site_ids)
+    return _ordered_feature_tags(derivations)
+
+
+def _local_feature_derivations(
+    world: "World",
+    loc: "LocationState",
+    site_type: str,
+    terrain_biome: str,
+    blocked_route_site_ids: Set[str],
+) -> Dict[str, _LocalFeatureDerivation]:
+    features: Dict[str, Dict[str, object]] = {}
     values: list[str] = []
-    site_seed_tags = getattr(world, "_site_seed_tags", None)
-    if callable(site_seed_tags):
-        values.extend(str(tag).strip() for tag in site_seed_tags(loc.id) if str(tag).strip())
-    values.extend(_inferred_building_tags(loc, site_type, values, terrain_biome))
+    seed = _site_seed(world, loc.id)
+    site_seed_tags = [str(tag).strip() for tag in getattr(seed, "tags", ()) if str(tag).strip()]
+    for tag in site_seed_tags:
+        values.append(tag)
+        _add_local_feature(features, tag, "authored")
+    language_key = str(getattr(seed, "language_key", "") or "")
+    culture_label = _culture_display_name(world, loc.id, language_key)
+    for tag in _culture_building_tags(loc, site_type, site_seed_tags, terrain_biome, language_key):
+        values.append(tag)
+        _add_local_feature(
+            features,
+            tag,
+            "culture",
+            culture_key=language_key,
+            culture_label=culture_label,
+        )
+    for tag in _inferred_building_tags(loc, site_type, values, terrain_biome):
+        values.append(tag)
+        _add_local_feature(features, tag, "inferred")
     if terrain_biome == "river":
-        values.append("river")
+        _add_local_feature(features, "river", "terrain")
     if loc.memorial_ids:
-        values.append("memorial")
+        _add_local_feature(features, "memorial", "memory")
     if loc.live_traces:
-        values.append("trace")
+        _add_local_feature(features, "trace", "memory")
     if loc.id in blocked_route_site_ids:
-        values.append("blocked_route")
-    return tuple(tag for tag, _category, _priority in _LOCAL_FEATURE_DEFINITIONS if tag in values)
+        _add_local_feature(features, "blocked_route", "route")
+    return _finalize_local_features(features)
+
+
+def _ordered_feature_tags(derivations: Dict[str, _LocalFeatureDerivation]) -> Tuple[str, ...]:
+    return tuple(tag for tag, _category, _priority in _LOCAL_FEATURE_DEFINITIONS if tag in derivations)
+
+
+def _culture_building_tags(
+    loc: "LocationState",
+    site_type: str,
+    tags: list[str],
+    terrain_biome: str,
+    language_key: str,
+) -> list[str]:
+    if not language_key:
+        return []
+    tag_text = " ".join(tags).lower()
+    site_text = f"{site_type} {loc.region_type} {loc.canonical_name} {terrain_biome} {tag_text}".lower()
+    culture_rules = dict(_CULTURE_BUILDING_RULES).get(language_key, ())
+    return [
+        tag for tag, tokens in culture_rules
+        if tag in tags or _contains_any(site_text, tokens)
+    ]
 
 
 def _inferred_building_tags(
@@ -313,16 +508,23 @@ def _local_feature_labels(feature_tags: Tuple[str, ...]) -> Tuple[str, ...]:
     return tuple(tr(f"map_feature_{tag}") for tag in feature_tags)
 
 
-def _local_feature_cues(feature_tags: Tuple[str, ...]) -> Tuple[LocalMapCue, ...]:
+def _local_feature_cues(
+    feature_tags: Tuple[str, ...],
+    derivations: Dict[str, _LocalFeatureDerivation] | None = None,
+) -> Tuple[LocalMapCue, ...]:
     from .i18n import tr
 
     tags = set(feature_tags)
+    derivations = derivations or {}
     return tuple(
         LocalMapCue(
             tag=tag,
             category=category,
             label=tr(f"map_feature_{tag}"),
             priority=priority,
+            causes=derivations.get(tag, _LocalFeatureDerivation(tag)).causes,
+            culture_key=derivations.get(tag, _LocalFeatureDerivation(tag)).culture_key,
+            culture_label=derivations.get(tag, _LocalFeatureDerivation(tag)).culture_label,
         )
         for tag, category, priority in _LOCAL_FEATURE_DEFINITIONS
         if tag in tags
@@ -348,8 +550,15 @@ def _build_cell_info(
         y,
     )
     site_type = site.site_type if site else loc.region_type
-    local_feature_tags = _local_feature_tags(world, loc, site_type, terrain_biome, blocked_route_site_ids)
-    local_feature_cues = _local_feature_cues(local_feature_tags)
+    local_feature_derivations = _local_feature_derivations(
+        world,
+        loc,
+        site_type,
+        terrain_biome,
+        blocked_route_site_ids,
+    )
+    local_feature_tags = _ordered_feature_tags(local_feature_derivations)
+    local_feature_cues = _local_feature_cues(local_feature_tags, local_feature_derivations)
     return MapCellInfo(
         location_id=loc.id,
         canonical_name=loc.canonical_name,

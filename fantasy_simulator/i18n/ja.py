@@ -1164,6 +1164,7 @@ TEXT_JA: Dict[str, str] = {
     'map_detail_rumor_heat': '噂の熱量',
     'map_detail_control': '支配',
     'map_detail_local_cues': '局所手がかり',
+    'map_detail_culture_cues': '文化由来',
     'map_detail_markers': 'マーカー',
     'map_detail_local_map_title': '自動生成ローカルマップ',
     'map_detail_route_sketch': '局所道路スケッチ',

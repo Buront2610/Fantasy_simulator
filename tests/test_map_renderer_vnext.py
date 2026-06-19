@@ -1,6 +1,6 @@
 """Tests for vNext map render info extensions."""
 
-from fantasy_simulator.ui.map_renderer import build_map_info
+from fantasy_simulator.ui.map_renderer import build_map_info, render_location_detail
 from fantasy_simulator.world import World
 
 
@@ -60,3 +60,28 @@ def test_build_map_info_exposes_authored_building_cues():
         "watch_camp",
         "arena",
     }.issubset(tags)
+
+
+def test_build_map_info_attaches_building_cues_to_culture():
+    world = World()
+
+    info = build_map_info(world)
+    frostpeak = next(c for c in info.cells.values() if c.location_id == "loc_frostpeak_summit")
+    culture_cues = {
+        cue.tag: cue
+        for cue in frostpeak.local_feature_cues
+        if "culture" in cue.causes
+    }
+
+    assert {"forge", "warehouse", "barracks", "workshop"}.issubset(culture_cues)
+    assert culture_cues["forge"].culture_key == "khazic"
+    assert culture_cues["forge"].culture_label == "Northern Holds"
+
+
+def test_location_detail_shows_cultural_building_causes():
+    world = World()
+
+    info = build_map_info(world)
+    output = render_location_detail(info, "loc_frostpeak_summit")
+
+    assert "Culture-built: Northern Holds: Forge, +3" in output

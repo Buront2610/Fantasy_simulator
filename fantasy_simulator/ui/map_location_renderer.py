@@ -91,6 +91,25 @@ def _format_local_cue_groups(cues: List[LocalMapCue]) -> str:
     return "; ".join(parts)
 
 
+def _format_culture_cue_groups(cues: List[LocalMapCue]) -> str:
+    groups: dict[str, List[str]] = {}
+    for cue in sorted(cues, key=lambda item: item.priority):
+        if "culture" not in cue.causes:
+            continue
+        culture = cue.culture_label or cue.culture_key
+        if not culture:
+            continue
+        labels = groups.setdefault(culture, [])
+        if cue.label not in labels:
+            labels.append(cue.label)
+    parts: List[str] = []
+    for culture, labels in groups.items():
+        if len(labels) > 1:
+            labels = [labels[0], f"+{len(labels) - 1}"]
+        parts.append(f"{culture}: {', '.join(labels)}")
+    return "; ".join(parts)
+
+
 def _local_symbol_line(cell: MapCellInfo, width: int) -> List[str]:
     symbols: List[str] = []
     tags = set(cell.local_feature_tags)
@@ -299,6 +318,10 @@ def _append_state_lines(lines: List[str], cell: MapCellInfo, width: int) -> None
     if cell.local_feature_cues:
         cues = _format_local_cue_groups(list(cell.local_feature_cues))
         lines.append(f"  |{_fit(f' {cues_label}: {cues}', width)}|")
+        culture_cues = _format_culture_cue_groups(list(cell.local_feature_cues))
+        if culture_cues:
+            culture_label = tr("map_detail_culture_cues")
+            lines.append(f"  |{_fit(f' {culture_label}: {culture_cues}', width)}|")
     lines.append(f"  |{_fit(f' {prosperity_label}: {cell.prosperity_label} ({cell.prosperity})', width)}|")
     lines.append(f"  |{_fit(f' {mood_label}: {cell.mood_label} ({cell.mood})', width)}|")
     lines.append(f"  |{_fit(f' {rumor_label}: {cell.rumor_heat} ({_band_label(cell.rumor_heat_band)})', width)}|")
