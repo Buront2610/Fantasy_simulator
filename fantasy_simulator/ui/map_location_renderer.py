@@ -75,6 +75,8 @@ def _local_symbol_line(cell: MapCellInfo, width: int) -> List[str]:
         symbols.append(f"G={tr('map_feature_gate')}")
     if "market" in tags:
         symbols.append(f"$={tr('map_feature_market')}")
+    if "tower" in tags:
+        symbols.append(f"Y={tr('map_feature_tower')}")
     if "notice_board" in tags:
         symbols.append(f"B={tr('map_feature_notice_board')}")
     if cell.has_memorial or "memorial" in tags:

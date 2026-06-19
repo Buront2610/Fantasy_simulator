@@ -208,6 +208,7 @@ def _faction_display_name(world: "World", faction_id: str | None) -> str:
 _LOCAL_FEATURE_DEFINITIONS = (
     ("gate", "site", 10),
     ("market", "site", 20),
+    ("tower", "site", 25),
     ("notice_board", "site", 30),
     ("river", "terrain", 40),
     ("accident_site", "memory", 50),
@@ -229,6 +230,7 @@ def _blocked_route_site_ids(world: "World") -> Set[str]:
 def _local_feature_tags(
     world: "World",
     loc: "LocationState",
+    site_type: str,
     terrain_biome: str,
     blocked_route_site_ids: Set[str],
 ) -> Tuple[str, ...]:
@@ -236,6 +238,8 @@ def _local_feature_tags(
     site_seed_tags = getattr(world, "_site_seed_tags", None)
     if callable(site_seed_tags):
         values.extend(str(tag).strip() for tag in site_seed_tags(loc.id) if str(tag).strip())
+    if _is_tower_like_site(loc, site_type, values):
+        values.append("tower")
     if terrain_biome == "river":
         values.append("river")
     if loc.memorial_ids:
@@ -245,6 +249,13 @@ def _local_feature_tags(
     if loc.id in blocked_route_site_ids:
         values.append("blocked_route")
     return tuple(tag for tag, _category, _priority in _LOCAL_FEATURE_DEFINITIONS if tag in values)
+
+
+def _is_tower_like_site(loc: "LocationState", site_type: str, tags: list[str]) -> bool:
+    if "tower" in tags:
+        return True
+    site_text = f"{site_type} {loc.region_type} {loc.canonical_name}".lower()
+    return any(token in site_text for token in ("tower", "watch", "keep", "fortress", "outpost"))
 
 
 def _local_feature_labels(feature_tags: Tuple[str, ...]) -> Tuple[str, ...]:
@@ -287,7 +298,8 @@ def _build_cell_info(
         x,
         y,
     )
-    local_feature_tags = _local_feature_tags(world, loc, terrain_biome, blocked_route_site_ids)
+    site_type = site.site_type if site else loc.region_type
+    local_feature_tags = _local_feature_tags(world, loc, site_type, terrain_biome, blocked_route_site_ids)
     local_feature_cues = _local_feature_cues(local_feature_tags)
     return MapCellInfo(
         location_id=loc.id,
@@ -321,7 +333,7 @@ def _build_cell_info(
         terrain_moisture=terrain_moisture,
         terrain_temperature=terrain_temperature,
         has_site=site is not None,
-        site_type=site.site_type if site else loc.region_type,
+        site_type=site_type,
         site_importance=site.importance if site else 50,
         atlas_x=site.atlas_x if site else -1,
         atlas_y=site.atlas_y if site else -1,

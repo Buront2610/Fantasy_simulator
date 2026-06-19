@@ -610,6 +610,15 @@ class TestRenderLocationDetail(unittest.TestCase):
         self.assertIn("Memorial", output)
         self.assertIn("Recent death", output)
 
+    def test_tower_cue_shown_in_location_detail(self) -> None:
+        self.info.cells[(1, 1)].local_feature_tags = ("tower",)
+        self.info.cells[(1, 1)].local_feature_cues = ()
+
+        output = render_location_detail(self.info, "loc_test_town")
+
+        self.assertIn("Y=Tower / keep", output)
+        self.assertIn("Y", output)
+
     def test_not_found(self) -> None:
         output = render_location_detail(self.info, "nonexistent")
         self.assertIn("nonexistent", output)

@@ -1079,6 +1079,8 @@ def _local_cue_marker_sequence(cell: Any) -> tuple[str, ...]:
     markers: list[str] = []
     if "notice_board" in tags or _cell_band(cell, "rumor_heat_band", "rumor_heat", 0) == "high":
         markers.append("B")
+    if "tower" in tags:
+        markers.append("Y")
     if bool(getattr(cell, "has_alias", False)):
         markers.append("a")
     if "memorial" in tags or bool(getattr(cell, "has_memorial", False)):

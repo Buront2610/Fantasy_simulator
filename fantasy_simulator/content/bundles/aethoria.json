@@ -466,6 +466,9 @@
         "description": "A lone watchtower staffed by a rotating ranger garrison.",
         "region_type": "village",
         "language_key": "aethic_common",
+        "tags": [
+          "tower"
+        ],
         "x": 4,
         "y": 1
       },

@@ -21,3 +21,15 @@ def test_build_map_info_populates_vnext_overlay_fields():
     assert cell.rumor_heat_band == "high"
     assert cell.has_alias is True
     assert cell.has_memorial is True
+
+
+def test_build_map_info_marks_authored_tower_sites():
+    world = World()
+
+    info = build_map_info(world)
+    tower = next(c for c in info.cells.values() if c.location_id == "loc_eastwatch_tower")
+    keep = next(c for c in info.cells.values() if c.location_id == "loc_stormwatch_keep")
+
+    assert "tower" in tower.local_feature_tags
+    assert "tower" in keep.local_feature_tags
+    assert any(cue.tag == "tower" and cue.label == "Tower / keep" for cue in tower.local_feature_cues)

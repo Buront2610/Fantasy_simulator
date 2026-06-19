@@ -570,6 +570,7 @@ def test_default_aethoria_bundle_has_minimal_phase_i_slots():
         for seed in bundle.world_definition.site_seeds
     }
     assert {"market", "river"}.issubset(tags_by_site_id["loc_silverbrook"])
+    assert "tower" in tags_by_site_id["loc_eastwatch_tower"]
     assert "accident_site" in tags_by_site_id["loc_sunken_ruins"]
     controllers_by_site_id = {
         seed.location_id: seed.controlling_faction_id

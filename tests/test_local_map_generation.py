@@ -188,6 +188,16 @@ def test_local_memory_cues_are_drawn_on_the_map() -> None:
     assert "local_map_legend_local_cues" in generated.legend_keys
 
 
+def test_tower_cue_is_drawn_on_the_map() -> None:
+    cell = _cell("loc_watchtower", "village", x=4, y=1)
+    cell.local_feature_tags = ("tower",)
+
+    generated = generate_local_map(cell)
+
+    assert "Y" in "\n".join(generated.lines)
+    assert "local_map_legend_local_cues" in generated.legend_keys
+
+
 def _structure_signature(lines: list[str]) -> str:
     structural_chars = set("@+|-=/\\#HMSGNICKDWwhb")
     return "".join(char for line in lines for char in line if char in structural_chars)
