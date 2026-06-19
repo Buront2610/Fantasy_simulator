@@ -9,6 +9,7 @@ from ..character_creator import CharacterCreator
 from ..i18n import tr
 from ..simulator import Simulator
 from ..world import World
+from .event_log_presenter import render_live_event_lines
 from .ui_context import UIContext, _default_ctx
 
 
@@ -86,11 +87,13 @@ def _advance_days(
         month = sim.current_month
         day = sim.current_day
         before_events = len(sim.world.event_records)
+        before_adventures = _adventure_stream_markers(sim)
         sim.advance_days(1)
         new_events = len(sim.world.event_records) - before_events
         if live:
             out.print_line(_daily_progress_line(sim, year, month, day, new_events))
             _print_daily_event_stream(sim, before_events, ctx=ctx, delay_seconds=delay_seconds)
+            _print_daily_adventure_stream(sim, before_adventures, ctx=ctx, delay_seconds=delay_seconds)
             if delay_seconds > 0:
                 time.sleep(delay_seconds)
     if not live:
@@ -127,24 +130,73 @@ def _print_daily_event_stream(
     *,
     delay_seconds: float,
 ) -> None:
-    from ..event_rendering import render_event_record
-
     new_records = sim.world.event_records[start_index:]
-    for record in new_records:
-        ctx.out.print_dim(f"    {_event_stream_prefix(record)} {render_event_record(record, world=sim.world)}")
+    if not new_records:
+        ctx.out.print_dim(f"    {tr('live_event_stream_no_major_events')}")
+        return
+    for line in render_live_event_lines(sim, new_records):
+        ctx.out.print_dim(f"    {line}")
         if delay_seconds > 0:
             time.sleep(delay_seconds)
 
 
-def _event_stream_prefix(record: object) -> str:
-    year = int(getattr(record, "year", 0) or 0)
-    month = int(getattr(record, "month", 0) or 0)
-    day = int(getattr(record, "day", 0) or 0)
-    if day > 0 and month > 0:
-        return tr("event_log_prefix_day", year=year, month=month, day=day)
-    if month > 0:
-        return tr("event_log_prefix_month", year=year, month=month)
-    return tr("event_log_prefix", year=year)
+def _adventure_stream_markers(sim: Simulator) -> dict[str, tuple[int, int, str]]:
+    markers: dict[str, tuple[int, int, str]] = {}
+    for run in getattr(sim.world, "active_adventures", []):
+        markers[str(getattr(run, "adventure_id", ""))] = (
+            len(getattr(run, "summary_log", [])),
+            len(getattr(run, "detail_log", [])),
+            str(getattr(run, "state", "")),
+        )
+    return markers
+
+
+def _print_daily_adventure_stream(
+    sim: Simulator,
+    before_markers: dict[str, tuple[int, int, str]],
+    ctx: UIContext,
+    *,
+    delay_seconds: float,
+) -> None:
+    lines = _daily_adventure_stream_lines(sim, before_markers)
+    for line in lines[:4]:
+        ctx.out.print_dim(f"    {line}")
+        if delay_seconds > 0:
+            time.sleep(delay_seconds)
+
+
+def _daily_adventure_stream_lines(
+    sim: Simulator,
+    before_markers: dict[str, tuple[int, int, str]],
+) -> list[str]:
+    lines: list[str] = []
+    for run in getattr(sim.world, "active_adventures", []):
+        adventure_id = str(getattr(run, "adventure_id", ""))
+        before_summary, _before_detail, before_state = before_markers.get(adventure_id, (0, 0, ""))
+        summary_log = list(getattr(run, "summary_log", []))
+        if len(summary_log) > before_summary:
+            for summary in summary_log[before_summary:]:
+                lines.append(tr("live_adventure_progress", name=getattr(run, "character_name", "-"), summary=summary))
+            continue
+        if before_state != str(getattr(run, "state", "")):
+            lines.append(_live_adventure_status_line(sim, run))
+    if not lines:
+        for run in list(getattr(sim.world, "active_adventures", []))[:2]:
+            lines.append(_live_adventure_status_line(sim, run))
+    return lines
+
+
+def _live_adventure_status_line(sim: Simulator, run: object) -> str:
+    destination_id = str(getattr(run, "destination", ""))
+    destination = sim.world.location_name(destination_id) if destination_id else tr("combat_log_unknown")
+    return tr(
+        "live_adventure_status",
+        name=getattr(run, "character_name", "-"),
+        state=getattr(run, "state", "-"),
+        destination=destination,
+        steps=getattr(run, "steps_taken", 0),
+        supply=getattr(run, "supply_state", "-"),
+    )
 
 
 def _simulation_date_label(sim: Simulator, year: int, month: int, day: int) -> str:

@@ -269,6 +269,59 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         # the separator/heading calls prove the route goes through backends)
         self.assertTrue(len(out.calls) > 3, "Too few backend calls captured")
 
+    def test_event_log_groups_entries_with_category_and_metadata(self) -> None:
+        from types import SimpleNamespace
+        from fantasy_simulator.event_models import WorldEventRecord
+        from fantasy_simulator.ui.screens import _show_results
+
+        world = World()
+        hero = Character("Mira", 24, "Female", "Human", "Warrior", char_id="mira")
+        hero.location_id = "loc_aethoria_capital"
+        world.add_character(hero)
+        world.record_event(
+            WorldEventRecord(
+                record_id="battle-readable",
+                kind="battle",
+                year=world.year,
+                month=1,
+                day=2,
+                primary_actor_id=hero.char_id,
+                location_id="loc_aethoria_capital",
+                severity=4,
+                description="Mira held the gate.",
+                render_params={
+                    "combat_log": [
+                        {
+                            "round_number": 1,
+                            "actor_name": "Mira",
+                            "target_name": "Rival",
+                            "action_kind": "weapon_attack",
+                            "skill_key": "Swordsmanship",
+                            "dice": 14,
+                            "modifier": 6,
+                            "attack_total": 20,
+                            "defense_total": 16,
+                            "damage": 3,
+                            "outcome": "advantage",
+                        }
+                    ]
+                },
+            )
+        )
+        sim = SimpleNamespace(world=world)
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(menu_keys=["event_log_last_30", "back_to_main", "exit"])
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_results(sim, ctx=ctx)
+
+        self.assertIn("Event log - latest entries", out.text)
+        self.assertIn("[COMBAT] Mira held the gate.", out.text)
+        self.assertIn("Actors: Mira", out.text)
+        self.assertIn("Location: Aethoria Capital", out.text)
+        self.assertIn("Severity: 4", out.text)
+        self.assertIn("Combat log: 1 rounds.", out.text)
+
     def test_event_log_renders_causal_chain_without_internal_hashes(self) -> None:
         from types import SimpleNamespace
         from fantasy_simulator.event_models import WorldEventRecord
@@ -308,6 +361,33 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         self.assertIn("The armies clashed at the old bridge.", out.text)
         self.assertIn("Because: The northern houses declared war.", out.text)
         self.assertIsNone(re.search(r"\b[0-9a-f]{32}\b", out.text))
+
+    def test_daily_live_stream_surfaces_quiet_days_and_adventure_status(self) -> None:
+        from fantasy_simulator.adventure import AdventureRun
+        from fantasy_simulator.simulator import Simulator
+        from fantasy_simulator.ui.screen_simulation import _advance_daily_live
+
+        world = World()
+        hero = Character("Mira", 24, "Female", "Human", "Warrior", char_id="mira")
+        hero.location_id = "loc_aethoria_capital"
+        world.add_character(hero)
+        world.active_adventures.append(
+            AdventureRun(
+                character_id=hero.char_id,
+                character_name=hero.name,
+                origin="loc_aethoria_capital",
+                destination="loc_thornwood",
+                year_started=world.year,
+            )
+        )
+        sim = Simulator(world, events_per_year=0, adventure_steps_per_year=0, population_maintenance_enabled=False)
+        out = RecordingRenderBackend()
+        ctx = UIContext(inp=ScriptedInputBackend(), out=out)
+
+        _advance_daily_live(sim, ctx=ctx, days=1)
+
+        self.assertIn("no major public events", out.text)
+        self.assertIn("[ADVENTURE] Mira is traveling toward Thornwood", out.text)
 
     def test_event_log_renders_relationship_personality_and_catalyst_factors(self) -> None:
         import random

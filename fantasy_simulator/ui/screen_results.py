@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from ..event_rendering import render_event_record
 from ..i18n import tr
 from ..simulator import Simulator
-from .combat_log_presenter import combat_round_count_for_event
+from .event_log_presenter import (
+    build_event_log_entries,
+    event_log_summary_line,
+    render_event_log_entry_lines,
+)
 from .screen_adventures import (
     _resolve_pending_adventure_choice,
     _show_adventure_details,
@@ -73,74 +76,26 @@ def _show_event_log(sim: Simulator, ctx: UIContext, last_n: int | None = None) -
     ctx.out.print_line()
     records = list(getattr(sim.world, "event_records", []))
     shown = records[-last_n:] if last_n is not None else records
+    title_key = "event_log_last_title" if last_n is not None else "event_log_full_title"
+    ctx.out.print_heading(f"  {tr(title_key)}")
     if not shown:
         ctx.out.print_dim(f"  {tr('event_log_empty')}")
         ctx.inp.pause()
         return
-    for record in shown:
-        ctx.out.print_line(f"  - {_event_log_prefix(record)} {render_event_record(record, world=sim.world)}")
-        cause_text = _event_log_cause_text(sim, record)
-        if cause_text:
-            ctx.out.print_dim(f"      {cause_text}")
-        relationship_text = _event_log_relationship_text(record)
-        if relationship_text:
-            ctx.out.print_dim(f"      {relationship_text}")
-        combat_rounds = combat_round_count_for_event(record)
-        if combat_rounds:
-            ctx.out.print_dim(f"      {tr('event_log_combat_summary', rounds=combat_rounds)}")
+    entries = build_event_log_entries(sim, shown)
+    ctx.out.print_dim(f"  {event_log_summary_line(entries, total_count=len(records))}")
+    previous_date = ""
+    for entry in entries:
+        include_date_divider = entry.date_label != previous_date
+        previous_date = entry.date_label
+        for index, line in enumerate(render_event_log_entry_lines(entry, include_date_divider=include_date_divider)):
+            if index == 0 and include_date_divider:
+                ctx.out.print_highlighted(f"  {line}")
+            elif line.startswith("["):
+                ctx.out.print_line(f"  {line}")
+            else:
+                ctx.out.print_dim(f"      {line}")
     ctx.inp.pause()
-
-
-def _event_log_prefix(record: object) -> str:
-    year = int(getattr(record, "year", 0) or 0)
-    month = int(getattr(record, "month", 0) or 0)
-    day = int(getattr(record, "day", 0) or 0)
-    if day > 0 and month > 0:
-        return tr("event_log_prefix_day", year=year, month=month, day=day)
-    if month > 0:
-        return tr("event_log_prefix_month", year=year, month=month)
-    return tr("event_log_prefix", year=year)
-
-
-def _event_log_cause_text(sim: Simulator, record: object) -> str:
-    cause_ids = list(getattr(record, "cause_event_ids", []))
-    if not cause_ids:
-        return ""
-    causes = [
-        render_event_record(cause, world=sim.world)
-        for cause in sim.world.get_event_causes(getattr(record, "record_id", ""))
-    ]
-    if not causes:
-        return tr("event_log_causes_unavailable")
-    return tr("event_log_caused_by", events=" | ".join(causes))
-
-
-def _event_log_relationship_text(record: object) -> str:
-    render_params = getattr(record, "render_params", {})
-    if not isinstance(render_params, dict):
-        return ""
-    parts = []
-    if "personality_affinity" in render_params:
-        parts.append(
-            tr(
-                "event_log_personality_reason",
-                affinity=render_params.get("personality_affinity", 0),
-                factors=render_params.get("personality_factors", tr("event_log_no_personality_factors")),
-                delta=render_params.get("relationship_delta", 0),
-            )
-        )
-    catalyst_bonus = int(render_params.get("relationship_catalyst_bonus", 0) or 0)
-    if catalyst_bonus:
-        parts.append(
-            tr(
-                "event_log_catalyst_reason",
-                bonus=catalyst_bonus,
-                factors=render_params.get("relationship_catalyst_factors", tr("event_log_no_catalyst_factors")),
-            )
-        )
-    if not parts:
-        return ""
-    return tr("event_log_relationship_reason", reasons=" / ".join(parts))
 
 
 def _update_dirty_state_for_action(action: str, sim: Simulator, ctx: UIContext) -> bool | None:
