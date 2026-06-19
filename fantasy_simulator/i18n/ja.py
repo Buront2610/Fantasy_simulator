@@ -232,6 +232,7 @@ TEXT_JA: Dict[str, str] = {
     'stats_label': '能力値',
     'top_skills_label': '主要スキル',
     'features_label': '特徴',
+    'known_languages_label': '言語',
     'injury_label': '負傷',
     'no_notable_events': '（記録された出来事はありません）',
     'story_of': '{name} の物語',

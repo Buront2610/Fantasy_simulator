@@ -256,6 +256,22 @@ class TestWorld:
         world.add_character(_make_char())
         assert capital.visited is True
 
+    def test_add_character_seeds_personal_language_knowledge(self):
+        world = World()
+        character = Character(
+            "Speaker",
+            25,
+            "Female",
+            "Human",
+            "Warrior",
+            location_id="loc_aethoria_capital",
+        )
+
+        world.add_character(character)
+
+        assert character.known_languages
+        assert max(character.known_languages.values()) >= 90
+
     def test_add_character_with_blank_location_uses_default_resident(self):
         world = World()
         character = Character("Wanderer", 25, "Male", "Human", "Warrior", location_id="")

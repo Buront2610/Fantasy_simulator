@@ -376,6 +376,7 @@ class TestSerialization:
             "alive", "location_id", "favorite", "spotlighted", "playable",
             "history", "spouse_id", "personality",
             "injury_status", "active_adventure_id", "founder_background",
+            "known_languages",
         }
         assert expected_keys.issubset(set(d.keys()))
 
@@ -406,6 +407,20 @@ class TestSerialization:
         assert restored.personality["discipline"] == 0
         assert restored.personality["extraversion"] == 70
         assert restored.personality["agreeableness"] == 50
+
+    def test_known_languages_round_trip_and_clamping(self):
+        char = Character(
+            "Test",
+            20,
+            "Male",
+            "Human",
+            "Warrior",
+            known_languages={"aethic_common": 120, "khazic": -3, "": 50},
+        )
+
+        restored = Character.from_dict(char.to_dict())
+
+        assert restored.known_languages == {"aethic_common": 100, "khazic": 0}
 
     def test_round_trip(self, hero):
         d = hero.to_dict()

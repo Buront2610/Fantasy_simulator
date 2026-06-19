@@ -232,6 +232,7 @@ TEXT_EN: Dict[str, str] = {
     'stats_label': 'Stats',
     'top_skills_label': 'Top Skills',
     'features_label': 'Features',
+    'known_languages_label': 'Languages',
     'injury_label': 'Injury',
     'no_notable_events': '(No notable events recorded.)',
     'story_of': 'The Story of {name}',

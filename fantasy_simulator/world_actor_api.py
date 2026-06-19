@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from .character import Character
     from .content.setting_bundle import SettingBundle
     from .event_models import WorldEventRecord
+    from .language.engine import LanguageEngine
     from .world_event_index import EventHistoryIndex
     from .world_location_state import LocationState
 
@@ -48,6 +49,8 @@ class WorldActorMixin:
         _event_index: EventHistoryIndex
         _location_id_index: Dict[str, LocationState]
 
+        @property
+        def language_engine(self) -> LanguageEngine: ...
         def _repair_location_references(self) -> None: ...
         def _rebuild_location_memorial_ids(self) -> None: ...
 
@@ -90,6 +93,23 @@ class WorldActorMixin:
             mark_visited=self.mark_location_visited,
             rng=rng,
         )
+        self._ensure_character_language_knowledge(character)
+
+    def _ensure_character_language_knowledge(self, character: Character) -> None:
+        """Seed personal language knowledge from race, residence, and lingua francas."""
+        known_languages = getattr(character, "known_languages", None)
+        if known_languages:
+            return
+        character.known_languages = {}
+        primary = self.language_engine.resolve_language(
+            race=getattr(character, "race", None),
+            region=getattr(character, "location_id", None),
+        )
+        if primary is not None:
+            character.known_languages[primary.language_key] = 90
+        for community in self._setting_bundle.world_definition.language_communities:
+            if community.is_lingua_franca and community.language_key not in character.known_languages:
+                character.known_languages[community.language_key] = 45
 
     def rebuild_char_index(self) -> None:
         """Rebuild the character ID index after external mutations."""

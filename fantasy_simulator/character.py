@@ -40,6 +40,34 @@ def _append_unique_tail(values: List[str], value: str, limit: int) -> None:
     del values[:-limit]
 
 
+def _normalize_language_knowledge(payload: Optional[Dict[str, int]]) -> Dict[str, int]:
+    if payload is None:
+        return {}
+    if not isinstance(payload, dict):
+        raise ValueError("known_languages must be a mapping")
+    normalized: Dict[str, int] = {}
+    for language_key, proficiency in payload.items():
+        key = str(language_key).strip()
+        if not key:
+            continue
+        normalized[key] = max(0, min(100, int(proficiency)))
+    return normalized
+
+
+def _normalize_skill_levels(payload: Optional[Dict[str, int]]) -> Dict[str, int]:
+    return {
+        skill: clamp_skill_level(level)
+        for skill, level in (payload or {}).items()
+    }
+
+
+def _normalize_relationship_scores(payload: Optional[Dict[str, int]]) -> Dict[str, int]:
+    return {
+        target_id: clamp_relationship_score(score)
+        for target_id, score in (payload or {}).items()
+    }
+
+
 class Character:
     """Represents a living (or deceased) inhabitant of the world."""
 
@@ -74,6 +102,7 @@ class Character:
         founder_background: Optional[Dict[str, str]] = None,
         personality: Optional[Dict[str, int]] = None,
         personality_feats: Optional[List[str]] = None,
+        known_languages: Optional[Dict[str, int]] = None,
         relation_tags: Optional[Dict[str, List[str]]] = None,
         relation_tag_sources: Optional[Dict[str, List[str]]] = None,
         rng: Any = None,
@@ -96,14 +125,8 @@ class Character:
             constitution=constitution,
         )
 
-        self.skills: Dict[str, int] = {
-            skill: clamp_skill_level(level)
-            for skill, level in (skills or {}).items()
-        }
-        self.relationships: Dict[str, int] = {
-            target_id: clamp_relationship_score(score)
-            for target_id, score in (relationships or {}).items()
-        }
+        self.skills: Dict[str, int] = _normalize_skill_levels(skills)
+        self.relationships: Dict[str, int] = _normalize_relationship_scores(relationships)
         self.alive = alive
         self.location_id = location_id
         self.favorite = favorite
@@ -116,6 +139,7 @@ class Character:
         self.founder_background: Optional[Dict[str, str]] = dict(founder_background) if founder_background else None
         self.personality: Dict[str, int] = normalize_personality(personality)
         self.personality_feats: List[str] = normalize_personality_feats(personality_feats)
+        self.known_languages: Dict[str, int] = _normalize_language_knowledge(known_languages)
         self.relation_tags: Dict[str, List[str]] = {
             target_id: list(tags)
             for target_id, tags in (relation_tags or {}).items()
