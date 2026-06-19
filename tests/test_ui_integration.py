@@ -37,6 +37,18 @@ class TestShowResultsUsesBackends(unittest.TestCase):
     def setUp(self) -> None:
         set_locale("en")
 
+    def test_title_screen_uses_render_backend(self) -> None:
+        from fantasy_simulator.ui.title_screen import render_title_screen
+
+        out = RecordingRenderBackend()
+        ctx = UIContext(inp=ScriptedInputBackend(), out=out)
+
+        render_title_screen(ctx)
+
+        self.assertIn("FANTASY SIMULATOR", out.text)
+        self.assertIn("Aethoria: living histories", out.text)
+        self.assertIn("log flows", out.text)
+
     def test_yearly_report_goes_through_render_backend(self) -> None:
         """Selecting 'yearly_report' then 'back_to_main' must produce
         output ONLY through the recording backend (not print())."""
