@@ -9,8 +9,8 @@ from dataclasses import dataclass
 from typing import Any, Iterable
 
 
-LOCAL_MAP_WIDTH = 37
-LOCAL_MAP_HEIGHT = 15
+LOCAL_MAP_WIDTH = 57
+LOCAL_MAP_HEIGHT = 19
 
 
 @dataclass(frozen=True)

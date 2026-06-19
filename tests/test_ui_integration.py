@@ -598,7 +598,7 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         ctx = UIContext(inp=inp, out=out)
 
         with (
-            patch("shutil.get_terminal_size", return_value=os.terminal_size((72, 24))),
+            patch("shutil.get_terminal_size", return_value=os.terminal_size((64, 24))),
             patch("fantasy_simulator.ui.atlas_renderer.render_atlas_overview", return_value="WIDE"),
             patch("fantasy_simulator.ui.atlas_renderer.render_atlas_compact", return_value="COMPACT"),
             patch("fantasy_simulator.ui.atlas_renderer.render_atlas_minimal", return_value="MINIMAL"),
@@ -607,6 +607,29 @@ class TestShowResultsUsesBackends(unittest.TestCase):
 
         self.assertIn("COMPACT", out.text)
         self.assertNotIn("WIDE", out.text)
+
+    def test_world_map_auto_mode_uses_wide_on_72_column_terminal(self) -> None:
+        from fantasy_simulator.ui.screens import _show_results, _build_default_world
+
+        world = _build_default_world(num_characters=4, seed=42)
+        from fantasy_simulator.simulator import Simulator
+        sim = Simulator(world, events_per_year=2)
+        sim.advance_years(1)
+
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(menu_keys=["world_map", "back_to_main", "back_to_main"])
+        ctx = UIContext(inp=inp, out=out)
+
+        with (
+            patch("shutil.get_terminal_size", return_value=os.terminal_size((72, 24))),
+            patch("fantasy_simulator.ui.atlas_renderer.render_atlas_overview", return_value="WIDE"),
+            patch("fantasy_simulator.ui.atlas_renderer.render_atlas_compact", return_value="COMPACT"),
+            patch("fantasy_simulator.ui.atlas_renderer.render_atlas_minimal", return_value="MINIMAL"),
+        ):
+            _show_results(sim, ctx=ctx)
+
+        self.assertIn("WIDE", out.text)
+        self.assertNotIn("COMPACT", out.text)
 
     def test_world_map_auto_mode_uses_wide_on_large_terminal(self) -> None:
         from fantasy_simulator.ui.screens import _show_results, _build_default_world

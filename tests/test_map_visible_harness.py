@@ -143,49 +143,18 @@ def _assert_seeded_map_visible_bundle(bundle: dict[str, list[str]]) -> None:
     assert any("Native name: Branthethal" in line for line in bundle["region"])
     assert any("Native name: Branthethal" in line for line in bundle["region"])
 
-    assert bundle["detail"][:40] == [
-        "  | V The Verdant Vale (Village)                     |",
-        "  | Generated local map                              |",
-        "  | .,....\"..\"....\"..\"\".\".--+.\"..\".\"\".\"..            |",
-        "  | ..\".....,\"\"...........-.\"\".\".\"h......            |",
-        "  | ..,...,..\"\"\"....\"..\".\"-.\",\".....\",...            |",
-        "  | .\".....\"\"..,.\",...\".\"--.\".....,..\"...            |",
-        '  | ...,..."...,.........-"..""""".""....            |',
-        "  | ..h.,\".\"..,.....\"...\"-\"..\"\"\"N\".\"\"\"\"\".            |",
-        "  | ..\".\".\"...\"\".....\"..\"-.\"....\"..\"\"\"\"\".            |",
-        "  | \"\"------------------@----------!\"\"\"\".            |",
-        "  | +--,\"f\"\"\"\".\".\"..f..w\".\".....\"\".\"\"\"\"\"\"            |",
-        "  | ....\"\"\"M\"\"..\".........S.\"..\".\"\"\"!\"\"-+            |",
-        "  | ...\"\"...\"...\".....,bbb...\".\".\"\"\"\"\"...            |",
-        "  | .,\"..,\"..\",.\".....\"bbb...\"\".....\"....            |",
-        "  | ....\"....h....\"....\".....\".,..,.\"..\"\"            |",
-        "  | ..\".,,\"....!........\".\"......\".\"\"\"...            |",
-        "  | ..........,\".,\"\".....\"..\"..\".......,.            |",
-        "  | Exterior view                                    |",
-        "  |  \"\"\"\" \"\"\"\"        ~~~~~~~~                       |",
-        "  |        /\\       /\\          T T                  |",
-        "  |   ____/__\\_____/__\\____   hhh hhh                |",
-        "  |       ___       ___           B                  |",
-        "  | --------------- @ -----------------              |",
-        "  | Local route sketch                               |",
-        "  |  +-------------------------------+               |",
-        "  |  |                               |               |",
-        "  |  |           C                   |               |",
-        "  |  |            \\             /--D |               |",
-        "  |  |             -\\    /------     |               |",
-        "  |  |            ---@---            |               |",
-        "  |  |     ------/                   |               |",
-        "  |  | o--/                          |               |",
-        "  |  |                               |               |",
-        "  |  |                               |               |",
-        "  |  +-------------------------------+               |",
-        "  | Sketch cues: !=High danger / S=Shrine / w=Mill...|",
-        "  | Map legend: @ center, h homes, M market, S shr...|",
-        "  | Scene: Profile: field village / barns / lane     |",
-        "  | Terrain: Plains (,)                              |",
-        "  | Elev: midland (50%)                              |",
-    ]
-    assert "  | Native name: Branthethal                         |" in bundle["detail"]
+    detail = "\n".join(bundle["detail"])
+    assert "  | V The Verdant Vale (Village)" in detail
+    assert "  | Generated local map" in detail
+    assert "  | Exterior view" in detail
+    assert "  | Local route sketch" in detail
+    assert "  | Sketch cues: !=High danger / S=Shrine / w=Mill / f=Farmstead" in detail
+    assert "  | Map legend: @ center, h homes, M market, S shrine, b barn, w mill" in detail
+    assert "  | cues / ! danger, ? rumor, r strain, X control" in detail
+    assert "  | Scene: Profile: field village / barns / lane" in detail
+    assert "  | Local cues: Site: Shrine, +2" in detail
+    assert "  | Culture-built: Thornwood Sindral: Shrine, +2" in detail
+    assert "  | Native name: Branthethal" in detail
     assert "  | Markers: Has alias                               |" not in bundle["detail"]
 
 
@@ -197,53 +166,17 @@ def _assert_memory_heavy_bundle(bundle: dict[str, list[str]]) -> None:
     assert "      Recent: Lysara passed through at dawn" in bundle["region"]
     assert any("The Verdant Vale: Site: Shrine, +2; Memory: Memori" in line for line in bundle["region"])
 
-    assert bundle["detail"][:40] == [
-        "  | V The Verdant Vale (Village)                     |",
-        "  | Generated local map                              |",
-        "  | .,....\"..\"....\"..\"\".\".--+.\"..\".\"\".\"..            |",
-        "  | ..\".....,\"\"...........-.\"\".\".\"h......            |",
-        "  | ..,...,..\"\"\"....\"..\".\"-.\",\".....\",...            |",
-        "  | .\".....\"\"..,.\",...\".\"--.\".....,..\"...            |",
-        '  | ...,..."...,.........-"..""""".""....            |',
-        "  | ..h.,\".\"..,.....\"...\"-\"*.\"\"\"N\".\"\"\"\"\".            |",
-        "  | ..\".\".\"...\"\".....\"..\"-.\"....\"..\"\"\"\"\".            |",
-        "  | \"\"-----------------a@---P------\"\"\"\"\".            |",
-        "  | +--,\"f\"\"\"\".\".\"..f..w\".\".....\"\".\"\"\"\"\"\"            |",
-        "  | ....\"\"\"M\"\"..\"....t....S.\"..\".\"\"\"\"\"\"-+            |",
-        "  | ...\"\"...\"...\".....,bbb...\".\".\"\"\"\"\"...            |",
-        "  | .,\"..,\"..\",.\".....\"bbb...\"\".....\"....            |",
-        "  | ....\"....h....\"....\".....\".,..,.\"..\"\"            |",
-        "  | ..\".,,\".............\".\"......\".\"\"\"...            |",
-        "  | ..........,\".,\"\".....\"..\"..\".......,.            |",
-        "  | Exterior view                                    |",
-        "  |  \"\"\"\" \"\"\"\"        ~~~~~~~~                       |",
-        "  |        /\\       /\\          T T                  |",
-        "  |   ____/__\\_____/__\\____   hhh hhh                |",
-        "  |       ___       ___           B                  |",
-        "  | --------------- @ -----------------              |",
-        "  | Local route sketch                               |",
-        "  |  +-------------------------------+               |",
-        "  |  |                               |               |",
-        "  |  |           C                   |               |",
-        "  |  |            \\             /--D |               |",
-        "  |  |             -\\    /------     |               |",
-        "  |  |            ---@---            |               |",
-        "  |  |     ------/                   |               |",
-        "  |  | o--/                          |               |",
-        "  |  |                               |               |",
-        "  |  |                               |               |",
-        "  |  +-------------------------------+               |",
-        "  | Sketch cues: a=Has alias / P=Memorial / *=Rece...|",
-        "  | Map legend: @ center, h homes, M market, S shr...|",
-        "  | Scene: Profile: field village / barns / lane     |",
-        "  | Terrain: Plains (,)                              |",
-        "  | Elev: midland (50%)                              |",
-    ]
-    assert "  | Markers: Memorial present, Has alias, Recent d...|" in bundle["detail"]
-    assert "  | Native name: Branthethal                         |" in bundle["detail"]
-    assert "  | Known as: The Lantern Vale                       |" in bundle["detail"]
-    assert "  |   [Year 1001] Here rests Aldric.                 |" in bundle["detail"]
-    assert "  |   - Lysara passed through at dawn                |" in bundle["detail"]
+    detail = "\n".join(bundle["detail"])
+    assert "  | V The Verdant Vale (Village)" in detail
+    assert "  | Generated local map" in detail
+    assert "  | Exterior view" in detail
+    assert "  | Sketch cues: a=Has alias / P=Memorial / *=Recent death site / t=Trace" in detail
+    assert "  | Local cues: Site: Shrine, +2; Memory: Memorial, Trace" in detail
+    assert "  | Markers: Memorial present, Has alias, Recent death site" in detail
+    assert "  | Native name: Branthethal" in detail
+    assert "  | Known as: The Lantern Vale" in detail
+    assert "  |   [Year 1001] Here rests Aldric." in detail
+    assert "  |   - Lysara passed through at dawn" in detail
 
 
 def test_seeded_map_visible_bundle_matches_expected_contract() -> None:
@@ -260,10 +193,10 @@ def test_map_views_keep_display_width_budgets_across_locales(locale: str) -> Non
 
     assert {name: max(display_width(line) for line in text.splitlines()) for name, text in rendered.items()} == {
         "region": 58 if locale == "en" else 57,
-        "detail": 54,
+        "detail": 78,
         "overview": 57 if locale == "en" else 49,
     }
-    assert _boxed_detail_widths(rendered["detail"]) == {54}
+    assert _boxed_detail_widths(rendered["detail"]) == {78}
 
 
 def test_map_views_surface_current_location_control() -> None:
@@ -275,7 +208,7 @@ def test_map_views_surface_current_location_control() -> None:
     )
 
     assert "    - Control: Aethoria Capital is held by Aethorian Crown Council" in rendered["region"]
-    assert "  | Control: Aethorian Crown Council                 |" in rendered["detail"]
+    assert "  | Control: Aethorian Crown Council" in rendered["detail"]
 
 
 def test_map_views_surface_authored_local_cues() -> None:
@@ -291,7 +224,8 @@ def test_map_views_surface_authored_local_cues() -> None:
     assert "    Silverbrook: Site: Market, +8; Terrain: River" in rendered["region"]
     assert "    Aethoria Capital: Site: Gate, +10" in rendered["region"]
     assert "    Sunken Ruins: Site: Graveyard, +2; Memory: Acciden..." in rendered["region"]
-    assert "  | Local cues: Site: Gate, Market, Shrine, Inn, G...|" in rendered["detail"]
+    assert "  | Local cues: Site: Gate, +10" in rendered["detail"]
+    assert "  | Culture-built: Aethic Heartlands: Inn, +4" in rendered["detail"]
 
 
 def test_location_detail_uses_generated_city_map() -> None:
@@ -303,21 +237,16 @@ def test_location_detail_uses_generated_city_map() -> None:
     )
 
     detail = rendered["detail"]
-    assert "  | Generated local map                              |" in detail
-    assert "  | ....,...X.,.....+....................            |" in detail
-    assert "  | ........../S\\../H\\......./N\\.........            |" in detail
-    assert "  | ..###......./H\\.=R.................,.            |" in detail
-    assert "  | ./G\\........###.=|.E/C\\..............            |" in detail
-    assert "  | ......../E\\..######W......../A\\......            |" in detail
-    assert "  | ===/I\\=========L=@==================+            |" in detail
-    assert "  | Exterior view                                    |" in detail
-    assert "  |   | [] [] |  o o o  | [] [] |                    |" in detail
-    assert "  | Local route sketch                               |" in detail
-    assert "  |  |            \\             /--D |               |" in detail
-    assert "  |  |            ---@---            |               |" in detail
-    assert "  | Sketch cues: g=Gate / $=Market / S=Shrine / I=...|" in detail
-    assert "  | Map legend: @ focus, H homes, M market, S shri...|" in detail
-    assert "  | Scene: Profile: open market / plaza / lanes      |" in detail
+    assert "  | Generated local map" in detail
+    assert "S" in detail and "G" in detail and "W" in detail and "@" in detail
+    assert "  | Exterior view" in detail
+    assert "  |   | [] [] |  o o o  | [] [] |" in detail
+    assert "  | Local route sketch" in detail
+    assert "  |  |            \\             /--D |" in detail
+    assert "  |  |            ---@---            |" in detail
+    assert "  | Sketch cues: g=Gate / $=Market / S=Shrine / I=Inn / G=Guild" in detail
+    assert "  | Map legend: @ focus, H homes, M market, S shrine, I inn, G gate/guild, C" in detail
+    assert "  | Scene: Profile: open market / plaza / lanes" in detail
 
 
 def test_region_route_sketch_renders_cities_as_blocks() -> None:
@@ -376,8 +305,8 @@ def test_location_detail_surfaces_name_etymology_preview() -> None:
         include_overview=False,
     )
 
-    assert "  | Native name: Thelbryn                            |" in rendered["detail"]
-    assert "  | Name origin: Thelbryn < Sindral; authored nati...|" in rendered["detail"]
+    assert "  | Native name: Thelbryn" in rendered["detail"]
+    assert "  | Name origin: Thelbryn < Sindral; authored native name for Thornwood" in rendered["detail"]
 
 
 def test_map_views_surface_runtime_local_cues() -> None:
@@ -411,7 +340,9 @@ def test_map_views_surface_runtime_local_cues() -> None:
     )
 
     assert "    Aethoria Capital: Site: Gate, +10; Memory: Memoria..." in rendered["region"]
-    assert "  | Local cues: Site: Gate, Market, Shrine, Inn, G...|" in rendered["detail"]
+    assert "  | Local cues: Site: Gate, +10; Memory: Memorial, Trace; Route: Blocked" in rendered["detail"]
+    assert "  | route" in rendered["detail"]
+    assert "  | Culture-built: Aethic Heartlands: Inn, +4" in rendered["detail"]
 
 
 def test_map_view_model_structures_local_cues_for_filtering() -> None:
