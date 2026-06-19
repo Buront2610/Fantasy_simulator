@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Callable, Dict, Mapping, Type
 
 from .content.setting_bundle import CalendarDefinition, bundle_from_dict_validated
-from .language.state import LanguageEvolutionRecord, LanguageRuntimeState
+from .language.state import LanguageEvolutionRecord, LanguageRuntimeState, LocationNameHistoryRecord
 from .terrain import AtlasLayout
 from .world_event_record_updates import normalize_event_record_locations
 from .world_arc import WorldArc
@@ -171,6 +171,10 @@ def _hydrate_calendar_and_language(
         LanguageEvolutionRecord.from_dict(item)
         for item in data.get("language_evolution_history", [])
     ]
+    world.location_name_history = [
+        LocationNameHistoryRecord.from_dict(item)
+        for item in data.get("location_name_history", [])
+    ]
     persisted_runtime_states = {
         key: LanguageRuntimeState.from_dict(value)
         for key, value in dict(data.get("language_runtime_states", {})).items()
@@ -272,5 +276,7 @@ def hydrate_world_state(
     )
     _hydrate_topology(world, data, bundle_backed_structure=bundle_backed_structure)
     _refresh_loaded_endonyms(world, data)
+    if "location_name_history" not in data:
+        world._seed_initial_location_name_history()
     world.normalize_after_load()
     return world

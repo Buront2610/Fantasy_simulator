@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple
 
 from .event_models import WorldEventRecord
 from .language.engine import LanguageEngine, fallback_evolution_targets
-from .language.state import LanguageEvolutionRecord, LanguageRuntimeState
+from .language.state import LanguageEvolutionRecord, LanguageRuntimeState, LocationNameHistoryRecord
 from .rule_override_resolution import (
     clone_default_event_impact_rules,
     clone_default_propagation_rules,
@@ -143,6 +143,7 @@ class World(
         self.calendar_history: List[CalendarChangeRecord] = []
         self.language_origin_year: int = year
         self.language_evolution_history: List[LanguageEvolutionRecord] = []
+        self.location_name_history: List[LocationNameHistoryRecord] = []
         self._language_runtime_states: Dict[str, LanguageRuntimeState] = {}
         # PR-G: terrain / site / route layers
         self.terrain_map: Optional[TerrainMap] = None
@@ -156,6 +157,7 @@ class World(
         self.atlas_layout: Optional[AtlasLayout] = None
         if not _skip_defaults:
             self._build_default_map()
+            self._seed_initial_location_name_history()
 
     @property
     def name(self) -> str:

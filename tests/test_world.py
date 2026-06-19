@@ -910,6 +910,65 @@ class TestWorld:
         assert len(restored.language_evolution_history) == 1
         assert restored.language_evolution_history[0].year == 1002
 
+    def test_location_name_history_tracks_generated_endonym_changes(self):
+        world = World(name="Custom", year=1000)
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="loc_custom",
+                        name="Custom",
+                        description="Custom site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                        language_key="custom_lang",
+                    ),
+                ],
+                languages=[
+                    LanguageDefinition(
+                        language_key="custom_lang",
+                        display_name="Custom Lang",
+                        toponym_stems=["tor"],
+                        toponym_suffixes=["um"],
+                        toponym_patterns=["RY"],
+                        evolution_rule_pool=[
+                            SoundChangeRuleDefinition(
+                                rule_key="custom_lang.t_to_d",
+                                source="t",
+                                target="d",
+                            ),
+                        ],
+                    )
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+        before = world.location_endonym("loc_custom")
+
+        record = WorldEventRecord(
+            record_id="evt_route_contact",
+            kind="route_opened",
+            year=1001,
+            location_id="loc_custom",
+        )
+        world.apply_language_evolution_from_event(record, cause_key="route_opened")
+
+        entries = world.location_name_records("loc_custom")
+        assert entries
+        assert entries[-1].surface == world.location_endonym("loc_custom")
+        assert entries[-1].previous_surface == before
+        assert entries[-1].language_key == "custom_lang"
+        assert entries[-1].source_event_id == "evt_route_contact"
+
+        restored = World.from_dict(world.to_dict())
+        restored_entries = restored.location_name_records("loc_custom")
+        assert [entry.to_dict() for entry in restored_entries] == [entry.to_dict() for entry in entries]
+
     def test_world_change_event_can_drive_language_evolution_with_cause_history(self):
         world = World(name="Custom", year=1000)
         world.setting_bundle = SettingBundle(

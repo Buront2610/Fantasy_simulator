@@ -118,3 +118,42 @@ class LanguageRuntimeState:
                 field_name="language_runtime_state.derived_toponym_suffixes",
             ),
         )
+
+
+@dataclass(frozen=True)
+class LocationNameHistoryRecord:
+    """Durable history entry for a location name observed in a language."""
+
+    location_id: str
+    year: int
+    surface: str
+    name_kind: str
+    language_key: str = ""
+    previous_surface: str = ""
+    reason_key: str = ""
+    source_event_id: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "location_id": self.location_id,
+            "year": int(self.year),
+            "surface": self.surface,
+            "name_kind": self.name_kind,
+            "language_key": self.language_key,
+            "previous_surface": self.previous_surface,
+            "reason_key": self.reason_key,
+            "source_event_id": self.source_event_id,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "LocationNameHistoryRecord":
+        return cls(
+            location_id=str(data.get("location_id", "")),
+            year=int(data.get("year", 0)),
+            surface=str(data.get("surface", "")),
+            name_kind=str(data.get("name_kind", "")),
+            language_key=str(data.get("language_key", "")),
+            previous_surface=str(data.get("previous_surface", "")),
+            reason_key=str(data.get("reason_key", "")),
+            source_event_id=str(data.get("source_event_id", "")),
+        )

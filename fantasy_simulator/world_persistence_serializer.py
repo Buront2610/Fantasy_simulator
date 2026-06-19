@@ -32,6 +32,7 @@ def _serialize_base_world_state(world: Any) -> Dict[str, Any]:
         "calendar_history": [entry.to_dict() for entry in world.calendar_history],
         "language_origin_year": world.language_origin_year,
         "language_evolution_history": [entry.to_dict() for entry in world.language_evolution_history],
+        "location_name_history": [entry.to_dict() for entry in world.location_name_history],
         "language_runtime_states": {
             key: state.to_dict()
             for key, state in world._language_runtime_states.items()
