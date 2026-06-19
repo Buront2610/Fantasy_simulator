@@ -288,6 +288,35 @@ def test_completed_adventure_updates_and_persists_site_state(tmp_path):
     assert restored_location.adventure_reputation == location.adventure_reputation
 
 
+def test_completed_dungeon_adventure_updates_durable_site_causality():
+    world = World()
+    dungeon = world.get_location_by_id("loc_goblin_warrens")
+    assert dungeon is not None
+    run = AdventureRun(
+        character_id="hero1",
+        character_name="Aldric",
+        origin="loc_aethoria_capital",
+        destination=dungeon.id,
+        year_started=world.year,
+        adventure_id="adv_causal_dungeon",
+        state="resolved",
+        outcome="safe_return",
+        loot_summary=["goblin war standard"],
+        resolution_year=world.year + 1,
+    )
+
+    from fantasy_simulator.adventure_site_state import apply_adventure_site_state
+
+    apply_adventure_site_state(world, run)
+
+    assert dungeon.last_adventure_id == "adv_causal_dungeon"
+    assert dungeon.last_adventure_year == world.year + 1
+    assert dungeon.last_adventure_outcome == "safe_return"
+    assert dungeon.adventure_count == 1
+    assert dungeon.dungeon_clearance >= 28
+    assert dungeon.hazard_regrowth == 0
+
+
 def test_pending_choice_persists_until_later_year(monkeypatch):
     world = World()
     char = _make_character()

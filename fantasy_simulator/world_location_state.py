@@ -144,6 +144,12 @@ class LocationState:
     live_traces: List[Dict[str, Any]] = field(default_factory=list)
     exploration_progress: int = 0
     adventure_reputation: int = 0
+    dungeon_clearance: int = 0
+    hazard_regrowth: int = 0
+    last_adventure_id: str = ""
+    last_adventure_year: int = 0
+    last_adventure_outcome: str = ""
+    adventure_count: int = 0
 
     def __post_init__(self) -> None:
         for field_name in (
@@ -158,6 +164,9 @@ class LocationState:
             setattr(self, field_name, clamp_state(getattr(self, field_name)))
         self.exploration_progress = clamp_state(self.exploration_progress)
         self.adventure_reputation = clamp_reputation(self.adventure_reputation)
+        self.dungeon_clearance = clamp_state(self.dungeon_clearance)
+        self.hazard_regrowth = clamp_state(self.hazard_regrowth)
+        self.adventure_count = max(0, int(self.adventure_count))
 
     @property
     def name(self) -> str:
@@ -221,6 +230,12 @@ class LocationState:
             "live_traces": [deepcopy(trace) for trace in self.live_traces],
             "exploration_progress": self.exploration_progress,
             "adventure_reputation": self.adventure_reputation,
+            "dungeon_clearance": self.dungeon_clearance,
+            "hazard_regrowth": self.hazard_regrowth,
+            "last_adventure_id": self.last_adventure_id,
+            "last_adventure_year": self.last_adventure_year,
+            "last_adventure_outcome": self.last_adventure_outcome,
+            "adventure_count": self.adventure_count,
         }
 
     @classmethod
@@ -293,6 +308,12 @@ class LocationState:
             live_traces=trace_list_payload(data.get("live_traces", []), field_name="live_traces"),
             exploration_progress=data.get("exploration_progress", 0),
             adventure_reputation=data.get("adventure_reputation", 0),
+            dungeon_clearance=data.get("dungeon_clearance", 0),
+            hazard_regrowth=data.get("hazard_regrowth", 0),
+            last_adventure_id=str(data.get("last_adventure_id", "")),
+            last_adventure_year=int(data.get("last_adventure_year", 0)),
+            last_adventure_outcome=str(data.get("last_adventure_outcome", "")),
+            adventure_count=int(data.get("adventure_count", 0)),
         )
 
 
