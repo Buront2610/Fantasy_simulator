@@ -98,6 +98,26 @@ def _boxed_detail_widths(detail: str) -> set[int]:
     }
 
 
+def _detail_sentence_lines(detail: str) -> list[str]:
+    labels = (
+        "Sketch cues:",
+        "Map legend:",
+        "Scene:",
+        "Local cues:",
+        "Culture-built:",
+        "Name origin:",
+        "Known as:",
+        "Markers:",
+        "Routes from here:",
+        "Recent events:",
+        "Rumors & Intelligence:",
+    )
+    return [
+        line for line in detail.splitlines()
+        if any(label in line for label in labels)
+    ]
+
+
 @pytest.fixture(autouse=True)
 def _restore_locale():
     previous = get_locale()
@@ -150,7 +170,6 @@ def _assert_seeded_map_visible_bundle(bundle: dict[str, list[str]]) -> None:
     assert "  | Local route sketch" in detail
     assert "  | Sketch cues: !=High danger / S=Shrine / w=Mill / f=Farmstead" in detail
     assert "  | Map legend: @ center, h homes, M market, S shrine, b barn, w mill" in detail
-    assert "  | cues / ! danger, ? rumor, r strain, X control" in detail
     assert "  | Scene: Profile: field village / barns / lane" in detail
     assert "  | Local cues: Site: Shrine, +2" in detail
     assert "  | Culture-built: Thornwood Sindral: Shrine, +2" in detail
@@ -193,10 +212,22 @@ def test_map_views_keep_display_width_budgets_across_locales(locale: str) -> Non
 
     assert {name: max(display_width(line) for line in text.splitlines()) for name, text in rendered.items()} == {
         "region": 58 if locale == "en" else 57,
-        "detail": 78,
+        "detail": 122,
         "overview": 57 if locale == "en" else 49,
     }
-    assert _boxed_detail_widths(rendered["detail"]) == {78}
+    assert _boxed_detail_widths(rendered["detail"]) == {122}
+
+
+def test_location_detail_sentence_lines_are_not_ellipsized() -> None:
+    set_locale("en")
+    rendered = render_world_map_views_for_location(
+        World(),
+        "loc_aethoria_capital",
+        include_overview=False,
+    )
+
+    assert _detail_sentence_lines(rendered["detail"])
+    assert all("..." not in line for line in _detail_sentence_lines(rendered["detail"]))
 
 
 def test_map_views_surface_current_location_control() -> None:
@@ -340,8 +371,7 @@ def test_map_views_surface_runtime_local_cues() -> None:
     )
 
     assert "    Aethoria Capital: Site: Gate, +10; Memory: Memoria..." in rendered["region"]
-    assert "  | Local cues: Site: Gate, +10; Memory: Memorial, Trace; Route: Blocked" in rendered["detail"]
-    assert "  | route" in rendered["detail"]
+    assert "  | Local cues: Site: Gate, +10; Memory: Memorial, Trace; Route: Blocked route" in rendered["detail"]
     assert "  | Culture-built: Aethic Heartlands: Inn, +4" in rendered["detail"]
 
 
