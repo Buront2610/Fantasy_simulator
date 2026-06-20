@@ -45,8 +45,10 @@ class TestShowResultsUsesBackends(unittest.TestCase):
 
         render_title_screen(ctx)
 
-        self.assertIn("FANTASY SIMULATOR", out.text)
-        self.assertIn("AETHORIA OBSERVATORY", out.text)
+        self.assertIn("____|           |                      ___| _)", out.text)
+        self.assertIn(r"_|  \__,_|_|  _|\__|\__,_|____/\__, |", out.text)
+        self.assertIn(r"/ \   ___| |_| |__   ___  _ __(_) __ _", out.text)
+        self.assertIn(r"\____/|_.__/|___/\___|_|", out.text)
         self.assertIn("C$======|1000.01.01", out.text)
         self.assertIn("D!=====C!---T---D^", out.text)
         self.assertIn("1000.01.01  >>>", out.text)
