@@ -25,8 +25,18 @@ def render_title_screen(ctx: UIContext | None = None) -> None:
     out = ctx.out
     out.print_line()
     out.print_separator("=", 76)
-    out.print_heading(f"    {tr('title_screen_name')}")
-    out.print_highlighted(f"    {tr('title_screen_edition')}")
+    wordmark = (
+        f"    .====================[ {tr('title_screen_name')} ]====================.",
+        r"    ||\\                                                          //||",
+        f"    || \\\\          {tr('title_screen_edition')}                         // ||",
+        r"    ||  \\______________________________________________________//  ||",
+        r"    '================================================================'",
+    )
+    for index, line in enumerate(wordmark):
+        if index == 0:
+            out.print_heading(line)
+        else:
+            out.print_highlighted(line)
     out.print_separator("-", 76)
     for line in _TITLE_SCENE:
         out.print_dim(f"    {line}")
