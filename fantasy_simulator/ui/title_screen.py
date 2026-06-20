@@ -7,10 +7,12 @@ from .ui_context import UIContext, _default_ctx
 
 
 _TITLE_MAP = (
-    r"      /\        . . . roads . . .        [ LIVE WORLD LOG ]",
-    r"  ___/  \___       C$---v~---D!          day ticks scroll",
-    r" /  ^  ^   \__       \   |   /           battles surface",
-    r" \__ ruins ___/        T--o--?           causes stay readable",
+    r"          /\                         +----------------------+",
+    r"      ___/  \___        C$====v~====D!    1000.01.01  >>>   |",
+    r"     /  ^  ^   \__        \\   |   //     !  ?  *  $  m     |",
+    r"     \__ T  ___ _/         T---o---?      ///// ///// ///   |",
+    r"        \__   __/          v'---C!--D^    >>> >>> >>> >>>   |",
+    r"           \_/                         +----------------------+",
 )
 
 
@@ -25,11 +27,4 @@ def render_title_screen(ctx: UIContext | None = None) -> None:
     out.print_separator("-", 72)
     for line in _TITLE_MAP:
         out.print_dim(f"    {line}")
-    out.print_separator("-", 72)
-    for key in (
-        "title_screen_signal_live",
-        "title_screen_signal_logs",
-        "title_screen_signal_atlas",
-    ):
-        out.print_line(f"    {tr(key)}")
     out.print_separator("=", 72)
