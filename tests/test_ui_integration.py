@@ -46,8 +46,9 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         render_title_screen(ctx)
 
         self.assertIn("FANTASY SIMULATOR", out.text)
-        self.assertIn("Aethoria: living histories", out.text)
-        self.assertIn("log flows", out.text)
+        self.assertIn("AETHORIA OBSERVATORY", out.text)
+        self.assertIn("[ LIVE WORLD LOG ]", out.text)
+        self.assertIn("combat / relations / world changes / life events", out.text)
 
     def test_yearly_report_goes_through_render_backend(self) -> None:
         """Selecting 'yearly_report' then 'back_to_main' must produce
