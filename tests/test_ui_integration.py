@@ -47,7 +47,8 @@ class TestShowResultsUsesBackends(unittest.TestCase):
 
         self.assertIn("FANTASY SIMULATOR", out.text)
         self.assertIn("AETHORIA OBSERVATORY", out.text)
-        self.assertIn("C$====v~====D!", out.text)
+        self.assertIn("C$======|1000.01.01", out.text)
+        self.assertIn("D!=====C!---T---D^", out.text)
         self.assertIn("1000.01.01  >>>", out.text)
         self.assertIn(">>> >>> >>> >>>", out.text)
 
