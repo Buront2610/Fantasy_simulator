@@ -7,6 +7,8 @@ world simulation, form relationships, travel, age, fight, discover things, and
 take part in multi-step adventures that the player can inspect and occasionally
 influence.
 
+![Fantasy Simulator title screen](docs/assets/title_screen_ascii_logo.png)
+
 ## Features
 
 - Yearly CLI progression backed by a day-granular simulation engine
