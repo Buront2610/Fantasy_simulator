@@ -8,6 +8,17 @@ from .event_models import WorldEventRecord
 from .world_arc import WorldArc
 
 
+WAR_LOCATION_FALLBACK_KINDS = {
+    "war_battle",
+    "war_ended",
+    "location_occupied",
+    "location_liberated",
+    "location_faction_changed",
+    "route_blocked",
+    "route_reopened",
+}
+
+
 def war_pair(aggressor_faction_id: str, target_faction_id: str) -> tuple[str, str]:
     """Return the order-independent identity for a faction war."""
     first, second = sorted((aggressor_faction_id, target_faction_id))
@@ -169,6 +180,8 @@ def _record_arc_match(record: WorldEventRecord, arcs: Iterable[WorldArc]) -> Opt
         for arc in arcs:
             if cause_event_id in arc.related_event_ids or cause_event_id == arc.cause_event_id:
                 return arc
+    if record.kind not in WAR_LOCATION_FALLBACK_KINDS and "war" not in record.tags:
+        return None
     record_locations = set(_string_values(params.get("location_ids", [])))
     if isinstance(params.get("location_id"), str):
         record_locations.add(str(params["location_id"]))

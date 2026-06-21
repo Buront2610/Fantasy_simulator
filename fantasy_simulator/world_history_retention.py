@@ -118,6 +118,14 @@ def _referenced_event_ids(world: Any) -> set[str]:
         if cause_event_id:
             ids.add(cause_event_id)
         ids.update(getattr(arc, "related_event_ids", []))
+    for rumor in list(getattr(world, "rumors", [])) + list(getattr(world, "rumor_archive", [])):
+        source_event_id = getattr(rumor, "source_event_id", None)
+        if isinstance(source_event_id, str) and source_event_id:
+            ids.add(source_event_id)
+        ids.update(
+            record_id for record_id in getattr(rumor, "related_event_ids", [])
+            if isinstance(record_id, str) and record_id
+        )
     for run in list(getattr(world, "active_adventures", [])) + list(getattr(world, "completed_adventures", [])):
         ids.update(getattr(run, "related_event_ids", []))
     return ids

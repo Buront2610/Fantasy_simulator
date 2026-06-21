@@ -106,6 +106,8 @@ def project_event_log_lines(
     world: EventRenderContext | None = None,
 ) -> List[str]:
     """Project log lines from canonical records."""
+    if max_event_log <= 0:
+        return []
     recent = list(records)[-max_event_log:]
     return [
         format_event_log_entry(

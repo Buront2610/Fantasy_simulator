@@ -27,5 +27,7 @@ def event_log_lines(world: MutableEventLogWorld, *, last_n: Optional[int] = None
     """Return projected event-log lines from canonical records."""
     log = list(event_log_view(world))
     if last_n is not None:
+        if last_n <= 0:
+            return []
         return log[-last_n:]
     return list(log)

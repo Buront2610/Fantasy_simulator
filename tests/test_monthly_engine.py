@@ -21,12 +21,13 @@ from fantasy_simulator.character_creator import CharacterCreator
 from fantasy_simulator.event_models import EventResult
 from fantasy_simulator.events import WorldEventRecord
 from fantasy_simulator.simulation.population import (
+    choose_migration_destination,
     has_population_capacity,
     population_capacity,
     population_pressure_factor,
 )
 from fantasy_simulator.simulator import Simulator
-from fantasy_simulator.world import World
+from fantasy_simulator.world import LocationState, World
 
 
 # ---------------------------------------------------------------------------
@@ -88,6 +89,48 @@ class TestPopulationMaintenance:
 
         assert population_capacity(world) >= 20
         assert has_population_capacity(world) is True
+
+    def test_migration_destination_excludes_dungeons(self):
+        world = _build_seeded_world(7, n_chars=0)
+        dungeon = LocationState(
+            id="loc_dungeon",
+            canonical_name="Dungeon",
+            description="A sealed ruin.",
+            region_type="dungeon",
+            x=0,
+            y=0,
+            prosperity=100,
+            safety=100,
+            mood=100,
+            danger=0,
+            traffic=100,
+            rumor_heat=0,
+            road_condition=100,
+        )
+        city = LocationState(
+            id="loc_city",
+            canonical_name="City",
+            description="A habitable city.",
+            region_type="city",
+            x=1,
+            y=0,
+            prosperity=1,
+            safety=1,
+            mood=1,
+            danger=99,
+            traffic=1,
+            rumor_heat=0,
+            road_condition=1,
+        )
+        world.grid = {dungeon.id: dungeon, city.id: city}
+
+        class FirstChoiceRng:
+            def choice(self, values):
+                return list(values)[0]
+
+        destination = choose_migration_destination(world, FirstChoiceRng())
+
+        assert destination is city
 
     def test_population_capacity_closes_when_living_population_reaches_limit(self):
         world = _build_seeded_world(7, n_chars=0)

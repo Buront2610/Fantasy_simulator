@@ -29,13 +29,17 @@ def population_pressure_factor(world: "World") -> float:
     return min(MAX_POPULATION_PRESSURE_FACTOR, max(1.0, len(living_characters(world)) / BASELINE_POPULATION))
 
 
-def population_capacity(world: "World") -> int:
-    """Return a soft population capacity for long-run simulation throughput."""
-    habitable_locations = [
+def habitable_locations(world: "World") -> list["LocationState"]:
+    """Return locations that can receive long-run resident population."""
+    return [
         location for location in world.grid.values()
         if getattr(location, "region_type", "") != "dungeon"
     ]
-    return max(BASELINE_POPULATION, len(habitable_locations) * LOCATION_POPULATION_CAPACITY)
+
+
+def population_capacity(world: "World") -> int:
+    """Return a soft population capacity for long-run simulation throughput."""
+    return max(BASELINE_POPULATION, len(habitable_locations(world)) * LOCATION_POPULATION_CAPACITY)
 
 
 def has_population_capacity(world: "World") -> bool:
@@ -51,7 +55,7 @@ def _location_pull_score(location: "LocationState") -> float:
 
 
 def choose_migration_destination(world: "World", rng: Any) -> "LocationState | None":
-    candidates = list(world.grid.values())
+    candidates = habitable_locations(world)
     if not candidates:
         return None
     weights = [_location_pull_score(location) for location in candidates]

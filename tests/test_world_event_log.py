@@ -53,6 +53,14 @@ def test_project_event_log_lines_uses_canonical_description() -> None:
     assert projected == ["[Y1000 M1 D1] new-format"]
 
 
+def test_project_event_log_lines_with_zero_limit_returns_empty_list() -> None:
+    records = [
+        WorldEventRecord(kind="meeting", year=1000, description="hidden"),
+    ]
+
+    assert project_event_log_lines(records, max_event_log=0, translate=_translate) == []
+
+
 def test_project_event_log_lines_uses_formatting() -> None:
     records = [
         WorldEventRecord(kind="battle", year=1001, month=6, day=4, description="battle"),
@@ -138,6 +146,24 @@ def test_event_log_facade_projects_canonical_records_only() -> None:
     assert world_event_log_facade.event_log_lines(world, last_n=1) == [
         "[Year 1042, Month 3, Day 4] Third",
     ]
+    assert world_event_log_facade.event_log_lines(world, last_n=0) == []
+
+
+def test_event_log_view_with_zero_max_event_log_returns_empty_view() -> None:
+    set_locale("en")
+
+    class _World:
+        MAX_EVENT_LOG = 0
+
+        def __init__(self) -> None:
+            self.event_records = [
+                WorldEventRecord(kind="meeting", year=1041, month=1, day=1, description="Hidden"),
+            ]
+
+    world = _World()
+
+    assert list(world_event_log_facade.event_log_view(world)) == []
+    assert world_event_log_facade.event_log_lines(world) == []
 
 
 def test_event_log_has_no_display_assignment_path() -> None:

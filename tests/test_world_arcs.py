@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+from fantasy_simulator.event_models import WorldEventRecord
 from fantasy_simulator.persistence.migrations import _migrate_v8_to_v9
 from fantasy_simulator.persistence.save_load import load_simulation, save_simulation
 from fantasy_simulator.simulation.world_change_driver import generate_war_arc_pulse
@@ -121,3 +122,56 @@ def test_v8_to_v9_migration_reconstructs_war_arcs_from_event_records() -> None:
     assert arc["phase"] == "resolved"
     assert arc["cause_event_id"] == declared.record_id
     assert arc["related_event_ids"] == [declared.record_id, ended.record_id]
+
+
+def test_v8_to_v9_migration_does_not_attach_unrelated_same_location_events_to_war_arc() -> None:
+    declared = WorldEventRecord(
+        record_id="war_declared",
+        kind="war_declared",
+        year=1000,
+        render_params={
+            "aggressor_faction_id": "stormwatch_wardens",
+            "target_faction_id": "silverbrook_merchant_league",
+            "location_ids": ["loc_aethoria_capital"],
+        },
+    )
+    birth = WorldEventRecord(
+        record_id="same_location_birth",
+        kind="birth",
+        year=1000,
+        render_params={"location_id": "loc_aethoria_capital"},
+    )
+    battle = WorldEventRecord(
+        record_id="same_location_battle",
+        kind="war_battle",
+        year=1000,
+        render_params={"location_id": "loc_aethoria_capital"},
+    )
+    ended = WorldEventRecord(
+        record_id="war_ended",
+        kind="war_ended",
+        year=1000,
+        render_params={
+            "aggressor_faction_id": "stormwatch_wardens",
+            "target_faction_id": "silverbrook_merchant_league",
+            "location_ids": ["loc_aethoria_capital"],
+        },
+    )
+    payload = {
+        "schema_version": 8,
+        "characters": [],
+        "world": {
+            "event_records": [
+                declared.to_dict(),
+                birth.to_dict(),
+                battle.to_dict(),
+                ended.to_dict(),
+            ],
+        },
+    }
+
+    migrated = _migrate_v8_to_v9(json.loads(json.dumps(payload)))
+
+    arc = migrated["world"]["world_arcs"][0]
+    assert arc["related_event_ids"] == [declared.record_id, battle.record_id, ended.record_id]
+    assert birth.record_id not in arc["related_event_ids"]

@@ -61,6 +61,36 @@ def test_history_retention_keeps_world_arc_related_events_even_when_old() -> Non
     assert declared.record_id in {record.record_id for record in world.event_records}
 
 
+def test_history_retention_keeps_rumor_event_references_even_when_old() -> None:
+    world = World()
+    world.year = 1200
+    source = WorldEventRecord(record_id="old_rumor_source", kind="meeting", year=1000, severity=1)
+    related = WorldEventRecord(record_id="old_rumor_related", kind="meeting", year=1000, severity=1)
+    archived_source = WorldEventRecord(record_id="old_archived_source", kind="meeting", year=1000, severity=1)
+    noise = [
+        WorldEventRecord(record_id=f"old_noise_{index}", kind="meeting", year=1000, severity=1)
+        for index in range(8)
+    ]
+    world.event_records = [*noise, source, related, archived_source]
+    world.rumors = [
+        Rumor(
+            id="tracked-rumor",
+            source_event_id=source.record_id,
+            related_event_ids=[related.record_id],
+            tracked=True,
+        )
+    ]
+    world.rumor_archive = [
+        Rumor(id="archived-rumor", source_event_id=archived_source.record_id, tracked=True)
+    ]
+
+    compact_world_history(world, max_event_records=1, recent_years=5, max_rumor_archive=10)
+
+    assert world.get_event_by_id(source.record_id) is not None
+    assert world.get_event_by_id(related.record_id) is not None
+    assert world.get_event_by_id(archived_source.record_id) is not None
+
+
 def test_history_retention_bounds_rumor_archive_and_prefers_tracked_recent_rumors() -> None:
     world = World()
     world.rumor_archive = [
