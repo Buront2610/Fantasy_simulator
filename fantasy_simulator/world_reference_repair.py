@@ -130,7 +130,6 @@ def normalize_world_references_after_structure_change(
     ensure_valid_character_locations: Callable[[], None],
     rebuild_adventure_index: Callable[[], None],
     rebuild_recent_event_ids: Callable[[], None],
-    rebuild_compatibility_event_log: Callable[[], None],
     has_event_records: bool,
 ) -> None:
     """Rebuild derived indexes after the world structure changes."""
@@ -140,8 +139,7 @@ def normalize_world_references_after_structure_change(
     ensure_valid_character_locations()
     rebuild_adventure_index()
     rebuild_recent_event_ids()
-    if has_event_records:
-        rebuild_compatibility_event_log()
+    del has_event_records
 
 
 def backfill_watched_actor_tags(

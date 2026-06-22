@@ -395,6 +395,10 @@
         "region_type": "village",
         "language_key": "quenic",
         "native_name": "Lumenor",
+        "tags": [
+          "shrine",
+          "library"
+        ],
         "x": 2,
         "y": 0
       },
@@ -404,6 +408,10 @@
         "description": "A deep mine rich in enchanted ore — and old curses.",
         "region_type": "dungeon",
         "language_key": "khazic",
+        "tags": [
+          "forge",
+          "warehouse"
+        ],
         "x": 3,
         "y": 0
       },
@@ -415,6 +423,13 @@
         "language_key": "aethic_common",
         "x": 4,
         "y": 0,
+        "tags": [
+          "tower",
+          "barracks",
+          "stable",
+          "forge",
+          "watch_camp"
+        ],
         "controlling_faction_id": "stormwatch_wardens"
       },
       {
@@ -447,7 +462,11 @@
         "y": 1,
         "tags": [
           "market",
-          "river"
+          "river",
+          "bridge",
+          "dock",
+          "warehouse",
+          "stable"
         ],
         "controlling_faction_id": "silverbrook_merchant_league"
       },
@@ -466,6 +485,11 @@
         "description": "A lone watchtower staffed by a rotating ranger garrison.",
         "region_type": "village",
         "language_key": "aethic_common",
+        "tags": [
+          "tower",
+          "barracks",
+          "watch_camp"
+        ],
         "x": 4,
         "y": 1
       },
@@ -484,6 +508,11 @@
         "description": "A quiet farming village known for its legendary apple wine.",
         "region_type": "village",
         "language_key": "aethic_common",
+        "tags": [
+          "farmstead",
+          "mill",
+          "stable"
+        ],
         "x": 1,
         "y": 2
       },
@@ -502,6 +531,13 @@
           "default_resident",
           "gate",
           "market",
+          "guild",
+          "inn",
+          "shrine",
+          "library",
+          "barracks",
+          "stable",
+          "arena",
           "notice_board"
         ]
       },
@@ -513,7 +549,9 @@
         "language_key": "proto_quenic",
         "native_name": "Sairiel",
         "tags": [
-          "accident_site"
+          "accident_site",
+          "graveyard",
+          "ruined_house"
         ],
         "x": 3,
         "y": 2
@@ -524,6 +562,11 @@
         "description": "A fishing village where sailors whisper of sea monsters.",
         "region_type": "village",
         "language_key": "aethic_common",
+        "tags": [
+          "bridge",
+          "dock",
+          "inn"
+        ],
         "x": 4,
         "y": 2
       },
@@ -544,6 +587,9 @@
         "language_key": "aethic_common",
         "tags": [
           "market",
+          "inn",
+          "stable",
+          "warehouse",
           "notice_board"
         ],
         "x": 1,
@@ -557,6 +603,13 @@
         "language_key": "aethic_common",
         "x": 2,
         "y": 3,
+        "tags": [
+          "guild",
+          "shrine",
+          "inn",
+          "workshop",
+          "library"
+        ],
         "controlling_faction_id": "hearthglow_healers_guild"
       },
       {
@@ -579,6 +632,11 @@
         "y": 3,
         "tags": [
           "market",
+          "dock",
+          "warehouse",
+          "inn",
+          "stable",
+          "guild",
           "notice_board"
         ],
         "controlling_faction_id": "dawnport_harbor_council"
@@ -599,6 +657,12 @@
         "region_type": "village",
         "language_key": "orcish_steppe",
         "native_name": "Kraggar",
+        "tags": [
+          "tower",
+          "barracks",
+          "stable",
+          "watch_camp"
+        ],
         "x": 1,
         "y": 4
       },
@@ -608,6 +672,11 @@
         "description": "A lush valley sheltered from harsh winds — a true paradise.",
         "region_type": "village",
         "language_key": "sindral",
+        "tags": [
+          "farmstead",
+          "mill",
+          "shrine"
+        ],
         "x": 2,
         "y": 4
       },
@@ -618,7 +687,9 @@
         "region_type": "dungeon",
         "language_key": "proto_quenic",
         "tags": [
-          "accident_site"
+          "accident_site",
+          "graveyard",
+          "ruined_house"
         ],
         "x": 3,
         "y": 4

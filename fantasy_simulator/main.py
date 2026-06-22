@@ -19,7 +19,7 @@ from .ui.screens import (
     screen_new_simulation,
     screen_world_lore,
 )
-from .ui.ui_helpers import HEADER
+from .ui.title_screen import render_title_screen
 from .ui.ui_context import UIContext, _default_ctx
 
 
@@ -28,7 +28,7 @@ def main(ctx: UIContext | None = None) -> None:
     out = ctx.out
 
     set_locale("ja")
-    out.print_heading(HEADER)
+    render_title_screen(ctx)
 
     while True:
         out.print_line()

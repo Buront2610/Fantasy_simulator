@@ -48,6 +48,14 @@ def test_location_history_projection_includes_rename_history() -> None:
     ]
     assert [entry.day for entry in projection.rename_history] == [3, 5]
     assert all(record_id in projection.recent_event_ids for record_id in [first.record_id, second.record_id])
+    assert [(record.surface, record.name_kind, record.is_primary) for record in projection.name_records[:3]] == [
+        ("Aethoria Capital", "historical", False),
+        ("Aethoria March", "historical", False),
+        ("Marchhold", "canonical", True),
+    ]
+    assert projection.name_records[0].valid_to_year == first.year
+    assert projection.name_records[1].source_event_id == first.record_id
+    assert projection.name_records[2].source_event_id == second.record_id
 
 
 def test_location_rename_applies_location_state_pressure_and_map_visibility() -> None:
@@ -125,6 +133,51 @@ def test_location_history_projection_reads_rename_names_from_impacts() -> None:
 
     assert [(entry.old_name, entry.new_name) for entry in projection.rename_history] == [
         ("Aethoria Capital", "Aethoria March"),
+    ]
+
+
+def test_location_history_projection_name_records_include_language_generated_rename_metadata() -> None:
+    world = World()
+    record = world.apply_location_rename_change("loc_aethoria_capital", "Aureon", month=2, day=3)
+    assert record is not None
+    record.render_params["name_language_key"] = "aurelian_common"
+    record.render_params["name_source"] = "language_generated_rename"
+
+    projection = build_location_history_projection(
+        locations=world.grid.values(),
+        event_records=world.event_records,
+        location_id="loc_aethoria_capital",
+    )
+
+    current_name = next(record for record in projection.name_records if record.is_primary)
+    assert current_name.surface == "Aureon"
+    assert current_name.name_kind == "canonical"
+    assert current_name.language_key == "aurelian_common"
+    assert current_name.valid_from_year == record.year
+    assert current_name.source_event_id == record.record_id
+
+
+def test_location_history_projection_name_records_include_generated_endonym_and_nicknames() -> None:
+    world = World()
+    location = world.get_location_by_id("loc_aethoria_capital")
+    assert location is not None
+    location.generated_endonym = "Aurelion"
+    world.add_alias(location.id, "Crownheart")
+
+    projection = build_location_history_projection(
+        locations=world.grid.values(),
+        event_records=world.event_records,
+        location_id=location.id,
+    )
+
+    assert ("Aethoria Capital", "canonical", True) in [
+        (record.surface, record.name_kind, record.is_primary) for record in projection.name_records
+    ]
+    assert ("Aurelion", "generated_endonym") in [
+        (record.surface, record.name_kind) for record in projection.name_records
+    ]
+    assert ("Crownheart", "nickname") in [
+        (record.surface, record.name_kind) for record in projection.name_records
     ]
 
 

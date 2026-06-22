@@ -11,8 +11,7 @@ The Simulator is composed from several mixins that separate concerns:
 - :class:`~.adventure_coordinator.AdventureMixin`: adventure management
 - :class:`~.queries.QueryMixin`: summary / report / story access
 
-This module contains only Simulator assembly, initialisation, and the legacy
-``history`` adapter.
+This module contains only Simulator assembly and initialisation.
 """
 
 from __future__ import annotations
@@ -21,7 +20,7 @@ import random
 from typing import TYPE_CHECKING, List, Optional
 
 from ..adventure import AdventureRun
-from ..event_models import EventResult, WorldEventRecord
+from ..event_models import WorldEventRecord
 from ..events import EventSystem
 from ..narrative.template_history import TemplateHistory
 
@@ -68,11 +67,13 @@ class Simulator(
         adventure_steps_per_year: int = 3,
         world_changes_per_year: int = 0,
         seed: Optional[int] = None,
+        population_maintenance_enabled: bool = True,
     ) -> None:
         self.world = world
         self.events_per_year = events_per_year
         self.adventure_steps_per_year = adventure_steps_per_year
         self.world_changes_per_year = world_changes_per_year
+        self.population_maintenance_enabled = population_maintenance_enabled
         self.event_system = EventSystem()
         # Mutable progress marker for structured event timestamps within the
         # current simulated year. This value is serialized and restored as-is
@@ -83,6 +84,7 @@ class Simulator(
         # Baseline year used for "latest completed report year" fallback when
         # the simulation has not yet completed a full year.
         self.start_year: int = world.year
+        self.starting_population: int = sum(1 for char in world.characters if char.alive)
         self.rng = random.Random(seed)
         self.id_rng = random.Random(self._id_seed_from_seed(seed))
         # Events that passed the should_notify() threshold during the
@@ -94,19 +96,9 @@ class Simulator(
         # Favorites whose condition worsened this year, used for
         # event-based condition_worsened_favorite pause checks.
         self._favorites_worsened_this_year: set[str] = set()
+        self._natural_death_chance_cache: dict[tuple[str, int, int, int, float], float] = {}
         # Accumulated seasonal delta tuples for _revert_seasonal_modifiers()
         self._active_seasonal_deltas: List[tuple] = []
         # PR-I: deterministic cooldown history for world-memory text selection.
         self.memorial_template_history = TemplateHistory(cooldown_size=4)
         self.alias_template_history = TemplateHistory(cooldown_size=4)
-
-    @property
-    def history(self) -> List[EventResult]:
-        """Project the legacy EventResult adapter from canonical world records.
-
-        Compatibility note:
-        This property intentionally survives until save/load and legacy callers
-        no longer require `EventResult` snapshots. New logic must consume
-        `world.event_records` instead of this adapter.
-        """
-        return [record.to_event_result() for record in self.world.event_records]

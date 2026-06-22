@@ -11,6 +11,8 @@ from ..adventure import (
     generate_adventure_id,
 )
 from ..i18n import tr
+from .calendar import annual_probability_to_fraction
+from .population import population_pressure_factor
 
 if TYPE_CHECKING:
     from ..character import Character
@@ -34,7 +36,12 @@ class AdventureStartMixin:
         ]
         if not candidates:
             return
-        start_chance = 0.25 if year_fraction >= 1.0 else 1.0 - ((1.0 - 0.25) ** year_fraction)
+        annual_start_chance = min(0.65, 0.25 * population_pressure_factor(self.world))
+        start_chance = (
+            annual_start_chance
+            if year_fraction >= 1.0
+            else annual_probability_to_fraction(annual_start_chance, year_fraction)
+        )
         if self.rng.random() >= start_chance:
             return
 
@@ -60,13 +67,14 @@ class AdventureStartMixin:
             )
         )
         self.world.add_adventure(run)
-        self._record_world_event(
+        record = self._record_world_event(
             run.summary_log[-1],
             kind="adventure_started",
             location_id=run.origin,
             primary_actor_id=char.char_id,
             severity=2,
         )
+        run.related_event_ids.append(record.record_id)
 
     def _start_party_adventure(self, candidates: List["Character"]) -> None:
         """Form a small party from candidates and start a shared adventure."""
@@ -116,13 +124,14 @@ class AdventureStartMixin:
             )
 
         self.world.add_adventure(run)
-        self._record_world_event(
+        record = self._record_world_event(
             run.summary_log[-1],
             kind="adventure_started",
             location_id=run.origin,
             primary_actor_id=leader.char_id,
             severity=2,
         )
+        run.related_event_ids.append(record.record_id)
 
     def _select_party_policy(self, members: List["Character"]) -> str:
         """Select a party policy through the coordinator compatibility symbol."""

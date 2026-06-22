@@ -216,6 +216,17 @@ def _apply_world_change_params(
             world=world,
             translate=translate,
         )
+    if record.summary_key == "events.war_battle.summary":
+        params["attacker_faction"] = _display_faction(
+            params.get("attacker_faction_id"),
+            world=world,
+            translate=translate,
+        )
+        params["defender_faction"] = _display_faction(
+            params.get("defender_faction_id"),
+            world=world,
+            translate=translate,
+        )
     if record.summary_key == "events.terrain_cell_mutated.summary":
         if "old_biome" in params:
             params["old_biome"] = _display_biome(params["old_biome"], translate=translate)
@@ -233,6 +244,18 @@ def _apply_battle_params(record: WorldEventRecord, params: dict[str, Any], *, tr
             params["injury"] = " " + translate(f"battle_injury_{injury_status}", name=loser)
         else:
             params["injury"] = ""
+
+
+def _apply_relationship_turning_point_params(params: dict[str, Any], *, translate: Translator) -> None:
+    if "turning_point_reason_key" in params and "turning_point_reason" not in params:
+        params["turning_point_reason"] = translate(str(params["turning_point_reason_key"]))
+
+
+def _apply_relationship_moment_params(params: dict[str, Any], *, translate: Translator) -> None:
+    if "relationship_moment" in params:
+        return
+    moment_key = params.get("relationship_moment_key")
+    params["relationship_moment"] = f" {translate(str(moment_key))}" if moment_key else ""
 
 
 def _apply_ordinary_event_params(record: WorldEventRecord, params: dict[str, Any], *, translate: Translator) -> None:
@@ -280,6 +303,8 @@ def _render_params(
     _apply_location_params(params, world=world)
     _apply_world_change_params(record, params, world=world, translate=translate)
     _apply_battle_params(record, params, translate=translate)
+    _apply_relationship_turning_point_params(params, translate=translate)
+    _apply_relationship_moment_params(params, translate=translate)
     _apply_ordinary_event_params(record, params, translate=translate)
     return params
 

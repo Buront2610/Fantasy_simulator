@@ -47,6 +47,12 @@ class TestStdInputBackendReadLine(unittest.TestCase):
         result = self.backend.read_line()
         self.assertEqual(result, "  spaced  ")
 
+    @patch("builtins.input", side_effect=EOFError)
+    def test_eof_returns_empty_string(self, mock_input: MagicMock) -> None:
+        result = self.backend.read_line("prompt> ")
+        self.assertEqual(result, "")
+        mock_input.assert_called_once_with("prompt> ")
+
 
 class TestStdInputBackendReadMenuKey(unittest.TestCase):
     """StdInputBackend.read_menu_key must return the key, not the display label."""
@@ -85,6 +91,22 @@ class TestStdInputBackendReadMenuKey(unittest.TestCase):
             [("only", "The Only Option")],
         )
         self.assertEqual(result, "only")
+
+    @patch("builtins.input", side_effect=EOFError)
+    def test_eof_prefers_exit_key(self, _mock: MagicMock) -> None:
+        result = self.backend.read_menu_key(
+            [("start", "Start"), ("exit", "Exit")],
+            default="1",
+        )
+        self.assertEqual(result, "exit")
+
+    @patch("builtins.input", side_effect=EOFError)
+    def test_eof_falls_back_to_default_without_exit_key(self, _mock: MagicMock) -> None:
+        result = self.backend.read_menu_key(
+            [("a", "A"), ("b", "B")],
+            default="2",
+        )
+        self.assertEqual(result, "b")
 
 
 class TestStdInputBackendPause(unittest.TestCase):

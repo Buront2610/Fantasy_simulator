@@ -14,6 +14,22 @@ from fantasy_simulator.world import World
 
 
 @dataclass(frozen=True)
+class PopulationSnapshot:
+    """Population state at a deterministic simulation checkpoint."""
+
+    year: int
+    month: int
+    elapsed_months: int
+    total: int
+    alive: int
+    deceased: int
+    births: int
+    deaths: int
+    immigrations: int
+    by_location: dict[str, int]
+
+
+@dataclass(frozen=True)
 class SimulationStats:
     """Small, serializable summary of a seeded simulation run."""
 
@@ -29,7 +45,11 @@ class SimulationStats:
     final_month: int
     events: int
     rumors: int
+    event_records_json_bytes: int
+    rumor_archive_json_bytes: int
+    save_json_bytes: int
     alive: int
+    population_series: list[PopulationSnapshot]
 
 
 def build_seeded_world(seed: int, n_chars: int = 6) -> World:
@@ -43,6 +63,34 @@ def build_seeded_world(seed: int, n_chars: int = 6) -> World:
         character.location_id = rng.choice(location_ids)
         world.add_character(character)
     return world
+
+
+def collect_population_snapshot(simulator: Simulator, *, elapsed_months: int) -> PopulationSnapshot:
+    """Return a location-mapped population snapshot for the simulator's current state."""
+    world = simulator.world
+    by_location: dict[str, int] = {}
+    alive = 0
+    deceased = 0
+    for character in world.characters:
+        if character.alive:
+            alive += 1
+            by_location[world.location_name(character.location_id)] = (
+                by_location.get(world.location_name(character.location_id), 0) + 1
+            )
+        else:
+            deceased += 1
+    return PopulationSnapshot(
+        year=world.year,
+        month=simulator.current_month,
+        elapsed_months=elapsed_months,
+        total=len(world.characters),
+        alive=alive,
+        deceased=deceased,
+        births=sum(1 for record in world.event_records if record.kind == "birth"),
+        deaths=sum(1 for record in world.event_records if record.kind in {"death", "adventure_death"}),
+        immigrations=sum(1 for record in world.event_records if record.kind == "immigration"),
+        by_location=dict(sorted(by_location.items())),
+    )
 
 
 def collect_simulation_stats(
@@ -71,7 +119,18 @@ def collect_simulation_stats(
         seed=simulation_seed,
     )
     total_months = years * world.months_per_year + months
-    simulator.advance_months(total_months)
+    population_series = [collect_population_snapshot(simulator, elapsed_months=0)]
+    elapsed_months = 0
+    for _ in range(years):
+        simulator.advance_months(world.months_per_year)
+        elapsed_months += world.months_per_year
+        population_series.append(collect_population_snapshot(simulator, elapsed_months=elapsed_months))
+    if months:
+        simulator.advance_months(months)
+        elapsed_months += months
+        population_series.append(collect_population_snapshot(simulator, elapsed_months=elapsed_months))
+    event_payloads = [record.to_dict() for record in world.event_records]
+    rumor_archive_payloads = [rumor.to_dict() for rumor in world.rumor_archive]
 
     return SimulationStats(
         world_seed=world_seed,
@@ -86,14 +145,38 @@ def collect_simulation_stats(
         final_month=simulator.current_month,
         events=len(world.event_records),
         rumors=len(world.rumors),
+        event_records_json_bytes=_json_size_bytes(event_payloads),
+        rumor_archive_json_bytes=_json_size_bytes(rumor_archive_payloads),
+        save_json_bytes=_json_size_bytes(simulator.to_dict()),
         alive=sum(1 for character in world.characters if character.alive),
+        population_series=population_series,
     )
+
+
+def _json_size_bytes(payload: Any) -> int:
+    text = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    return len(text.encode("utf-8"))
 
 
 def format_stats(stats: SimulationStats) -> str:
     """Format stats as stable, line-oriented text."""
     data = asdict(stats)
-    return "\n".join(f"{key}: {data[key]}" for key in data)
+    population_series = data.pop("population_series")
+    lines = [f"{key}: {data[key]}" for key in data]
+    lines.append("population_series:")
+    for snapshot in population_series:
+        locations = ", ".join(
+            f"{name}={count}" for name, count in snapshot["by_location"].items()
+        )
+        lines.append(
+            "  "
+            f"month {snapshot['elapsed_months']}: "
+            f"year={snapshot['year']} current_month={snapshot['month']} "
+            f"alive={snapshot['alive']} deceased={snapshot['deceased']} "
+            f"births={snapshot['births']} deaths={snapshot['deaths']} "
+            f"immigrations={snapshot['immigrations']} locations=[{locations}]"
+        )
+    return "\n".join(lines)
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:

@@ -760,7 +760,9 @@ python -m fantasy_simulator.content preview-roots bundle.json --language highlan
 
 作業:
 
-- `LocationNameRecord` を追加。
+- `LocationNameRecord` は observation read model として追加済み。
+  canonical name、generated endonym、alias、location_renamed record から
+  current / historical / generated_endonym / nickname を投影する。
 - `ToponymEtymology` を永続化。
 - `RenameLocationCommand` に optional naming reason、language、faction、
   etymology/source event metadataを接続。

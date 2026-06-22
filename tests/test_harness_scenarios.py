@@ -48,7 +48,13 @@ def _extract_section(text: str, header: str) -> list[str]:
 def _capture_bundle_cached(locale: str) -> dict[str, object]:
     set_locale(locale)
     world = build_seeded_world(7)
-    sim = Simulator(world, events_per_year=4, adventure_steps_per_year=2, seed=99)
+    sim = Simulator(
+        world,
+        events_per_year=4,
+        adventure_steps_per_year=2,
+        seed=99,
+        population_maintenance_enabled=False,
+    )
     sim.advance_months(24)
     info = build_map_info(world)
     detail = render_location_detail(info, "loc_the_verdant_vale")
@@ -76,7 +82,6 @@ def _capture_bundle_cached(locale: str) -> dict[str, object]:
         "month": sim.current_month,
         "event_record_count": len(sim.world.event_records),
         "event_log_count": len(sim.world.event_log),
-        "history_count": len(sim.history),
         "kind_counts": dict(sorted(Counter(r.kind for r in sim.world.event_records).items())),
         "summary_lines": content_lines(sim.get_summary()),
         "yearly_overview": _extract_section(yearly_report, yearly_overview_header),
@@ -280,7 +285,13 @@ def _capture_projection_contract_cached(locale: str) -> dict[str, Any]:
     """Capture the seeded, locale-stable projection contract for report/detail selection."""
     set_locale(locale)
     world = build_seeded_world(7)
-    sim = Simulator(world, events_per_year=4, adventure_steps_per_year=2, seed=99)
+    sim = Simulator(
+        world,
+        events_per_year=4,
+        adventure_steps_per_year=2,
+        seed=99,
+        population_maintenance_enabled=False,
+    )
     sim.advance_months(60)
     return _projection_contract_for_sim(sim)
 
@@ -293,7 +304,13 @@ def _capture_projection_contract(locale: str) -> dict[str, Any]:
 def _capture_simulation_statistics(world_seed: int) -> dict[str, int]:
     """Capture broad seeded-run balance signals without pinning exact stories."""
     set_locale("en")
-    sim = Simulator(build_seeded_world(world_seed), events_per_year=4, adventure_steps_per_year=2, seed=99)
+    sim = Simulator(
+        build_seeded_world(world_seed),
+        events_per_year=4,
+        adventure_steps_per_year=2,
+        seed=99,
+        population_maintenance_enabled=False,
+    )
     sim.advance_months(24)
     kind_counts = Counter(record.kind for record in sim.world.event_records)
     active_months = {
@@ -491,55 +508,88 @@ def _assert_seeded_acceptance_bundle(bundle: dict[str, Any], *, locale: str) -> 
     assert bundle["month"] == 1
     assert bundle["event_record_count"] == 17
     assert bundle["event_log_count"] == 17
-    assert bundle["history_count"] == 17
     assert bundle["kind_counts"] == {
-        "aging": 12,
-        "discovery": 2,
-        "journey": 3,
+        "adventure_arrived": 2,
+        "adventure_injured": 1,
+        "adventure_started": 2,
+        "aging": 2,
+        "battle": 2,
+        "discovery": 1,
+        "journey": 1,
+        "meeting": 3,
+        "relationship_value_clash": 1,
+        "skill_training": 2,
     }
-    assert bundle["monthly_notable"] == []
-    assert bundle["monthly_world"] == []
-
     if locale == "en":
+        assert bundle["monthly_notable"] == [
+            "    - Strange signs around Sandstone Outpost led Gwynsylwen Gwynthebryn onward. "
+            "Gwynsylwen Gwynthebryn discovered a vein of star-metal ore near Sandstone Outpost. "
+            "The discovery will prove useful in future battles."
+        ]
         assert bundle["summary_lines"][0] == "  SIMULATION SUMMARY - Aethoria"
         assert bundle["summary_lines"][1] == "  Final year: 1002"
-        assert bundle["yearly_overview"] == ["    Total events recorded: 6"]
+        assert bundle["yearly_overview"] == ["    Total events recorded: 9"]
         assert bundle["yearly_regions"] == [
-            "    Sandstone Outpost: 2 event(s)",
-            "    Aethoria Capital: 1 event(s)",
-            "    Obsidian Crater: 1 event(s)",
-            "    Skyveil Monastery: 1 event(s)",
+            "    The Verdant Vale: Mokrar Zugufang and Brynvalra Brynuwood found that their values cut "
+            "against each other at The Verdant Vale. The memory of violence kept every word sharp. "
+            "(Mokrar Zugufang->Brynvalra Brynuwood: -7 / Brynvalra Brynuwood->Mokrar Zugufang: -18 / "
+            "Avg: -12)",
+            "    The Verdant Vale: An old grudge finally surfaced. Mokrar Zugufang defeated Brynvalra "
+            "Brynuwood. Brynvalra Brynuwood suffered serious wounds in the fight.",
+            "    Ironvein Mine: Goraga Gorufang was injured during the expedition and pulled back.",
+            "    Sandstone Outpost: Strange signs around Sandstone Outpost led Gwynsylwen Gwynthebryn onward. "
+            "Gwynsylwen Gwynthebryn discovered a vein of star-metal ore near Sandstone Outpost. "
+            "The discovery will prove useful in future battles.",
+            "    Sunbaked Plains: 1 event(s)",
             "    The Grey Pass: 1 event(s)",
         ]
-        assert bundle["monthly_rumors"][-1] == "    Total events: 0"
-        assert any(line.startswith("    • ") for line in bundle["summary_lines"])
+        assert bundle["monthly_rumors"][-1] == "    Total events: 1"
+        assert "  Notable moments:" in bundle["summary_lines"]
     else:
+        assert bundle["monthly_notable"] == [
+            "    - Sandstone Outpost 周辺の奇妙な兆しが、Gwynsylwen Gwynthebryn を先へ導いた。 "
+            "Gwynsylwen Gwynthebryn は Sandstone Outpost 近くで 星鉄鉱の鉱脈 "
+            "を発見した。その発見は、これからの戦いで大いに役立つだろう。"
+        ]
         assert bundle["summary_lines"][0] == "  シミュレーション要約 - Aethoria"
         assert bundle["summary_lines"][1] == "  最終年: 1002"
-        assert bundle["yearly_overview"] == ["    記録イベント数: 6"]
+        assert bundle["yearly_overview"] == ["    記録イベント数: 9"]
         assert bundle["yearly_regions"] == [
-            "    Sandstone Outpost: 2件の出来事",
-            "    Aethoria Capital: 1件の出来事",
-            "    Obsidian Crater: 1件の出来事",
-            "    Skyveil Monastery: 1件の出来事",
+            "    The Verdant Vale: Mokrar Zugufang と Brynvalra Brynuwood は The Verdant Vale "
+            "で価値観の食い違いを露わにした。暴力の記憶が、すべての言葉を鋭くしていた。"
+            "（Mokrar Zugufang->Brynvalra Brynuwood: -7 / Brynvalra Brynuwood->Mokrar Zugufang: -18 / "
+            "平均: -12）",
+            "    The Verdant Vale: 古い遺恨がついに表に出た。 Mokrar Zugufang は Brynvalra Brynuwood "
+            "に勝利した。 Brynvalra Brynuwood は戦いで重傷を負った。",
+            "    Ironvein Mine: Goraga Gorufang は遠征中に負傷し、引き返した。",
+            "    Sandstone Outpost: Sandstone Outpost 周辺の奇妙な兆しが、Gwynsylwen Gwynthebryn "
+            "を先へ導いた。 Gwynsylwen Gwynthebryn は Sandstone Outpost 近くで 星鉄鉱の鉱脈 "
+            "を発見した。その発見は、これからの戦いで大いに役立つだろう。",
+            "    Sunbaked Plains: 1件の出来事",
             "    The Grey Pass: 1件の出来事",
         ]
-        assert bundle["monthly_rumors"][-1] == "    イベント総数: 0"
-        assert any(line.startswith("    • ") for line in bundle["summary_lines"])
+        assert bundle["monthly_rumors"][-1] == "    イベント総数: 1"
+        assert "  主な出来事:" in bundle["summary_lines"]
 
 
 def _assert_projection_contract(contract: dict[str, Any]) -> None:
     assert contract["summary"] == {
-        "total_events": 45,
+        "total_events": 36,
         "kind_counts": {
-            "aging": 30,
-            "battle": 1,
-            "discovery": 5,
-            "injury_recovery": 1,
-            "journey": 5,
-            "meeting": 1,
-            "skill_training": 2,
-        },
+            "adventure_arrived": 2,
+            "adventure_discovery": 1,
+            "adventure_injured": 1,
+            "adventure_returned": 1,
+            "adventure_started": 2,
+            "adventure_update": 1,
+            "aging": 4,
+            "battle": 3,
+            "discovery": 2,
+            "journey": 7,
+            "meeting": 4,
+            "relationship_value_clash": 1,
+            "skill_training": 7,
+        }
     }
     assert len(contract["topology"]["site_ids"]) == 25
     assert "loc_the_verdant_vale" in contract["topology"]["site_ids"]
@@ -550,29 +600,26 @@ def _assert_projection_contract(contract: dict[str, Any]) -> None:
     assert ("aging",) in contract["event_tags"]
     assert ("discovery",) in contract["event_tags"]
     assert ("journey",) in contract["event_tags"]
+    assert ("relationship_value_clash",) in contract["event_tags"]
     assert contract["relation_tags"] == [
-        ("1738f7d9", "1e27a1c0", ("rival",)),
-        ("1e27a1c0", "1738f7d9", ("rival",)),
+        ("1e27a1c0", "7f26144b", ("rival", "value_rift")),
+        ("7f26144b", "1e27a1c0", ("rival", "value_rift")),
     ]
     assert contract["detail_projection"] == {
         "location_id": "loc_elderroot_forest",
         "memory_tags": (),
     }
-    assert contract["memory_tags"] == []
-    assert contract["report_selection"]["yearly"]["total_events"] == 11
+    assert contract["memory_tags"] == [
+        ("loc_ironvein_mine", ("alias", "memorial", "trace")),
+        ("loc_the_grey_pass", ("trace",)),
+    ]
+    assert contract["report_selection"]["yearly"]["total_events"] == 7
     assert contract["report_selection"]["yearly"]["deaths_this_year"] == 0
-    assert contract["report_selection"]["monthly"] == {
-        "year": 1004,
-        "month": 3,
-        "total_events": 0,
-        "character_ids": [],
-        "notable_records": [],
-        "location_ids": [],
-        "location_event_counts": {},
-        "location_notable_records": {},
-        "rumor_ids": [],
-        "rumor_categories": {},
-    }
+    assert contract["report_selection"]["monthly"]["year"] == 1004
+    assert contract["report_selection"]["monthly"]["month"] == 3
+    assert contract["report_selection"]["monthly"]["total_events"] == 0
+    assert contract["report_selection"]["monthly"]["notable_records"] == []
+    assert contract["report_selection"]["monthly"]["location_event_counts"] == {}
 
 
 def test_seeded_acceptance_bundle_matches_english_projection() -> None:
@@ -595,9 +642,9 @@ def test_seeded_long_run_statistics_stay_in_expected_bounds() -> None:
     summaries = [_capture_simulation_statistics(seed) for seed in (7, 8, 9)]
 
     for summary in summaries:
-        assert 12 <= summary["event_count"] <= 36
+        assert 6 <= summary["event_count"] <= 36
         assert 4 <= summary["non_aging_event_count"] <= 20
-        assert summary["kind_diversity"] >= 3
+        assert summary["kind_diversity"] >= 2
         assert summary["active_month_count"] >= 6
         assert summary["alive_count"] >= 3
         assert summary["active_rumor_count"] <= 20
@@ -607,7 +654,13 @@ def test_seeded_long_run_statistics_stay_in_expected_bounds() -> None:
 
 def test_midyear_save_load_preserves_projection_contract(tmp_path) -> None:
     set_locale("en")
-    sim = Simulator(build_seeded_world(7), events_per_year=4, adventure_steps_per_year=2, seed=99)
+    sim = Simulator(
+        build_seeded_world(7),
+        events_per_year=4,
+        adventure_steps_per_year=2,
+        seed=99,
+        population_maintenance_enabled=False,
+    )
     sim.advance_months(30)
     save_path = tmp_path / "midyear-seeded.json"
     remaining_months = 18

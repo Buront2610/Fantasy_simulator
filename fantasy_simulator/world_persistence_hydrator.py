@@ -5,9 +5,10 @@ from __future__ import annotations
 from typing import Any, Callable, Dict, Mapping, Type
 
 from .content.setting_bundle import CalendarDefinition, bundle_from_dict_validated
-from .language.state import LanguageEvolutionRecord, LanguageRuntimeState
+from .language.state import LanguageEvolutionRecord, LanguageRuntimeState, LocationNameHistoryRecord
 from .terrain import AtlasLayout
 from .world_event_record_updates import normalize_event_record_locations
+from .world_arc import WorldArc
 from .world_persistence_terrain import (
     apply_sparse_terrain_event_overlay,
     restore_bundle_terrain_snapshot,
@@ -26,7 +27,7 @@ _UNSUPPORTED_ERA_RUNTIME_FIELDS = frozenset({
 def _discard_unsupported_era_runtime_fields(data: Dict[str, Any]) -> None:
     """Drop experimental PR-K era runtime snapshots before hydration.
 
-    In schema v8, canonical event records are the only durable source for
+    In schema v9, canonical event records are the only durable source for
     era/civilization projections. These fields may appear in experimental
     payloads, but must not become observable runtime state.
     """
@@ -92,7 +93,6 @@ def _hydrate_world_bundle_and_grid(world: Any, data: Dict[str, Any], serialized_
 
 def _hydrate_event_records(world: Any, data: Dict[str, Any], world_event_record_cls: Type[Any]) -> None:
     """Restore canonical event records and normalize location references."""
-    world._restore_display_event_log_for_load(list(data.get("event_log", [])))
     world.event_records = [
         world_event_record_cls.from_dict(r) for r in data.get("event_records", [])
     ]
@@ -100,6 +100,20 @@ def _hydrate_event_records(world: Any, data: Dict[str, Any], world_event_record_
         world.event_records,
         world.normalize_location_id,
     )
+
+
+def _hydrate_world_arcs(world: Any, data: Dict[str, Any]) -> None:
+    """Restore durable long-running world process state."""
+    world.world_arcs = []
+    for item in data.get("world_arcs", []):
+        arc = WorldArc.from_dict(item)
+        arc.location_ids = tuple(
+            normalized
+            for location_id in arc.location_ids
+            for normalized in [world.normalize_location_id(location_id)]
+            if normalized is not None
+        )
+        world.world_arcs.append(arc)
 
 
 def _hydrate_rumors(world: Any, data: Dict[str, Any]) -> None:
@@ -156,6 +170,10 @@ def _hydrate_calendar_and_language(
     world.language_evolution_history = [
         LanguageEvolutionRecord.from_dict(item)
         for item in data.get("language_evolution_history", [])
+    ]
+    world.location_name_history = [
+        LocationNameHistoryRecord.from_dict(item)
+        for item in data.get("location_name_history", [])
     ]
     persisted_runtime_states = {
         key: LanguageRuntimeState.from_dict(value)
@@ -244,6 +262,7 @@ def hydrate_world_state(
     serialized_grid = list(data.get("grid", []))
     bundle_backed_structure = _hydrate_world_bundle_and_grid(world, data, serialized_grid)
     _hydrate_event_records(world, data, world_event_record_cls)
+    _hydrate_world_arcs(world, data)
     _hydrate_rumors(world, data)
     _hydrate_adventures(world, data)
     world.memorials = {
@@ -257,5 +276,7 @@ def hydrate_world_state(
     )
     _hydrate_topology(world, data, bundle_backed_structure=bundle_backed_structure)
     _refresh_loaded_endonyms(world, data)
+    if "location_name_history" not in data:
+        world._seed_initial_location_name_history()
     world.normalize_after_load()
     return world

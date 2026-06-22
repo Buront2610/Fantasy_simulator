@@ -3,6 +3,8 @@ from __future__ import annotations
 from fantasy_simulator.event_models import WorldEventRecord
 from fantasy_simulator.world_event_index import EventHistoryIndex
 from fantasy_simulator.world_event_queries import (
+    event_causes,
+    events_caused_by,
     events_by_actor,
     events_by_kind,
     events_by_location,
@@ -79,3 +81,16 @@ def test_location_query_index_rebuilds_after_metadata_mutation() -> None:
 
     assert events_by_location(event_index, records, "loc_bravo") == []
     assert events_by_location(event_index, records, "loc_charlie") == records
+
+
+def test_causal_query_helpers_return_direct_causes_and_effects() -> None:
+    event_index = EventHistoryIndex()
+    cause = WorldEventRecord(record_id="cause", kind="war_declared")
+    effect = WorldEventRecord(record_id="effect", kind="war_battle", cause_event_ids=["cause"])
+    unrelated = WorldEventRecord(record_id="unrelated", kind="meeting")
+    records = [cause, effect, unrelated]
+
+    assert event_causes(event_index, records, "effect") == [cause]
+    assert event_causes(event_index, records, "missing") == []
+    assert events_caused_by(records, "cause") == [effect]
+    assert events_caused_by(records, "missing") == []

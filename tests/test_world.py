@@ -16,6 +16,7 @@ from fantasy_simulator.content.setting_bundle import (
     SiteSeedDefinition,
     WorldDefinition,
 )
+from fantasy_simulator.event_models import WorldEventRecord
 from fantasy_simulator.i18n import set_locale
 from fantasy_simulator.language.schema import SoundChangeRuleDefinition
 from fantasy_simulator.language.state import LanguageEvolutionRecord
@@ -43,6 +44,39 @@ def _display_width(text: str) -> int:
             continue
         width += 2 if unicodedata.east_asian_width(char) in ("F", "W") else 1
     return width
+
+
+def _make_language_law_world(seed_syllables):
+    world = World(name="Custom", year=1000)
+    world.setting_bundle = SettingBundle(
+        schema_version=1,
+        world_definition=WorldDefinition(
+            world_key="custom",
+            display_name="Custom",
+            lore_text="Custom lore",
+            site_seeds=[
+                SiteSeedDefinition(
+                    location_id="loc_custom",
+                    name="Custom",
+                    description="Custom site.",
+                    region_type="city",
+                    x=0,
+                    y=0,
+                    language_key="custom_lang",
+                ),
+            ],
+            languages=[
+                LanguageDefinition(
+                    language_key="custom_lang",
+                    display_name="Custom Lang",
+                    seed_syllables=list(seed_syllables),
+                    lexicon_size=8,
+                )
+            ],
+            naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+        ),
+    )
+    return world
 
 
 class TestWorld:
@@ -221,6 +255,22 @@ class TestWorld:
         assert capital.visited is False
         world.add_character(_make_char())
         assert capital.visited is True
+
+    def test_add_character_seeds_personal_language_knowledge(self):
+        world = World()
+        character = Character(
+            "Speaker",
+            25,
+            "Female",
+            "Human",
+            "Warrior",
+            location_id="loc_aethoria_capital",
+        )
+
+        world.add_character(character)
+
+        assert character.known_languages
+        assert max(character.known_languages.values()) >= 90
 
     def test_add_character_with_blank_location_uses_default_resident(self):
         world = World()
@@ -860,6 +910,157 @@ class TestWorld:
         assert len(restored.language_evolution_history) == 1
         assert restored.language_evolution_history[0].year == 1002
 
+    def test_location_name_history_tracks_generated_endonym_changes(self):
+        world = World(name="Custom", year=1000)
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="loc_custom",
+                        name="Custom",
+                        description="Custom site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                        language_key="custom_lang",
+                    ),
+                ],
+                languages=[
+                    LanguageDefinition(
+                        language_key="custom_lang",
+                        display_name="Custom Lang",
+                        toponym_stems=["tor"],
+                        toponym_suffixes=["um"],
+                        toponym_patterns=["RY"],
+                        evolution_rule_pool=[
+                            SoundChangeRuleDefinition(
+                                rule_key="custom_lang.t_to_d",
+                                source="t",
+                                target="d",
+                            ),
+                        ],
+                    )
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+        before = world.location_endonym("loc_custom")
+
+        record = WorldEventRecord(
+            record_id="evt_route_contact",
+            kind="route_opened",
+            year=1001,
+            location_id="loc_custom",
+        )
+        world.apply_language_evolution_from_event(record, cause_key="route_opened")
+
+        entries = world.location_name_records("loc_custom")
+        assert entries
+        assert entries[-1].surface == world.location_endonym("loc_custom")
+        assert entries[-1].previous_surface == before
+        assert entries[-1].language_key == "custom_lang"
+        assert entries[-1].source_event_id == "evt_route_contact"
+
+        restored = World.from_dict(world.to_dict())
+        restored_entries = restored.location_name_records("loc_custom")
+        assert [entry.to_dict() for entry in restored_entries] == [entry.to_dict() for entry in entries]
+
+    def test_world_change_event_can_drive_language_evolution_with_cause_history(self):
+        world = World(name="Custom", year=1000)
+        world.setting_bundle = SettingBundle(
+            schema_version=1,
+            world_definition=WorldDefinition(
+                world_key="custom",
+                display_name="Custom",
+                lore_text="Custom lore",
+                site_seeds=[
+                    SiteSeedDefinition(
+                        location_id="loc_custom",
+                        name="Custom",
+                        description="Custom site.",
+                        region_type="city",
+                        x=0,
+                        y=0,
+                        language_key="custom_lang",
+                    ),
+                ],
+                languages=[
+                    LanguageDefinition(
+                        language_key="custom_lang",
+                        display_name="Custom Lang",
+                        seed_syllables=["tor", "sel", "mar"],
+                        name_stems=["tor"],
+                        toponym_suffixes=["um"],
+                        evolution_rule_pool=[
+                            SoundChangeRuleDefinition(
+                                rule_key="custom_lang.t_to_d",
+                                source="t",
+                                target="d",
+                            ),
+                        ],
+                        evolution_interval_years=10,
+                    )
+                ],
+                naming_rules=NamingRulesDefinition(last_names=["Fallback"]),
+            ),
+        )
+
+        record = world.apply_location_rename_change("loc_custom", "Custom March")
+
+        assert record is not None
+        assert len(world.language_evolution_history) == 1
+        evolution = world.language_evolution_history[0]
+        assert evolution.language_key == "custom_lang"
+        assert evolution.cause_key == "location_renamed"
+        assert evolution.cause_event_id == record.record_id
+        assert world.apply_language_evolution_from_event(record, cause_key="manual_replay") is None
+
+        restored = World.from_dict(world.to_dict())
+
+        assert len(restored.language_evolution_history) == 1
+        restored_evolution = restored.language_evolution_history[0]
+        assert restored_evolution.cause_key == "location_renamed"
+        assert restored_evolution.cause_event_id == record.record_id
+        assert restored_evolution.rule_key.startswith("law:custom_lang:prestige:")
+        assert "prestige" in restored_evolution.rule_description.lower()
+
+    @pytest.mark.parametrize(
+        ("cause_key", "expected_group", "seed_syllables", "description_fragment"),
+        [
+            ("war_battle", "contact", ["ata", "aka", "asa", "apa"], "contact"),
+            ("route_blocked", "isolation", ["tor", "dan", "ran"], "isolation"),
+            ("era_shifted", "prestige", ["ke", "ge", "sare", "se"], "prestige"),
+        ],
+    )
+    def test_world_event_language_evolution_uses_cause_specific_linguistic_laws(
+        self,
+        cause_key,
+        expected_group,
+        seed_syllables,
+        description_fragment,
+    ):
+        world = _make_language_law_world(seed_syllables)
+        record = WorldEventRecord(
+            record_id=f"evt_{cause_key}",
+            kind=cause_key,
+            year=1005,
+            location_id="loc_custom",
+        )
+
+        evolution = world.apply_language_evolution_from_event(record, cause_key=cause_key)
+
+        assert evolution is not None
+        assert evolution.rule_key.startswith(f"law:custom_lang:{expected_group}:")
+        assert description_fragment in evolution.rule_description.lower()
+        assert evolution.cause_key == cause_key
+        assert evolution.cause_event_id == record.record_id
+        assert evolution.added_name_stem
+        assert evolution.added_toponym_suffix
+
     def test_setting_bundle_rebases_language_origin_year_for_new_language_state(self):
         world = World(name="Custom", year=1010)
         bundle = SettingBundle(
@@ -1496,18 +1697,22 @@ class TestWorld:
         location = world.random_location(rng=FixedRng())
         assert location == list(world.grid.values())[-1]
 
-    def test_log_event_uses_localized_year_prefix_english(self):
+    def test_event_log_uses_localized_year_prefix_english(self):
+        from fantasy_simulator.events import WorldEventRecord
+
         set_locale("en")
         world = World(year=1042)
-        world.log_event("Something happened.")
-        assert world.event_log[-1] == "[Year 1042] Something happened."
+        world.record_event(WorldEventRecord(kind="meeting", year=1042, description="Something happened."))
+        assert world.event_log[-1] == "[Year 1042, Month 1, Day 1] Something happened."
 
-    def test_log_event_uses_localized_year_prefix_japanese(self):
+    def test_event_log_uses_localized_year_prefix_japanese(self):
+        from fantasy_simulator.events import WorldEventRecord
+
         set_locale("ja")
         world = World(year=1042)
-        world.log_event("何かが起きた。")
+        world.record_event(WorldEventRecord(kind="meeting", year=1042, description="何かが起きた。"))
         entry = world.event_log[-1]
-        assert "[1042年]" in entry
+        assert "[1042年1月1日]" in entry
         assert "何かが起きた。" in entry
         assert "[Year" not in entry
         set_locale("en")
@@ -1569,6 +1774,22 @@ class TestWorld:
 
         assert world.get_event_by_id("r1") is first
         assert world.get_event_by_id("missing") is None
+
+    def test_event_record_indexes_support_causal_queries(self):
+        from fantasy_simulator.events import WorldEventRecord
+        world = World()
+        cause = world.record_event(WorldEventRecord(record_id="cause", kind="war_declared"))
+        effect = world.record_event(
+            WorldEventRecord(
+                record_id="effect",
+                kind="war_battle",
+                render_params={"cause_event_id": cause.record_id},
+            )
+        )
+
+        assert effect.cause_event_ids == [cause.record_id]
+        assert world.get_event_causes("effect") == [cause]
+        assert world.get_events_caused_by("cause") == [effect]
 
     def test_direct_record_event_adds_semantic_render_param_ids(self):
         from fantasy_simulator.events import WorldEventRecord
@@ -2093,7 +2314,7 @@ class TestWorld:
         assert thornwood is not None
         assert thornwood.recent_event_ids == ["r1", "r2"]
 
-    def test_from_dict_rebuilds_compatibility_event_log_from_event_records_even_when_stale(self):
+    def test_from_dict_projects_event_log_from_event_records_even_when_stale_input_exists(self):
         from fantasy_simulator.events import WorldEventRecord
 
         world = World()
@@ -2105,31 +2326,9 @@ class TestWorld:
 
         restored = World.from_dict(payload)
 
-        assert restored.get_compatibility_event_log() == ["[Year 1001, Month 2, Day 3] A clash"]
+        assert restored.event_log == ["[Year 1001, Month 2, Day 3] A clash"]
 
-    def test_compatibility_event_log_prefers_canonical_projection_over_stale_cache(self):
-        from fantasy_simulator.events import WorldEventRecord
-
-        world = World()
-        with pytest.warns(DeprecationWarning, match="compatibility path"):
-            world.event_log = ["stale cache entry"]
-        world.record_event(
-            WorldEventRecord(
-                record_id="r1",
-                kind="battle",
-                year=1001,
-                month=2,
-                day=3,
-                description="Canonical clash",
-            )
-        )
-        world._restore_display_event_log_for_load(["stale cache entry"])
-
-        with pytest.raises(RuntimeError, match="canonical event_records"):
-            world.event_log = ["stale cache entry"]
-        assert world.get_compatibility_event_log() == ["[Year 1001, Month 2, Day 3] Canonical clash"]
-
-    def test_event_log_property_projects_canonical_history_over_stale_cache(self):
+    def test_event_log_projects_canonical_history(self):
         from fantasy_simulator.events import WorldEventRecord
 
         world = World()
@@ -2143,7 +2342,6 @@ class TestWorld:
                 description="Canonical clash",
             )
         )
-        world._restore_display_event_log_for_load(["stale cache entry"])
 
         assert world.event_log == ["[Year 1001, Month 2, Day 3] Canonical clash"]
 
@@ -2151,11 +2349,6 @@ class TestWorld:
         from fantasy_simulator.events import WorldEventRecord
 
         world = World()
-        world.log_event("display-only line")
-        with pytest.raises(TypeError):
-            world.event_log.append("mutated")
-        assert any("display-only line" in line for line in world.event_log)
-
         world.record_event(
             WorldEventRecord(
                 record_id="r1",
@@ -2166,43 +2359,6 @@ class TestWorld:
         )
         with pytest.raises(TypeError):
             world.event_log.append("mutated again")
-        assert world.event_log == ["[Year 1001, Month 1, Day 1] Canonical clash"]
-
-    def test_record_event_clears_display_adapter_through_world_facade(self):
-        from fantasy_simulator.events import WorldEventRecord
-
-        world = World()
-        world.log_event("display-only line")
-
-        world.record_event(
-            WorldEventRecord(
-                record_id="r1",
-                kind="battle",
-                year=1001,
-                month=1,
-                day=1,
-                description="canonical line",
-            )
-        )
-
-        assert all("display-only line" not in line for line in world.get_compatibility_event_log())
-
-    def test_log_event_rejects_display_only_write_after_canonical_history_exists(self):
-        from fantasy_simulator.events import WorldEventRecord
-
-        world = World()
-        world.record_event(
-            WorldEventRecord(
-                record_id="r1",
-                kind="battle",
-                year=1001,
-                description="Canonical clash",
-            )
-        )
-
-        with pytest.raises(RuntimeError, match="canonical event_records"):
-            world.log_event("display-only line")
-
         assert world.event_log == ["[Year 1001, Month 1, Day 1] Canonical clash"]
 
     def test_trimming_event_records_removes_dangling_recent_event_ids(self):

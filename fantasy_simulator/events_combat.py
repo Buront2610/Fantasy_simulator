@@ -6,6 +6,7 @@ import random
 from typing import TYPE_CHECKING, Any, Dict, List
 
 from .combat import Combatant, CombatResolution, resolve_combat
+from .event_causality import pair_cause_event_ids
 from .event_models import EventResult, generate_record_id
 from .event_story import prefix_description_with_story_hook
 from .i18n import tr
@@ -42,6 +43,7 @@ def _battle_render_metadata(
             "loser": resolution.loser.name,
             "loser_injury_status": resolution.loser.injury_status,
             "story_hook_key": story_hook_key,
+            "combat_log": resolution.combat_log_payload(),
         },
     }
 
@@ -49,6 +51,7 @@ def _battle_render_metadata(
 def _battle_metadata(
     summary_key: str,
     event_source_id: str,
+    cause_event_ids: List[str],
     relation_tag_updates: List[Dict[str, str]],
     resolution: CombatResolution,
     story_hook_key: str,
@@ -56,7 +59,7 @@ def _battle_metadata(
     return {
         "relation_tag_updates": relation_tag_updates,
         "record_id": event_source_id,
-        "combat_log": resolution.combat_log_payload(),
+        "cause_event_ids": cause_event_ids,
         **_battle_render_metadata(summary_key, resolution, story_hook_key),
     }
 
@@ -74,6 +77,14 @@ def resolve_battle_event(
     _apply_battle_side_effects(resolution)
 
     event_source_id = generate_record_id(rng)
+    cause_event_ids = pair_cause_event_ids(
+        world,
+        resolution.winner,
+        resolution.loser,
+        relation_tags=("rival",),
+        event_kinds=("battle", "battle_fatal", "meeting"),
+        limit=3,
+    )
     relation_tag_updates = _rival_tag_updates(resolution.winner, resolution.loser)
 
     old_status = resolution.loser.injury_status
@@ -100,6 +111,7 @@ def resolve_battle_event(
             metadata=_battle_metadata(
                 "events.battle_fatal.summary",
                 event_source_id,
+                cause_event_ids,
                 relation_tag_updates,
                 resolution,
                 story_hook_key,
@@ -123,6 +135,7 @@ def resolve_battle_event(
         metadata=_battle_metadata(
             "events.battle_result.summary",
             event_source_id,
+            cause_event_ids,
             relation_tag_updates,
             resolution,
             story_hook_key,

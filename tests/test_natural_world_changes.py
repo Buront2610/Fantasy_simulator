@@ -21,6 +21,7 @@ from fantasy_simulator.simulation.world_change_driver import (
 )
 from fantasy_simulator.simulator import Simulator
 from fantasy_simulator.ui.map_renderer import build_map_info
+from fantasy_simulator.ui.screen_map_payloads import render_world_map_views_for_location
 from fantasy_simulator.ui.view_models import build_monthly_report_card_view, build_world_dashboard_view
 from fantasy_simulator.world import World
 
@@ -157,6 +158,20 @@ def test_natural_era_world_change_projects_reports_dashboards_and_roundtrips(tmp
     assert restored_dashboard.era_status.era_id == "age_of_bloom"
 
 
+def test_natural_era_world_change_respects_minimum_interval() -> None:
+    world = World()
+    rng = FirstChoiceRng()
+
+    first = generate_era_world_change(world, month=2, day=3, rng=rng)
+    second = generate_era_world_change(world, month=3, day=4, rng=rng)
+    world.year += 25
+    third = generate_era_world_change(world, month=4, day=5, rng=rng)
+
+    assert first is not None
+    assert second is None
+    assert third is not None
+
+
 def test_natural_war_world_change_declares_active_war_visible_in_dashboard_report_and_map() -> None:
     world = World()
     rng = FirstChoiceRng()
@@ -271,6 +286,28 @@ def test_natural_occupation_world_change_uses_authored_initial_war() -> None:
 def test_natural_rename_world_change_updates_history_report_map_and_save(tmp_path) -> None:
     world = World()
     rng = FirstChoiceRng()
+    expected_location = next(
+        location
+        for location_id in sorted(world.location_ids)
+        for location in [world.get_location_by_id(location_id)]
+        if location is not None and location.controlling_faction_id
+    )
+    seed = next(
+        site_seed
+        for site_seed in world.setting_bundle.world_definition.site_seeds
+        if site_seed.location_id == expected_location.id
+    )
+    expected_language_names = {
+        world.language_engine.generate_toponym(
+            seed.language_key,
+            seed_key=(
+                f"rename:{expected_location.id}:{expected_location.canonical_name}:"
+                f"{expected_location.controlling_faction_id}:{index}"
+            ),
+            region_type=seed.region_type,
+        )
+        for index in range(4)
+    }
 
     record = generate_rename_world_change(world, month=5, day=6, rng=rng)
 
@@ -288,13 +325,20 @@ def test_natural_rename_world_change_updates_history_report_map_and_save(tmp_pat
     cell = next(cell for cell in map_info.cells.values() if cell.location_id == location_id)
 
     assert record.kind == "location_renamed"
+    assert location_id == expected_location.id
     assert location.canonical_name == record.render_params["new_name"]
+    assert record.render_params["new_name"] in expected_language_names
+    assert record.render_params["name_source"] == "language_generated_rename"
+    assert record.render_params["name_language_key"] == seed.language_key
+    assert record.render_params["name_language_seed_key"].startswith(f"rename:{expected_location.id}:")
     assert projection.rename_history[0].record_id == record.record_id
     assert projection.aliases == (record.render_params["old_name"],)
     assert [(entry.record_id, entry.category) for entry in report.world_change_entries] == [
         (record.record_id, "location")
     ]
     assert cell.recent_world_change_categories == ("location",)
+    detail = render_world_map_views_for_location(world, location_id, include_overview=False)["detail"]
+    assert f"Name origin: {record.render_params['new_name']} <" in detail
 
     path = tmp_path / "natural-rename.json"
     assert save_simulation(Simulator(world, seed=0), str(path)) is True

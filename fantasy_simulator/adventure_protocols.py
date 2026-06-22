@@ -23,6 +23,8 @@ class AdventureRunLike(Protocol):
     loot_summary: List[str]
     summary_log: List[str]
     detail_log: List[str]
+    combat_logs: List[dict[str, Any]]
+    related_event_ids: List[str]
     resolution_year: Optional[int]
     injury_member_id: Optional[str]
     death_member_id: Optional[str]

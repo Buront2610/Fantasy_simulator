@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Container, Dict, Iterable, List, Optional
 from .event_models import WorldEventRecord
 from .event_rendering import render_event_record
 from .ids import EventRecordId, FactionId, LocationId, RouteId
-from . import world_conflict_pressure
+from . import world_arcs, world_conflict_pressure
 from .world_change import (
     DeclareWarCommand,
     EndWarCommand,
@@ -38,10 +38,6 @@ from .world_memory import (
 )
 from .world_records import MemorialRecord
 
-if TYPE_CHECKING:
-    from .world_route_graph import RouteCollection
-
-
 __all__ = ["WorldConflictMixin", "WorldLocationLookupMixin", "WorldMemoryMixin"]
 
 
@@ -70,12 +66,18 @@ def _render_world_change_description(
     return description
 
 
+def _apply_caused_language_evolution(world: Any, record: WorldEventRecord, cause_key: str) -> None:
+    apply_language_evolution = getattr(world, "apply_language_evolution_from_event", None)
+    if callable(apply_language_evolution):
+        apply_language_evolution(record, cause_key=cause_key)
+
+
 class WorldConflictMixin:
     """Headless PR-K conflict/war API methods."""
 
     if TYPE_CHECKING:
         year: int
-        routes: RouteCollection
+        routes: Any
         MAX_LIVE_TRACES: int
         _location_id_index: Dict[str, LocationState]
 
@@ -149,6 +151,8 @@ class WorldConflictMixin:
             max_live_traces=self.MAX_LIVE_TRACES,
             world_context=self,
         )
+        _apply_caused_language_evolution(self, record, cause_key or "war_declared")
+        world_arcs.create_war_arc_from_record(self, record)
         return record
 
     def apply_war_ended(
@@ -206,6 +210,8 @@ class WorldConflictMixin:
             max_live_traces=self.MAX_LIVE_TRACES,
             world_context=self,
         )
+        _apply_caused_language_evolution(self, record, cause_key or "war_ended")
+        world_arcs.close_war_arc_from_record(self, record)
         return record
 
 
@@ -218,7 +224,7 @@ class WorldMemoryMixin:
     if TYPE_CHECKING:
         year: int
         grid: Dict[Tuple[int, int], LocationState]
-        routes: RouteCollection
+        routes: Any
         terrain_map: Any
         memorials: Dict[str, MemorialRecord]
         _location_id_index: Dict[str, LocationState]
@@ -406,6 +412,7 @@ class WorldMemoryMixin:
             max_live_traces=self.MAX_LIVE_TRACES,
             world_context=self,
         )
+        _apply_caused_language_evolution(self, record, "location_renamed")
         return record
 
     def set_location_controlling_faction(self, location_id: str, faction_id: Optional[str]) -> Optional[str]:
@@ -476,6 +483,7 @@ class WorldMemoryMixin:
             max_live_traces=self.MAX_LIVE_TRACES,
             world_context=self,
         )
+        _apply_caused_language_evolution(self, record, "location_control_changed")
         return record
 
     def set_route_blocked(self, route_id: str, blocked: bool) -> bool:
@@ -534,6 +542,7 @@ class WorldMemoryMixin:
             max_live_traces=self.MAX_LIVE_TRACES,
             world_context=self,
         )
+        _apply_caused_language_evolution(self, record, "route_blocked" if blocked else "route_reopened")
         return record
 
     def apply_terrain_cell_change(
@@ -611,6 +620,7 @@ class WorldMemoryMixin:
             max_live_traces=self.MAX_LIVE_TRACES,
             world_context=self,
         )
+        _apply_caused_language_evolution(self, record, reason_key or "terrain_cell_mutated")
         return record
 
     def get_memorials_for_location(self, location_id: str) -> List[MemorialRecord]:

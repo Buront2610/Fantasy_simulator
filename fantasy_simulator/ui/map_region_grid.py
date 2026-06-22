@@ -126,6 +126,57 @@ def _region_sketch_step_delta(path: List[Tuple[int, int]], index: int) -> Tuple[
     return 1, 0
 
 
+def _route_bend_seed(route_id: str) -> int:
+    return sum((index + 1) * ord(ch) for index, ch in enumerate(route_id))
+
+
+def _clamp_sketch_coord(value: int, lower: int, upper: int) -> int:
+    return max(lower, min(upper, value))
+
+
+def _append_segment_path(
+    path: List[Tuple[int, int]],
+    start: Tuple[int, int],
+    end: Tuple[int, int],
+) -> None:
+    segment = _bresenham(start[0], start[1], end[0], end[1])
+    if path and segment and path[-1] == segment[0]:
+        path.extend(segment[1:])
+    else:
+        path.extend(segment)
+
+
+def _region_sketch_route_path(
+    route_id: str,
+    start: Tuple[int, int],
+    end: Tuple[int, int],
+    width: int,
+    height: int,
+) -> List[Tuple[int, int]]:
+    sx, sy = start
+    tx, ty = end
+    dx = tx - sx
+    dy = ty - sy
+    if abs(dx) + abs(dy) < 6:
+        return _bresenham(sx, sy, tx, ty)
+
+    seed = _route_bend_seed(route_id)
+    bend = (seed % 3) + 1
+    bend *= -1 if seed % 2 else 1
+    mid_x = _clamp_sketch_coord((sx + tx) // 2, 1, width - 2)
+    mid_y = _clamp_sketch_coord((sy + ty) // 2, 1, height - 2)
+
+    if abs(dx) >= abs(dy):
+        mid_y = _clamp_sketch_coord(mid_y + bend, 1, height - 2)
+    else:
+        mid_x = _clamp_sketch_coord(mid_x + bend, 1, width - 2)
+
+    path: List[Tuple[int, int]] = []
+    _append_segment_path(path, start, (mid_x, mid_y))
+    _append_segment_path(path, (mid_x, mid_y), end)
+    return path
+
+
 def _paint_region_sketch_routes(
     canvas: List[List[str]],
     info: MapRenderInfo,
@@ -139,7 +190,7 @@ def _paint_region_sketch_routes(
         tp = site_positions.get(route.to_site_id)
         if not fp or not tp:
             continue
-        path = _bresenham(fp[0], fp[1], tp[0], tp[1])
+        path = _region_sketch_route_path(route.route_id, fp, tp, width, height)
         for index, (px, py) in enumerate(path):
             if (px, py) in protected_centers or not (0 <= px < width and 0 <= py < height):
                 continue
@@ -264,10 +315,10 @@ def append_region_detail_grid(
                 route_char = route_layer.get((x - x_min, y - y_min))
                 if route_char is not None:
                     _paint_detail_route(tile, route_char)
-            for row_index, row in enumerate(tile):
-                rows[row_index] += "".join(row)
-        for row in rows:
-            lines.append("    |" + row + "|")
+            for row_index, tile_row in enumerate(tile):
+                rows[row_index] += "".join(tile_row)
+        for rendered_row in rows:
+            lines.append("    |" + rendered_row + "|")
     lines.append("    +" + "-" * width + "+")
 
 

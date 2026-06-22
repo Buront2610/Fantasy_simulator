@@ -113,14 +113,12 @@ def test_implementation_plan_reflects_bundle_migration_status_for_world_lore_scr
 
 def test_architecture_doc_records_canonical_event_store_rules() -> None:
     assert "World.event_records" in ARCHITECTURE_TEXT
-    assert "events_by_type()" in ARCHITECTURE_TEXT
-    assert "compatibility display buffer" in ARCHITECTURE_TEXT
-    assert "Compatibility Adapter Inventory" in ARCHITECTURE_TEXT
-    assert "Simulator.history" in ARCHITECTURE_TEXT
+    assert "legacy_event_result" in ARCHITECTURE_TEXT
+    assert "legacy_event_log_entry" in ARCHITECTURE_TEXT
+    assert "Event Projection Inventory" in ARCHITECTURE_TEXT
     assert "Sunset Conditions" in ARCHITECTURE_TEXT
-    assert "World.get_compatibility_event_log()" in ARCHITECTURE_TEXT
-    assert "runtime compatibility projection" in ARCHITECTURE_TEXT
-    assert "backward-load compatibility" in ARCHITECTURE_TEXT
+    assert "World.event_log" in ARCHITECTURE_TEXT
+    assert "read-only projection" in ARCHITECTURE_TEXT
     assert "persisted compatibility projection" not in ARCHITECTURE_TEXT
     assert "persisted save snapshots" not in ARCHITECTURE_TEXT
 
@@ -151,6 +149,7 @@ def test_td_backlog_status_tracks_invariants_and_closed_major_split() -> None:
 def test_serialization_contract_documents_conflict_precedence() -> None:
     assert "world.event_records" in SERIALIZATION_CONTRACT_TEXT
     assert "world.event_log" in SERIALIZATION_CONTRACT_TEXT
+    assert "migration-only" in SERIALIZATION_CONTRACT_TEXT
     assert "language_evolution_history" in SERIALIZATION_CONTRACT_TEXT
     assert "language_runtime_states" in SERIALIZATION_CONTRACT_TEXT
     assert "history wins" in SERIALIZATION_CONTRACT_TEXT

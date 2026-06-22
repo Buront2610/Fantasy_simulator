@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 
 from . import world_language_facade as language_facade
 from .language.engine import LanguageEngine
-from .language.state import LanguageEvolutionRecord
+from .language.state import LanguageEvolutionRecord, LocationNameHistoryRecord
 
 
 class WorldLanguageMixin:
@@ -46,6 +46,12 @@ class WorldLanguageMixin:
     def language_evolution_records(self, language_key: str) -> List[LanguageEvolutionRecord]:
         return language_facade.language_evolution_records(self, language_key)
 
+    def location_name_records(self, location_id: str) -> List[LocationNameHistoryRecord]:
+        return language_facade.location_name_history(self, location_id)
+
+    def _seed_initial_location_name_history(self) -> None:
+        language_facade.seed_initial_location_name_history(self)
+
     def _refresh_generated_endonyms(
         self,
         stale_endonyms_by_location_id: Dict[str, str] | None = None,
@@ -60,6 +66,20 @@ class WorldLanguageMixin:
 
     def _apply_language_evolution_record(self, record: LanguageEvolutionRecord) -> bool:
         return language_facade.apply_language_evolution_record(self, record)
+
+    def apply_language_evolution_from_event(
+        self,
+        record: Any,
+        *,
+        language_key: str | None = None,
+        cause_key: str = "",
+    ) -> LanguageEvolutionRecord | None:
+        return language_facade.apply_language_evolution_from_event(
+            self,
+            record,
+            language_key=language_key,
+            cause_key=cause_key,
+        )
 
     def _maybe_evolve_languages_for_year(self, year: int) -> None:
         language_facade.maybe_evolve_languages_for_year(self, year)

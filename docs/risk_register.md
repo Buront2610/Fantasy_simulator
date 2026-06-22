@@ -82,6 +82,13 @@ work and its serialization guardrails.
   current without rebuilding the full mutation-sensitive event signature on
   every write; location/actor/year/month/kind indexes remain read-side derived
   state and rebuild through `EventHistoryIndex.ensure_current()` when queried.
+- Direct event-causality query contract.
+  Status: completed for canonical direct edges.
+  Evidence: `WorldEventRecord.cause_event_ids` is the normalized direct-cause
+  field; existing `render_params["cause_event_id"]` payloads are lifted into
+  it at the record boundary, `World.get_event_causes()` /
+  `World.get_events_caused_by()` expose direct graph traversal, and world
+  health metrics flag dangling cause references.
 - Era runtime snapshot conflict policy.
   Status: completed for the v8 K0 save/load policy.
   Evidence: new saves omit world-level era/civilization runtime fields; the

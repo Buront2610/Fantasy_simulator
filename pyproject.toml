@@ -36,6 +36,9 @@ include = ["fantasy_simulator*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+markers = [
+    "simulation_stats: longer deterministic balance smoke tests for world-health bands",
+]
 
 [tool.mypy]
 python_version = "3.10"

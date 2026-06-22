@@ -11,8 +11,10 @@ from __future__ import annotations
 import io
 import os
 import re
+import tempfile
 import unittest
 from contextlib import redirect_stdout
+from pathlib import Path
 from unittest.mock import patch
 
 from fantasy_simulator.character import Character
@@ -35,6 +37,23 @@ class TestShowResultsUsesBackends(unittest.TestCase):
     def setUp(self) -> None:
         set_locale("en")
 
+    def test_title_screen_uses_render_backend(self) -> None:
+        from fantasy_simulator.ui.title_screen import render_title_screen
+
+        out = RecordingRenderBackend()
+        ctx = UIContext(inp=ScriptedInputBackend(), out=out)
+
+        render_title_screen(ctx)
+
+        self.assertIn("____|           |                      ___| _)", out.text)
+        self.assertIn(r"_|  \__,_|_|  _|\__|\__,_|____/\__, |", out.text)
+        self.assertIn(r"/ \   ___| |_| |__   ___  _ __(_) __ _", out.text)
+        self.assertIn(r"\____/|_.__/|___/\___|_|", out.text)
+        self.assertIn("C$======|1000.01.01", out.text)
+        self.assertIn("D!=====C!---T---D^", out.text)
+        self.assertIn("1000.01.01  >>>", out.text)
+        self.assertIn(">>> >>> >>> >>>", out.text)
+
     def test_yearly_report_goes_through_render_backend(self) -> None:
         """Selecting 'yearly_report' then 'back_to_main' must produce
         output ONLY through the recording backend (not print())."""
@@ -56,6 +75,36 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         # Heading calls must exist (post-results header)
         headings = [c for c in out.calls if c[0] == "print_heading"]
         self.assertTrue(len(headings) >= 1, "No headings printed")
+
+    def test_results_leave_warning_can_keep_reviewing_then_exit(self) -> None:
+        from fantasy_simulator.simulator import Simulator
+        from fantasy_simulator.ui.screens import _build_default_world, _show_results
+
+        world = _build_default_world(num_characters=4, seed=42)
+        sim = Simulator(world, events_per_year=0)
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(menu_keys=["back_to_main", "keep_reviewing", "back_to_main", "exit"])
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_results(sim, ctx=ctx)
+
+        self.assertIn("There are unsaved simulation results.", out.text)
+
+    def test_save_snapshot_cancel_preserves_existing_file(self) -> None:
+        from fantasy_simulator.ui.screens import _save_simulation_snapshot
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "snapshot.json"
+            path.write_text("original", encoding="utf-8")
+            out = RecordingRenderBackend()
+            inp = ScriptedInputBackend(answers=[str(path)], menu_keys=["cancel"])
+            ctx = UIContext(inp=inp, out=out)
+
+            saved = _save_simulation_snapshot(object(), ctx=ctx)
+
+            self.assertFalse(saved)
+            self.assertEqual(path.read_text(encoding="utf-8"), "original")
+            self.assertIn("Save cancelled.", out.text)
 
     def test_yearly_report_defaults_to_card_without_legacy_text(self) -> None:
         from types import SimpleNamespace
@@ -225,6 +274,351 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         # the separator/heading calls prove the route goes through backends)
         self.assertTrue(len(out.calls) > 3, "Too few backend calls captured")
 
+    def test_event_log_groups_entries_with_category_and_metadata(self) -> None:
+        from types import SimpleNamespace
+        from fantasy_simulator.event_models import WorldEventRecord
+        from fantasy_simulator.ui.screens import _show_results
+
+        world = World()
+        hero = Character("Mira", 24, "Female", "Human", "Warrior", char_id="mira")
+        hero.location_id = "loc_aethoria_capital"
+        world.add_character(hero)
+        world.record_event(
+            WorldEventRecord(
+                record_id="battle-readable",
+                kind="battle",
+                year=world.year,
+                month=1,
+                day=2,
+                primary_actor_id=hero.char_id,
+                location_id="loc_aethoria_capital",
+                severity=4,
+                description="Mira held the gate.",
+                render_params={
+                    "combat_log": [
+                        {
+                            "round_number": 1,
+                            "actor_name": "Mira",
+                            "target_name": "Rival",
+                            "action_kind": "weapon_attack",
+                            "skill_key": "Swordsmanship",
+                            "dice": 14,
+                            "modifier": 6,
+                            "attack_total": 20,
+                            "defense_total": 16,
+                            "damage": 3,
+                            "outcome": "advantage",
+                        }
+                    ]
+                },
+            )
+        )
+        sim = SimpleNamespace(world=world)
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(menu_keys=["event_log_last_30", "back_to_main", "exit"])
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_results(sim, ctx=ctx)
+
+        self.assertIn("Event log - latest entries", out.text)
+        self.assertIn("[COMBAT] Mira held the gate.", out.text)
+        self.assertIn("Actors: Mira", out.text)
+        self.assertIn("Location: Aethoria Capital", out.text)
+        self.assertIn("Severity: 4", out.text)
+        self.assertIn("Combat log: 1 rounds.", out.text)
+
+    def test_event_log_renders_causal_chain_without_internal_hashes(self) -> None:
+        from types import SimpleNamespace
+        from fantasy_simulator.event_models import WorldEventRecord
+        from fantasy_simulator.ui.screens import _show_results
+
+        cause_id = "0123456789abcdef0123456789abcdef"
+        effect_id = "fedcba9876543210fedcba9876543210"
+        world = World()
+        world.record_event(
+            WorldEventRecord(
+                record_id=cause_id,
+                kind="war_declared",
+                year=world.year,
+                month=1,
+                day=2,
+                description="The northern houses declared war.",
+            )
+        )
+        world.record_event(
+            WorldEventRecord(
+                record_id=effect_id,
+                kind="war_battle",
+                year=world.year,
+                month=2,
+                day=9,
+                description="The armies clashed at the old bridge.",
+                cause_event_ids=[cause_id],
+            )
+        )
+        sim = SimpleNamespace(world=world)
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(menu_keys=["event_log_last_30", "back_to_main", "exit"])
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_results(sim, ctx=ctx)
+
+        self.assertIn("The armies clashed at the old bridge.", out.text)
+        self.assertIn("Because: The northern houses declared war.", out.text)
+        self.assertIsNone(re.search(r"\b[0-9a-f]{32}\b", out.text))
+
+    def test_daily_live_stream_surfaces_quiet_days_and_adventure_status(self) -> None:
+        from fantasy_simulator.adventure import AdventureRun
+        from fantasy_simulator.simulator import Simulator
+        from fantasy_simulator.ui.screen_simulation import _advance_daily_live
+
+        world = World()
+        hero = Character("Mira", 24, "Female", "Human", "Warrior", char_id="mira")
+        hero.location_id = "loc_aethoria_capital"
+        world.add_character(hero)
+        world.active_adventures.append(
+            AdventureRun(
+                character_id=hero.char_id,
+                character_name=hero.name,
+                origin="loc_aethoria_capital",
+                destination="loc_thornwood",
+                year_started=world.year,
+            )
+        )
+        sim = Simulator(world, events_per_year=0, adventure_steps_per_year=0, population_maintenance_enabled=False)
+        out = RecordingRenderBackend()
+        ctx = UIContext(inp=ScriptedInputBackend(), out=out)
+
+        _advance_daily_live(sim, ctx=ctx, days=1)
+
+        self.assertIn("no major public events", out.text)
+        self.assertIn("[ADVENTURE] Mira is traveling toward Thornwood", out.text)
+
+    def test_event_log_renders_relationship_personality_and_catalyst_factors(self) -> None:
+        import random
+        from types import SimpleNamespace
+        from fantasy_simulator.event_models import WorldEventRecord
+        from fantasy_simulator.events import EventSystem
+        from fantasy_simulator.ui.screens import _show_results
+
+        world = World()
+        saved = Character("Saved", 25, "Female", "Human", "Warrior", char_id="saved")
+        rescuer = Character("Rescuer", 25, "Male", "Human", "Warrior", char_id="rescuer")
+        saved.personality = {
+            "openness": 100,
+            "discipline": 0,
+            "extraversion": 100,
+            "agreeableness": 20,
+            "stability": 20,
+        }
+        rescuer.personality = {
+            "openness": 0,
+            "discipline": 100,
+            "extraversion": 0,
+            "agreeableness": 20,
+            "stability": 20,
+        }
+        for character in (saved, rescuer):
+            world.add_character(character)
+        world.record_event(WorldEventRecord(
+            record_id="rescue_cause",
+            kind="dying_rescued",
+            year=world.year,
+            primary_actor_id=saved.char_id,
+            secondary_actor_ids=[rescuer.char_id],
+            description="Rescuer saved Saved.",
+        ))
+        result = EventSystem().event_marriage(saved, rescuer, world, rng=random.Random(1))
+        world.record_event(WorldEventRecord.from_event_result(result, rng=random.Random(2)))
+        sim = SimpleNamespace(world=world)
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(menu_keys=["event_log_last_30", "back_to_main", "exit"])
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_results(sim, ctx=ctx)
+
+        self.assertIn("Because: Rescuer saved Saved.", out.text)
+        self.assertIn("Relationship factors:", out.text)
+        self.assertIn("personality", out.text)
+        self.assertIn("gratitude after being rescued", out.text)
+        self.assertIn("catalyst a rescue debt", out.text)
+
+    def test_event_log_summarizes_combat_rounds_without_expanding_details(self) -> None:
+        from types import SimpleNamespace
+        from fantasy_simulator.event_models import WorldEventRecord
+        from fantasy_simulator.ui.screens import _show_results
+
+        world = World()
+        world.record_event(
+            WorldEventRecord(
+                record_id="battle-round-visible",
+                kind="war_battle",
+                year=world.year,
+                month=2,
+                day=9,
+                description="The armies clashed at the old bridge.",
+                render_params={
+                    "combat_log": [
+                        {
+                            "round_number": 1,
+                            "actor_name": "Northern levy",
+                            "target_name": "Bridge guard",
+                            "action_kind": "weapon_attack",
+                            "skill_key": "Swordsmanship",
+                            "dice": 14,
+                            "modifier": 6,
+                            "attack_total": 20,
+                            "defense_total": 16,
+                            "damage": 3,
+                            "outcome": "advantage",
+                        }
+                    ]
+                },
+            )
+        )
+        sim = SimpleNamespace(world=world)
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(menu_keys=["event_log_last_30", "back_to_main", "exit"])
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_results(sim, ctx=ctx)
+
+        self.assertIn("Combat log: 1 rounds.", out.text)
+        self.assertNotIn("R1: Northern levy used Swordsmanship", out.text)
+        self.assertNotIn("roll 14+6=20 vs 16, damage 3, advantage.", out.text)
+
+    def test_combat_log_menu_renders_latest_combat_without_full_event_log(self) -> None:
+        from types import SimpleNamespace
+        from fantasy_simulator.event_models import WorldEventRecord
+        from fantasy_simulator.ui.screens import _show_results
+
+        world = World()
+        world.record_event(
+            WorldEventRecord(
+                record_id="battle-focused",
+                kind="battle",
+                year=world.year,
+                month=2,
+                day=9,
+                description="Aldric fought a rival.",
+                render_params={
+                    "combat_log": [
+                        {
+                            "round_number": 1,
+                            "actor_name": "Aldric",
+                            "target_name": "Rival",
+                            "action_kind": "weapon_attack",
+                            "skill_key": "Swordsmanship",
+                            "dice": 14,
+                            "modifier": 6,
+                            "attack_total": 20,
+                            "defense_total": 16,
+                            "damage": 3,
+                            "outcome": "advantage",
+                        }
+                    ]
+                },
+            )
+        )
+        sim = SimpleNamespace(world=world)
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(answers=["1"], menu_keys=["combat_logs", "latest", "back_to_main", "exit"])
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_results(sim, ctx=ctx)
+
+        self.assertIn("Combat logs", out.text)
+        self.assertIn("Aldric fought a rival.", out.text)
+        self.assertIn("R1: Aldric used Swordsmanship", out.text)
+
+    def test_combat_log_menu_filters_by_character(self) -> None:
+        from types import SimpleNamespace
+        from fantasy_simulator.event_models import WorldEventRecord
+        from fantasy_simulator.ui.screens import _show_results
+
+        world = World()
+        hero = Character("Aldric", 25, "Male", "Human", "Warrior", char_id="hero")
+        rival = Character("Rival", 25, "Male", "Human", "Warrior", char_id="rival")
+        bystander = Character("Mira", 25, "Female", "Human", "Mage", char_id="bystander")
+        for character in (hero, rival, bystander):
+            world.add_character(character)
+        world.record_event(
+            WorldEventRecord(
+                record_id="battle-hero",
+                kind="battle",
+                year=world.year,
+                primary_actor_id=hero.char_id,
+                secondary_actor_ids=[rival.char_id],
+                description="Aldric fought a rival.",
+                render_params={
+                    "combat_log": [{"round_number": 1, "actor_id": hero.char_id, "target_id": rival.char_id}]
+                },
+            )
+        )
+        sim = SimpleNamespace(world=world)
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(answers=["1", "1"], menu_keys=["combat_logs", "character", "back_to_main", "exit"])
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_results(sim, ctx=ctx)
+
+        self.assertIn("Combat logs: Aldric", out.text)
+        self.assertIn("Aldric fought a rival.", out.text)
+        self.assertNotIn("Combat logs: Mira", out.text)
+
+    def test_adventure_detail_renders_hazard_combat_rounds(self) -> None:
+        from fantasy_simulator.adventure import AdventureRun
+        from fantasy_simulator.simulator import Simulator
+        from fantasy_simulator.ui.screens import _show_results
+
+        world = World()
+        hero = Character("Aldric", 25, "Male", "Human", "Warrior", location_id="loc_aethoria_capital")
+        world.add_character(hero)
+        run = AdventureRun(
+            character_id=hero.char_id,
+            character_name=hero.name,
+            origin="loc_aethoria_capital",
+            destination="loc_thornwood",
+            year_started=world.year,
+        )
+        run.detail_log.append("Aldric entered the thornwood.")
+        run.combat_logs.append({
+            "step": 2,
+            "location_id": "loc_thornwood",
+            "member_id": hero.char_id,
+            "member_name": hero.name,
+            "hazard_id": "hazard:adv:2",
+            "hazard_name": "forest warden",
+            "winner_id": hero.char_id,
+            "loser_id": "hazard:adv:2",
+            "combat_log": [
+                {
+                    "round_number": 1,
+                    "actor_name": hero.name,
+                    "target_name": "forest warden",
+                    "action_kind": "weapon_attack",
+                    "skill_key": "Swordsmanship",
+                    "dice": 12,
+                    "modifier": 5,
+                    "attack_total": 17,
+                    "defense_total": 11,
+                    "damage": 4,
+                    "outcome": "decisive",
+                }
+            ],
+        })
+        world.add_adventure(run)
+        sim = Simulator(world, events_per_year=0, seed=1)
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(answers=["1"], menu_keys=["adventure_details", "back_to_main", "exit"])
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_results(sim, ctx=ctx)
+
+        self.assertIn("Combat encounter: Aldric vs forest warden", out.text)
+        self.assertIn("R1: Aldric used Swordsmanship", out.text)
+        self.assertIn("damage 4, decisive.", out.text)
+
     def test_world_dashboard_follow_up_opens_character_story(self) -> None:
         from fantasy_simulator.simulator import Simulator
         from fantasy_simulator.ui.screens import _show_results
@@ -263,7 +657,7 @@ class TestShowResultsUsesBackends(unittest.TestCase):
 
         self.assertIn("Open follow-up", out.text)
         self.assertIn("Location follow-up", out.text)
-        self.assertIn("Local site sketch", out.text)
+        self.assertIn("Generated local map", out.text)
 
     def test_world_map_auto_mode_uses_minimal_on_narrow_terminal(self) -> None:
         from fantasy_simulator.ui.screens import _show_results, _build_default_world
@@ -301,7 +695,7 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         ctx = UIContext(inp=inp, out=out)
 
         with (
-            patch("shutil.get_terminal_size", return_value=os.terminal_size((72, 24))),
+            patch("shutil.get_terminal_size", return_value=os.terminal_size((64, 24))),
             patch("fantasy_simulator.ui.atlas_renderer.render_atlas_overview", return_value="WIDE"),
             patch("fantasy_simulator.ui.atlas_renderer.render_atlas_compact", return_value="COMPACT"),
             patch("fantasy_simulator.ui.atlas_renderer.render_atlas_minimal", return_value="MINIMAL"),
@@ -310,6 +704,29 @@ class TestShowResultsUsesBackends(unittest.TestCase):
 
         self.assertIn("COMPACT", out.text)
         self.assertNotIn("WIDE", out.text)
+
+    def test_world_map_auto_mode_uses_wide_on_72_column_terminal(self) -> None:
+        from fantasy_simulator.ui.screens import _show_results, _build_default_world
+
+        world = _build_default_world(num_characters=4, seed=42)
+        from fantasy_simulator.simulator import Simulator
+        sim = Simulator(world, events_per_year=2)
+        sim.advance_years(1)
+
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(menu_keys=["world_map", "back_to_main", "back_to_main"])
+        ctx = UIContext(inp=inp, out=out)
+
+        with (
+            patch("shutil.get_terminal_size", return_value=os.terminal_size((72, 24))),
+            patch("fantasy_simulator.ui.atlas_renderer.render_atlas_overview", return_value="WIDE"),
+            patch("fantasy_simulator.ui.atlas_renderer.render_atlas_compact", return_value="COMPACT"),
+            patch("fantasy_simulator.ui.atlas_renderer.render_atlas_minimal", return_value="MINIMAL"),
+        ):
+            _show_results(sim, ctx=ctx)
+
+        self.assertIn("WIDE", out.text)
+        self.assertNotIn("COMPACT", out.text)
 
     def test_world_map_auto_mode_uses_wide_on_large_terminal(self) -> None:
         from fantasy_simulator.ui.screens import _show_results, _build_default_world
@@ -436,6 +853,123 @@ class TestShowRosterUsesBackends(unittest.TestCase):
         self.assertTrue(any(c[0] == "print_separator" for c in out.calls))
         self.assertTrue(any(c[0] == "print_heading" for c in out.calls))
         self.assertTrue(any("Alice" in c[1] for c in out.calls if len(c) > 1))
+
+    def test_roster_profile_groups_background_family_history_and_combat(self) -> None:
+        from fantasy_simulator.event_models import WorldEventRecord
+        from fantasy_simulator.ui.screens import _show_roster
+
+        world = World()
+        hero = Character(
+            "Aldric",
+            25,
+            "Male",
+            "Human",
+            "Warrior",
+            char_id="hero",
+            location_id="loc_aethoria_capital",
+            founder_background={
+                "family_origin": "minor_noble",
+                "family_status": "fallen",
+                "upbringing": "strict_training",
+                "pre_adventure": "local_guard",
+                "reputation": "promising",
+            },
+            history=["Year 1000: Took up the sword.", "Year 1001: Guarded the north road."],
+            personality_feats=["brave", "oathbound"],
+        )
+        spouse = Character("Mira", 24, "Female", "Human", "Mage", char_id="spouse")
+        child = Character("Lio", 3, "Male", "Human", "Warrior", char_id="child")
+        hero.spouse_id = spouse.char_id
+        hero.add_relation_tag(child.char_id, "child")
+        hero.add_relation_tag(spouse.char_id, "spouse")
+        hero.update_relationship(spouse.char_id, 72)
+        for character in (hero, spouse, child):
+            world.add_character(character)
+        world.record_event(
+            WorldEventRecord(
+                record_id="rescue_1",
+                kind="dying_rescued",
+                year=1001,
+                primary_actor_id=hero.char_id,
+                secondary_actor_ids=[spouse.char_id],
+                description="Mira pulled Aldric from a collapsed bridge.",
+            )
+        )
+        world.record_event(
+            WorldEventRecord(
+                record_id="comfort_1",
+                kind="relationship_comfort",
+                year=1002,
+                primary_actor_id=hero.char_id,
+                secondary_actor_ids=[spouse.char_id],
+                description="Aldric and Mira found a quiet moment of comfort.",
+                cause_event_ids=["rescue_1"],
+                render_params={
+                    "personality_affinity": 6,
+                    "personality_factors": "mutual warmth; relief after recovery",
+                    "relationship_delta": 12,
+                },
+            )
+        )
+        hero.add_relation_tag(spouse.char_id, "shared_values", source_event_id="comfort_1")
+        world.record_event(
+            WorldEventRecord(
+                record_id="battle_1",
+                kind="battle",
+                year=1002,
+                primary_actor_id=hero.char_id,
+                secondary_actor_ids=["rival"],
+                description="Aldric fought a rival.",
+                render_params={
+                    "combat_log": [{
+                        "round_number": 1,
+                        "actor_id": hero.char_id,
+                        "actor_name": hero.name,
+                        "target_id": "rival",
+                        "target_name": "Rival",
+                        "action_kind": "weapon_attack",
+                        "skill_key": "Swordsmanship",
+                        "dice": 12,
+                        "modifier": 5,
+                        "attack_total": 17,
+                        "defense_total": 11,
+                        "damage": 4,
+                        "outcome": "decisive",
+                    }],
+                },
+            )
+        )
+
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend(answers=["1"])
+        ctx = UIContext(inp=inp, out=out)
+
+        _show_roster(world, ctx=ctx)
+
+        self.assertIn("Aldric profile", out.text)
+        self.assertIn("Personality", out.text)
+        self.assertIn("Temperament", out.text)
+        self.assertIn("Features", out.text)
+        self.assertIn("brave, oathbound", out.text)
+        self.assertIn("Current demeanor", out.text)
+        self.assertIn("gratitude after being rescued", out.text)
+        self.assertIn("combat tension", out.text)
+        self.assertIn("Background", out.text)
+        self.assertIn("Family", out.text)
+        self.assertIn("Spouse: Mira", out.text)
+        self.assertIn("Children: Lio", out.text)
+        self.assertIn("Relationships", out.text)
+        self.assertIn("Mira: +72", out.text)
+        self.assertIn("Relationship memory", out.text)
+        self.assertIn("Mira [Shared values]: Aldric and Mira found a quiet moment of comfort.", out.text)
+        self.assertIn("Relationship history", out.text)
+        self.assertIn("Aldric and Mira found a quiet moment of comfort.", out.text)
+        self.assertIn("Because: Mira pulled Aldric from a collapsed bridge.", out.text)
+        self.assertIn("Factors: personality mutual warmth; relief after recovery", out.text)
+        self.assertIn("Recent history", out.text)
+        self.assertIn("Guarded the north road", out.text)
+        self.assertIn("Recent combat", out.text)
+        self.assertIn("Aldric fought a rival.", out.text)
 
 
 class TestSelectLanguageUsesBackends(unittest.TestCase):
@@ -737,6 +1271,65 @@ class TestNoPrintLeaks(unittest.TestCase):
             self.assertNotIn("years", out.text)
         finally:
             set_locale("en")
+
+    def test_advance_days_live_outputs_daily_ticks_without_stdout(self) -> None:
+        from fantasy_simulator.simulator import Simulator
+        from fantasy_simulator.ui.screens import _advance_days, _build_default_world
+
+        world = _build_default_world(num_characters=4, seed=42)
+        sim = Simulator(world, events_per_year=0, adventure_steps_per_year=0, seed=1)
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend()
+        ctx = UIContext(inp=inp, out=out)
+
+        captured = io.StringIO()
+        with redirect_stdout(captured):
+            _advance_days(sim, 2, ctx=ctx, live=True, delay_seconds=0.0)
+
+        self.assertEqual(captured.getvalue(), "")
+        self.assertEqual(sim.elapsed_days, 2)
+        self.assertIn("Advancing simulation... (+2 day(s))", out.text)
+        self.assertIn("Year 1000, Embermorn 1 | +0 event(s)", out.text)
+        self.assertIn("Simulation advanced to Year 1000, Embermorn 3.", out.text)
+
+    def test_advance_days_live_streams_every_new_event(self) -> None:
+        from fantasy_simulator.event_models import WorldEventRecord
+        from fantasy_simulator.simulator import Simulator
+        from fantasy_simulator.ui.screens import _advance_days, _build_default_world
+
+        world = _build_default_world(num_characters=4, seed=42)
+        sim = Simulator(world, events_per_year=0, adventure_steps_per_year=0, seed=1)
+
+        def _record_dense_day(days: int) -> None:
+            self.assertEqual(days, 1)
+            for index in range(5):
+                world.record_event(WorldEventRecord(
+                    record_id=f"dense_{index}",
+                    kind="meeting",
+                    year=world.year,
+                    month=sim.current_month,
+                    day=sim.current_day,
+                    description=f"Dense event {index}.",
+                ))
+            sim.current_month, sim.current_day, year_delta = world.advance_calendar_position(
+                sim.current_month,
+                sim.current_day,
+                days=1,
+            )
+            sim.elapsed_days += 1
+            if year_delta:
+                world.advance_time(year_delta)
+
+        sim.advance_days = _record_dense_day  # type: ignore[method-assign]
+        out = RecordingRenderBackend()
+        inp = ScriptedInputBackend()
+        ctx = UIContext(inp=inp, out=out)
+
+        _advance_days(sim, 1, ctx=ctx, live=True, delay_seconds=0.0)
+
+        self.assertIn("Year 1000, Embermorn 1 | +5 event(s)", out.text)
+        for index in range(5):
+            self.assertIn(f"[Year 1000, Month 1, Day 1] Dense event {index}.", out.text)
 
     def test_main_exit_produces_no_stdout(self) -> None:
         """main() exit path must not leak to stdout."""

@@ -7,6 +7,7 @@ from typing import Any
 from ..i18n import tr, tr_term
 from ..simulator import Simulator
 from ..world import World
+from .combat_log_presenter import combat_log_lines_for_adventure
 from .presenters import AdventurePresenter
 from .screen_input import _get_numeric_choice
 from .ui_context import UIContext, _default_ctx
@@ -120,6 +121,11 @@ def _show_adventure_details(sim: Simulator, ctx: UIContext | None = None) -> Non
     out.print_line()
     for entry in sim.get_adventure_details(run.adventure_id):
         out.print_line(f"  - {entry}")
+    combat_lines = combat_log_lines_for_adventure(run, sim.world)
+    if combat_lines:
+        out.print_line()
+        for entry in combat_lines:
+            out.print_line(f"  - {entry}")
     ctx.inp.pause()
 
 

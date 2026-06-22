@@ -10,7 +10,7 @@ from typing import Any, Dict, Iterable, List, Sequence
 
 from .content.setting_bundle import WorldDefinition
 from .language.engine import LanguageEngine
-from .language.state import LanguageEvolutionRecord, LanguageRuntimeState
+from .language.state import LanguageEvolutionRecord, LanguageRuntimeState, LocationNameHistoryRecord
 
 
 def language_signature(world_definition: WorldDefinition) -> List[Dict[str, Any]]:
@@ -176,17 +176,96 @@ def refresh_generated_endonyms(
         location.generated_endonym = generated_endonym
 
 
+def seed_initial_location_name_history(world: Any) -> None:
+    """Persist current generated or authored local names as the initial name layer."""
+    for location in world.grid.values():
+        surface = getattr(location, "generated_endonym", "") or world.location_endonym(location.id) or ""
+        if not surface or surface == location.canonical_name:
+            continue
+        record_location_name_history(
+            world,
+            location_id=location.id,
+            surface=surface,
+            name_kind="generated_endonym",
+            language_key=_language_key_for_location(world, location.id),
+            reason_key="initial_world_language",
+        )
+
+
+def location_name_history_for_location(
+    name_history: Sequence[LocationNameHistoryRecord],
+    location_id: str,
+) -> List[LocationNameHistoryRecord]:
+    """Return durable name history entries for one location."""
+    return [
+        record
+        for record in name_history
+        if record.location_id == location_id
+    ]
+
+
+def record_location_name_history(
+    world: Any,
+    *,
+    location_id: str,
+    surface: str,
+    name_kind: str,
+    language_key: str = "",
+    previous_surface: str = "",
+    reason_key: str = "",
+    source_event_id: str = "",
+) -> None:
+    """Append a durable location-name history record unless it is already present."""
+    if not location_id or not surface:
+        return
+    record = LocationNameHistoryRecord(
+        location_id=location_id,
+        year=int(getattr(world, "year", 0)),
+        surface=surface,
+        name_kind=name_kind,
+        language_key=language_key,
+        previous_surface=previous_surface,
+        reason_key=reason_key,
+        source_event_id=source_event_id,
+    )
+    if any(existing.to_dict() == record.to_dict() for existing in world.location_name_history):
+        return
+    world.location_name_history.append(record)
+
+
 def refresh_world_generated_endonyms(
     world: Any,
     *,
     stale_endonyms_by_location_id: Dict[str, str] | None = None,
+    reason_key: str = "generated_endonym_refreshed",
+    source_event_id: str = "",
 ) -> None:
     """Apply generated-endonym refresh to a world aggregate."""
+    before = {
+        location.id: getattr(location, "generated_endonym", "")
+        for location in world.grid.values()
+    }
     refresh_generated_endonyms(
         locations=world.grid.values(),
         endonym_resolver=world.location_endonym,
         stale_endonyms_by_location_id=stale_endonyms_by_location_id,
     )
+    for location in world.grid.values():
+        previous = stale_endonyms_by_location_id.get(location.id, "") if stale_endonyms_by_location_id else ""
+        previous = previous or before.get(location.id, "")
+        current = getattr(location, "generated_endonym", "")
+        if not current or current == previous:
+            continue
+        record_location_name_history(
+            world,
+            location_id=location.id,
+            surface=current,
+            name_kind="generated_endonym",
+            language_key=_language_key_for_location(world, location.id),
+            previous_surface=previous,
+            reason_key=reason_key,
+            source_event_id=source_event_id,
+        )
 
 
 def derive_evolution_record(
@@ -195,12 +274,14 @@ def derive_evolution_record(
     language_key: str,
     year: int,
     evolution_history: Sequence[LanguageEvolutionRecord],
+    cause_key: str = "",
 ) -> LanguageEvolutionRecord | None:
     """Ask the language engine for the next historical change event."""
     return language_engine.derive_evolution_record(
         language_key,
         year=year,
         evolution_history=evolution_history,
+        cause_key=cause_key,
     )
 
 
@@ -214,6 +295,138 @@ def apply_evolution_record(
     if not changed:
         return None
     return language_engine.runtime_states_snapshot()
+
+
+def evolution_record_with_cause(
+    record: LanguageEvolutionRecord,
+    *,
+    cause_key: str = "",
+    cause_event_id: str = "",
+) -> LanguageEvolutionRecord:
+    """Return a copy of *record* annotated with a historical cause."""
+    payload = record.to_dict()
+    payload["cause_key"] = cause_key
+    payload["cause_event_id"] = cause_event_id
+    return LanguageEvolutionRecord.from_dict(payload)
+
+
+def apply_language_evolution_from_event(
+    world: Any,
+    record: Any,
+    *,
+    language_key: str | None = None,
+    cause_key: str = "",
+) -> LanguageEvolutionRecord | None:
+    """Apply one immediate language evolution record caused by a world event."""
+    resolved_language_key = language_key or _language_key_for_world_event(world, record)
+    if not resolved_language_key:
+        return None
+    event_location_id = _location_id_for_world_event(world, record)
+    previous_endonym = world.location_endonym(event_location_id) if event_location_id else ""
+    already_applied = any(
+        item.cause_event_id == record.record_id and item.language_key == resolved_language_key
+        for item in world.language_evolution_history
+    )
+    if already_applied:
+        return None
+    resolved_cause_key = cause_key or _cause_key_for_world_event(record)
+    derived = derive_evolution_record(
+        world.language_engine,
+        language_key=resolved_language_key,
+        year=record.year,
+        evolution_history=world.language_evolution_history,
+        cause_key=resolved_cause_key,
+    )
+    if derived is None:
+        return None
+    caused_record = evolution_record_with_cause(
+        derived,
+        cause_key=resolved_cause_key,
+        cause_event_id=record.record_id,
+    )
+    if not world._apply_language_evolution_record(caused_record):
+        return None
+    world.language_evolution_history.append(caused_record)
+    world._language_engine = None
+    refresh_world_generated_endonyms(
+        world,
+        reason_key=resolved_cause_key,
+        source_event_id=record.record_id,
+    )
+    if event_location_id:
+        current_endonym = world.location_endonym(event_location_id) or ""
+        if current_endonym:
+            record_location_name_history(
+                world,
+                location_id=event_location_id,
+                surface=current_endonym,
+                name_kind="generated_endonym",
+                language_key=resolved_language_key,
+                previous_surface=previous_endonym or "",
+                reason_key=resolved_cause_key,
+                source_event_id=record.record_id,
+            )
+    return caused_record
+
+
+def _language_key_for_world_event(world: Any, record: Any) -> str:
+    location_id = _location_id_for_world_event(world, record)
+    if isinstance(location_id, str) and location_id:
+        for seed in world._setting_bundle.world_definition.site_seeds:
+            if seed.location_id == location_id and seed.language_key:
+                return seed.language_key
+        language = world.language_engine.resolve_language(region=location_id)
+        if language is not None:
+            return language.language_key
+    language = world.language_engine.resolve_language()
+    return language.language_key if language is not None else ""
+
+
+def _location_id_for_world_event(world: Any, record: Any) -> str:
+    render_params = getattr(record, "render_params", {})
+    location_id = None
+    if isinstance(render_params, dict):
+        location_id = (
+            render_params.get("location_id")
+            or render_params.get("from_location_id")
+            or _first_location_id(render_params.get("location_ids"))
+            or _first_location_id(render_params.get("endpoint_location_ids"))
+        )
+    if not isinstance(location_id, str) or not location_id:
+        location_id = getattr(record, "location_id", None)
+    if not isinstance(location_id, str) or not location_id:
+        location_id = _first_location_tag(getattr(record, "tags", []))
+    if not isinstance(location_id, str) or not location_id:
+        return ""
+    return world.normalize_location_id(location_id) or location_id
+
+
+def _first_location_id(value: Any) -> str:
+    if not isinstance(value, list):
+        return ""
+    for item in value:
+        if isinstance(item, str) and item:
+            return item
+    return ""
+
+
+def _first_location_tag(tags: Any) -> str:
+    if not isinstance(tags, list):
+        return ""
+    prefix = "location:"
+    for tag in tags:
+        if isinstance(tag, str) and tag.startswith(prefix):
+            return tag[len(prefix):]
+    return ""
+
+
+def _cause_key_for_world_event(record: Any) -> str:
+    render_params = getattr(record, "render_params", {})
+    if isinstance(render_params, dict):
+        cause_key = render_params.get("cause_key") or render_params.get("reason_key")
+        if isinstance(cause_key, str):
+            return cause_key
+    return getattr(record, "kind", "")
 
 
 def maybe_evolve_languages_for_year(
@@ -272,4 +485,12 @@ def advance_world_languages_for_year(world: Any, year: int) -> None:
     world._language_runtime_states = next_runtime_states
     if changed:
         world._language_engine = None
-        refresh_world_generated_endonyms(world)
+        refresh_world_generated_endonyms(world, reason_key="yearly_language_evolution")
+
+
+def _language_key_for_location(world: Any, location_id: str) -> str:
+    for seed in world._setting_bundle.world_definition.site_seeds:
+        if seed.location_id == location_id and seed.language_key:
+            return seed.language_key
+    language = world.language_engine.resolve_language(region=location_id)
+    return language.language_key if language is not None else ""

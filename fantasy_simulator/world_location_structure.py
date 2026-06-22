@@ -71,6 +71,14 @@ def copy_location_runtime_state(source: Any, target: Any) -> None:
     target.generated_endonym = structural_endonym
     target.memorial_ids = list(source.memorial_ids)
     target.live_traces = deepcopy(source.live_traces)
+    target.exploration_progress = getattr(source, "exploration_progress", 0)
+    target.adventure_reputation = getattr(source, "adventure_reputation", 0)
+    target.dungeon_clearance = getattr(source, "dungeon_clearance", 0)
+    target.hazard_regrowth = getattr(source, "hazard_regrowth", 0)
+    target.last_adventure_id = getattr(source, "last_adventure_id", "")
+    target.last_adventure_year = getattr(source, "last_adventure_year", 0)
+    target.last_adventure_outcome = getattr(source, "last_adventure_outcome", "")
+    target.adventure_count = getattr(source, "adventure_count", 0)
 
 
 def preserved_locations_by_normalized_id(

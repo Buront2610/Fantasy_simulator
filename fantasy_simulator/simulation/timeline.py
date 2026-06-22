@@ -8,8 +8,11 @@ across the full year instead of pinning them to a few scripted months.
 
 from __future__ import annotations
 
+from ..events_lifecycle import character_lifespan_years, natural_death_chance, should_record_aging_event
 from ..i18n import tr
+from ..world_history_retention import compact_world_history
 from .calendar import annual_probability_to_fraction, distributed_budget
+from .population import population_pressure_factor, run_population_maintenance
 from .timeline_calendar import propagation_month_window
 from .timeline_pipeline import (
     DayPhaseContext,
@@ -25,6 +28,49 @@ from .timeline_seasons import (
 )
 
 
+def record_aging_event_if_notable(simulator, char, result) -> None:
+    if should_record_aging_event(char, simulator.world):
+        simulator._record_event(result, location_id=char.location_id)
+
+
+def cached_natural_death_chance(simulator, char, year_fraction: float) -> float:
+    """Return a cached natural-decline chance without changing daily RNG rolls."""
+    cache = getattr(simulator, "_natural_death_chance_cache", None)
+    if cache is None:
+        cache = {}
+        simulator._natural_death_chance_cache = cache
+    cache_key = (char.char_id, simulator.world.year, char.age, char.constitution, year_fraction)
+    death_chance = cache.get(cache_key)
+    if death_chance is None:
+        death_chance = natural_death_chance(char, simulator.world, year_fraction=year_fraction)
+        cache[cache_key] = death_chance
+    return death_chance
+
+
+def natural_decline_can_trigger(simulator, char) -> bool:
+    """Return whether the natural-health roll can change this character today."""
+    if not char.alive:
+        return False
+    max_age = max(character_lifespan_years(char, simulator.world), 1)
+    return char.age / max_age > 0.6
+
+
+def natural_health_candidates(simulator) -> list:
+    """Return cached characters whose natural decline can currently trigger."""
+    cache_key = (simulator.world.year, len(simulator.world.characters))
+    cached_key = getattr(simulator, "_natural_health_candidates_key", None)
+    cached = getattr(simulator, "_natural_health_candidates", None)
+    if cached_key == cache_key and cached is not None:
+        return cached
+    candidates = [
+        char for char in simulator.world.characters
+        if natural_decline_can_trigger(simulator, char)
+    ]
+    simulator._natural_health_candidates_key = cache_key
+    simulator._natural_health_candidates = candidates
+    return candidates
+
+
 class TimelineMixin:
     """Mixin providing daily processing methods for the Simulator.
 
@@ -36,7 +82,6 @@ class TimelineMixin:
     - ``adventure_steps_per_year``: target adventure step budget per year
     - ``event_system``: EventSystem instance
     - ``rng``: RNG for simulation decisions
-    - ``_favorites_worsened_this_year`` and seasonal delta trackers
     """
 
     # Seasonal modifiers applied to locations each month (design §5.7).
@@ -52,7 +97,7 @@ class TimelineMixin:
     def _events_for_month(self, month: int) -> int:
         """Compatibility helper exposing the old month-level random-event budget."""
         return distributed_budget(
-            self.events_per_year * self.SIMULATION_DENSITY,
+            self.events_per_year * self.SIMULATION_DENSITY * population_pressure_factor(self.world),
             self.world.months_per_year,
             self.rng,
         )
@@ -61,7 +106,7 @@ class TimelineMixin:
         """Number of random events to generate on this in-world day."""
         del month, day
         return distributed_budget(
-            self.events_per_year * self.SIMULATION_DENSITY,
+            self.events_per_year * self.SIMULATION_DENSITY * population_pressure_factor(self.world),
             self.world.days_per_year,
             self.rng,
         )
@@ -128,17 +173,19 @@ class TimelineMixin:
 
     def _run_natural_health_phase(self, day_context: DayPhaseContext) -> None:
         """Process daily natural death and condition-worsening checks."""
-        for char in list(self.world.characters):
-            self._process_natural_health_check(char, day_context.year_fraction_per_day)
+        for char in natural_health_candidates(self):
+            self._process_natural_health_check(char, day_context.year_fraction_per_day, known_candidate=True)
 
-    def _process_natural_health_check(self, char, year_fraction: float) -> None:
+    def _process_natural_health_check(self, char, year_fraction: float, *, known_candidate: bool = False) -> None:
         """Run the daily natural-health check for a single character."""
+        if not char.alive or (not known_candidate and not natural_decline_can_trigger(self, char)):
+            return
         active_adventure_id = char.active_adventure_id
         result = self.event_system.check_natural_death(
             char,
             self.world,
             rng=self.rng,
-            year_fraction=year_fraction,
+            death_chance=cached_natural_death_chance(self, char, year_fraction),
         )
         if result is None:
             return
@@ -197,6 +244,8 @@ class TimelineMixin:
         """Advance annual character aging only at the last month of the year."""
         if month == self.world.months_per_year:
             self._age_characters()
+            run_population_maintenance(self)
+            compact_world_history(self.world)
 
     def _age_characters(self) -> None:
         """Advance every living character by one year exactly once per 360 days."""
@@ -204,7 +253,7 @@ class TimelineMixin:
             if not char.alive:
                 continue
             result = self.event_system.event_aging(char, self.world, rng=self.rng)
-            self._record_event(result, location_id=char.location_id)
+            record_aging_event_if_notable(self, char, result)
 
     def _resolve_dying_characters(self, year_fraction: float | None = None) -> None:
         """Give dying characters a daily chance at rescue, decline, or stasis."""

@@ -6,6 +6,8 @@ import random
 from typing import Any, Callable, Dict, Sequence
 
 from .character import Character, random_stats
+from .character_founder_background import attach_founder_background
+from .character_personality import generate_personality_feats_for_character, generate_personality_for_character
 from .character_creator_naming import GENDERS, random_name
 from .character_templates import TEMPLATES
 from .content.setting_bundle import NamingRulesDefinition
@@ -15,9 +17,11 @@ from .i18n import tr, tr_term
 NamingRulesResolver = Callable[..., NamingRulesDefinition]
 
 
-def add_origin_history(char: Character) -> None:
+def add_origin_history(char: Character, *, founder_background: bool = True) -> None:
     """Attach the localized birth history line shared by creation paths."""
     char.add_history(tr("history_born_into_world", race=tr_term(char.race), job=tr_term(char.job)))
+    if founder_background:
+        attach_founder_background(char)
 
 
 def create_random_character(
@@ -30,6 +34,7 @@ def create_random_character(
     rng: Any = random,
     tribe: str | None = None,
     region: str | None = None,
+    founder_background: bool = True,
 ) -> Character:
     """Build a random character from resolved race/job catalogs."""
     gender = rng.choice(GENDERS)
@@ -66,9 +71,16 @@ def create_random_character(
         job=job,
         skills=skills,
         rng=char_rng,
-        **stats,
+        strength=stats["strength"],
+        intelligence=stats["intelligence"],
+        dexterity=stats["dexterity"],
+        wisdom=stats["wisdom"],
+        charisma=stats["charisma"],
+        constitution=stats["constitution"],
     )
-    add_origin_history(char)
+    char.personality = generate_personality_for_character(char)
+    char.personality_feats = generate_personality_feats_for_character(char)
+    add_origin_history(char, founder_background=founder_background)
     return char
 
 
@@ -80,6 +92,7 @@ def create_template_character(
     rng: Any = random,
     tribe: str | None = None,
     region: str | None = None,
+    founder_background: bool = True,
 ) -> Character:
     """Build a character from a built-in Aethoria template."""
     key = template_name.lower().strip()
@@ -109,7 +122,14 @@ def create_template_character(
         job=job,
         skills=skills,
         rng=char_rng,
-        **stats,
+        strength=stats["strength"],
+        intelligence=stats["intelligence"],
+        dexterity=stats["dexterity"],
+        wisdom=stats["wisdom"],
+        charisma=stats["charisma"],
+        constitution=stats["constitution"],
     )
-    add_origin_history(char)
+    char.personality = generate_personality_for_character(char)
+    char.personality_feats = generate_personality_feats_for_character(char)
+    add_origin_history(char, founder_background=founder_background)
     return char

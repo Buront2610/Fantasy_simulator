@@ -6,6 +6,9 @@ import random
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from .event_models import EventResult
+from .events_family import resolve_birth_event
+from .events_relationships import resolve_relationship_turning_point_event
+from .simulation.population import has_population_capacity
 
 if TYPE_CHECKING:
     from .character import Character
@@ -20,7 +23,9 @@ EVENT_WEIGHTS: Dict[str, int] = {
     "discovery": 10,
     "battle": 15,
     "marriage": 5,
+    "relationship_turning_point": 7,
 }
+BIRTH_EVENT_WEIGHT = 3
 
 
 def eligible_random_event_characters(characters: List["Character"]) -> List["Character"]:
@@ -46,6 +51,55 @@ def find_collocated_pair(alive: List["Character"], rng: Any = random) -> Optiona
     return char1, char2
 
 
+def find_romance_pair(alive: List["Character"], rng: Any = random) -> Optional[Tuple["Character", "Character"]]:
+    """Pick a collocated unmarried pair, preferring existing affection."""
+    pairs: List[Tuple["Character", "Character"]] = []
+    weights: List[float] = []
+    by_loc: Dict[str, List["Character"]] = {}
+    for character in alive:
+        by_loc.setdefault(character.location_id, []).append(character)
+    for group in by_loc.values():
+        for index, char1 in enumerate(group):
+            if char1.spouse_id is not None:
+                continue
+            for char2 in group[index + 1:]:
+                if char2.spouse_id is not None:
+                    continue
+                avg_rel = (char1.get_relationship(char2.char_id) + char2.get_relationship(char1.char_id)) / 2
+                pairs.append((char1, char2))
+                weights.append(max(1.0, 1.0 + avg_rel))
+    if not pairs:
+        return find_collocated_pair(alive, rng=rng)
+    return rng.choices(pairs, weights=weights, k=1)[0]
+
+
+def birth_pairs(alive: List["Character"]) -> List[Tuple["Character", "Character"]]:
+    """Return collocated married pairs eligible for a generational event."""
+    pairs: List[Tuple["Character", "Character"]] = []
+    seen: set[frozenset[str]] = set()
+    by_id = {char.char_id: char for char in alive}
+    for char in alive:
+        if char.age < 18 or not char.spouse_id:
+            continue
+        spouse = by_id.get(char.spouse_id)
+        if spouse is None or spouse.age < 18 or spouse.location_id != char.location_id:
+            continue
+        pair_key = frozenset((char.char_id, spouse.char_id))
+        if pair_key in seen:
+            continue
+        seen.add(pair_key)
+        pairs.append((char, spouse))
+    return pairs
+
+
+def find_birth_pair(alive: List["Character"], rng: Any = random) -> Optional[Tuple["Character", "Character"]]:
+    """Pick a collocated married pair for a generational event."""
+    pairs = birth_pairs(alive)
+    if not pairs:
+        return None
+    return rng.choice(pairs)
+
+
 def generate_random_event(
     event_system: "EventSystem",
     characters: List["Character"],
@@ -59,10 +113,24 @@ def generate_random_event(
 
     event_types = list(EVENT_WEIGHTS.keys())
     weights = [EVENT_WEIGHTS[event_type] for event_type in event_types]
+    eligible_birth_pairs = birth_pairs(eligible) if has_population_capacity(world) else []
+    if eligible_birth_pairs:
+        event_types.append("birth")
+        weights.append(BIRTH_EVENT_WEIGHT)
     chosen_type = rng.choices(event_types, weights=weights, k=1)[0]
 
-    if chosen_type in ("marriage", "battle", "meeting"):
-        pair = find_collocated_pair(eligible, rng=rng)
+    if chosen_type == "birth":
+        pair = rng.choice(eligible_birth_pairs) if eligible_birth_pairs else find_birth_pair(eligible, rng=rng)
+        if pair is not None:
+            return resolve_birth_event(pair[0], pair[1], world, rng=rng)
+        chosen_type = rng.choice(["skill_training", "discovery", "journey"])
+
+    if chosen_type in ("marriage", "battle", "meeting", "relationship_turning_point"):
+        pair = (
+            find_romance_pair(eligible, rng=rng)
+            if chosen_type == "marriage"
+            else find_collocated_pair(eligible, rng=rng)
+        )
         if pair is None:
             chosen_type = rng.choice(["skill_training", "discovery", "journey"])
         else:
@@ -71,6 +139,8 @@ def generate_random_event(
                 return event_system.event_marriage(char1, char2, world, rng=rng)
             if chosen_type == "battle":
                 return event_system.event_battle(char1, char2, world, rng=rng)
+            if chosen_type == "relationship_turning_point":
+                return resolve_relationship_turning_point_event(char1, char2, world, rng=rng)
             return event_system.event_meeting(char1, char2, world, rng=rng)
 
     char = rng.choice(eligible)

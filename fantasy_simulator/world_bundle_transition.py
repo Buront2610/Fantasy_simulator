@@ -11,6 +11,7 @@ from .rule_override_resolution import (
 )
 from .world_language import language_signature, prune_runtime_states
 from .world_location_references import LocationReferenceResolver
+from .world_calendar_facade import invalidate_calendar_metrics_cache
 
 
 def set_setting_bundle_metadata(
@@ -25,9 +26,14 @@ def set_setting_bundle_metadata(
     if hasattr(world, "_setting_bundle") and world._setting_bundle is not None:
         previous_calendar = world._setting_bundle.world_definition.calendar.to_dict()
     world._setting_bundle = clone_bundle(bundle)
+    invalidate_calendar_metrics_cache(world)
     world._location_reference_resolver = LocationReferenceResolver.from_site_seeds(
         world._setting_bundle.world_definition.site_seeds
     )
+    world._race_lifespan_by_name = {
+        race.name: race.lifespan_years
+        for race in world._setting_bundle.world_definition.races
+    }
     world._language_engine = None
     world._language_runtime_states = prune_runtime_states(
         world._setting_bundle.world_definition,

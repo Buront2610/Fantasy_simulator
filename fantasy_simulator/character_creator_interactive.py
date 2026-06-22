@@ -2,26 +2,79 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, TYPE_CHECKING
+from typing import Any, Dict, List, Protocol
 
 from .character import Character
 from .character_creator_builders import add_origin_history
 from .character_creator_naming import GENDERS, random_name
+from .character_personality import (
+    PERSONALITY_TRAITS,
+    generate_personality,
+    generate_personality_feats_for_character,
+    normalize_personality,
+)
 from .i18n import tr
 
-if TYPE_CHECKING:
-    from .ui.ui_context import UIContext
+
+class _InteractiveInput(Protocol):
+    def read_line(self, prompt: str = "") -> str:
+        ...
+
+
+class _InteractiveOutput(Protocol):
+    def print_line(self, text: str = "") -> None:
+        ...
+
+    def print_separator(self, char: str = "=", width: int = 62) -> None:
+        ...
+
+
+class InteractiveContext(Protocol):
+    inp: _InteractiveInput
+    out: _InteractiveOutput
+
+
+class _StdInput:
+    def read_line(self, prompt: str = "") -> str:
+        try:
+            return input(prompt)
+        except EOFError:
+            return ""
+
+
+class _StdOutput:
+    def print_line(self, text: str = "") -> None:
+        print(text)
+
+    def print_separator(self, char: str = "=", width: int = 62) -> None:
+        print(char * width)
+
+
+class _StdInteractiveContext:
+    inp: _InteractiveInput
+    out: _InteractiveOutput
+
+    def __init__(self) -> None:
+        self.inp = _StdInput()
+        self.out = _StdOutput()
+
+
+def _default_interactive_ctx(ctx: InteractiveContext | None) -> InteractiveContext:
+    if ctx is not None:
+        return ctx
+    return _StdInteractiveContext()
 
 
 class CharacterCreatorInteractiveMixin:
+    naming_rules: Any
+
     def _require_race_and_job_entries(
         self,
     ) -> tuple[List[tuple[str, str, Dict[str, int]]], List[tuple[str, str, List[str]]]]:
         raise NotImplementedError
 
-    def create_interactive(self, ctx: "UIContext | None" = None) -> Character:
-        from .ui.ui_context import _default_ctx
-        ctx = _default_ctx(ctx)
+    def create_interactive(self, ctx: InteractiveContext | None = None) -> Character:
+        ctx = _default_interactive_ctx(ctx)
         out = ctx.out
 
         out.print_line()
@@ -67,16 +120,32 @@ class CharacterCreatorInteractiveMixin:
         job_skills = next((entry[2] for entry in job_entries if entry[0] == job), [])
         skills = {skill: 1 for skill in job_skills}
 
-        char = Character(name=name, age=age, gender=gender, race=race, job=job, skills=skills, **stats)
-        add_origin_history(char)
+        personality = self._allocate_personality(ctx=ctx, race=race)
+
+        char = Character(
+            name=name,
+            age=age,
+            gender=gender,
+            race=race,
+            job=job,
+            skills=skills,
+            personality=personality,
+            strength=stats["strength"],
+            intelligence=stats["intelligence"],
+            dexterity=stats["dexterity"],
+            wisdom=stats["wisdom"],
+            charisma=stats["charisma"],
+            constitution=stats["constitution"],
+        )
+        char.personality_feats = generate_personality_feats_for_character(char)
+        add_origin_history(char, founder_background=True)
         out.print_line(f"\n  {tr('character_created')}")
         out.print_line(char.stat_block())
         return char
 
     @staticmethod
-    def _prompt(message: str, default: str = "", ctx: "UIContext | None" = None) -> str:
-        from .ui.ui_context import _default_ctx
-        ctx = _default_ctx(ctx)
+    def _prompt(message: str, default: str = "", ctx: InteractiveContext | None = None) -> str:
+        ctx = _default_interactive_ctx(ctx)
         display = f"  > {message}"
         if default:
             display += f" [{default}]"
@@ -89,10 +158,9 @@ class CharacterCreatorInteractiveMixin:
         message: str,
         choices: List[str],
         default: str,
-        ctx: "UIContext | None" = None,
+        ctx: InteractiveContext | None = None,
     ) -> str:
-        from .ui.ui_context import _default_ctx
-        ctx = _default_ctx(ctx)
+        ctx = _default_interactive_ctx(ctx)
         display = f"  > {message} ({'/'.join(choices)}) [{default}]: "
         while True:
             raw = ctx.inp.read_line(display).strip()
@@ -111,9 +179,8 @@ class CharacterCreatorInteractiveMixin:
                 ctx.out.print_line(f"  {tr('invalid_options', choices=', '.join(choices))}")
 
     @staticmethod
-    def _allocate_stats(ctx: "UIContext | None" = None) -> Dict[str, int]:
-        from .ui.ui_context import _default_ctx
-        ctx = _default_ctx(ctx)
+    def _allocate_stats(ctx: InteractiveContext | None = None) -> Dict[str, int]:
+        ctx = _default_interactive_ctx(ctx)
         stat_names = ["strength", "intelligence", "dexterity", "wisdom", "charisma", "constitution"]
         defaults = {stat: 10 for stat in stat_names}
         extra_points = 60
@@ -145,3 +212,28 @@ class CharacterCreatorInteractiveMixin:
                 allocated[stat] = val
                 break
         return allocated
+
+    @staticmethod
+    def _allocate_personality(ctx: InteractiveContext | None = None, race: str | None = None) -> Dict[str, int]:
+        ctx = _default_interactive_ctx(ctx)
+        raw = ctx.inp.read_line(f"  > {tr('customize_personality')}: ").strip().lower()
+        if raw != "y":
+            return generate_personality(race=race)
+
+        values: Dict[str, int] = {}
+        for trait in PERSONALITY_TRAITS:
+            label = tr(f"personality_trait_name_{trait}")
+            while True:
+                raw_val = ctx.inp.read_line(
+                    f"  > {label:15s} (0-100, default 50): "
+                ).strip()
+                if not raw_val:
+                    values[trait] = 50
+                    break
+                try:
+                    values[trait] = int(raw_val)
+                except ValueError:
+                    ctx.out.print_line(f"  {tr('please_enter_number')}")
+                    continue
+                break
+        return normalize_personality(values)

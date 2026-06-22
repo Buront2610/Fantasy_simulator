@@ -65,6 +65,34 @@ def test_resolve_active_adventure_for_death_completes_unresolved_run() -> None:
     assert run.pending_choice is None
 
 
+def test_resolve_active_party_adventure_for_death_clears_survivors_and_marks_deceased() -> None:
+    world = World()
+    leader = _make_character("Leader")
+    companion = _make_character("Companion")
+    world.add_character(leader)
+    world.add_character(companion)
+    run = AdventureRun(
+        character_id=leader.char_id,
+        character_name=leader.name,
+        origin=leader.location_id,
+        destination="loc_thornwood",
+        year_started=world.year,
+        state="exploring",
+        member_ids=[leader.char_id, companion.char_id],
+    )
+    leader.active_adventure_id = run.adventure_id
+    companion.active_adventure_id = run.adventure_id
+    world.add_adventure(run)
+
+    resolve_active_adventure_for_death(companion, world)
+
+    assert run.death_member_id == companion.char_id
+    assert leader.active_adventure_id is None
+    assert companion.active_adventure_id is None
+    assert world.active_adventures == []
+    assert world.completed_adventures == [run]
+
+
 def test_mark_character_dead_applies_common_death_state() -> None:
     world = World()
     hero = _make_character("Hero")

@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from .character import Character
     from .content.setting_bundle import SettingBundle
     from .event_models import WorldEventRecord
+    from .language.engine import LanguageEngine
     from .world_event_index import EventHistoryIndex
     from .world_location_state import LocationState
 
@@ -48,9 +49,10 @@ class WorldActorMixin:
         _event_index: EventHistoryIndex
         _location_id_index: Dict[str, LocationState]
 
+        @property
+        def language_engine(self) -> LanguageEngine: ...
         def _repair_location_references(self) -> None: ...
         def _rebuild_location_memorial_ids(self) -> None: ...
-        def rebuild_compatibility_event_log(self) -> None: ...
 
     def _location_ids_for_site_tag(self, tag: str) -> List[str]:
         """Return in-bounds location_ids for bundle site seeds carrying *tag*."""
@@ -91,6 +93,23 @@ class WorldActorMixin:
             mark_visited=self.mark_location_visited,
             rng=rng,
         )
+        self._ensure_character_language_knowledge(character)
+
+    def _ensure_character_language_knowledge(self, character: Character) -> None:
+        """Seed personal language knowledge from race, residence, and lingua francas."""
+        known_languages = getattr(character, "known_languages", None)
+        if known_languages:
+            return
+        character.known_languages = {}
+        primary = self.language_engine.resolve_language(
+            race=getattr(character, "race", None),
+            region=getattr(character, "location_id", None),
+        )
+        if primary is not None:
+            character.known_languages[primary.language_key] = 90
+        for community in self._setting_bundle.world_definition.language_communities:
+            if community.is_lingua_franca and community.language_key not in character.known_languages:
+                character.known_languages[community.language_key] = 45
 
     def rebuild_char_index(self) -> None:
         """Rebuild the character ID index after external mutations."""
@@ -142,7 +161,6 @@ class WorldActorMixin:
             rebuild_adventure_index=self.rebuild_adventure_index,
             rebuild_recent_event_ids_fn=self.rebuild_recent_event_ids,
             rebuild_location_memorial_ids_fn=self._rebuild_location_memorial_ids,
-            rebuild_compatibility_event_log=self.rebuild_compatibility_event_log,
         )
 
     def _backfill_watched_actor_tags_after_load(self) -> None:

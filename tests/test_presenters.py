@@ -364,7 +364,7 @@ def test_monthly_report_card_clusters_rumor_threads_by_source_event():
     assert card.rumor_threads[0].headline == "Merchants insist the capital road collapsed."
     assert card.rumor_threads[0].source_location_name == "Aethoria Capital"
     assert any("Rumor threads" in line for line in lines)
-    assert any("evt_road: 2 rumor(s)" in line and "plausible" in line for line in lines)
+    assert any("The capital road failed.: 2 rumor(s)" in line and "plausible" in line for line in lines)
 
 
 def test_monthly_report_card_surfaces_world_change_projection_summary():
@@ -1005,4 +1005,5 @@ def test_yearly_report_card_surfaces_rumor_threads_from_active_and_archive():
     ]
     assert card.rumor_threads[0].source_event_text == "A hidden shrine was found."
     assert any("Rumor threads" in line for line in lines)
-    assert any("evt_archive: 1 rumor(s)" in line and "certain" in line for line in lines)
+    assert any("A hidden shrine was found.: 1 rumor(s)" in line and "certain" in line for line in lines)
+    assert all("evt_archive" not in line for line in lines)

@@ -23,17 +23,25 @@ TEXT_EN: Dict[str, str] = {
     'simulation_complete': 'Simulation complete.',
     'advancing_simulation': 'Advancing simulation...',
     'advancing_simulation_years': 'Advancing simulation... (+{years} years)',
+    'advancing_simulation_days': 'Advancing simulation... (+{days} day(s))',
     'simulation_advanced_to_year': 'Simulation advanced to year {year}.',
+    'simulation_advanced_to_date': 'Simulation advanced to {date}.',
+    'simulation_date_label': 'Year {year}, {month} {day}',
+    'daily_tick_line': '{date} | +{events} event(s)',
     'alive': 'alive',
     'pending_choices': 'pending choices',
     'post_results': 'POST-SIMULATION RESULTS',
     'what_to_view': 'What would you like to see?',
+    'advance_1_day': 'Advance 1 day',
+    'advance_daily_live': 'Live daily simulation (30 days)',
     'advance_1_year': 'Advance 1 year',
     'advance_5_years': 'Advance 5 years',
     'world_map': 'World map',
     'dashboard_menu': 'World dashboard',
     'rumor_board_menu': 'Rumor board',
     'character_roster': 'Character roster',
+    'family_tree_menu': 'Family tree',
+    'combat_logs_menu': 'Combat logs',
     'event_log_last_30': 'Event log (last 30)',
     'full_event_log': 'Full event log',
     'adventure_summaries': 'Adventure summaries',
@@ -56,6 +64,24 @@ TEXT_EN: Dict[str, str] = {
     'injury': 'Injury',
     'steps': 'Steps',
     'discoveries': 'Discoveries',
+    'combat_log_header': 'Combat log',
+    'combat_log_adventure_encounter': 'Combat encounter: {member} vs {hazard} at {location} (step {step})',
+    'combat_log_round': (
+        'R{round}: {actor} used {skill} ({action}) against {target}; '
+        'roll {dice}{modifier}={attack_total} vs {defense_total}, damage {damage}, {outcome}.'
+    ),
+    'combat_log_unknown': 'unknown',
+    'combat_skill_basic': 'basic attack',
+    'combat_action_weapon_attack': 'weapon attack',
+    'combat_action_weapon_art': 'weapon art',
+    'combat_action_spell_attack': 'spell attack',
+    'combat_action_spell_guard': 'spell guard',
+    'combat_action_maneuver': 'maneuver',
+    'combat_outcome_miss': 'miss',
+    'combat_outcome_checked': 'checked',
+    'combat_outcome_advantage': 'advantage',
+    'combat_outcome_decisive': 'decisive',
+    'combat_outcome_unknown': 'unknown result',
     'no_pending_choices': 'No pending adventure choices.',
     'enter_pending_choice_number': 'Enter pending choice number (or ENTER to cancel): ',
     'enter_option_number': 'Enter option number (or ENTER for default): ',
@@ -63,15 +89,24 @@ TEXT_EN: Dict[str, str] = {
     'choice_resolved': 'Choice resolved.',
     'choice_resolve_failed': 'Could not resolve that choice.',
     'save_path_prompt': 'Save path (default {default_name}): ',
+    'save_overwrite_prompt': 'Overwrite existing snapshot?: {path}',
+    'save_overwrite_confirm': 'Overwrite',
+    'save_overwrite_cancel': 'Cancel',
+    'save_cancelled': 'Save cancelled.',
     'save_failed': 'Could not save snapshot: {error}',
     'save_error_io': 'I/O or serialization error',
     'save_succeeded': 'Snapshot saved to {path}.',
+    'unsaved_leave_prompt': 'There are unsaved simulation results. Return to the main menu?',
+    'unsaved_leave_confirm': 'Leave without saving',
+    'unsaved_leave_keep_reviewing': 'Keep reviewing',
     'load_snapshot_header': 'LOAD SIMULATION SNAPSHOT',
     'load_path_prompt': 'Load path (default {default_name}): ',
     'load_not_found': 'Snapshot not found: {path}',
     'load_failed': 'Could not load snapshot: {error}',
     'load_error_corrupted': 'file not found or corrupted',
     'load_succeeded': 'Loaded snapshot from {path}.',
+    'title_screen_name': 'FANTASY SIMULATOR',
+    'title_screen_edition': 'AETHORIA OBSERVATORY',
     'main_menu': 'MAIN MENU',
     'main_menu_prompt': 'Choose an option',
     'start_new_sim': 'Start new simulation (default world + random characters)',
@@ -113,6 +148,107 @@ TEXT_EN: Dict[str, str] = {
     'language_evolution_count_label': 'Evolution events',
     'load_language_prompt': 'Choose a language',
     'language_set_ja': '表示言語を日本語に変更しました。',
+    'family_tree_header': 'FAMILY TREE',
+    'family_tree_summary': (
+        'Married couples: {couples} | children from married couples: {children} | '
+        'avg children/couple: {average} | couples with children: {couples_with_children}'
+    ),
+    'family_tree_empty': 'No marriages or parent-child links have been recorded yet.',
+    'family_tree_no_children': 'Children: none recorded',
+    'family_tree_child_prefix': 'Child',
+    'family_tree_married_years': 'married in {years}',
+    'family_tree_active_marriage': 'currently married',
+    'family_tree_family_pair': 'family pair',
+    'family_tree_couple_line': '{partner1} + {partner2} [{status}] children={count} bond={relationship}',
+    'family_tree_relationship_unknown': 'unknown',
+    'family_tree_unknown_member': 'Unknown',
+    'family_tree_member_label': '{name} ({race} {job}, age {age}, {status})',
+    'combat_logs_prompt': 'Combat logs',
+    'combat_logs_latest': 'Latest combat',
+    'combat_logs_by_character': 'Combat by character',
+    'combat_logs_header': 'Combat logs',
+    'combat_logs_character_header': 'Combat logs: {name}',
+    'combat_logs_empty': 'No combat logs have been recorded yet.',
+    'combat_logs_truncated': '{count} older combat entries hidden.',
+    'combat_logs_choose_detail': 'Choose a combat entry for details',
+    'combat_logs_entry': '{date} | {kind} | {title} @ {location} | rounds={rounds}',
+    'event_log_last_title': 'Event log - latest entries',
+    'event_log_full_title': 'Event log - full timeline',
+    'event_log_summary': 'Showing {shown}/{total} events | {breakdown}',
+    'event_log_summary_no_breakdown': 'no categories',
+    'event_log_date_divider': '-- {date} --',
+    'event_log_entry_line': '{category} {headline}',
+    'event_log_meta_line': '{meta}',
+    'event_log_meta_actors': 'Actors: {actors}',
+    'event_log_meta_location': 'Location: {location}',
+    'event_log_meta_severity': 'Severity: {severity}',
+    'event_log_category_combat': '[COMBAT]',
+    'event_log_category_adventure': '[ADVENTURE]',
+    'event_log_category_world': '[WORLD]',
+    'event_log_category_life': '[LIFE]',
+    'event_log_category_relationship': '[RELATION]',
+    'event_log_category_discovery': '[DISCOVERY]',
+    'event_log_category_general': '[EVENT]',
+    'event_log_category_count_adventure': 'adventure {count}',
+    'event_log_category_count_combat': 'combat {count}',
+    'event_log_category_count_discovery': 'discovery {count}',
+    'event_log_category_count_general': 'event {count}',
+    'event_log_category_count_life': 'life {count}',
+    'event_log_category_count_relationship': 'relation {count}',
+    'event_log_category_count_world': 'world {count}',
+    'live_event_stream_line': '{date} {headline} {category}',
+    'live_event_stream_detail': '  {detail}',
+    'live_event_stream_no_major_events': '... no major public events; local routines continue.',
+    'live_adventure_progress': '[ADVENTURE] {name}: {summary}',
+    'live_adventure_status': (
+        '[ADVENTURE] {name} is {state} toward {destination} '
+        '(step {steps}, supply {supply})'
+    ),
+    'family_tree_founders_header': 'Founder generation:',
+    'family_tree_founder_line': '  {member}: {summary}',
+    'founder_background_summary': (
+        '{family_origin}, {family_status}; raised through {upbringing}; '
+        'before adventuring: {pre_adventure}; reputation: {reputation}'
+    ),
+    'history_founder_family_background': (
+        'Family background: {family_origin}, {family_status}; upbringing: {upbringing}.'
+    ),
+    'history_founder_career_background': (
+        'Before adventuring: {pre_adventure}; early reputation: {reputation}.'
+    ),
+    'founder_background_family_origin_minor_noble': 'a minor noble line',
+    'founder_background_family_origin_craft_family': 'a craft family',
+    'founder_background_family_origin_farmstead': 'a plain farmstead family',
+    'founder_background_family_origin_temple_orphan': 'temple-raised orphanage ties',
+    'founder_background_family_origin_merchant_house': 'a merchant household',
+    'founder_background_family_origin_soldier_line': 'a line of old soldiers',
+    'founder_background_family_origin_unknown_parentage': 'unknown parentage',
+    'founder_background_family_status_comfortable': 'comfortably established',
+    'founder_background_family_status_fallen': 'fallen from better days',
+    'founder_background_family_status_scattered': 'scattered by trouble',
+    'founder_background_family_status_ordinary': 'ordinary and uncelebrated',
+    'founder_background_family_status_secretive': 'careful with old secrets',
+    'founder_background_family_status_respected': 'locally respected',
+    'founder_background_upbringing_strict_training': 'strict training',
+    'founder_background_upbringing_warm_household': 'a warm household',
+    'founder_background_upbringing_lonely_roads': 'lonely roads',
+    'founder_background_upbringing_apprenticed_young': 'early apprenticeship',
+    'founder_background_upbringing_self_taught': 'self-taught habits',
+    'founder_background_upbringing_quiet_village': 'a quiet village life',
+    'founder_background_pre_adventure_local_guard': 'local guard service',
+    'founder_background_pre_adventure_wandering_laborer': 'wandering labor',
+    'founder_background_pre_adventure_failed_scholar': 'a failed scholarly attempt',
+    'founder_background_pre_adventure_family_debt': 'family debt',
+    'founder_background_pre_adventure_pilgrim_errand': 'a pilgrim errand',
+    'founder_background_pre_adventure_ordinary_restlessness': 'ordinary restlessness',
+    'founder_background_pre_adventure_minor_scandal': 'a minor scandal',
+    'founder_background_pre_adventure_quiet_departure': 'a quiet departure from home',
+    'founder_background_reputation_promising': 'promising',
+    'founder_background_reputation_unremarkable': 'unremarkable',
+    'founder_background_reputation_trouble_shadow': 'shadowed by trouble',
+    'founder_background_reputation_dependable': 'dependable',
+    'founder_background_reputation_lucky': 'lucky',
+    'founder_background_reputation_unproven': 'unproven',
     'language_set_en': 'Switched display language to English.',
     'language_option_ja': '日本語',
     'language_option_en': 'English',
@@ -129,6 +265,8 @@ TEXT_EN: Dict[str, str] = {
     'status_label': 'Status',
     'stats_label': 'Stats',
     'top_skills_label': 'Top Skills',
+    'features_label': 'Features',
+    'known_languages_label': 'Languages',
     'injury_label': 'Injury',
     'no_notable_events': '(No notable events recorded.)',
     'story_of': 'The Story of {name}',
@@ -146,6 +284,12 @@ TEXT_EN: Dict[str, str] = {
     'set_out_for_adventure': 'Year {year}: Set out from {origin} toward {destination}.',
     'summary_adventure_set_out': '{name} set out from {origin} toward {destination}.',
     'detail_adventure_set_out': '{name} began an expedition from {origin} toward {destination}.',
+    'detail_adventure_warfront_pressure': (
+        '{destination} lay inside an active war zone, raising the expedition danger.'
+    ),
+    'detail_adventure_blocked_route_pressure': (
+        'Blocked roads near {location} forced the party onto a more hazardous detour.'
+    ),
     'summary_adventure_arrived': '{name} reached {destination} and began the expedition.',
     'detail_adventure_arrived': '{name} left {origin}, arrived at {destination}, and started scouting the area.',
     'choice_dangerous_approach': '{name} found a dangerous approach into {destination}.',
@@ -200,17 +344,74 @@ TEXT_EN: Dict[str, str] = {
     'event_story_training_deadline': 'A looming trial gave the training a clear purpose.',
     'event_story_training_rival': 'Word of a rival sharpened {name}\'s focus.',
     'event_story_training_failed_attempt': 'A recent failure made practice impossible to ignore.',
-    'meeting_positive': '{name1} and {name2} met in {location} and hit it off splendidly. ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
-    'meeting_pleasant': '{name1} and {name2} met in {location} and had a pleasant exchange. ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
-    'meeting_neutral': '{name1} and {name2} met in {location} and exchanged a polite nod. ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
-    'meeting_negative': '{name1} and {name2} met in {location} and had a tense, uncomfortable encounter. ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
+    'meeting_positive': '{name1} and {name2} met in {location} and hit it off splendidly.{relationship_moment} ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
+    'meeting_pleasant': '{name1} and {name2} met in {location} and had a pleasant exchange.{relationship_moment} ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
+    'meeting_neutral': '{name1} and {name2} met in {location} and exchanged a polite nod.{relationship_moment} ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
+    'meeting_negative': '{name1} and {name2} met in {location} and had a tense, uncomfortable encounter.{relationship_moment} ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
     'history_met': 'Year {year}: Met {name} in {location}.',
-    'romance_growing_closer': '{name1} and {name2} spent time together at {location}, growing closer.',
-    'romance_commitments_blocked': '{name1} and {name2} shared a meaningful moment at {location}, but existing commitments kept the relationship from deepening.',  # noqa: E501
+    'romance_growing_closer': '{name1} and {name2} spent time together at {location}, growing closer.{relationship_moment}',  # noqa: E501
+    'romance_commitments_blocked': '{name1} and {name2} shared a meaningful moment at {location}, but existing commitments kept the relationship from deepening.{relationship_moment}',  # noqa: E501
     'marriage_anniversary': '{name1} and {name2} celebrated another year of their marriage.',
     'history_anniversary': 'Year {year}: Celebrated marriage anniversary with {name}.',
     'marriage_happened': '{name1} ({race1} {job1}) and {name2} ({race2} {job2}) were married in {location} amid great celebration!',  # noqa: E501
     'history_married': 'Year {year}: Married {name} in {location}.',
+    'relationship_reconciliation': '{name1} and {name2} faced old hurt at {location} and chose to make peace. {turning_point_reason} ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
+    'relationship_conflict': '{name1} and {name2} clashed at {location}, and the strain between them sharpened. {turning_point_reason} ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
+    'relationship_mentorship': '{name1} and {name2} settled into a mentor bond at {location}. {turning_point_reason} ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
+    'relationship_betrayal': '{name1} and {name2} broke trust at {location}, leaving a bitter mark. {turning_point_reason} ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
+    'relationship_comfort': '{name1} and {name2} found a quiet moment of comfort at {location}. {turning_point_reason} ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
+    'relationship_value_alignment': '{name1} and {name2} recognized a shared value at {location}. {turning_point_reason} ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
+    'relationship_value_clash': '{name1} and {name2} found that their values cut against each other at {location}. {turning_point_reason} ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
+    'relationship_value_reconsidered': '{name1} and {name2} reconsidered an old value rift at {location}. {turning_point_reason} ({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})',  # noqa: E501
+    'relationship_turning_point_reason_rescue_debt': 'A rescue debt still shaped how they saw each other.',
+    'relationship_turning_point_reason_unlikely_bond': (
+        'Their temperaments did not fit, but a shared ordeal made the exception matter.'
+    ),
+    'relationship_turning_point_reason_vulnerability': 'Recent fear made old defenses harder to keep raised.',
+    'relationship_turning_point_reason_combat_tension': 'The memory of violence kept every word sharp.',
+    'relationship_turning_point_reason_shared_curiosity': 'Shared curiosity made the lesson worth trusting.',
+    'relationship_turning_point_reason_guidance': 'Discipline and experience gave the bond a clear shape.',
+    'relationship_turning_point_reason_mistrust': 'Low trust and clashing outlooks left little room for grace.',
+    'relationship_turning_point_reason_old_grudge': 'An older grievance finally found a voice.',
+    'relationship_turning_point_reason_mismatch': 'Their temperaments pulled the moment in opposite directions.',
+    'relationship_turning_point_reason_trust': 'Steady warmth gave them enough trust to risk honesty.',
+    'relationship_turning_point_reason_shared_history': 'Shared history mattered more than the immediate quarrel.',
+    'relationship_turning_point_reason_shared_features': 'Their defining features pointed toward the same promise.',
+    'relationship_turning_point_reason_shared_values': 'Their values lined up clearly enough to become a bond.',
+    'relationship_turning_point_reason_feature_clash': 'Their defining habits made the disagreement personal.',
+    'relationship_turning_point_reason_value_clash': 'What each of them valued made compromise difficult.',
+    'relationship_turning_point_reason_value_reconsidered': (
+        'A later debt or shared purpose made the old disagreement less absolute.'
+    ),
+    'relationship_moment_unlikely_catalyst': (
+        'Their temperaments resisted each other, but the shared ordeal left a door open.'
+    ),
+    'relationship_moment_temper_balanced': 'One had the patience to steady the other before sparks became fire.',
+    'relationship_moment_feature_clash': 'Their defining habits caught on each other like rough edges.',
+    'relationship_moment_vulnerable': 'Recent vulnerability made the exchange carry more weight than usual.',
+    'relationship_moment_shared_ordeal': 'What they had endured together spoke before either of them did.',
+    'relationship_moment_shared_pursuit': 'A shared pursuit gave them language for mutual respect.',
+    'relationship_moment_mismatch': 'Different rhythms made even simple words land unevenly.',
+    'relationship_moment_trust': 'Steady trust made the silence between them easier to cross.',
+    'relationship_moment_spark': 'Something in the moment answered quickly between them.',
+    'relationship_moment_friction': 'Old friction showed through before either could hide it.',
+    'relationship_moment_measured': 'Neither fully opened up, but both took the measure of the other.',
+    'history_relationship_reconciliation': 'Year {year}: Made peace with {name} in {location}.',
+    'history_relationship_conflict': 'Year {year}: Clashed with {name} in {location}.',
+    'history_relationship_mentorship': 'Year {year}: Entered a mentor bond with {name} in {location}.',
+    'history_relationship_betrayal': 'Year {year}: Trust broke with {name} in {location}.',
+    'history_relationship_comfort': 'Year {year}: Shared comfort with {name} in {location}.',
+    'history_relationship_value_alignment': 'Year {year}: Recognized a shared value with {name} in {location}.',
+    'history_relationship_value_clash': 'Year {year}: Clashed over values with {name} in {location}.',
+    'history_relationship_value_reconsidered': 'Year {year}: Reconsidered an old value rift with {name} in {location}.',
+    'birth_happened': '{child}, child of {parent1} and {parent2}, was born in {location}.',
+    'history_child_born': 'Year {year}: {child}, child with {partner}, was born.',
+    'history_born_to_parents': 'Year {year}: Born to {parent1} and {parent2}.',
+    'population_migrant_arrived': (
+        '{name} ({race} {job}) arrived in {location}, drawn by rumors of opportunity.'
+    ),
+    'population_migrants_arrived': '{count} new wanderers arrived in Aethoria, keeping the world in motion.',
+    'history_migrated_to_world': 'Year {year}: Arrived in {location} as a migrant adventurer.',
     'battle_fatal': '{winner} defeated {loser}, who did not survive the encounter.',
     'battle_normal': '{winner} defeated {loser}.',
     'history_battle_win': 'Year {year}: Won a battle against {name} at {location}.',
@@ -279,6 +480,41 @@ TEXT_EN: Dict[str, str] = {
     'roster_header_age': 'Age',
     'roster_header_status': 'Status',
     'roster_header_location': 'Location',
+    'roster_detail_prompt': 'Enter character number for profile (or ENTER to return): ',
+    'roster_profile_header': '{name} profile',
+    'roster_profile_identity': '{race} {job}, age {age}, {status}, injury {injury}, at {location}',
+    'roster_profile_stats': (
+        'Stats STR {strength} / INT {intelligence} / DEX {dexterity} / '
+        'WIS {wisdom} / CHA {charisma} / CON {constitution}'
+    ),
+    'roster_profile_personality': 'Personality: {summary}',
+    'roster_profile_temperament': 'Temperament: {archetype}',
+    'roster_profile_feats': 'Features: {feats}',
+    'roster_profile_current_personality': 'Current demeanor: {archetype}; {summary} (shaped by {factors})',
+    'roster_profile_background': 'Background',
+    'roster_profile_family': 'Family',
+    'roster_profile_relationships': 'Relationships',
+    'roster_profile_relationship_memory': 'Relationship memory',
+    'roster_profile_relationship_history': 'Relationship history',
+    'roster_profile_recent_history': 'Recent history',
+    'roster_profile_recent_combat': 'Recent combat',
+    'roster_profile_no_background': 'No founder background recorded.',
+    'roster_profile_no_family': 'No close family links recorded.',
+    'roster_profile_no_relationships': 'No named relationships recorded.',
+    'roster_profile_no_relationship_memory': 'No sourced relationship memories recorded.',
+    'roster_profile_no_relationship_history': 'No relationship events recorded.',
+    'roster_profile_no_history': 'No personal history recorded.',
+    'roster_profile_spouse': 'Spouse: {name}',
+    'roster_profile_parents': 'Parents: {names}',
+    'roster_profile_children': 'Children: {names}',
+    'roster_profile_relation': '{name}: {score:+d}{tags}',
+    'roster_profile_relationship_memory_line': '{name} [{tag}]: {description}',
+    'roster_profile_relationship_memory_unavailable': 'source event is unavailable',
+    'roster_profile_relationship_event': '{date} | {kind} | {description}',
+    'roster_profile_relationship_cause': 'Because: {causes}',
+    'roster_profile_relationship_cause_unavailable': 'Because: source event is unavailable.',
+    'roster_profile_relationship_factor': 'Factors: {factors}',
+    'roster_profile_combat_line': '{date} | {kind} | {title} @ {location} | rounds={rounds}',
     'interactive_character_creation': 'CHARACTER CREATION',
     'enter_character_name': 'Enter character name',
     'choose_gender': 'Choose gender',
@@ -289,6 +525,7 @@ TEXT_EN: Dict[str, str] = {
     'enter_starting_age': 'Enter starting age (15-80)',
     'stat_distribution_info': 'You have 60 points to distribute among 6 stats (each 10-40).',
     'accept_default_stats': 'Press ENTER to accept the default (10 each).',
+    'customize_personality': 'Customize personality? (y/N)',
     'character_created': 'Character created!',
     'manually_distribute_stats': 'Manually distribute stats? (y/N)',
     'please_enter_number': 'Please enter a number.',
@@ -299,6 +536,15 @@ TEXT_EN: Dict[str, str] = {
     'event_log_prefix': '[Year {year}]',
     'event_log_prefix_month': '[Year {year}, Month {month}]',
     'event_log_prefix_day': '[Year {year}, Month {month}, Day {day}]',
+    'event_log_empty': 'No events have been recorded.',
+    'event_log_caused_by': 'Because: {events}',
+    'event_log_causes_unavailable': 'Because: source event is unavailable.',
+    'event_log_combat_summary': 'Combat log: {rounds} rounds. Open Combat logs for round details.',
+    'event_log_relationship_reason': 'Relationship factors: {reasons}',
+    'event_log_personality_reason': 'personality {factors}, affinity {affinity:+d}, delta {delta:+d}',
+    'event_log_catalyst_reason': 'catalyst {factors}, bonus {bonus:+d}',
+    'event_log_no_personality_factors': 'unrecorded temperament factors',
+    'event_log_no_catalyst_factors': 'unrecorded shared experience',
     'injury_status_none': 'none',
     'injury_status_injured': 'injured',
     'injury_status_serious': 'serious',
@@ -316,15 +562,83 @@ TEXT_EN: Dict[str, str] = {
     'event_type_condition_worsened': 'Condition worsened',
     'event_type_dying_rescued': 'Rescued from death',
     'relations_label': 'Relations:',
+    'personality_label': 'Personality',
+    'personality_summary': '{traits}',
+    'personality_trait_name_openness': 'Openness',
+    'personality_trait_name_discipline': 'Discipline',
+    'personality_trait_name_extraversion': 'Extraversion',
+    'personality_trait_name_agreeableness': 'Agreeableness',
+    'personality_trait_name_stability': 'Stability',
+    'personality_trait_openness': 'Open {value} ({level})',
+    'personality_trait_discipline': 'Disciplined {value} ({level})',
+    'personality_trait_extraversion': 'Social {value} ({level})',
+    'personality_trait_agreeableness': 'Agreeable {value} ({level})',
+    'personality_trait_stability': 'Steady {value} ({level})',
+    'personality_level_high': 'high',
+    'personality_level_mid': 'mid',
+    'personality_level_low': 'low',
+    'personality_archetype_steady_mediator': 'steady mediator',
+    'personality_archetype_steadfast_guardian': 'steadfast guardian',
+    'personality_archetype_restless_seeker': 'restless seeker',
+    'personality_archetype_quiet_scholar': 'quiet scholar',
+    'personality_archetype_pragmatic_traditionalist': 'pragmatic traditionalist',
+    'personality_archetype_volatile_maverick': 'volatile maverick',
+    'personality_archetype_reserved_planner': 'reserved planner',
+    'personality_archetype_gentle_neighbor': 'gentle neighbor',
+    'personality_archetype_curious_wanderer': 'curious wanderer',
+    'personality_archetype_balanced_adventurer': 'balanced adventurer',
+    'personality_feat_brave': 'brave',
+    'personality_feat_patient_listener': 'patient listener',
+    'personality_feat_quick_tempered': 'quick-tempered',
+    'personality_feat_oathbound': 'oathbound',
+    'personality_feat_curious_mind': 'curious mind',
+    'personality_feat_scarred_survivor': 'scarred survivor',
+    'personality_feat_silver_tongue': 'silver tongue',
+    'personality_feat_lone_wolf': 'lone wolf',
+    'personality_feat_family_minded': 'family-minded',
+    'personality_feat_reckless': 'reckless',
+    'personality_feat_affinity_shared_features': 'shared defining features',
+    'personality_feat_affinity_temper_balanced': 'one temper steadied the other',
+    'personality_feat_affinity_hard_won_courage': 'hard-won courage',
+    'personality_feat_affinity_vow_vs_impulse': 'vows clashed with impulse',
+    'personality_feat_affinity_home_vs_distance': 'home ties pulled against distance',
+    'personality_feat_affinity_social_bridge': 'social ease bridged the gap',
+    'personality_affinity_shared_kindness': 'mutual warmth',
+    'personality_affinity_low_trust': 'low trust',
+    'personality_affinity_steady_pair': 'steady temperaments',
+    'personality_affinity_volatile_pair': 'volatile temperaments',
+    'personality_affinity_shared_curiosity': 'shared curiosity',
+    'personality_affinity_shared_discipline': 'shared discipline',
+    'personality_affinity_social_mismatch': 'social rhythm mismatch',
+    'personality_affinity_outlook_gap': 'different outlooks',
+    'personality_affinity_balanced': 'balanced temperaments',
+    'personality_context_rescued_gratitude': 'gratitude after being rescued',
+    'personality_context_rescuer_responsibility': 'responsibility after saving someone',
+    'personality_context_recent_fear': 'recent fear',
+    'personality_context_grief': 'grief',
+    'personality_context_combat_tension': 'combat tension',
+    'personality_context_recent_wonder': 'recent wonder',
+    'personality_context_relief': 'relief after recovery',
+    'relationship_catalyst_rescue_debt': 'a rescue debt',
+    'relationship_catalyst_family_bond': 'family responsibility',
+    'relationship_catalyst_shared_adventure': 'a shared adventure',
+    'relationship_catalyst_prior_romance': 'an earlier romantic spark',
+    'relationship_catalyst_hard_won_respect': 'hard-won respect',
+    'relationship_catalyst_shared_values': 'shared values',
     'relation_tag_friend': 'Friend',
     'relation_tag_rival': 'Rival',
     'relation_tag_spouse': 'Spouse',
+    'relation_tag_parent': 'Parent',
+    'relation_tag_child': 'Child',
+    'relation_tag_co_parent': 'Co-parent',
     'relation_tag_savior': 'Savior',
     'relation_tag_rescued': 'Rescued',
     'relation_tag_mentor': 'Mentor',
     'relation_tag_disciple': 'Disciple',
     'relation_tag_betrayer': 'Betrayer',
     'relation_tag_family': 'Family',
+    'relation_tag_shared_values': 'Shared values',
+    'relation_tag_value_rift': 'Value rift',
     'auto_pause_dying_spotlighted': 'A spotlighted character is dying',
     'auto_pause_dying_favorite': 'A favorite character is dying',
     'auto_pause_dying_any': 'A character is dying',
@@ -343,10 +657,21 @@ TEXT_EN: Dict[str, str] = {
     'event_type_battle': 'Battle',
     'event_type_aging': 'Aging',
     'event_type_marriage': 'Marriage',
+    'event_type_birth': 'Birth',
     'event_type_battle_fatal': 'Fatal battle',
+    'event_type_adventure_combat': 'Adventure combat',
     'event_type_death': 'Death',
     'event_type_anniversary': 'Anniversary',
     'event_type_romance': 'Romance',
+    'event_type_relationship_reconciliation': 'Reconciliation',
+    'event_type_relationship_conflict': 'Relationship conflict',
+    'event_type_relationship_mentorship': 'Mentorship',
+    'event_type_relationship_betrayal': 'Betrayal',
+    'event_type_relationship_comfort': 'Comfort',
+    'event_type_relationship_value_alignment': 'Value alignment',
+    'event_type_relationship_value_clash': 'Value clash',
+    'event_type_relationship_value_reconsidered': 'Value reconsidered',
+    'event_type_immigration': 'Immigration',
     'event_type_generic': 'Other',
     'event_type_injury_recovery': 'Injury recovery',
     'event_type_adventure_started': 'Adventure departure',
@@ -369,42 +694,42 @@ TEXT_EN: Dict[str, str] = {
     ),
     'events.meeting.summary': '{actor} met {other} at {location}.',
     'events.meeting_positive.summary': (
-        '{name1} and {name2} met in {location} and hit it off splendidly. '
+        '{name1} and {name2} met in {location} and hit it off splendidly.{relationship_moment} '
         '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         'Avg: {relationship_avg:+d})'
     ),
     'events.meeting_positive.summary.narrative': (
-        '{story_hook} {name1} and {name2} hit it off splendidly at {location}. '
+        '{story_hook} {name1} and {name2} hit it off splendidly at {location}.{relationship_moment} '
         '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         'Avg: {relationship_avg:+d})'
     ),
     'events.meeting_pleasant.summary': (
-        '{name1} and {name2} met in {location} and had a pleasant exchange. '
+        '{name1} and {name2} met in {location} and had a pleasant exchange.{relationship_moment} '
         '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         'Avg: {relationship_avg:+d})'
     ),
     'events.meeting_pleasant.summary.narrative': (
-        '{story_hook} {name1} and {name2} had a pleasant exchange at {location}. '
+        '{story_hook} {name1} and {name2} had a pleasant exchange at {location}.{relationship_moment} '
         '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         'Avg: {relationship_avg:+d})'
     ),
     'events.meeting_neutral.summary': (
-        '{name1} and {name2} met in {location} and exchanged a polite nod. '
+        '{name1} and {name2} met in {location} and exchanged a polite nod.{relationship_moment} '
         '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         'Avg: {relationship_avg:+d})'
     ),
     'events.meeting_neutral.summary.narrative': (
-        '{story_hook} {name1} and {name2} exchanged a polite nod at {location}. '
+        '{story_hook} {name1} and {name2} exchanged a polite nod at {location}.{relationship_moment} '
         '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         'Avg: {relationship_avg:+d})'
     ),
     'events.meeting_negative.summary': (
-        '{name1} and {name2} met in {location} and had a tense, uncomfortable encounter. '
+        '{name1} and {name2} met in {location} and had a tense, uncomfortable encounter.{relationship_moment} '
         '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         'Avg: {relationship_avg:+d})'
     ),
     'events.meeting_negative.summary.narrative': (
-        '{story_hook} {name1} and {name2} had a tense encounter at {location}. '
+        '{story_hook} {name1} and {name2} had a tense encounter at {location}.{relationship_moment} '
         '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
         'Avg: {relationship_avg:+d})'
     ),
@@ -412,6 +737,7 @@ TEXT_EN: Dict[str, str] = {
         '{name1} ({race1} {job1}) and {name2} ({race2} {job2}) were married in {location} '
         'amid great celebration!'
     ),
+    'events.birth.summary': '{child}, child of {parent1} and {parent2}, was born in {location}.',
     'events.discovery.summary': '{name} discovered {item} near {location}. {extra}',
     'events.discovery.summary.narrative': '{story_hook} {name} discovered {item} near {location}. {extra}',
     'events.skill_training.summary': (
@@ -441,11 +767,52 @@ TEXT_EN: Dict[str, str] = {
     'events.dying_stabilized.summary': '{name} miraculously stabilized from a dying state at {location}.',
     'events.marriage_anniversary.summary': '{name1} and {name2} celebrated another year of their marriage.',
     'events.romance_growing_closer.summary': (
-        '{name1} and {name2} spent time together at {location}, growing closer.'
+        '{name1} and {name2} spent time together at {location}, growing closer.{relationship_moment}'
     ),
     'events.romance_commitments_blocked.summary': (
         '{name1} and {name2} shared a meaningful moment at {location}, but existing commitments kept the '
-        'relationship from deepening.'
+        'relationship from deepening.{relationship_moment}'
+    ),
+    'events.relationship_reconciliation.summary': (
+        '{name1} and {name2} faced old hurt at {location} and chose to make peace. {turning_point_reason} '
+        '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        'Avg: {relationship_avg:+d})'
+    ),
+    'events.relationship_conflict.summary': (
+        '{name1} and {name2} clashed at {location}, and the strain between them sharpened. '
+        '{turning_point_reason} '
+        '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        'Avg: {relationship_avg:+d})'
+    ),
+    'events.relationship_mentorship.summary': (
+        '{name1} and {name2} settled into a mentor bond at {location}. {turning_point_reason} '
+        '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        'Avg: {relationship_avg:+d})'
+    ),
+    'events.relationship_betrayal.summary': (
+        '{name1} and {name2} broke trust at {location}, leaving a bitter mark. {turning_point_reason} '
+        '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        'Avg: {relationship_avg:+d})'
+    ),
+    'events.relationship_comfort.summary': (
+        '{name1} and {name2} found a quiet moment of comfort at {location}. {turning_point_reason} '
+        '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        'Avg: {relationship_avg:+d})'
+    ),
+    'events.relationship_value_alignment.summary': (
+        '{name1} and {name2} recognized a shared value at {location}. {turning_point_reason} '
+        '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        'Avg: {relationship_avg:+d})'
+    ),
+    'events.relationship_value_clash.summary': (
+        '{name1} and {name2} found that their values cut against each other at {location}. '
+        '{turning_point_reason} ({name1}->{name2}: {relationship_a:+d} / '
+        '{name2}->{name1}: {relationship_b:+d} / Avg: {relationship_avg:+d})'
+    ),
+    'events.relationship_value_reconsidered.summary': (
+        '{name1} and {name2} reconsidered an old value rift at {location}. {turning_point_reason} '
+        '({name1}->{name2}: {relationship_a:+d} / {name2}->{name1}: {relationship_b:+d} / '
+        'Avg: {relationship_avg:+d})'
     ),
     'events.location_renamed.summary': '{old_name} was renamed {new_name}.',
     'events.route_blocked.summary': 'The route from {from_location} to {to_location} was blocked.',
@@ -473,6 +840,9 @@ TEXT_EN: Dict[str, str] = {
     ),
     'events.war_ended.summary': (
         '{aggressor_faction} ended war with {target_faction}.'
+    ),
+    'events.war_battle.summary': (
+        '{attacker_faction} and {defender_faction} fought near {location}.'
     ),
     'journey_road_event_0': 'encountered bandits on the road but bluffed their way past',
     'journey_road_event_1': 'helped a lost child find their village',
@@ -539,7 +909,7 @@ TEXT_EN: Dict[str, str] = {
     'rumor_section_title': 'Rumors & Intelligence',
     'rumor_board_title': 'RUMOR BOARD',
     'rumor_board_empty': 'No active rumors are circulating.',
-    'rumor_board_meta': 'source: {location} | age: {age} month(s) | spread: {spread}/10 | event: {event_id}',
+    'rumor_board_meta': 'source: {location} | age: {age} month(s) | spread: {spread}/10 | event: {event}',
     'rumor_board_prompt': "Rumor number, 'l' filter, 'c' clear, or ENTER to return: ",
     'rumor_board_filter_prompt': 'Source location id/name (ENTER to cancel): ',
     'rumor_board_filter_label': 'Filter: {location}',
@@ -552,9 +922,10 @@ TEXT_EN: Dict[str, str] = {
     ),
     'rumor_board_source_event': 'Source event',
     'rumor_board_no_source_event': 'No source event is attached to this rumor.',
-    'rumor_board_event_missing': 'Source event is no longer available: {event_id}',
+    'rumor_board_event_missing': 'Source event is no longer available.',
+    'rumor_board_event_unavailable': 'unavailable event',
     'rumor_board_related_location': 'Related location',
-    'rumor_board_related_ids': 'Related IDs',
+    'rumor_board_related_records': 'Related records',
     'rumor_board_related_events': 'events',
     'rumor_board_related_factions': 'factions',
     'rumor_tracked_marker': '[tracked]',
@@ -591,6 +962,9 @@ TEXT_EN: Dict[str, str] = {
     'summary_adventure_scouting': '{name} scouted the area around {destination}.',
     'detail_adventure_scouting': (
         '{name} carefully surveyed the surroundings of {destination} but found nothing of note.'
+    ),
+    'detail_adventure_hazard_combat': (
+        '{name} fought a {hazard} at {destination} and was wounded after {rounds} rounds.'
     ),
     # UI labels
     'party_members_label': 'Party',
@@ -825,6 +1199,7 @@ TEXT_EN: Dict[str, str] = {
     'map_region_focus_blocked': 'Closure: route toward {destination} is blocked',
     'map_region_focus_control': 'Control: {location} is held by {faction}',
     'map_region_focus_world_change': 'World change: {location} changed recently ({category})',
+    'map_region_focus_profile': 'Profile: {location} - {profile}',
     'map_region_routes': 'Routes from here',
     'map_region_local_cues': 'Local cues',
     'map_region_detail_grid': 'Region detail',
@@ -836,10 +1211,73 @@ TEXT_EN: Dict[str, str] = {
     'map_detail_rumor_heat': 'Rumor heat',
     'map_detail_control': 'Control',
     'map_detail_local_cues': 'Local cues',
+    'map_detail_culture_cues': 'Culture-built',
     'map_detail_markers': 'Markers',
-    'map_detail_aa_title': 'Local site sketch',
+    'map_detail_local_map_title': 'Generated local map',
     'map_detail_route_sketch': 'Local route sketch',
     'map_detail_aa_legend': 'Sketch cues',
+    'map_detail_local_map_legend': 'Map legend',
+    'map_detail_local_map_scene': 'Scene',
+    'map_detail_local_map_exterior': 'Exterior view',
+    'local_map_legend_city': '@ focus, H homes, M market, S shrine, I inn, G gate/guild, C craft, D docks, K keep',
+    'local_map_legend_settlement': '@ center, h homes, M market, S shrine, b barn, w mill, " fields, ~ water',
+    'local_map_legend_dungeon': '@ entrance, # walls, . floors, > stairs, ! threat, ? cache, A altar, ~ pool, r rubble',
+    'local_map_legend_wild': '@ focus, . paths, terrain glyphs as cover',
+    'local_map_legend_route_gate': '+ route gate',
+    'local_map_legend_local_cues': 'local cue glyphs are listed in Sketch cues',
+    'local_map_legend_state_overlay': '! danger, ? rumor, r strain, X control',
+    'local_map_scene_city_open_market': 'Profile: open market / plaza / lanes',
+    'local_map_scene_city_riverport': 'Profile: riverport / quay / warehouses',
+    'local_map_scene_city_citadel': 'Profile: citadel / keep / gates',
+    'local_map_scene_village': 'Profile: fields / homes / lane',
+    'local_map_scene_village_field': 'Profile: field village / barns / lane',
+    'local_map_scene_village_riverside': 'Profile: riverside village / bridge / mill',
+    'local_map_scene_village_woodland': 'Profile: woodland village / shrine / trails',
+    'local_map_scene_village_highland': 'Profile: highland hamlet / rocks / trail',
+    'local_map_scene_dungeon': 'Profile: ruin / rooms / stairs',
+    'local_map_scene_dungeon_flooded': 'Profile: flooded ruin / pools / rubble',
+    'local_map_scene_dungeon_cavern': 'Profile: cavern ruin / rough chambers / threats',
+    'local_map_scene_dungeon_vault': 'Profile: buried vault / altar / cache',
+    'local_map_scene_wild': 'Profile: wild paths / terrain cover',
+    'local_map_scene_occupied_city': 'Profile: occupied city / checkpoints / barracks',
+    'local_map_scene_mourning_city': 'Profile: mourning city / memorial square / quiet lanes',
+    'local_map_scene_mourning_village': 'Profile: mourning village / memorial lane / closed homes',
+    'map_profile_generic_short': 'ordinary place',
+    'map_profile_generic_summary': '{location} is an ordinary place with no dominant visual profile yet.',
+    'map_profile_occupied_city_short': 'occupied fortress city',
+    'map_profile_occupied_city_summary': '{location} is an occupied fortress city of checkpoints and barracks.',
+    'map_profile_mourning_city_short': 'mourning city',
+    'map_profile_mourning_city_summary': '{location} is a mourning city of memorial space and quiet streets.',
+    'map_profile_riverport_city_short': 'riverport city',
+    'map_profile_riverport_city_summary': '{location} is a riverport city of quays, warehouses, and wet roads.',
+    'map_profile_market_city_short': 'market city',
+    'map_profile_market_city_summary': '{location} is a busy market city of trade roads and guild life.',
+    'map_profile_walled_city_short': 'walled city',
+    'map_profile_walled_city_summary': '{location} is a walled city of gates, a central road, and landmarks.',
+    'map_profile_mourning_village_short': 'mourning village',
+    'map_profile_mourning_village_summary': '{location} is a mourning village, marked by memorials and closed homes.',
+    'map_profile_riverside_village_short': 'riverside village',
+    'map_profile_riverside_village_summary': '{location} is a riverside village of bridge, mill, and fields.',
+    'map_profile_woodland_village_short': 'woodland village',
+    'map_profile_woodland_village_summary': '{location} is a woodland village of trees and shrine paths.',
+    'map_profile_highland_hamlet_short': 'highland hamlet',
+    'map_profile_highland_hamlet_summary': '{location} is a highland hamlet of rocks, slopes, and watch points.',
+    'map_profile_field_village_short': 'field village',
+    'map_profile_field_village_summary': '{location} is a field village, with barns, lanes, and cultivated ground.',
+    'map_profile_flooded_dungeon_short': 'flooded dungeon',
+    'map_profile_flooded_dungeon_summary': '{location} is a flooded dungeon of pools and broken rooms.',
+    'map_profile_danger_dungeon_short': 'dangerous dungeon',
+    'map_profile_danger_dungeon_summary': '{location} is a dangerous dungeon, with threat signs around deeper rooms.',
+    'map_profile_cavern_dungeon_short': 'cavern dungeon',
+    'map_profile_cavern_dungeon_summary': '{location} is a cavern dungeon, cut through rough chambers and stone drops.',
+    'map_profile_buried_vault_short': 'buried vault',
+    'map_profile_buried_vault_summary': '{location} is a buried vault of old rooms, altar, and caches.',
+    'map_profile_forest_paths_short': 'forest paths',
+    'map_profile_forest_paths_summary': '{location} is a forest pathland, where trails run under heavy cover.',
+    'map_profile_mountain_pass_short': 'mountain pass',
+    'map_profile_mountain_pass_summary': '{location} is a mountain pass of rocks, lookouts, and narrow routes.',
+    'map_profile_open_wilds_short': 'open wilds',
+    'map_profile_open_wilds_summary': '{location} is open wild country, with brush and tracks rather than settlement.',
     'map_detail_followup_prompt': 'Location follow-up',
     'map_detail_followup_location_history': 'Open location history',
     'map_detail_elevation': 'Elev',
@@ -865,12 +1303,33 @@ TEXT_EN: Dict[str, str] = {
     'map_nav_cues': 'Browse by local cue',
     'map_legend_routes': 'Route lines',
     'map_legend_site_marker': 'Location',
+    'map_legend_site_city': 'City profile',
+    'map_legend_site_village': 'Village profile',
+    'map_legend_site_dungeon': 'Dungeon profile',
     'map_legend_site_hub': 'Hub (high traffic)',
     'map_legend_site_quiet': 'Quiet (low traffic)',
     'map_legend_traffic_high': 'High traffic',
     'map_legend_rumor_high': 'High rumor heat',
     'map_feature_gate': 'Gate',
     'map_feature_market': 'Market',
+    'map_feature_tower': 'Tower / keep',
+    'map_feature_bridge': 'Bridge',
+    'map_feature_shrine': 'Shrine',
+    'map_feature_inn': 'Inn',
+    'map_feature_guild': 'Guild',
+    'map_feature_mill': 'Mill',
+    'map_feature_dock': 'Dock',
+    'map_feature_forge': 'Forge',
+    'map_feature_warehouse': 'Warehouse',
+    'map_feature_stable': 'Stable',
+    'map_feature_barracks': 'Barracks',
+    'map_feature_graveyard': 'Graveyard',
+    'map_feature_library': 'Library',
+    'map_feature_ruined_house': 'Ruined house',
+    'map_feature_workshop': 'Workshop',
+    'map_feature_farmstead': 'Farmstead',
+    'map_feature_watch_camp': 'Watch camp',
+    'map_feature_arena': 'Arena',
     'map_feature_notice_board': 'Notice board',
     'map_feature_river': 'River',
     'map_feature_accident_site': 'Accident site',
@@ -903,6 +1362,13 @@ TEXT_EN: Dict[str, str] = {
 }
 
 TERMS_EN: Dict[str, str] = {
+    'city': 'City',
+    'village': 'Village',
+    'forest': 'Forest',
+    'dungeon': 'Dungeon',
+    'mountain': 'Mountain',
+    'plains': 'Plains',
+    'sea': 'Sea',
     # PR-G: biome terms
     'ocean': 'Ocean',
     'coast': 'Coast',

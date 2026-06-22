@@ -60,7 +60,7 @@ def medium_world() -> World:
 
 @pytest.fixture
 def sim_small(small_world) -> Simulator:
-    return Simulator(small_world, events_per_year=4, seed=0)
+    return Simulator(small_world, events_per_year=4, seed=0, population_maintenance_enabled=False)
 
 
 @pytest.fixture
@@ -84,15 +84,15 @@ class TestSimulatorConstruction:
     def test_world_attached(self, sim_small, small_world):
         assert sim_small.world is small_world
 
-    def test_history_empty_at_start(self, sim_small):
-        assert sim_small.history == []
+    def test_event_records_empty_at_start(self, sim_small):
+        assert sim_small.world.event_records == []
 
     def test_custom_events_per_year(self, small_world):
         s = Simulator(small_world, events_per_year=15)
         assert s.events_per_year == 15
 
     def test_seed_reproducibility(self, small_world):
-        """Two simulators with the same seed should produce the same history."""
+        """Two simulators with the same seed should produce the same canonical event records."""
         w1 = _make_world(n_chars=4)
         w2 = _make_world(n_chars=4)
         # Ensure same starting state by syncing char IDs
@@ -104,7 +104,7 @@ class TestSimulatorConstruction:
         s2 = Simulator(w2, events_per_year=4, seed=99)
         s1.run(years=3)
         s2.run(years=3)
-        assert [ev.description for ev in s1.history] == [ev.description for ev in s2.history]
+        assert [ev.description for ev in s1.world.event_records] == [ev.description for ev in s2.world.event_records]
         assert s1.world.event_log == s2.world.event_log
 
     def test_initial_generation_reproducibility_with_rng(self):
@@ -141,7 +141,7 @@ class TestSimulatorConstruction:
         s2 = Simulator(w2, events_per_year=4, seed=99)
         s1.run(years=3)
         s2.run(years=3)
-        assert [ev.description for ev in s1.history] == [ev.description for ev in s2.history]
+        assert [ev.description for ev in s1.world.event_records] == [ev.description for ev in s2.world.event_records]
 
     def test_seed_fixed_world_generation_is_deterministic(self):
         import random as _random
@@ -273,9 +273,9 @@ class TestSimulatorRun:
         sim_small.run(years=5)
         assert small_world.year == start_year + 5
 
-    def test_history_populated(self, sim_small):
+    def test_event_records_populated(self, sim_small):
         sim_small.run(years=3)
-        assert len(sim_small.history) > 0
+        assert len(sim_small.world.event_records) > 0
 
     def test_event_log_populated(self, sim_small, small_world):
         sim_small.run(years=3)
@@ -285,7 +285,7 @@ class TestSimulatorRun:
         start_year = small_world.year
         sim_small.run(years=0)
         assert small_world.year == start_year
-        assert sim_small.history == []
+        assert sim_small.world.event_records == []
 
     def test_characters_age_during_run(self, sim_small, small_world):
         """Aging events should increment character ages over time."""
@@ -319,6 +319,17 @@ class TestSimulatorRun:
         start_year = small_world.year
         sim_small.advance_years(2)
         assert small_world.year == start_year + 2
+
+    def test_advance_days_public_api_preserves_partial_month_cursor(self):
+        world = _make_world(n_chars=2)
+        sim = Simulator(world, events_per_year=0, adventure_steps_per_year=0, seed=1)
+
+        sim.advance_days(5)
+
+        assert world.year == 1000
+        assert sim.current_month == 1
+        assert sim.current_day == 6
+        assert sim.elapsed_days == 5
 
 
 # ---------------------------------------------------------------------------
@@ -478,7 +489,104 @@ class TestGetCharacterStory:
 
         assert "Canonical story event" in story
         assert "Born beneath a comet." in story
-        assert story.index("Canonical story event") < story.index("Born beneath a comet.")
+        assert story.index("Born beneath a comet.") < story.index("Canonical story event")
+
+    def test_story_hides_legacy_year_lines_when_canonical_records_exist(self):
+        world = World()
+        hero = Character("Hero", 25, "Male", "Human", "Warrior", location_id="loc_aethoria_capital")
+        world.add_character(hero)
+        hero.history.extend([
+            "Born beneath a comet.",
+            "Year 1000: Turned 26.",
+            "1001年: 修行した。",
+        ])
+        world.record_event(
+            WorldEventRecord(
+                record_id="story_canonical_1",
+                kind="meeting",
+                year=world.year,
+                month=1,
+                primary_actor_id=hero.char_id,
+                description="Canonical story event",
+                severity=2,
+            )
+        )
+        sim = Simulator(world, events_per_year=0, seed=1)
+
+        story = sim.get_character_story(hero.char_id)
+
+        assert "Canonical story event" in story
+        assert "Born beneath a comet." in story
+        assert "Turned 26" not in story
+        assert "修行した" not in story
+
+    def test_story_hides_mechanical_relationship_deltas(self):
+        world = World()
+        hero = Character("Hero", 25, "Male", "Human", "Warrior", location_id="loc_aethoria_capital")
+        friend = Character("Friend", 24, "Female", "Elf", "Mage", location_id="loc_aethoria_capital")
+        world.add_character(hero)
+        world.add_character(friend)
+        world.record_event(
+            WorldEventRecord(
+                record_id="story_meeting_1",
+                kind="meeting",
+                year=world.year,
+                month=1,
+                primary_actor_id=hero.char_id,
+                secondary_actor_ids=[friend.char_id],
+                description=(
+                    "Hero and Friend had a pleasant exchange at Aethoria Capital. "
+                    "(Hero->Friend: +12 / Friend->Hero: +8 / Avg: +10)"
+                ),
+                severity=2,
+            )
+        )
+        sim = Simulator(world, events_per_year=0, seed=1)
+
+        story = sim.get_character_story(hero.char_id)
+
+        assert "Hero and Friend had a pleasant exchange" in story
+        assert "Hero->Friend" not in story
+        assert "Avg:" not in story
+
+    def test_story_deduplicates_compacted_entries(self):
+        world = World()
+        hero = Character("Hero", 25, "Male", "Human", "Warrior", location_id="loc_aethoria_capital")
+        friend = Character("Friend", 24, "Female", "Elf", "Mage", location_id="loc_aethoria_capital")
+        world.add_character(hero)
+        world.add_character(friend)
+        for index, delta in enumerate(("+12", "+8"), start=1):
+            world.record_event(
+                WorldEventRecord(
+                    record_id=f"story_meeting_{index}",
+                    kind="meeting",
+                    year=world.year,
+                    month=index,
+                    primary_actor_id=hero.char_id,
+                    secondary_actor_ids=[friend.char_id],
+                    description=(
+                        "Hero and Friend had a pleasant exchange at Aethoria Capital. "
+                        f"(Hero->Friend: {delta} / Friend->Hero: +8 / Avg: +10)"
+                    ),
+                    severity=2,
+                )
+            )
+        sim = Simulator(world, events_per_year=0, seed=1)
+
+        story = sim.get_character_story(hero.char_id)
+
+        assert story.count("Hero and Friend had a pleasant exchange at Aethoria Capital.") == 1
+
+    def test_story_keeps_legacy_year_lines_without_canonical_records(self):
+        world = World()
+        hero = Character("Hero", 25, "Male", "Human", "Warrior", location_id="loc_aethoria_capital")
+        world.add_character(hero)
+        hero.history.append("Year 1000: Turned 26.")
+        sim = Simulator(world, events_per_year=0, seed=1)
+
+        story = sim.get_character_story(hero.char_id)
+
+        assert "Year 1000: Turned 26." in story
 
     def test_story_renders_canonical_records_with_current_locale(self):
         world = World()
@@ -570,23 +678,23 @@ class TestGetEventLog:
 
 
 # ---------------------------------------------------------------------------
-# events_by_type()
+# events_by_kind()
 # ---------------------------------------------------------------------------
 
-class TestEventsByType:
+class TestEventsByKind:
     def test_returns_list(self, sim_small):
         sim_small.run(years=5)
-        results = sim_small.events_by_type("meeting")
+        results = sim_small.events_by_kind("meeting")
         assert isinstance(results, list)
 
     def test_all_results_match_type(self, sim_small):
         sim_small.run(years=5)
-        battles = sim_small.events_by_type("battle")
-        assert all(e.event_type == "battle" for e in battles)
+        battles = sim_small.events_by_kind("battle")
+        assert all(e.kind == "battle" for e in battles)
 
     def test_unknown_type_empty_list(self, sim_small):
         sim_small.run(years=3)
-        results = sim_small.events_by_type("dragon_attack")
+        results = sim_small.events_by_kind("dragon_attack")
         assert results == []
 
 
@@ -607,7 +715,7 @@ class TestFullIntegration:
 
         s = Simulator(world, events_per_year=5, seed=42)
         s.run(years=10)
-        assert len(s.history) > 0
+        assert len(s.world.event_records) > 0
         # World year advanced
         assert world.year == 1010
 
@@ -637,7 +745,7 @@ class TestSimulatorSerialization:
         assert len(restored.world.characters) == len(sim.world.characters)
         assert restored.events_per_year == sim.events_per_year
         assert restored.adventure_steps_per_year == sim.adventure_steps_per_year
-        assert len(restored.history) == len(sim.history)
+        assert len(restored.world.event_records) == len(sim.world.event_records)
         assert len(restored.world.completed_adventures) == len(sim.world.completed_adventures)
 
     def test_save_and_load_snapshot_file(self, tmp_path):
@@ -677,7 +785,9 @@ class TestSimulatorSerialization:
 
         assert restored.world.year == sim_b.world.year
         assert restored.world.event_log == sim_b.world.event_log
-        assert [ev.description for ev in restored.history] == [ev.description for ev in sim_b.history]
+        assert [ev.description for ev in restored.world.event_records] == [
+            ev.description for ev in sim_b.world.event_records
+        ]
 
     def test_save_and_load_preserves_locale(self, tmp_path):
         set_locale("ja")
@@ -1077,12 +1187,7 @@ class TestWorldEventRecordIntegration:
             (record.year, record.kind, record.description)
             for record in sim.world.event_records
         }
-        legacy_keys = {
-            (event.year, event.event_type, event.description)
-            for event in sim.history
-        }
-
-        assert legacy_keys <= structured_keys
+        assert structured_keys
 
     def test_simulator_log_entries_are_mirrored_into_event_records(self):
         world = _make_world(n_chars=1)
@@ -1153,6 +1258,25 @@ class TestWorldEventRecordIntegration:
         key2 = f"{char1.char_id}:rival"
         assert char1.relation_tag_sources.get(key1) == [record_id]
         assert char2.relation_tag_sources.get(key2) == [record_id]
+
+    def test_adventure_event_records_form_direct_causal_chain(self, small_world):
+        sim = Simulator(small_world, events_per_year=0, adventure_steps_per_year=1, seed=42)
+        adventurer = sim.world.characters[0]
+
+        sim._start_solo_adventure([adventurer])
+        run = sim.world.active_adventures[0]
+        start_record = sim.world.get_event_by_id(run.related_event_ids[-1])
+        sim._advance_adventures(steps=1)
+
+        adventure_records = [
+            record for record in sim.world.event_records
+            if record.kind.startswith("adventure_") and record.primary_actor_id == adventurer.char_id
+        ]
+
+        assert start_record is not None
+        assert len(adventure_records) >= 2
+        assert adventure_records[1].cause_event_ids == [start_record.record_id]
+        assert run.related_event_ids[-1] == adventure_records[1].record_id
 
 
 # ---------------------------------------------------------------------------

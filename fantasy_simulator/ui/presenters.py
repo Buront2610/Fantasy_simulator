@@ -244,7 +244,7 @@ class ReportPresenter:
         lines.extend(
             tr(
                 "report_rumor_thread_line",
-                source_event=thread.source_event_id or tr("report_rumor_no_source_event"),
+                source_event=thread.source_event_text or tr("report_rumor_no_source_event"),
                 count=thread.rumor_count,
                 location=thread.source_location_name or tr("report_thread_no_locations"),
                 reliability=tr(f"rumor_reliability_{thread.reliability}"),

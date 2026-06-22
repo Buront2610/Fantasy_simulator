@@ -53,6 +53,8 @@ from .screen_setup import (  # noqa: F401
 )
 from .screen_simulation import (  # noqa: F401
     _advance_auto as _advance_auto,
+    _advance_daily_live as _advance_daily_live,
+    _advance_days as _advance_days,
     _advance_simulation as _advance_simulation,
     _build_default_world as _build_default_world,
     _run_simulation as _run_simulation,

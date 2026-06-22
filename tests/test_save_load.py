@@ -236,11 +236,35 @@ class TestSaveSimulation:
         assert "event_records" in data["world"]
         assert "event_log" not in data["world"]
 
+    def test_simulator_to_dict_includes_schema_version(self):
+        sim = Simulator(_make_world(), seed=0)
+
+        payload = sim.to_dict()
+
+        assert payload["schema_version"] == CURRENT_VERSION
+
     def test_save_returns_false_on_bad_path(self, tmp_path):
         sim = Simulator(_make_world(), seed=0)
         bad_path = str(tmp_path / "nonexistent_dir" / "file.json")
         result = save_simulation(sim, bad_path)
         assert result is False
+
+    def test_save_failure_does_not_corrupt_existing_file(self, tmp_path, monkeypatch):
+        path = tmp_path / "existing.json"
+        path.write_text('{"ok": true}\n', encoding="utf-8")
+        sim = Simulator(_make_world(), seed=0)
+
+        def failing_dump(_payload, handle, **_kwargs):
+            handle.write("{broken")
+            raise OSError("simulated write failure")
+
+        monkeypatch.setattr("fantasy_simulator.persistence.save_load.json.dump", failing_dump)
+
+        result = save_simulation(sim, str(path))
+
+        assert result is False
+        assert path.read_text(encoding="utf-8") == '{"ok": true}\n'
+        assert list(tmp_path.glob(".save-*.tmp")) == []
 
 
 class TestLoadSimulation:
@@ -310,6 +334,24 @@ class TestLoadSimulation:
         assert restored_route.distance == route.distance
         assert restored_route.blocked is True
         assert {item.route_id for item in restored.world.routes} == {item.route_id for item in sim.world.routes}
+
+    def test_round_trip_preserves_active_seasonal_deltas_for_month_end_revert(self, tmp_path):
+        path = tmp_path / "seasonal-midmonth.json"
+        sim = Simulator(World(), seed=0)
+        mountain = next(loc for loc in sim.world.grid.values() if loc.region_type == "mountain")
+        original_danger = mountain.danger
+        sim._apply_seasonal_modifiers(1)
+        assert mountain.danger > original_danger
+
+        assert save_simulation(sim, str(path)) is True
+        restored = load_simulation(str(path))
+
+        assert restored is not None
+        restored_mountain = restored.world.get_location_by_id(mountain.id)
+        assert restored_mountain is not None
+        assert restored_mountain.danger == mountain.danger
+        restored._revert_seasonal_modifiers()
+        assert restored_mountain.danger == original_danger
 
     def test_load_preserves_bundle_backed_route_overlay_when_payload_order_changes(self, tmp_path):
         path = tmp_path / "route-overlay-order.json"
@@ -1122,8 +1164,8 @@ class TestLoadSimulation:
 
         assert restored is not None
         assert len(restored.world.event_records) == 1
-        assert restored.world.event_records[0].legacy_event_log_entry == payload["world"]["event_log"][0]
         assert restored.world.event_records[0].description == payload["world"]["event_log"][0]
+        assert "legacy_event_log_entry" not in restored.world.event_records[0].to_dict()
         restored.world.record_event(
             WorldEventRecord(
                 record_id="rec_new",
@@ -1134,9 +1176,9 @@ class TestLoadSimulation:
                 description="A new structured event.",
             )
         )
-        compatibility_log = restored.world.get_compatibility_event_log()
-        assert payload["world"]["event_log"][0] in compatibility_log
-        assert any("A new structured event." in entry for entry in compatibility_log)
+        projected_log = list(restored.world.event_log)
+        assert any(payload["world"]["event_log"][0] in entry for entry in projected_log)
+        assert any("A new structured event." in entry for entry in projected_log)
 
     def test_migration_lifts_legacy_history_into_canonical_event_records(self, tmp_path):
         path = tmp_path / "legacy-history-only.json"
@@ -1165,10 +1207,7 @@ class TestLoadSimulation:
         assert restored is not None
         assert len(restored.world.event_records) == 1
         assert restored.world.event_records[0].kind == "battle"
-        assert len(restored.history) == 1
-        assert restored.history[0].event_type == "battle"
-        assert restored.history[0].stat_changes == {"char_1": {"strength": -2}}
-        assert restored.history[0].metadata == {"source": "legacy"}
+        assert restored.world.event_records[0].primary_actor_id == "char_1"
 
     def test_current_schema_event_records_take_precedence_over_stale_event_log(self, tmp_path):
         path = tmp_path / "current-schema-stale-event-log.json"
@@ -1182,17 +1221,17 @@ class TestLoadSimulation:
                 description="A canonical meeting should be displayed.",
             )
         ]
-        payload["world"]["event_log"] = ["Year 999: A stale compatibility line should not survive."]
+        payload["world"]["event_log"] = ["Year 999: A stale event-log line should not survive."]
         _write_payload(path, payload)
 
         restored = load_simulation(str(path))
 
         assert restored is not None
         assert [record.record_id for record in restored.world.event_records] == ["canonical_001"]
-        compatibility_log = list(restored.world.get_compatibility_event_log())
-        assert len(compatibility_log) == 1
-        assert "A canonical meeting should be displayed." in compatibility_log[0]
-        assert "stale compatibility line" not in compatibility_log[0]
+        projected_log = list(restored.world.event_log)
+        assert len(projected_log) == 1
+        assert "A canonical meeting should be displayed." in projected_log[0]
+        assert "stale event-log line" not in projected_log[0]
 
     def test_load_current_schema_backfills_watched_tags_for_untagged_canonical_records(self, tmp_path):
         path = tmp_path / "current-schema-untagged-watch.json"
@@ -1250,14 +1289,11 @@ class TestLoadSimulation:
         assert restored is not None
         assert len(restored.world.event_records) == 2
         assert {record.kind for record in restored.world.event_records} == {"battle", "legacy_event_log"}
-        assert len(restored.history) == 2
-        assert {event.event_type for event in restored.history} == {"battle", "legacy_event_log"}
-        battle_event = next(event for event in restored.history if event.event_type == "battle")
-        legacy_log_event = next(event for event in restored.history if event.event_type == "legacy_event_log")
-        assert battle_event.stat_changes == {"char_1": {"strength": -2}}
-        assert battle_event.metadata == {"source": "legacy"}
-        assert legacy_log_event.metadata == {"legacy_event_log_entry": True}
-        assert payload["world"]["event_log"][0] in restored.world.get_compatibility_event_log()
+        assert any(record.primary_actor_id == "char_1" for record in restored.world.event_records)
+        assert any(
+            payload["world"]["event_log"][0] in entry
+            for entry in restored.world.event_log
+        )
 
     def test_migration_merges_existing_canonical_records_with_legacy_adapters(self, tmp_path):
         path = tmp_path / "legacy-mixed-with-canonical.json"
@@ -1324,8 +1360,6 @@ class TestLoadSimulation:
                 location_id=None,
                 primary_actor_id="char_1",
                 severity=1,
-                legacy_event_result=dict(repeated_history_item),
-                legacy_event_log_entry=None,
             ),
             _event_record_payload(
                 record_id="legacy_event_log_000001",
@@ -1334,15 +1368,6 @@ class TestLoadSimulation:
                 location_id=None,
                 severity=1,
                 tags=["legacy_event_log"],
-                legacy_event_result={
-                    "description": repeated_log_entry,
-                    "affected_characters": [],
-                    "stat_changes": {},
-                    "event_type": "legacy_event_log",
-                    "year": 1000,
-                    "metadata": {"legacy_event_log_entry": True},
-                },
-                legacy_event_log_entry=repeated_log_entry,
             ),
         ]
         payload["world"]["event_log"] = [repeated_log_entry, repeated_log_entry]
@@ -1668,7 +1693,6 @@ class TestLoadSimulation:
         restored = load_simulation(str(path))
 
         assert restored is not None
-        assert len(restored.history) == 1
-        assert restored.history[0].affected_characters == ["char_1", "char_2"]
-        assert restored.history[0].stat_changes == {"char_1": {"wisdom": 2}}
-        assert restored.history[0].metadata == {"source": "runtime", "chain": {"step": 1}}
+        assert len(restored.world.event_records) == 1
+        assert restored.world.event_records[0].primary_actor_id == "char_1"
+        assert restored.world.event_records[0].secondary_actor_ids == ["char_2"]

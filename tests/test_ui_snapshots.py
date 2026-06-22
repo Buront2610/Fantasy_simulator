@@ -151,7 +151,7 @@ def test_snapshot_world_map_screen_en():
     _show_world_map(sim, ctx=ctx)
 
     assert out.lines[0] == ""
-    assert out.lines[1] == "World map (Compact atlas (narrow))"
+    assert out.lines[1] == "World map (Wide atlas (full))"
     assert "Aethoria (Year: 1000)" in out.lines[2]
     assert "Aethoria Capital" in out.text
     assert "Semantic legend" in out.text

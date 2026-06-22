@@ -13,6 +13,9 @@ names, historical sound change, and world-facing endonyms.
   - Runtime-only evolution records and mutable language state.
 - `fantasy_simulator/language/presets.py`
   - Historically inspired rule pools keyed by `inspiration_tags`.
+- `fantasy_simulator/language/laws.py`
+  - Cause-aware linguistic laws used when world events trigger immediate
+    language evolution.
 - `fantasy_simulator/language/engine.py`
   - The main authoring/debug surface for lexicon generation, naming pools,
     toponym generation, productive-rule selection, and runtime evolution.
@@ -63,13 +66,20 @@ rule gets first access to the current token stream.
 
 Evolution rule selection is separate from surface evaluation:
 
-1. inherited `evolution_rule_pool`
-2. local `evolution_rule_pool`
-3. preset rules from `inspiration_tags`
-4. fallback drift if no productive authored/preset rule changes any sampled form
+1. cause-aware linguistic laws when a world event supplies a `cause_key`
+2. inherited `evolution_rule_pool`
+3. local `evolution_rule_pool`
+4. preset rules from `inspiration_tags`
+5. fallback drift if no productive authored/preset rule changes any sampled form
 
 Only productive candidate rules are selected for runtime evolution. A rule that
 cannot change any sampled surface form in the current language state is skipped.
+Cause-aware laws are grouped by historical pressure: contact/war/occupation
+favor borrowing and intervocalic lenition, route isolation favors fortition and
+local backing, and era or official rename pressure favors prestige shifts such
+as palatalization and vowel raising. The selected law is stored as a normal
+`LanguageEvolutionRecord`, so `rule_key`, `rule_description`, `cause_key`, and
+`cause_event_id` remain visible through history replay and `world.language_status()`.
 
 ## Feature-Based Phonology
 

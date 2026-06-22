@@ -5,6 +5,7 @@ from __future__ import annotations
 import random
 from typing import Any, Callable, Dict, Optional
 
+from .character_personality import render_personality_feats, render_personality_summary
 from .i18n import tr, tr_term
 
 
@@ -35,6 +36,16 @@ def character_stat_block(
             f"{tr('stat_con')} {character.constitution:>3}"
         ),
     ]
+    if getattr(character, "personality", None):
+        lines.append(f"  {tr('personality_label'):<10}: {render_personality_summary(character.personality)}")
+    if getattr(character, "personality_feats", []):
+        lines.append(f"  {tr('features_label'):<10}: {render_personality_feats(character.personality_feats)}")
+    if getattr(character, "known_languages", {}):
+        languages = ", ".join(
+            f"{language_key} {proficiency}"
+            for language_key, proficiency in sorted(character.known_languages.items())
+        )
+        lines.append(f"  {tr('known_languages_label'):<10}: {languages}")
     if character.skills:
         top_skills = sorted(character.skills.items(), key=lambda x: -x[1])[:5]
         skill_str = "  |  ".join(f"{tr_term(k)}(Lv{v})" for k, v in top_skills)

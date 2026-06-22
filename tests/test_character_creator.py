@@ -61,6 +61,54 @@ class TestCharacterCreator:
             job=tr_term(char.job),
         )
 
+    def test_random_character_gets_founder_background_and_history(self):
+        set_locale("en")
+        creator = CharacterCreator()
+        char = creator.create_random(name="Aldric", rng=random.Random(42))
+
+        assert char.founder_background is not None
+        assert {
+            "family_origin",
+            "family_status",
+            "upbringing",
+            "pre_adventure",
+            "reputation",
+        } <= set(char.founder_background)
+        assert any(entry.startswith("Family background:") for entry in char.history)
+        assert any(entry.startswith("Before adventuring:") for entry in char.history)
+
+    def test_founder_background_can_be_disabled_for_non_founders(self):
+        creator = CharacterCreator()
+        char = creator.create_random(name="Child", rng=random.Random(42), founder_background=False)
+
+        assert char.founder_background is None
+        assert len(char.history) == 1
+
+    def test_founder_background_does_not_consume_caller_rng(self):
+        creator = CharacterCreator()
+        rng_with_background = random.Random(42)
+        rng_without_background = random.Random(42)
+
+        creator.create_random(rng=rng_with_background, founder_background=True)
+        creator.create_random(rng=rng_without_background, founder_background=False)
+
+        assert rng_with_background.random() == rng_without_background.random()
+
+    def test_random_character_gets_personality_profile(self):
+        creator = CharacterCreator()
+        char = creator.create_random(name="Aldric", rng=random.Random(42))
+
+        assert set(char.personality) == {
+            "openness",
+            "discipline",
+            "extraversion",
+            "agreeableness",
+            "stability",
+        }
+        assert all(0 <= value <= 100 for value in char.personality.values())
+        assert len(char.personality_feats) == 2
+        assert all(isinstance(feat, str) for feat in char.personality_feats)
+
 
 class TestCreateRandomReproducibility:
     def test_same_seed_produces_same_character(self):
@@ -360,3 +408,32 @@ class TestInteractiveStatAllocation:
 
         assert stats["strength"] == 20
         assert sum(stats.values()) == 70
+
+    def test_manual_personality_allocation_clamps_values(self):
+        creator = CharacterCreator()
+
+        class ScriptedInput:
+            def __init__(self, responses):
+                self._responses = iter(responses)
+
+            def read_line(self, prompt: str = "") -> str:
+                return next(self._responses)
+
+        class BufferOut:
+            def print_line(self, text: str = "") -> None:
+                pass
+
+        ctx = SimpleNamespace(
+            inp=ScriptedInput(["y", "120", "-5", "70", "65", "40"]),
+            out=BufferOut(),
+        )
+
+        personality = creator._allocate_personality(ctx=ctx)
+
+        assert personality == {
+            "openness": 100,
+            "discipline": 0,
+            "extraversion": 70,
+            "agreeableness": 65,
+            "stability": 40,
+        }

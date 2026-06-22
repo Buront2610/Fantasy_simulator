@@ -18,10 +18,54 @@ from .character_domain import (
     clamp_skill_level,
 )
 from .character_lifespan import legacy_lifespan_years
+from .character_personality import normalize_personality, normalize_personality_feats
 from .character_presentation import character_stat_block, random_stats as roll_random_stats
 from .character_serialization import deserialize_character, serialize_character
 from .content.world_data import NAME_TO_LOCATION_ID, fallback_location_id
 from .i18n import tr
+
+
+MAX_CHARACTER_HISTORY = 120
+MAX_RELATION_TAG_SOURCE_EVENTS = 3
+
+
+def _tail(values: List[str], limit: int) -> List[str]:
+    return list(values)[-limit:]
+
+
+def _append_unique_tail(values: List[str], value: str, limit: int) -> None:
+    if value in values:
+        return
+    values.append(value)
+    del values[:-limit]
+
+
+def _normalize_language_knowledge(payload: Optional[Dict[str, int]]) -> Dict[str, int]:
+    if payload is None:
+        return {}
+    if not isinstance(payload, dict):
+        raise ValueError("known_languages must be a mapping")
+    normalized: Dict[str, int] = {}
+    for language_key, proficiency in payload.items():
+        key = str(language_key).strip()
+        if not key:
+            continue
+        normalized[key] = max(0, min(100, int(proficiency)))
+    return normalized
+
+
+def _normalize_skill_levels(payload: Optional[Dict[str, int]]) -> Dict[str, int]:
+    return {
+        skill: clamp_skill_level(level)
+        for skill, level in (payload or {}).items()
+    }
+
+
+def _normalize_relationship_scores(payload: Optional[Dict[str, int]]) -> Dict[str, int]:
+    return {
+        target_id: clamp_relationship_score(score)
+        for target_id, score in (payload or {}).items()
+    }
 
 
 class Character:
@@ -55,6 +99,10 @@ class Character:
         spouse_id: Optional[str] = None,
         injury_status: str = "none",
         active_adventure_id: Optional[str] = None,
+        founder_background: Optional[Dict[str, str]] = None,
+        personality: Optional[Dict[str, int]] = None,
+        personality_feats: Optional[List[str]] = None,
+        known_languages: Optional[Dict[str, int]] = None,
         relation_tags: Optional[Dict[str, List[str]]] = None,
         relation_tag_sources: Optional[Dict[str, List[str]]] = None,
         rng: Any = None,
@@ -66,11 +114,7 @@ class Character:
         else:
             self.char_id = uuid.uuid4().hex[:8]
 
-        self.name = name
-        self.age = age
-        self.gender = gender
-        self.race = race
-        self.job = job
+        self.name, self.age, self.gender, self.race, self.job = name, age, gender, race, job
 
         self._abilities = CharacterAbilities(
             strength=strength,
@@ -81,29 +125,27 @@ class Character:
             constitution=constitution,
         )
 
-        self.skills: Dict[str, int] = {
-            skill: clamp_skill_level(level)
-            for skill, level in (skills or {}).items()
-        }
-        self.relationships: Dict[str, int] = {
-            target_id: clamp_relationship_score(score)
-            for target_id, score in (relationships or {}).items()
-        }
+        self.skills: Dict[str, int] = _normalize_skill_levels(skills)
+        self.relationships: Dict[str, int] = _normalize_relationship_scores(relationships)
         self.alive = alive
         self.location_id = location_id
         self.favorite = favorite
         self.spotlighted = spotlighted
         self.playable = playable
-        self.history: List[str] = list(history or [])
+        self.history: List[str] = list(history or [])[-MAX_CHARACTER_HISTORY:]
         self.spouse_id = spouse_id
         self.injury_status = injury_status if injury_status in self.VALID_INJURY_STATUSES else "none"
         self.active_adventure_id = active_adventure_id
+        self.founder_background: Optional[Dict[str, str]] = dict(founder_background) if founder_background else None
+        self.personality: Dict[str, int] = normalize_personality(personality)
+        self.personality_feats: List[str] = normalize_personality_feats(personality_feats)
+        self.known_languages: Dict[str, int] = _normalize_language_knowledge(known_languages)
         self.relation_tags: Dict[str, List[str]] = {
             target_id: list(tags)
             for target_id, tags in (relation_tags or {}).items()
         }
         self.relation_tag_sources: Dict[str, List[str]] = {
-            key: list(values)
+            key: _tail(values, MAX_RELATION_TAG_SOURCE_EVENTS)
             for key, values in (relation_tag_sources or {}).items()
         }
 
@@ -132,6 +174,7 @@ class Character:
             spouse_id=self.spouse_id,
             injury_status=self.injury_status,
             active_adventure_id=self.active_adventure_id,
+            founder_background=dict(self.founder_background) if self.founder_background is not None else None,
         )
 
     @property
@@ -228,8 +271,7 @@ class Character:
         if source_event_id:
             key = f"{other_id}:{tag}"
             sources = self.relation_tag_sources.setdefault(key, [])
-            if source_event_id not in sources:
-                sources.append(source_event_id)
+            _append_unique_tail(sources, source_event_id, MAX_RELATION_TAG_SOURCE_EVENTS)
 
     def has_relation_tag(self, other_id: str, tag: str) -> bool:
         return tag in self.relation_tags.get(other_id, [])
@@ -247,6 +289,7 @@ class Character:
 
     def add_history(self, event: str) -> None:
         self.history.append(event)
+        del self.history[:-MAX_CHARACTER_HISTORY]
 
     def get_relationship(self, other_id: str) -> int:
         return self.relationships.get(other_id, 0)
@@ -292,11 +335,7 @@ class Character:
         char_name_lookup: Optional[Dict[str, str]] = None,
         location_resolver: Callable[[str], str] | None = None,
     ) -> str:
-        return character_stat_block(
-            self,
-            char_name_lookup=char_name_lookup,
-            location_resolver=location_resolver,
-        )
+        return character_stat_block(self, char_name_lookup=char_name_lookup, location_resolver=location_resolver)
 
 
 def random_stats(

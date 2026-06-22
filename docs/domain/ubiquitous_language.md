@@ -23,7 +23,7 @@ term already has a production implementation.
 | ChangeSet | The result of a command: canonical events plus runtime updates and projection hints. |
 | Projection | A read model built from World Runtime and Event History for reports, maps, story, or rumor. |
 | ViewModel | UI-independent data shaped for a renderer or report formatter. |
-| Compatibility Adapter | A boundary for legacy surfaces such as `event_log`, `history`, or `events_by_type()`. |
+| Compatibility Adapter | A boundary for remaining legacy surfaces such as older `event_log` save input. |
 | Observation | A read path that explains world state: report, atlas, detail, rumor, or story. |
 | Setting Authoring | `SettingBundle` / `WorldDefinition` data for era, culture, faction, naming, and rules. |
 
@@ -32,8 +32,7 @@ term already has a production implementation.
 | Term | Meaning |
 |---|---|
 | Canonical Event Store | `World.event_records`, the authoritative durable event source. |
-| Compatibility Display Buffer | `World.event_log`, a display projection retained for older paths. |
-| Legacy History Adapter | `Simulator.history`, a compatibility projection for older `EventResult` consumers. |
+| Event Log Projection | `World.event_log`, a read-only display projection from canonical records. |
 | Summary Key | Locale-aware rendering key stored on `WorldEventRecord`. |
 | Render Params | JSON-compatible semantic values used with `summary_key`; IDs stay IDs. |
 | Description Fallback | Compatibility text used when structured rendering is unavailable. |
@@ -89,5 +88,5 @@ Prefer these words in future PR-K modules and tests:
 - `view_models`
 
 Avoid using compatibility terms as primary-path names for new PR-K behavior.
-For example, a new projection should not be named around `event_log` or
-`events_by_type()`.
+For example, new projections should be named around canonical records and
+domain concepts rather than older save-input names.

@@ -246,6 +246,7 @@ class WorldDashboardView:
     world_name: str
     year: int
     month: int
+    day: int
     month_label: str
     alive_count: int
     deceased_count: int
@@ -1045,6 +1046,7 @@ def build_world_dashboard_view(
     world: "World",
     *,
     current_month: int,
+    current_day: int = 1,
     pending_choice_count: int = 0,
 ) -> WorldDashboardView:
     """Build a compact observer dashboard from canonical world state."""
@@ -1091,6 +1093,7 @@ def build_world_dashboard_view(
         world_name=getattr(world, "name", ""),
         year=getattr(world, "year", 0),
         month=current_month,
+        day=current_day,
         month_label=month_label,
         alive_count=alive_count,
         deceased_count=deceased_count,

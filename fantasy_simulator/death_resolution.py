@@ -34,10 +34,12 @@ def resolve_active_adventure_for_death(char: "Character", world: "World") -> Non
     adventure_id = char.active_adventure_id
     run = world.get_adventure_by_id(adventure_id)
     if run is not None and not run.is_resolved:
+        run.death_member_id = char.char_id
         run.state = "resolved"
         run.outcome = "death"
         run.resolution_year = world.year
         run.pending_choice = None
+        run._clear_member_adventures(world)
         world.complete_adventure(adventure_id)
     char.active_adventure_id = None
 

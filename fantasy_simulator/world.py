@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple
 
 from .event_models import WorldEventRecord
 from .language.engine import LanguageEngine, fallback_evolution_targets
-from .language.state import LanguageEvolutionRecord, LanguageRuntimeState
+from .language.state import LanguageEvolutionRecord, LanguageRuntimeState, LocationNameHistoryRecord
 from .rule_override_resolution import (
     clone_default_event_impact_rules,
     clone_default_propagation_rules,
@@ -81,10 +81,7 @@ class World(
     WorldTopologyMixin,
     WorldActorMixin,
     WorldConflictMixin, WorldEraMixin, WorldMemoryMixin, WorldLocationLookupMixin,
-    WorldLanguageMixin,
-    WorldCalendarMixin,
-    WorldEventMixin,
-    WorldEventLogMixin,
+    WorldLanguageMixin, WorldCalendarMixin, WorldEventMixin, WorldEventLogMixin,
 ):
     """Represents the entire game world."""
 
@@ -109,6 +106,10 @@ class World(
         self._location_reference_resolver = LocationReferenceResolver.from_site_seeds(
             self._setting_bundle.world_definition.site_seeds
         )
+        self._race_lifespan_by_name: Dict[str, int] = {
+            race.name: race.lifespan_years
+            for race in self._setting_bundle.world_definition.races
+        }
         self._fallback_location_id_resolver = fallback_location_id
         self._location_state_defaults_resolver = get_location_state_defaults
         self._language_engine: LanguageEngine | None = None
@@ -126,10 +127,9 @@ class World(
         self._location_id_index: Dict[str, LocationState] = {}
         # Event storage contract:
         # - event_records is the canonical structured history for all new reads.
-        # - _display_event_log holds only display-only legacy lines.
-        # - event_log projects from canonical history when records exist.
-        self._display_event_log: List[str] = []
+        # - event_log is a read-only projection from canonical history.
         self.event_records: List[WorldEventRecord] = []
+        self.world_arcs: List[Any] = []
         self._event_index = EventHistoryIndex()
         self.event_impact_rules: Dict[str, Dict[str, int]] = clone_default_event_impact_rules()
         self.propagation_rules: Dict[str, Dict[str, Any]] = clone_default_propagation_rules()
@@ -143,6 +143,7 @@ class World(
         self.calendar_history: List[CalendarChangeRecord] = []
         self.language_origin_year: int = year
         self.language_evolution_history: List[LanguageEvolutionRecord] = []
+        self.location_name_history: List[LocationNameHistoryRecord] = []
         self._language_runtime_states: Dict[str, LanguageRuntimeState] = {}
         # PR-G: terrain / site / route layers
         self.terrain_map: Optional[TerrainMap] = None
@@ -156,6 +157,7 @@ class World(
         self.atlas_layout: Optional[AtlasLayout] = None
         if not _skip_defaults:
             self._build_default_map()
+            self._seed_initial_location_name_history()
 
     @property
     def name(self) -> str:
@@ -200,7 +202,7 @@ class World(
 
     def race_lifespan_years(self, race_name: str) -> int | None:
         """Return bundle-authored lifespan for a race, if available."""
-        return self._setting_bundle.world_definition.race_lifespan_years(race_name)
+        return self._race_lifespan_by_name.get(race_name)
 
     def _set_setting_bundle_metadata(self, bundle: SettingBundle) -> None:
         set_setting_bundle_metadata(
@@ -257,14 +259,12 @@ class World(
     def render_map(self, highlight_location: Optional[str] = None) -> str:
         """Return a stable ASCII grid of the world map.
 
-        This is a backward-compatible wrapper.  Internally it delegates
-        to :func:`ui.map_renderer.build_map_info` and
-        :func:`ui.map_renderer.render_map_ascii` so that the rendering
-        logic lives in the UI layer.
+        This is a backward-compatible wrapper around the renderer-agnostic
+        map snapshot and stable ASCII renderer.
         """
-        from .ui.map_renderer import build_map_info, render_map_ascii
-        info = build_map_info(self, highlight_location)
-        return render_map_ascii(info)
+        from .map_ascii_renderer import render_world_map_ascii
+
+        return render_world_map_ascii(self, highlight_location)
 
     def to_dict(self) -> Dict[str, Any]:
         return serialize_world_state(self)

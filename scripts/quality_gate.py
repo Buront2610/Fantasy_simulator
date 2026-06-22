@@ -4,6 +4,8 @@ Usage examples
 --------------
     python scripts/quality_gate.py minimal --pytest-target tests/test_character_creator.py
     python scripts/quality_gate.py standard
+    python scripts/quality_gate.py playtest
+    python scripts/quality_gate.py exhaustive
     python scripts/quality_gate.py strict --dry-run
 """
 
@@ -26,6 +28,8 @@ STANDARD_TARGETS = [
     "tests/test_agent_workflow_docs.py",
     "tests/test_doc_freshness.py",
     "tests/test_event_record_read_policy.py",
+    "tests/test_app_service.py",
+    "tests/test_events.py::TestEventSemanticContract",
     "tests/test_route_mutation_state_machine.py",
     "tests/test_terrain_mutation_state_machine.py",
     "tests/test_location_rename_state_machine.py",
@@ -47,6 +51,11 @@ STANDARD_TARGETS = [
     "tests/test_map_visible_harness.py",
 ]
 
+PLAYTEST_TARGETS = [
+    "tests/test_world_health.py",
+    "tests/test_world_health_stats.py",
+]
+
 LINT_TARGETS = [
     ".",
 ]
@@ -56,9 +65,16 @@ DEFAULT_EXCLUDES = [
     "__pycache__",
     ".claude",
     ".worktrees",
+    ".trunk",
 ]
 
-WORLD_TYPECHECK_EXCLUSIONS: dict[str, str] = {}
+WORLD_TYPECHECK_EXCLUSIONS: dict[str, str] = {
+    "fantasy_simulator/world_arc.py": "New v9 data model; add to CI mypy targets with the next approved CI update.",
+    "fantasy_simulator/world_arcs.py": "New v9 arc helpers; add to CI mypy targets with the next approved CI update.",
+    "fantasy_simulator/world_history_retention.py": (
+        "New long-run retention policy; add to CI mypy targets with the next approved CI update."
+    ),
+}
 
 
 @dataclass(frozen=True)
@@ -71,6 +87,13 @@ def _pytest_command(targets: Sequence[str]) -> CommandSpec:
     return CommandSpec(
         label="pytest",
         argv=[sys.executable, "-m", "pytest", "-q", *targets],
+    )
+
+
+def _playtest_command(targets: Sequence[str] | None = None) -> CommandSpec:
+    return CommandSpec(
+        label="playtest",
+        argv=[sys.executable, "-m", "pytest", "-q", *(targets or PLAYTEST_TARGETS)],
     )
 
 
@@ -212,8 +235,19 @@ def build_profile_commands(profile: str, pytest_targets: Sequence[str] | None = 
         commands.append(_pytest_command(STANDARD_TARGETS))
         return commands
 
+    if profile == "playtest":
+        commands.append(_playtest_command())
+        return commands
+
     if profile == "strict":
         commands.append(_pytest_command(STANDARD_TARGETS))
+        commands.append(_flake8_command(LINT_TARGETS))
+        commands.append(_complexity_command(LINT_TARGETS))
+        commands.append(_mypy_command(TYPECHECK_TARGETS))
+        commands.append(_playtest_command())
+        return commands
+
+    if profile == "exhaustive":
         commands.append(_flake8_command(LINT_TARGETS))
         commands.append(_complexity_command(LINT_TARGETS))
         commands.append(_mypy_command(TYPECHECK_TARGETS))
@@ -243,7 +277,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "profile",
-        choices=("minimal", "standard", "strict"),
+        choices=("minimal", "standard", "playtest", "strict", "exhaustive"),
         help="Verification profile to run.",
     )
     parser.add_argument(

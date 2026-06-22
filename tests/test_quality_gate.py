@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from scripts.quality_gate import (
+    PLAYTEST_TARGETS,
     STANDARD_TARGETS,
     TYPECHECK_TARGETS,
     WORLD_TYPECHECK_EXCLUSIONS,
@@ -20,6 +21,8 @@ EXPECTED_STANDARD_TARGETS = [
     "tests/test_agent_workflow_docs.py",
     "tests/test_doc_freshness.py",
     "tests/test_event_record_read_policy.py",
+    "tests/test_app_service.py",
+    "tests/test_events.py::TestEventSemanticContract",
     "tests/test_route_mutation_state_machine.py",
     "tests/test_terrain_mutation_state_machine.py",
     "tests/test_location_rename_state_machine.py",
@@ -91,14 +94,42 @@ def test_standard_profile_can_prepend_changed_area_pytest():
     assert commands[1].argv[-len(EXPECTED_STANDARD_TARGETS):] == EXPECTED_STANDARD_TARGETS
 
 
-def test_strict_profile_includes_targeted_lint_and_full_pytest():
+def test_playtest_profile_runs_world_health_bands():
+    commands = build_profile_commands("playtest")
+    assert len(commands) == 1
+    assert commands[0].label == "playtest"
+    assert commands[0].argv[-len(PLAYTEST_TARGETS):] == PLAYTEST_TARGETS
+
+
+def test_strict_profile_includes_bounded_guardrail_suite():
     commands = build_profile_commands("strict")
-    assert [command.label for command in commands] == ["pytest", "flake8", "complexity", "mypy", "pytest"]
+    assert [command.label for command in commands] == [
+        "pytest",
+        "flake8",
+        "complexity",
+        "mypy",
+        "playtest",
+    ]
+    assert commands[0].argv[-len(EXPECTED_STANDARD_TARGETS):] == EXPECTED_STANDARD_TARGETS
     assert "." in commands[1].argv
     assert "--max-complexity=25" in commands[2].argv
     assert "." in commands[2].argv
     assert commands[3].argv[-len(TYPECHECK_TARGETS):] == TYPECHECK_TARGETS
-    assert len(commands[4].argv) == 4
+    assert commands[4].argv[-len(PLAYTEST_TARGETS):] == PLAYTEST_TARGETS
+
+
+def test_exhaustive_profile_runs_static_checks_and_full_pytest():
+    commands = build_profile_commands("exhaustive")
+    assert [command.label for command in commands] == [
+        "flake8",
+        "complexity",
+        "mypy",
+        "pytest",
+    ]
+    assert "." in commands[0].argv
+    assert "--max-complexity=25" in commands[1].argv
+    assert commands[2].argv[-len(TYPECHECK_TARGETS):] == TYPECHECK_TARGETS
+    assert len(commands[3].argv) == 4
 
 
 def test_pyproject_includes_type_gate_scaffolding():

@@ -297,6 +297,22 @@ def test_language_runtime_state_rejects_string_stem_payloads():
             }
         )
 
+
+def test_language_evolution_record_round_trips_event_cause_fields():
+    record = LanguageEvolutionRecord(
+        year=1204,
+        language_key="child",
+        source_token="s",
+        target_token="sh",
+        cause_key="route_blocked",
+        cause_event_id="evt_route_blocked_1204_0001",
+    )
+
+    restored = LanguageEvolutionRecord.from_dict(record.to_dict())
+
+    assert restored.cause_key == "route_blocked"
+    assert restored.cause_event_id == "evt_route_blocked_1204_0001"
+
     with pytest.raises(ValueError, match="derived_toponym_suffixes"):
         LanguageRuntimeState.from_dict(
             {

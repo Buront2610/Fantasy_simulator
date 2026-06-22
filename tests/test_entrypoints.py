@@ -58,14 +58,14 @@ class TestEntrypointSmoke:
         )
 
     def test_python_m_produces_menu_header(self) -> None:
-        """The package entrypoint should display the FANTASY SIMULATOR header."""
+        """The package entrypoint should display the ASCII title logo."""
         result = self._run_entrypoint(["-m", "fantasy_simulator"])
-        assert "FANTASY SIMULATOR" in result.stdout
+        assert "____|           |                      ___| _)" in result.stdout
 
     def test_main_py_produces_menu_header(self) -> None:
-        """The compatibility wrapper should display the same header."""
+        """The compatibility wrapper should display the same title logo."""
         result = self._run_entrypoint(["main.py"])
-        assert "FANTASY SIMULATOR" in result.stdout
+        assert "____|           |                      ___| _)" in result.stdout
 
     def test_package_importable(self) -> None:
         """``import fantasy_simulator`` must succeed without side-effects."""

@@ -570,7 +570,17 @@ def test_default_aethoria_bundle_has_minimal_phase_i_slots():
         for seed in bundle.world_definition.site_seeds
     }
     assert {"market", "river"}.issubset(tags_by_site_id["loc_silverbrook"])
+    assert "tower" in tags_by_site_id["loc_eastwatch_tower"]
     assert "accident_site" in tags_by_site_id["loc_sunken_ruins"]
+    assert {"guild", "inn", "shrine", "library", "barracks", "stable", "arena"}.issubset(
+        tags_by_site_id["loc_aethoria_capital"]
+    )
+    assert {"bridge", "dock", "warehouse", "stable"}.issubset(tags_by_site_id["loc_silverbrook"])
+    assert {"forge", "warehouse"}.issubset(tags_by_site_id["loc_ironvein_mine"])
+    assert {"farmstead", "mill", "stable"}.issubset(tags_by_site_id["loc_millhaven"])
+    assert {"graveyard", "ruined_house"}.issubset(tags_by_site_id["loc_sunken_ruins"])
+    assert {"workshop", "library"}.issubset(tags_by_site_id["loc_hearthglow_town"])
+    assert {"tower", "barracks", "stable", "watch_camp"}.issubset(tags_by_site_id["loc_sandstone_outpost"])
     controllers_by_site_id = {
         seed.location_id: seed.controlling_faction_id
         for seed in bundle.world_definition.site_seeds

@@ -1,7 +1,7 @@
-"""Compatibility event-log projection helpers.
+"""Event-log projection helpers.
 
 This module isolates formatting/projection logic from ``World`` so that
-stateful world orchestration and compatibility rendering are separated.
+stateful world orchestration and event rendering are separated.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ Translator = Callable[..., str]
 
 
 class ReadOnlyEventLog(Sequence[str]):
-    """List-like read-only view for compatibility event-log access."""
+    """List-like read-only view for projected event-log access."""
 
     def __init__(self, entries: Iterable[str]) -> None:
         self._entries = tuple(entries)
@@ -47,7 +47,7 @@ class ReadOnlyEventLog(Sequence[str]):
         return repr(list(self._entries))
 
     def _readonly(self, *_args: Any, **_kwargs: Any) -> None:
-        raise TypeError("event_log is a read-only view; use log_event() or record_event()")
+        raise TypeError("event_log is a read-only view; use record_event()")
 
     def append(self, _value: str) -> None:
         self._readonly()
@@ -83,11 +83,11 @@ def format_event_log_entry(
     month: Optional[int] = None,
     day: Optional[int] = None,
 ) -> str:
-    """Format one compatibility event-log line.
+    """Format one projected event-log line.
 
     Contract:
     - ``year`` must be an ``int``.
-    - If ``day`` is specified without ``month``, the value is ignored for compatibility.
+    - If ``day`` is specified without ``month``, the value is ignored.
     """
     if month is not None and day is not None:
         prefix = translate("event_log_prefix_day", year=year, month=month, day=day)
@@ -98,19 +98,19 @@ def format_event_log_entry(
     return f"{prefix} {event_text}"
 
 
-def project_compatibility_event_log(
+def project_event_log_lines(
     records: Iterable[WorldEventRecord],
     *,
     max_event_log: int,
     translate: Translator,
     world: EventRenderContext | None = None,
 ) -> List[str]:
-    """Project compatibility log lines from canonical records."""
+    """Project log lines from canonical records."""
+    if max_event_log <= 0:
+        return []
     recent = list(records)[-max_event_log:]
     return [
-        record.legacy_event_log_entry
-        if record.legacy_event_log_entry is not None
-        else format_event_log_entry(
+        format_event_log_entry(
             render_event_record(record, world=world, translate=translate),
             translate=translate,
             year=record.year,
@@ -121,64 +121,19 @@ def project_compatibility_event_log(
     ]
 
 
-def trim_event_log_entries(entries: Iterable[str], *, max_event_log: int) -> List[str]:
-    """Return at most the newest ``max_event_log`` display entries."""
-    return list(entries)[-max_event_log:]
-
-
-def append_display_event_log_entry(
-    entries: Iterable[str],
-    event_text: str,
-    *,
-    translate: Translator,
-    year: int,
-    max_event_log: int,
-    month: Optional[int] = None,
-    day: Optional[int] = None,
-) -> List[str]:
-    """Append one display-only compatibility line and trim the buffer."""
-    updated = list(entries)
-    updated.append(
-        format_event_log_entry(
-            event_text,
-            translate=translate,
-            year=year,
-            month=month,
-            day=day,
-        )
-    )
-    return trim_event_log_entries(updated, max_event_log=max_event_log)
-
-
-def rebuild_display_event_log(
-    entries: Iterable[str],
-    records: Iterable[WorldEventRecord],
-    *,
-    max_event_log: int,
-) -> List[str]:
-    """Drop stale display-only lines once canonical history exists."""
-    if list(records):
-        return []
-    return trim_event_log_entries(entries, max_event_log=max_event_log)
-
-
-def compatibility_event_log_view(
-    display_entries: Iterable[str],
+def event_log_view(
     records: Iterable[WorldEventRecord],
     *,
     max_event_log: int,
     translate: Translator,
     world: EventRenderContext | None = None,
 ) -> ReadOnlyEventLog:
-    """Return the current read-only compatibility log view."""
-    canonical_records = list(records)
-    if canonical_records:
-        return ReadOnlyEventLog(
-            project_compatibility_event_log(
-                canonical_records,
-                max_event_log=max_event_log,
-                translate=translate,
-                world=world,
-            )
+    """Return the current read-only event log view."""
+    return ReadOnlyEventLog(
+        project_event_log_lines(
+            records,
+            max_event_log=max_event_log,
+            translate=translate,
+            world=world,
         )
-    return ReadOnlyEventLog(trim_event_log_entries(display_entries, max_event_log=max_event_log))
+    )

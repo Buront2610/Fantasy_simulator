@@ -1,19 +1,14 @@
 """Summary, report, story, and event-log access for the Simulator.
 
-``world.event_records`` is the canonical data source by policy.  New
-read-paths should query ``event_records`` (via ``events_by_kind()``).
-
-``history`` and ``event_log`` remain runtime compatibility adapters projected
-from canonical records for legacy consumers. Older snapshots that still carry
-legacy fields remain load-compatible.
+``world.event_records`` is the canonical data source by policy.
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+import re
 from typing import TYPE_CHECKING, Dict, List, Optional
 
-from ..event_models import EventResult, WorldEventRecord
+from ..event_models import WorldEventRecord
 from ..event_rendering import render_event_record
 from ..i18n import tr
 from ..reports import (
@@ -40,13 +35,11 @@ class QueryMixin:
     Expected attributes on *self* (provided by ``engine.Simulator``):
     - ``world``: the World instance
     - ``start_year``: baseline year for report bounds
-    - ``history``: legacy EventResult list (compatibility adapter)
     """
 
     if TYPE_CHECKING:
         world: World
         start_year: int
-        history: Sequence[EventResult]
 
     def get_summary(self) -> str:
         """Return a human-readable summary using WorldEventRecord as canonical source."""
@@ -153,6 +146,7 @@ class QueryMixin:
         seen_entries = set()
         story_entries: List[str] = []
         if event_history:
+            supplemental_entries: List[str] = []
             for record in event_history:
                 rendered = render_event_record(record, world=self.world)
                 story_entries.append(rendered)
@@ -161,7 +155,10 @@ class QueryMixin:
             for entry in char.history:
                 if entry in seen_entries:
                     continue
-                story_entries.append(entry)
+                if _is_legacy_year_history_entry(entry):
+                    continue
+                supplemental_entries.append(entry)
+            story_entries = supplemental_entries + story_entries
         elif char.history:
             for entry in char.history:
                 story_entries.append(entry)
@@ -186,34 +183,37 @@ class QueryMixin:
         return "\n\n".join(self.get_character_story(c.char_id) for c in chars)
 
     # ------------------------------------------------------------------
-    # Event log access and compatibility adapters
+    # Event log access
     # ------------------------------------------------------------------
 
     def get_event_log(self, last_n: Optional[int] = None) -> List[str]:
-        """Return the compatibility text log, optionally only the last *n*.
+        """Return the projected text log, optionally only the last *n*.
 
-        Reads through ``World.get_compatibility_event_log()`` for backward
-        compatibility. New features should query ``world.event_records``
-        directly instead.
+        New features should query ``world.event_records`` directly.
         """
-        return self.world.get_compatibility_event_log(last_n=last_n)
-
-    def events_by_type(self, event_type: str) -> List[EventResult]:
-        """Return legacy EventResult entries of the given type.
-
-        This compatibility adapter returns projected ``EventResult`` objects
-        derived from the canonical store, so it now sees the full event set.
-        Keep this only for migration-era callers; new code should call
-        ``events_by_kind()``.
-        """
-        return [ev for ev in self.history if ev.event_type == event_type]
+        log = list(self.world.event_log)
+        if last_n is not None:
+            return log[-last_n:]
+        return log
 
     def events_by_kind(self, kind: str) -> List[WorldEventRecord]:
         """Return WorldEventRecord entries matching the given kind.
 
-        This is the canonical replacement for ``events_by_type()``, reading
-        from the world's derived canonical event index when available.
+        Reads from the world's derived canonical event index when available.
         """
         if hasattr(self.world, "get_events_by_kind"):
             return self.world.get_events_by_kind(kind)
         return [rec for rec in self.world.event_records if rec.kind == kind]
+
+
+_LEGACY_YEAR_HISTORY_RE = re.compile(r"^(?:Year\s+\d+|\d+年):")
+
+
+def _is_legacy_year_history_entry(entry: str) -> bool:
+    """Return True for old per-character yearly display lines.
+
+    Canonical event records are richer and already ordered, so showing both
+    canonical records and legacy ``Year ...:`` lines makes character stories
+    noisy.  Non-year-prefixed biography/origin text remains visible.
+    """
+    return bool(_LEGACY_YEAR_HISTORY_RE.match(entry.strip()))

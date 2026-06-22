@@ -47,6 +47,7 @@ class CharacterCreator(
         *,
         tribe: str | None = None,
         region: str | None = None,
+        founder_background: bool = True,
     ) -> Character:
         race_entries, job_entries = self._require_race_and_job_entries()
         race_entries = self._race_entries_for_context(tribe=tribe, region=region)
@@ -59,6 +60,7 @@ class CharacterCreator(
             rng=rng,
             tribe=tribe,
             region=region,
+            founder_background=founder_background,
         )
 
     def create_from_template(
@@ -69,6 +71,7 @@ class CharacterCreator(
         *,
         tribe: str | None = None,
         region: str | None = None,
+        founder_background: bool = True,
     ) -> Character:
         if not self._supports_aethoria_templates():
             raise ValueError("Character templates are only available for Aethoria-compatible bundles")
@@ -79,4 +82,5 @@ class CharacterCreator(
             rng=rng,
             tribe=tribe,
             region=region,
+            founder_background=founder_background,
         )

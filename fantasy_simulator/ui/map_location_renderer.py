@@ -2,16 +2,51 @@
 
 from __future__ import annotations
 
+import shutil
 from typing import List, Optional
 
 from ..i18n import tr, tr_term
+from ..local_map_generation import generate_local_map
 from .atlas_canvas import _ROUTE_LINE, _bresenham
 from .map_view_models import LocalMapCue, MapCellInfo, MapRenderInfo, RouteRenderInfo
-from .ui_helpers import fit_display_width
+from .ui_helpers import display_width, fit_display_width
 
 
 def _fit(text: str, width: int) -> str:
     return fit_display_width(text, width)
+
+
+def _boxed(text: str, width: int) -> str:
+    return f"  |{_fit(text, width)}|"
+
+
+def _wrap_display_text(text: str, width: int) -> List[str]:
+    if display_width(text) <= width:
+        return [text]
+    indent = text[:len(text) - len(text.lstrip(" "))]
+    body = text.strip()
+    content_width = max(1, width - display_width(indent))
+    wrapped: List[str] = []
+    current = ""
+    for word in body.split(" "):
+        candidate = word if not current else f"{current} {word}"
+        if display_width(candidate) <= content_width:
+            current = candidate
+            continue
+        if current:
+            wrapped.append(current)
+        current = word
+    if current:
+        wrapped.append(current)
+    return [
+        f"{indent}{line}" if display_width(f"{indent}{line}") <= width else _fit(f"{indent}{line}", width).rstrip()
+        for line in wrapped
+    ]
+
+
+def _append_boxed_wrapped(lines: List[str], text: str, width: int) -> None:
+    for line in _wrap_display_text(text, width):
+        lines.append(_boxed(line, width))
 
 
 def _band_label(band: str) -> str:
@@ -46,13 +81,52 @@ def _append_terrain_metric(
     high_key: str,
 ) -> None:
     metric = _terrain_metric_line(label_key, value, low_key, middle_key, high_key)
-    lines.append(f"  |{_fit(metric, width)}|")
+    lines.append(_boxed(metric, width))
 
 
 _LOCAL_CUE_CATEGORY_ORDER = ("site", "terrain", "memory", "route")
+_DETAIL_PANEL_MIN_WIDTH = 118
+_DETAIL_PANEL_MAX_WIDTH = 132
+_DETAIL_PANEL_FALLBACK_COLUMNS = 124
 _DETAIL_ROUTE_SKETCH_WIDTH = 31
 _DETAIL_ROUTE_SKETCH_HEIGHT = 9
 _DETAIL_ROUTE_CENTER = (15, 4)
+_DETAIL_SYMBOL_TAGS = (
+    ("gate", "g"),
+    ("market", "$"),
+    ("tower", "Y"),
+    ("bridge", "J"),
+    ("shrine", "S"),
+    ("inn", "I"),
+    ("guild", "G"),
+    ("mill", "w"),
+    ("dock", "D"),
+    ("forge", "F"),
+    ("warehouse", "W"),
+    ("stable", "E"),
+    ("barracks", "R"),
+    ("graveyard", "V"),
+    ("library", "L"),
+    ("ruined_house", "U"),
+    ("workshop", "C"),
+    ("farmstead", "f"),
+    ("watch_camp", "p"),
+    ("arena", "A"),
+    ("notice_board", "B"),
+)
+
+
+def detail_panel_width(terminal_width: int | None = None) -> int:
+    """Return the content width for location detail panels."""
+    if terminal_width is None:
+        terminal_width = shutil.get_terminal_size(fallback=(_DETAIL_PANEL_FALLBACK_COLUMNS, 24)).columns
+    return max(_DETAIL_PANEL_MIN_WIDTH, min(_DETAIL_PANEL_MAX_WIDTH, int(terminal_width) - 6))
+
+
+def _format_cue_labels(labels: List[str]) -> str:
+    if len(labels) <= 2:
+        return ", ".join(labels)
+    return f"{labels[0]}, +{len(labels) - 1}"
 
 
 def _format_local_cue_groups(cues: List[LocalMapCue]) -> str:
@@ -63,85 +137,53 @@ def _format_local_cue_groups(cues: List[LocalMapCue]) -> str:
     for category in _LOCAL_CUE_CATEGORY_ORDER:
         labels = groups.get(category, [])
         if labels:
-            parts.append(f"{tr(f'map_cue_category_{category}')}: {', '.join(labels)}")
+            parts.append(f"{tr(f'map_cue_category_{category}')}: {_format_cue_labels(labels)}")
     return "; ".join(parts)
 
 
-def _site_ascii_lines(cell: MapCellInfo) -> List[str]:
-    if cell.region_type == "city":
-        return [
-            "       ____||____        ________       ",
-            "  ____/ []  []  \\______/ [] []  \\____  ",
-            " | []  []  []    |  $  []   []   []  | ",
-            " |      ____      |____     ____      | ",
-            " | []  | [] |  o  | [] |   | [] |  []| ",
-            " |_____|____|_____|____|___|____|____| ",
-            "       |  G |===== main road =====| G | ",
-            "  _____|____|_____________________|___|_",
-            "       /      market square       \\    ",
-        ]
-    if cell.region_type == "village":
-        return [
-            "        _       _          B",
-            "   ____/ \\__ __/ \\____    []",
-            "  | []  []  |  []  [] |",
-            "  |   o     |   ..    |====",
-            "  |____   __|__   ____|",
-            "       |_|     |_|",
-        ]
-    if cell.region_type == "dungeon":
-        return [
-            "          /\\",
-            "     ____/  \\____",
-            "    /  []    []   \\",
-            "   /__[]______[]__\\",
-            "      ||  ||  ||",
-            "      xx  ||  xx",
-        ]
-    if cell.region_type == "mountain":
-        return [
-            "          /\\        /\\",
-            "     /\\  /  \\__/\\  /  \\",
-            "    /  \\/  ||  \\/  /\\",
-            "        /__||__\\",
-            "           ||",
-        ]
-    if cell.region_type == "forest":
-        return [
-            "      ^^   ^^   ^^",
-            "    ^^    --     ^^",
-            "      ^^   []   ^^",
-            "    ^^    ..     ^^",
-            "          ||",
-        ]
-    return [
-        "       .     .      .",
-        "    .       --       .",
-        "       .    []    .",
-        "    .______/  \\____.",
-        "          ||",
-    ]
+def _format_culture_cue_groups(cues: List[LocalMapCue]) -> str:
+    groups: dict[str, List[str]] = {}
+    for cue in sorted(cues, key=lambda item: item.priority):
+        if "culture" not in cue.causes:
+            continue
+        culture = cue.culture_label or cue.culture_key
+        if not culture:
+            continue
+        labels = groups.setdefault(culture, [])
+        if cue.label not in labels:
+            labels.append(cue.label)
+    parts: List[str] = []
+    for culture, labels in groups.items():
+        if len(labels) > 1:
+            labels = [labels[0], f"+{len(labels) - 1}"]
+        parts.append(f"{culture}: {', '.join(labels)}")
+    return "; ".join(parts)
 
 
 def _local_symbol_line(cell: MapCellInfo, width: int) -> List[str]:
     symbols: List[str] = []
     tags = set(cell.local_feature_tags)
-    if "gate" in tags:
-        symbols.append(f"G={tr('map_feature_gate')}")
-    if "market" in tags:
-        symbols.append(f"$={tr('map_feature_market')}")
-    if "notice_board" in tags:
-        symbols.append(f"B={tr('map_feature_notice_board')}")
-    if cell.has_memorial or "memorial" in tags:
-        symbols.append(f"M={tr('map_feature_memorial')}")
-    if cell.rumor_heat_band == "high":
-        symbols.append(f"?={tr('map_legend_rumor_high')}")
     if cell.danger_band == "high":
         symbols.append(f"!={tr('map_legend_danger_high')}")
+    if cell.rumor_heat_band == "high":
+        symbols.append(f"?={tr('map_legend_rumor_high')}")
+    if cell.has_alias:
+        symbols.append(f"a={tr('map_legend_alias')}")
+    if cell.has_memorial or "memorial" in tags:
+        symbols.append(f"P={tr('map_feature_memorial')}")
+    if cell.recent_death_site:
+        symbols.append(f"*={tr('map_legend_recent_death')}")
+    if "trace" in tags:
+        symbols.append(f"t={tr('map_feature_trace')}")
+    if "blocked_route" in tags:
+        symbols.append(f"x={tr('map_feature_blocked_route')}")
+    for tag, symbol in _DETAIL_SYMBOL_TAGS:
+        if tag in tags:
+            symbols.append(f"{symbol}={tr(f'map_feature_{tag}')}")
     if not symbols:
         return []
     legend = f" {tr('map_detail_aa_legend')}: {' / '.join(symbols)}"
-    return [f"  |{_fit(legend, width)}|"]
+    return [_boxed(line, width) for line in _wrap_display_text(legend, width)]
 
 
 def _connected_detail_routes(info: MapRenderInfo, cell: MapCellInfo) -> list[tuple[RouteRenderInfo, MapCellInfo]]:
@@ -238,27 +280,46 @@ def _append_detail_route_sketch(lines: List[str], info: MapRenderInfo, cell: Map
     if not sketch:
         return
     title = f" {tr('map_detail_route_sketch')}"
-    lines.append(f"  |{_fit(title, width)}|")
-    lines.append(f"  |{_fit('  +' + '-' * _DETAIL_ROUTE_SKETCH_WIDTH + '+', width)}|")
+    lines.append(_boxed(title, width))
+    lines.append(_boxed('  +' + '-' * _DETAIL_ROUTE_SKETCH_WIDTH + '+', width))
     for row in sketch:
-        lines.append(f"  |{_fit(f'  |{row}|', width)}|")
-    lines.append(f"  |{_fit('  +' + '-' * _DETAIL_ROUTE_SKETCH_WIDTH + '+', width)}|")
+        lines.append(_boxed(f'  |{row}|', width))
+    lines.append(_boxed('  +' + '-' * _DETAIL_ROUTE_SKETCH_WIDTH + '+', width))
 
 
 def _append_site_ascii(lines: List[str], info: MapRenderInfo, cell: MapCellInfo, width: int, border: str) -> None:
-    title = f" {tr('map_detail_aa_title')}"
-    lines.append(f"  |{_fit(title, width)}|")
-    for art_line in _site_ascii_lines(cell):
-        lines.append(f"  |{_fit(f' {art_line}', width)}|")
+    title = f" {tr('map_detail_local_map_title')}"
+    connected = _connected_detail_routes(info, cell)
+    generated_map = generate_local_map(
+        cell,
+        [other for _route, other in connected],
+        visual_profile=cell.visual_profile,
+    )
+    lines.append(_boxed(title, width))
+    for art_line in generated_map.lines:
+        lines.append(_boxed(f' {art_line}', width))
+    if generated_map.exterior_lines:
+        exterior_title = f" {tr('map_detail_local_map_exterior')}"
+        lines.append(_boxed(exterior_title, width))
+        for art_line in generated_map.exterior_lines:
+            lines.append(_boxed(f' {art_line}', width))
     _append_detail_route_sketch(lines, info, cell, width)
     lines.extend(_local_symbol_line(cell, width))
+    if generated_map.legend_keys:
+        legend = " / ".join(tr(key) for key in generated_map.legend_keys)
+        legend_label = tr("map_detail_local_map_legend")
+        _append_boxed_wrapped(lines, f' {legend_label}: {legend}', width)
+    if generated_map.scene_keys:
+        scene = " / ".join(tr(key) for key in generated_map.scene_keys)
+        scene_label = tr("map_detail_local_map_scene")
+        _append_boxed_wrapped(lines, f' {scene_label}: {scene}', width)
     lines.append(border)
 
 
 def _append_terrain_lines(lines: List[str], cell: MapCellInfo, width: int, border: str) -> None:
     terrain_label = tr("map_terrain")
     biome_name = tr_term(cell.terrain_biome)
-    lines.append(f"  |{_fit(f' {terrain_label}: {biome_name} ({cell.terrain_glyph})', width)}|")
+    lines.append(_boxed(f' {terrain_label}: {biome_name} ({cell.terrain_glyph})', width))
     _append_terrain_metric(
         lines,
         width,
@@ -300,20 +361,24 @@ def _append_state_lines(lines: List[str], cell: MapCellInfo, width: int) -> None
     control_label = tr("map_detail_control")
     cues_label = tr("map_detail_local_cues")
 
-    lines.append(f"  |{_fit(f' {safety_label}: {cell.safety_label}', width)}|")
-    lines.append(f"  |{_fit(f' {danger_label}: {cell.danger:>3} ({_band_label(cell.danger_band)})', width)}|")
+    lines.append(_boxed(f' {safety_label}: {cell.safety_label}', width))
+    lines.append(_boxed(f' {danger_label}: {cell.danger:>3} ({_band_label(cell.danger_band)})', width))
     lines.append(
-        f"  |{_fit(f' {traffic_label}: {cell.traffic_indicator} ({_band_label(cell.traffic_band)})', width)}|"
+        _boxed(f' {traffic_label}: {cell.traffic_indicator} ({_band_label(cell.traffic_band)})', width)
     )
-    lines.append(f"  |{_fit(f' {pop_label}: {cell.population}', width)}|")
+    lines.append(_boxed(f' {pop_label}: {cell.population}', width))
     if cell.controlling_faction_name:
-        lines.append(f"  |{_fit(f' {control_label}: {cell.controlling_faction_name}', width)}|")
+        lines.append(_boxed(f' {control_label}: {cell.controlling_faction_name}', width))
     if cell.local_feature_cues:
         cues = _format_local_cue_groups(list(cell.local_feature_cues))
-        lines.append(f"  |{_fit(f' {cues_label}: {cues}', width)}|")
-    lines.append(f"  |{_fit(f' {prosperity_label}: {cell.prosperity_label} ({cell.prosperity})', width)}|")
-    lines.append(f"  |{_fit(f' {mood_label}: {cell.mood_label} ({cell.mood})', width)}|")
-    lines.append(f"  |{_fit(f' {rumor_label}: {cell.rumor_heat} ({_band_label(cell.rumor_heat_band)})', width)}|")
+        _append_boxed_wrapped(lines, f' {cues_label}: {cues}', width)
+        culture_cues = _format_culture_cue_groups(list(cell.local_feature_cues))
+        if culture_cues:
+            culture_label = tr("map_detail_culture_cues")
+            _append_boxed_wrapped(lines, f' {culture_label}: {culture_cues}', width)
+    lines.append(_boxed(f' {prosperity_label}: {cell.prosperity_label} ({cell.prosperity})', width))
+    lines.append(_boxed(f' {mood_label}: {cell.mood_label} ({cell.mood})', width))
+    lines.append(_boxed(f' {rumor_label}: {cell.rumor_heat} ({_band_label(cell.rumor_heat_band)})', width))
 
 
 def _append_overlay_markers(lines: List[str], cell: MapCellInfo, width: int, border: str) -> None:
@@ -327,7 +392,7 @@ def _append_overlay_markers(lines: List[str], cell: MapCellInfo, width: int, bor
     if overlay_items:
         markers_label = tr("map_detail_markers")
         overlay_line = ", ".join(overlay_items)
-        lines.append(f"  |{_fit(f' {markers_label}: {overlay_line}', width)}|")
+        lines.append(_boxed(f' {markers_label}: {overlay_line}', width))
         lines.append(border)
 
 
@@ -341,21 +406,21 @@ def _append_name_lines(
 ) -> None:
     if generated_endonym:
         endonym_label = tr("location_endonym_label")
-        lines.append(f"  |{_fit(f' {endonym_label}: {generated_endonym}', width)}|")
+        lines.append(_boxed(f' {endonym_label}: {generated_endonym}', width))
     if name_etymology_line:
         etymology_label = tr("location_etymology_label")
-        lines.append(f"  |{_fit(f' {etymology_label}: {name_etymology_line}', width)}|")
+        _append_boxed_wrapped(lines, f' {etymology_label}: {name_etymology_line}', width)
     if aliases:
         aliases_label = tr("location_aliases_label")
         aliases_line = ", ".join(aliases)
-        lines.append(f"  |{_fit(f' {aliases_label}: {aliases_line}', width)}|")
+        _append_boxed_wrapped(lines, f' {aliases_label}: {aliases_line}', width)
 
 
 def _append_labeled_list(lines: List[str], width: int, label: str, items: List[str], *, bullet: str = "") -> None:
-    lines.append(f"  |{_fit(f' {label}:', width)}|")
+    lines.append(_boxed(f' {label}:', width))
     for item in items[:5]:
         prefix = f"   {bullet}" if bullet else "   "
-        lines.append(f"  |{_fit(f'{prefix}{item}', width)}|")
+        _append_boxed_wrapped(lines, f'{prefix}{item}', width)
 
 
 def _append_detail_lists(
@@ -401,12 +466,12 @@ def render_location_detail(
     if cell is None:
         return f"  {tr('map_detail_not_found', location=location_id)}"
 
-    width = 50
+    width = detail_panel_width()
     border = "  +" + "-" * width + "+"
     lines: List[str] = [border]
 
     title = f" {cell.icon} {cell.canonical_name} ({tr_term(cell.region_type)})"
-    lines.append(f"  |{_fit(title, width)}|")
+    lines.append(_boxed(title, width))
     lines.append(border)
     _append_site_ascii(lines, info, cell, width, border)
 

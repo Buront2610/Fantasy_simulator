@@ -22,6 +22,7 @@ class RumorSummaryView:
     source_location_id: str | None = None
     source_location_name: str = ""
     source_event_id: str | None = None
+    source_event_text: str = ""
     age_in_months: int = 0
     spread_level: int = 0
     audience_key: str = ""
@@ -88,6 +89,7 @@ def build_rumor_summary_views(
                 else ""
             ),
             source_event_id=rumor.source_event_id,
+            source_event_text=_source_event_text(world, rumor.source_event_id),
             age_in_months=rumor.age_in_months,
             spread_level=rumor.spread_level,
             audience_key=getattr(rumor, "audience_key", ""),
@@ -100,6 +102,13 @@ def build_rumor_summary_views(
         )
         for rumor in rumors
     ]
+
+
+def _source_event_text(world: "World", source_event_id: str | None) -> str:
+    if not source_event_id:
+        return ""
+    record = world.get_event_by_id(source_event_id)
+    return render_event_record(record, world=world) if record is not None else ""
 
 
 def build_location_observation_view(

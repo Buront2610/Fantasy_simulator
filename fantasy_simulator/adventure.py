@@ -39,6 +39,7 @@ from .adventure_domain import (
     select_party_policy,
     validate_adventure_run_payload,
 )
+from .adventure_world_pressure import adventure_world_pressure
 from .i18n import tr
 
 if TYPE_CHECKING:
@@ -124,6 +125,8 @@ class AdventureRun:
     loot_summary: List[str] = field(default_factory=list)
     summary_log: List[str] = field(default_factory=list)
     detail_log: List[str] = field(default_factory=list)
+    combat_logs: List[Dict[str, Any]] = field(default_factory=list)
+    related_event_ids: List[str] = field(default_factory=list)
     resolution_year: Optional[int] = None
     injury_member_id: Optional[str] = None
     death_member_id: Optional[str] = None
@@ -182,10 +185,9 @@ class AdventureRun:
 
     def _clear_member_adventures(self, world: "World") -> None:
         for member_id in self.member_ids:
-            if member_id != self.character_id:
-                member = world.get_character_by_id(member_id)
-                if member is not None:
-                    member.active_adventure_id = None
+            member = world.get_character_by_id(member_id)
+            if member is not None:
+                member.active_adventure_id = None
 
     def to_dict(self) -> Dict[str, Any]:
         return AdventureSerialization.to_dict(self)
@@ -248,7 +250,8 @@ def create_adventure_run(
 
     origin_name = world.location_name(character.location_id)
     destination_name = world.location_name(destination.id)
-    danger_level = getattr(destination, "danger", 50)
+    pressure = adventure_world_pressure(world, character.location_id, destination.id)
+    danger_level = min(100, getattr(destination, "danger", 50) + pressure.danger_bonus)
 
     run = AdventureRun(
         character_id=character.char_id,
@@ -264,4 +267,5 @@ def create_adventure_run(
         tr("summary_adventure_set_out", name=character.name, origin=origin_name, destination=destination_name),
         tr("detail_adventure_set_out", name=character.name, origin=origin_name, destination=destination_name),
     )
+    run.detail_log.extend(pressure.detail_lines)
     return run

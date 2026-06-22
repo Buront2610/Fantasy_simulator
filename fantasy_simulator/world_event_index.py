@@ -101,6 +101,8 @@ class EventHistoryIndex:
         tables; those remain a read-side concern and are rebuilt by
         ``ensure_current`` when queried.
         """
+        if len(self.record_ids) == len(records) and not self.signature:
+            return
         record_ids = {record.record_id for record in records}
         if record_ids == self.record_ids:
             return

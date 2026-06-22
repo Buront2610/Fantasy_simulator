@@ -12,6 +12,8 @@ import random
 import pytest
 
 from fantasy_simulator.character import Character
+from fantasy_simulator.event_causality import pair_cause_event_ids
+from fantasy_simulator.event_models import WorldEventRecord
 from fantasy_simulator.events import EventSystem
 from fantasy_simulator.world import World
 
@@ -184,3 +186,22 @@ class TestRelationTagSources:
         key = "abc123:rival"
         assert key in restored.relation_tag_sources
         assert "evt_battle_01" in restored.relation_tag_sources[key]
+
+    def test_pair_cause_event_ids_ignores_pruned_relation_sources(self):
+        world = World()
+        char1 = _make_char("One", char_id="one")
+        char2 = _make_char("Two", char_id="two")
+        world.add_character(char1)
+        world.add_character(char2)
+        world.event_records = [
+            WorldEventRecord(
+                record_id="evt_kept",
+                kind="meeting",
+                primary_actor_id=char1.char_id,
+                secondary_actor_ids=[char2.char_id],
+            )
+        ]
+        char1.add_relation_tag(char2.char_id, "friend", source_event_id="evt_pruned")
+        char2.add_relation_tag(char1.char_id, "friend", source_event_id="evt_kept")
+
+        assert pair_cause_event_ids(world, char1, char2, relation_tags=("friend",)) == ["evt_kept"]

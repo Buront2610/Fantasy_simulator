@@ -150,6 +150,22 @@ class TestReadMenuChoice(unittest.TestCase):
         )
         self.assertEqual(result, "b")
 
+    @patch("builtins.input", side_effect=EOFError)
+    def test_eof_prefers_exit(self, _mock_input: object) -> None:
+        result = _read_menu_choice(
+            [("start", "Start"), ("exit", "Exit")],
+            default="1",
+        )
+        self.assertEqual(result, "exit")
+
+    @patch("builtins.input", side_effect=EOFError)
+    def test_eof_falls_back_to_default(self, _mock_input: object) -> None:
+        result = _read_menu_choice(
+            [("a", "A"), ("b", "B")],
+            default="2",
+        )
+        self.assertEqual(result, "b")
+
 
 class TestChooseKeyCompat(unittest.TestCase):
     """_choose_key backward-compat wrapper delegates to render + read."""

@@ -2,15 +2,24 @@
 tests/test_character.py - Unit tests for the Character class.
 """
 
+import random
+
 import pytest
 from fantasy_simulator.character import (
     Character,
     CharacterAbilities,
     CharacterNarrativeState,
+    MAX_CHARACTER_HISTORY,
+    MAX_RELATION_TAG_SOURCE_EVENTS,
     Relationship,
     random_stats,
 )
 from fantasy_simulator.character_lifespan import legacy_lifespan_years
+from fantasy_simulator.character_personality import (
+    generate_personality,
+    personality_archetype_key,
+    render_personality_archetype,
+)
 from fantasy_simulator.i18n import get_locale, set_locale
 
 
@@ -175,6 +184,51 @@ class TestCharacterProperties:
         assert relationship.tag_sources == {"friend": ["evt_001"]}
 
 
+class TestCharacterPersonality:
+    def test_race_tendency_biases_generated_personality_without_fixing_it(self):
+        neutral = generate_personality(rng=random.Random(7))
+        dwarf = generate_personality(rng=random.Random(7), race="Dwarf")
+
+        assert dwarf["discipline"] > neutral["discipline"]
+        assert dwarf["openness"] < neutral["openness"]
+
+    def test_archetype_uses_trait_combinations(self):
+        assert personality_archetype_key({
+            "openness": 75,
+            "discipline": 40,
+            "extraversion": 25,
+            "agreeableness": 45,
+            "stability": 50,
+        }) == "quiet_scholar"
+        assert personality_archetype_key({
+            "openness": 20,
+            "discipline": 75,
+            "extraversion": 45,
+            "agreeableness": 40,
+            "stability": 75,
+        }) == "steadfast_guardian"
+
+    def test_archetype_renders_translated_label(self):
+        assert render_personality_archetype({
+            "openness": 50,
+            "discipline": 50,
+            "extraversion": 50,
+            "agreeableness": 50,
+            "stability": 50,
+        }) == "balanced adventurer"
+
+    def test_personality_feats_round_trip(self, hero):
+        hero.personality_feats = ["brave", "oathbound"]
+
+        restored = Character.from_dict(hero.to_dict())
+
+        assert restored.personality_feats == ["brave", "oathbound"]
+
+    def test_unknown_personality_feat_is_rejected(self):
+        with pytest.raises(ValueError, match="unknown personality feat"):
+            Character("Test", 20, "Male", "Human", "Warrior", personality_feats=["impossible_feat"])
+
+
 # ---------------------------------------------------------------------------
 # Methods
 # ---------------------------------------------------------------------------
@@ -247,6 +301,23 @@ class TestAddHistory:
         assert hero.history[-1] == "Event B"
         assert hero.history[-2] == "Event A"
 
+    def test_history_is_bounded_for_long_running_worlds(self, hero):
+        for index in range(MAX_CHARACTER_HISTORY + 5):
+            hero.add_history(f"Event {index}")
+
+        assert len(hero.history) == MAX_CHARACTER_HISTORY
+        assert hero.history[0] == "Event 5"
+        assert hero.history[-1] == f"Event {MAX_CHARACTER_HISTORY + 4}"
+
+    def test_relation_tag_sources_are_bounded_for_long_running_worlds(self, hero, mage):
+        for index in range(MAX_RELATION_TAG_SOURCE_EVENTS + 4):
+            hero.add_relation_tag(mage.char_id, "friend", source_event_id=f"evt_{index}")
+
+        key = f"{mage.char_id}:friend"
+        assert hero.relation_tag_sources[key] == [
+            f"evt_{index}" for index in range(4, MAX_RELATION_TAG_SOURCE_EVENTS + 4)
+        ]
+
 
 class TestApplyStatDelta:
     def test_positive_delta(self, hero):
@@ -303,10 +374,53 @@ class TestSerialization:
             "strength", "intelligence", "dexterity", "wisdom",
             "charisma", "constitution", "skills", "relationships",
             "alive", "location_id", "favorite", "spotlighted", "playable",
-            "history", "spouse_id",
-            "injury_status", "active_adventure_id",
+            "history", "spouse_id", "personality",
+            "injury_status", "active_adventure_id", "founder_background",
+            "known_languages",
         }
         assert expected_keys.issubset(set(d.keys()))
+
+    def test_default_personality_is_neutral(self):
+        c = Character("Test", 20, "Male", "Human", "Warrior")
+
+        assert c.personality == {
+            "openness": 50,
+            "discipline": 50,
+            "extraversion": 50,
+            "agreeableness": 50,
+            "stability": 50,
+        }
+
+    def test_personality_round_trip_and_clamping(self):
+        char = Character(
+            "Test",
+            20,
+            "Male",
+            "Human",
+            "Warrior",
+            personality={"openness": 120, "discipline": -5, "extraversion": 70},
+        )
+
+        restored = Character.from_dict(char.to_dict())
+
+        assert restored.personality["openness"] == 100
+        assert restored.personality["discipline"] == 0
+        assert restored.personality["extraversion"] == 70
+        assert restored.personality["agreeableness"] == 50
+
+    def test_known_languages_round_trip_and_clamping(self):
+        char = Character(
+            "Test",
+            20,
+            "Male",
+            "Human",
+            "Warrior",
+            known_languages={"aethic_common": 120, "khazic": -3, "": 50},
+        )
+
+        restored = Character.from_dict(char.to_dict())
+
+        assert restored.known_languages == {"aethic_common": 100, "khazic": 0}
 
     def test_round_trip(self, hero):
         d = hero.to_dict()
@@ -396,6 +510,7 @@ class TestSerialization:
                 "spouse_id": "ally_001",
                 "injury_status": "injured",
                 "active_adventure_id": "adv_001",
+                "founder_background": {"family_origin": "minor_noble"},
             },
             "relationship_details": {
                 "ally_001": {
@@ -411,9 +526,30 @@ class TestSerialization:
         assert restored.strength == 70
         assert restored.favorite is True
         assert restored.history == ["Nested history"]
+        assert restored.founder_background == {"family_origin": "minor_noble"}
         assert restored.relationships == {"ally_001": 33}
         assert restored.relation_tags == {"ally_001": ["friend", "savior"]}
         assert restored.relation_tag_sources["ally_001:friend"] == ["evt_001"]
+
+    def test_from_dict_preserves_zero_score_relationship_details(self):
+        data = {
+            "name": "Neutral",
+            "age": 30,
+            "gender": "Male",
+            "race": "Human",
+            "job": "Warrior",
+            "relationship_details": {
+                "known_001": {
+                    "score": 0,
+                    "tags": [],
+                    "tag_sources": {},
+                }
+            },
+        }
+
+        restored = Character.from_dict(data)
+
+        assert restored.relationships == {"known_001": 0}
 
     def test_from_dict_prefers_nested_payload_over_flat_legacy_fields(self):
         data = {

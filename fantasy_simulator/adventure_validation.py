@@ -27,3 +27,8 @@ def validate_adventure_run_payload(run: AdventureRunLike) -> None:
         raise ValueError("member_ids must be a list of strings")
     if run.member_ids and run.character_id not in run.member_ids:
         raise ValueError("member_ids must include character_id")
+    if (
+        not isinstance(run.related_event_ids, list)
+        or any(not isinstance(record_id, str) for record_id in run.related_event_ids)
+    ):
+        raise ValueError("related_event_ids must be a list of strings")

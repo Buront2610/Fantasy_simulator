@@ -65,6 +65,7 @@ def test_world_event_record_round_trip_and_defensive_copy() -> None:
         day=12,
         summary_key="events.battle.summary",
         render_params={"actor": "Aldric", "location": "Thornwood"},
+        cause_event_ids=["cause_1"],
         impacts=[{"delta": {"danger": 1}}],
         tags=["combat"],
     )
@@ -72,9 +73,11 @@ def test_world_event_record_round_trip_and_defensive_copy() -> None:
     dumped = record.to_dict()
     dumped["impacts"][0]["delta"]["danger"] = 9
     dumped["render_params"]["actor"] = "Changed"
+    dumped["cause_event_ids"].append("changed")
 
     assert record.impacts[0]["delta"]["danger"] == 1
     assert record.render_params["actor"] == "Aldric"
+    assert record.cause_event_ids == ["cause_1"]
 
     restored = WorldEventRecord.from_dict(record.to_dict())
     assert restored.to_dict() == record.to_dict()
@@ -101,6 +104,62 @@ def test_world_event_record_rejects_malformed_render_params_at_load_boundary() -
         assert "render_params" in str(exc)
     else:
         raise AssertionError("Expected malformed render_params to fail fast")
+
+
+def test_world_event_record_derives_cause_event_ids_from_render_params() -> None:
+    record = WorldEventRecord(
+        record_id="effect",
+        kind="war_battle",
+        render_params={"cause_event_id": "cause"},
+    )
+
+    assert record.cause_event_ids == ["cause"]
+    assert record.to_dict()["cause_event_ids"] == ["cause"]
+
+
+def test_world_event_record_from_event_result_uses_metadata_cause_ids() -> None:
+    result = EventResult(
+        description="Effect",
+        event_type="war_ended",
+        metadata={"cause_event_id": "cause-a", "cause_event_ids": ["cause-b"]},
+    )
+
+    record = WorldEventRecord.from_event_result(result)
+    projected = record.to_event_result()
+
+    assert record.cause_event_ids == ["cause-a", "cause-b"]
+    assert projected.metadata["cause_event_id"] == "cause-a"
+    assert projected.metadata["cause_event_ids"] == ["cause-a", "cause-b"]
+
+
+def test_world_event_record_rejects_malformed_cause_event_ids_at_load_boundary() -> None:
+    malformed = {
+        "record_id": "bad-cause",
+        "kind": "war_ended",
+        "cause_event_ids": "cause",
+    }
+
+    try:
+        WorldEventRecord.from_dict(malformed)
+    except ValueError as exc:
+        assert "cause_event_ids" in str(exc)
+    else:
+        raise AssertionError("Expected malformed cause_event_ids to fail fast")
+
+
+def test_world_event_record_rejects_malformed_metadata_cause_event_ids() -> None:
+    result = EventResult(
+        description="Effect",
+        event_type="war_ended",
+        metadata={"cause_event_ids": ["cause", 3]},
+    )
+
+    try:
+        WorldEventRecord.from_event_result(result)
+    except ValueError as exc:
+        assert "cause_event_ids" in str(exc)
+    else:
+        raise AssertionError("Expected malformed metadata cause_event_ids to fail fast")
 
 
 def test_world_event_record_rejects_non_string_render_param_keys() -> None:
@@ -433,8 +492,8 @@ def test_world_event_record_from_event_result_to_event_result_round_trip() -> No
     assert projected.summary_key == source.summary_key
     assert projected.year == source.year
     assert projected.affected_characters == source.affected_characters
-    assert projected.stat_changes == source.stat_changes
-    assert projected.metadata == source.metadata
+    assert projected.stat_changes == {}
+    assert projected.metadata == {}
 
 
 def test_world_event_record_to_event_result_exposes_render_params_metadata() -> None:
@@ -457,32 +516,6 @@ def test_world_event_record_to_event_result_exposes_render_params_metadata() -> 
 
     assert projected.metadata["render_params"]["route_id"] == "route_a_b"
     assert record.render_params["from_location"] == "Alpha"
-
-
-def test_world_event_record_to_event_result_merges_render_params_into_legacy_metadata() -> None:
-    record = WorldEventRecord(
-        record_id="legacy_route_blocked_1",
-        kind="route_blocked",
-        year=1000,
-        description="The route was blocked.",
-        summary_key="events.route_blocked.summary",
-        render_params={"from_location": "Alpha", "to_location": "Bravo"},
-        legacy_event_result={
-            "description": "Legacy route text.",
-            "affected_characters": [],
-            "stat_changes": {},
-            "event_type": "generic",
-            "year": 999,
-            "metadata": {"source": "legacy"},
-        },
-    )
-
-    projected = record.to_event_result()
-
-    assert projected.metadata == {
-        "source": "legacy",
-        "render_params": {"from_location": "Alpha", "to_location": "Bravo"},
-    }
 
 
 def test_world_event_record_from_event_result_uses_metadata_summary_key_fallback() -> None:
@@ -550,7 +583,7 @@ def test_world_event_record_rejects_invalid_summary_key_shape() -> None:
         raise AssertionError("Expected malformed summary_key to fail fast")
 
 
-def test_world_event_record_preserves_migrated_legacy_event_result_payload() -> None:
+def test_world_event_record_ignores_removed_legacy_payload_fields_at_load_boundary() -> None:
     record = WorldEventRecord.from_dict(
         {
             "record_id": "legacy_history_000001",
@@ -568,175 +601,17 @@ def test_world_event_record_preserves_migrated_legacy_event_result_payload() -> 
                 "year": 1000,
                 "metadata": {"source": "legacy"},
             },
+            "legacy_event_log_entry": "Year 1000: A legacy omen spread through the capital.",
         }
     )
 
     projected = record.to_event_result()
 
     assert projected.affected_characters == ["char_1"]
-    assert projected.stat_changes == {"char_1": {"strength": -1}}
-    assert projected.metadata == {"source": "legacy"}
-
-
-def test_world_event_record_legacy_event_result_payload_is_defensively_copied() -> None:
-    payload = {
-        "description": "A legacy battle occurred.",
-        "affected_characters": ["char_1"],
-        "stat_changes": {"char_1": {"strength": -1}},
-        "event_type": "battle",
-        "year": 1000,
-        "metadata": {"source": "legacy", "nested": {"flag": True}},
-    }
-    record = WorldEventRecord.from_dict(
-        {
-            "record_id": "legacy_history_000001",
-            "kind": "battle",
-            "year": 1000,
-            "description": "A legacy battle occurred.",
-            "legacy_event_result": payload,
-        }
-    )
-
-    payload["metadata"]["nested"]["flag"] = False
-    dumped = record.to_dict()
-    dumped["legacy_event_result"]["metadata"]["nested"]["flag"] = "changed"
-
-    assert record.legacy_event_result == {
-        "description": "A legacy battle occurred.",
-        "affected_characters": ["char_1"],
-        "stat_changes": {"char_1": {"strength": -1}},
-        "event_type": "battle",
-        "year": 1000,
-        "metadata": {"source": "legacy", "nested": {"flag": True}},
-    }
-
-
-def test_world_event_record_rejects_malformed_legacy_event_result_payload_at_load_boundary() -> None:
-    malformed = {
-        "record_id": "legacy_history_000001",
-        "kind": "battle",
-        "year": 1000,
-        "description": "A legacy battle occurred.",
-        "legacy_event_result": {
-            "description": "A legacy battle occurred.",
-            "affected_characters": ["char_1"],
-            "stat_changes": {"char_1": {"strength": "bad"}},
-            "event_type": "battle",
-            "year": 1000,
-            "metadata": {"source": "legacy"},
-        },
-    }
-
-    try:
-        WorldEventRecord.from_dict(malformed)
-    except ValueError as exc:
-        assert "legacy_event_result" in str(exc)
-    else:
-        raise AssertionError("Expected malformed legacy_event_result to fail fast")
-
-
-def test_world_event_record_rejects_bool_year_in_legacy_event_result() -> None:
-    malformed = {
-        "record_id": "legacy_history_000003",
-        "kind": "battle",
-        "year": 1000,
-        "description": "A legacy battle occurred.",
-        "legacy_event_result": {
-            "description": "A legacy battle occurred.",
-            "affected_characters": ["char_1"],
-            "stat_changes": {"char_1": {"strength": -1}},
-            "event_type": "battle",
-            "year": True,
-            "metadata": {"source": "legacy"},
-        },
-    }
-
-    try:
-        WorldEventRecord.from_dict(malformed)
-    except ValueError as exc:
-        assert "year" in str(exc)
-    else:
-        raise AssertionError("Expected bool year to fail fast")
-
-
-def test_world_event_record_rejects_bool_stat_delta_in_legacy_event_result() -> None:
-    malformed = {
-        "record_id": "legacy_history_000004",
-        "kind": "battle",
-        "year": 1000,
-        "description": "A legacy battle occurred.",
-        "legacy_event_result": {
-            "description": "A legacy battle occurred.",
-            "affected_characters": ["char_1"],
-            "stat_changes": {"char_1": {"strength": False}},
-            "event_type": "battle",
-            "year": 1000,
-            "metadata": {"source": "legacy"},
-        },
-    }
-
-    try:
-        WorldEventRecord.from_dict(malformed)
-    except ValueError as exc:
-        assert "stat deltas" in str(exc)
-    else:
-        raise AssertionError("Expected bool stat delta to fail fast")
-
-
-def test_world_event_record_rejects_string_affected_characters_in_legacy_event_result() -> None:
-    malformed = {
-        "record_id": "legacy_history_000002",
-        "kind": "battle",
-        "year": 1000,
-        "description": "A legacy battle occurred.",
-        "legacy_event_result": {
-            "description": "A legacy battle occurred.",
-            "affected_characters": "char_1",
-            "stat_changes": {"char_1": {"strength": -1}},
-            "event_type": "battle",
-            "year": 1000,
-            "metadata": {"source": "legacy"},
-        },
-    }
-
-    try:
-        WorldEventRecord.from_dict(malformed)
-    except ValueError as exc:
-        assert "affected_characters" in str(exc)
-    else:
-        raise AssertionError("Expected string affected_characters to fail fast")
-
-
-def test_world_event_record_preserves_legacy_event_log_entry_string_payload() -> None:
-    record = WorldEventRecord.from_dict(
-        {
-            "record_id": "legacy_log_000001",
-            "kind": "legacy_event_log",
-            "year": 1000,
-            "description": "Year 1000: A legacy omen spread through the capital.",
-            "legacy_event_log_entry": "Year 1000: A legacy omen spread through the capital.",
-        }
-    )
-
-    assert record.legacy_event_log_entry == "Year 1000: A legacy omen spread through the capital."
-    assert record.to_dict()["legacy_event_log_entry"] == "Year 1000: A legacy omen spread through the capital."
-
-
-def test_world_event_record_rejects_non_string_legacy_event_log_entry_at_load_boundary() -> None:
-    malformed = {
-        "record_id": "legacy_log_000001",
-        "kind": "legacy_event_log",
-        "year": 1000,
-        "description": "Year 1000: A legacy omen spread through the capital.",
-        "legacy_event_log_entry": {"text": "not-a-string"},
-    }
-
-    try:
-        WorldEventRecord.from_dict(malformed)
-    except ValueError as exc:
-        assert "legacy_event_log_entry" in str(exc)
-    else:
-        raise AssertionError("Expected non-string legacy_event_log_entry to fail fast")
+    assert projected.stat_changes == {}
+    assert projected.metadata == {}
+    assert "legacy_event_result" not in record.to_dict()
+    assert "legacy_event_log_entry" not in record.to_dict()
 
 
 def test_world_event_record_normalization_policy_is_lenient_not_fail_fast() -> None:

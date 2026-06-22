@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Dict, Iterable, List
 
 from ..event_models import WorldEventRecord
@@ -70,8 +71,13 @@ def render_character_story(
         "─" * 50,
     ]
     if entries:
+        seen_entries = set()
         for entry in entries:
-            lines.append(f"  • {entry}")
+            compact_entry = _compact_story_entry(entry)
+            if compact_entry in seen_entries:
+                continue
+            seen_entries.add(compact_entry)
+            lines.append(f"  • {compact_entry}")
     else:
         lines.append(f"  {tr('no_notable_events')}")
 
@@ -79,3 +85,11 @@ def render_character_story(
     lines.append(stat_block)
     lines.append("─" * 50)
     return "\n".join(lines)
+
+
+_RELATION_DETAIL_RE = re.compile(r"\s+\([^()]*->[^()]*Avg:\s*[+-]?\d+[^()]*\)")
+
+
+def _compact_story_entry(entry: str) -> str:
+    """Remove mechanical relationship deltas from character story prose."""
+    return _RELATION_DETAIL_RE.sub("", entry)

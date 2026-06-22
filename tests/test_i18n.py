@@ -71,6 +71,60 @@ class TestI18n:
         set_locale("en")
         assert tr_term("an ancient relic") == "an ancient relic"
 
+    def test_region_terms_render_in_english(self):
+        set_locale("en")
+        for term in ("city", "village", "forest", "dungeon", "mountain", "plains", "sea"):
+            assert tr_term(term) != term
+
+    def test_japanese_history_templates_do_not_mix_english_year_label(self):
+        set_locale("ja")
+        history_keys = [
+            "history_recovered_from_injuries",
+            "set_out_for_adventure",
+            "history_adventure_detail",
+            "history_met",
+            "history_anniversary",
+            "history_married",
+            "history_child_born",
+            "history_born_to_parents",
+            "history_migrated_to_world",
+            "history_battle_win",
+            "history_battle_loss",
+            "history_battle_fatal",
+            "history_discovery",
+            "history_turned_age",
+            "history_passed_away",
+            "history_lost_spouse",
+            "history_trained_skill",
+            "history_travelled",
+            "history_condition_worsened",
+            "history_condition_improved",
+            "history_narrowly_survived",
+        ]
+        for key in history_keys:
+            rendered = tr(
+                key,
+                year=1000,
+                origin="Capital",
+                destination="Forest",
+                detail="detail",
+                name="Aldric",
+                location="Capital",
+                partner="Mira",
+                child="Lio",
+                parent1="Aldric",
+                parent2="Mira",
+                item="an ancient relic",
+                skill="Swordsmanship",
+                new_level=2,
+                old_location="Capital",
+                status="負傷中",
+                age=30,
+                cause="老衰で",
+            )
+            assert "Year 1000:" not in rendered
+            assert "1000年:" in rendered
+
     def test_event_log_prefix_translations(self):
         set_locale("ja")
         assert "[1000年]" == tr("event_log_prefix", year=1000)
@@ -118,7 +172,7 @@ class TestI18n:
     def test_rumor_board_templates_render(self):
         set_locale("ja")
         assert tr("rumor_board_menu") == "噂一覧"
-        assert "Aethoria" in tr("rumor_board_meta", location="Aethoria", age=2, spread=4, event_id="evt1")
+        assert "Aethoria" in tr("rumor_board_meta", location="Aethoria", age=2, spread=4, event="変化あり")
         assert "Aethoria" in tr("rumor_board_detail_source", location="Aethoria", age=2, spread=4)
         assert "local" in tr(
             "rumor_board_detail_tracking",
@@ -129,7 +183,7 @@ class TestI18n:
         )
         set_locale("en")
         assert tr("rumor_board_menu") == "Rumor board"
-        assert "evt1" in tr("rumor_board_meta", location="Aethoria", age=2, spread=4, event_id="evt1")
+        assert "Changed" in tr("rumor_board_meta", location="Aethoria", age=2, spread=4, event="Changed")
         assert "Aethoria" in tr("rumor_board_detail_source", location="Aethoria", age=2, spread=4)
         assert tr("rumor_tracked_marker") == "[tracked]"
         assert "tracked: yes" in tr(
@@ -181,13 +235,14 @@ class TestI18n:
         ) == "    Route: 2 change(s), Aethoria | Changed"
         assert tr(
             "report_rumor_thread_line",
-            source_event="evt1",
+            source_event="Changed",
             count=2,
             location="Aethoria",
             reliability="plausible",
             spread=7,
             headline="Changed",
-        ) == "    evt1: 2 rumor(s), Aethoria, plausible, spread 7/10 | Changed"
+        ) == "    Changed: 2 rumor(s), Aethoria, plausible, spread 7/10 | Changed"
+        assert tr("event_log_caused_by", events="Cause text") == "Because: Cause text"
 
     def test_dashboard_templates_render(self):
         set_locale("ja")

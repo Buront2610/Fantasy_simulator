@@ -16,6 +16,7 @@ def _show_world_dashboard(sim: Simulator, ctx: UIContext | None = None) -> None:
     view = build_world_dashboard_view(
         sim.world,
         current_month=sim.current_month,
+        current_day=sim.current_day,
         pending_choice_count=len(sim.get_pending_adventure_choices()),
     )
     _render_world_dashboard(view, ctx=ctx)
@@ -27,7 +28,7 @@ def _render_world_dashboard(view: WorldDashboardView, ctx: UIContext) -> None:
     out.print_line()
     out.print_heading(f"  {tr('dashboard_title', world=view.world_name)}")
     out.print_line(
-        f"  {tr('year_label')} {view.year} / {view.month_label}  |  "
+        f"  {tr('simulation_date_label', year=view.year, month=view.month_label, day=view.day)}  |  "
         f"{view.alive_count} {tr('alive')}  |  "
         f"{view.deceased_count} {tr('status_dead')}  |  "
         f"{tr('dashboard_active_adventures', count=view.active_adventure_count)}  |  "

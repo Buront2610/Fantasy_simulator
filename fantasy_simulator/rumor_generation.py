@@ -361,26 +361,31 @@ def generate_rumors_for_period(
     by severity and random chance. The default 12-month window ensures
     yearly batch generation captures events from the entire year.
     """
-    lookback_months = world.months_per_year
+    months_per_year = world.months_per_year
+    lookback_months = months_per_year
     cutoff_year = year
     cutoff_month = month - lookback_months
     while cutoff_month < 1:
-        cutoff_month += world.months_per_year
+        cutoff_month += months_per_year
         cutoff_year -= 1
 
     candidates: List[WorldEventRecord] = []
-    cutoff_abs = cutoff_year * world.months_per_year + cutoff_month
-    current_abs = year * world.months_per_year + month
+    cutoff_abs = cutoff_year * months_per_year + cutoff_month
+    current_abs = year * months_per_year + month
     current_absolute_day = world.latest_absolute_day_before_or_on(year, month)
-    for record in world.event_records:
-        event_abs = record.year * world.months_per_year + record.month
-        if cutoff_abs <= event_abs <= current_abs and record.severity >= MIN_SEVERITY_FOR_RUMOR:
+    for record in reversed(world.event_records):
+        event_abs = record.year * months_per_year + record.month
+        if event_abs > current_abs:
+            continue
+        if event_abs < cutoff_abs:
+            break
+        if record.severity >= MIN_SEVERITY_FOR_RUMOR:
             candidates.append(record)
 
     candidates.sort(
         key=lambda record: (
             -record.absolute_day,
-            -(record.year * world.months_per_year + record.month),
+            -(record.year * months_per_year + record.month),
             -record.severity,
         )
     )

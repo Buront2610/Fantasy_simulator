@@ -192,7 +192,7 @@ def _resolved_atlas_mode(atlas_mode: str, out: Any) -> str:
         width = shutil.get_terminal_size(fallback=(80, 24)).columns
     if width < 56:
         return "minimal"
-    if width < 88:
+    if width < 72:
         return "compact"
     return "wide"
 

@@ -3,6 +3,7 @@
 from .location_history_projection import (
     LocationControlHistoryEntry,
     LocationHistoryProjection,
+    LocationNameRecord,
     LocationRenameHistoryEntry,
     build_location_history_projection,
 )
@@ -34,6 +35,7 @@ __all__ = [
     "EraTimelineProjection",
     "LocationControlHistoryEntry",
     "LocationHistoryProjection",
+    "LocationNameRecord",
     "LocationRenameHistoryEntry",
     "OccupationEntry",
     "RouteStatusHistoryEntry",

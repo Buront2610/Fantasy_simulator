@@ -287,13 +287,11 @@ class TestGenerateMonthlyReport:
             record_id="r6c", kind="battle", year=1000, month=3,
             description="Canonical monthly event", severity=3,
         ))
-        world_with_chars._restore_display_event_log_for_load(["stale compatibility buffer"])
 
         report = generate_monthly_report(world_with_chars, 1000, 3)
 
         assert report.total_events == 1
         assert "Canonical monthly event" in report.notable_events
-        assert "stale compatibility buffer" not in report.notable_events
 
     def test_month_label_uses_historical_calendar_after_calendar_change(self, world_with_chars):
         old_calendar = CalendarDefinition(
@@ -416,12 +414,10 @@ class TestGenerateYearlyReport:
             record_id="y1c", kind="death", year=1001, month=6,
             description="Canonical death", severity=5,
         ))
-        world_with_chars._restore_display_event_log_for_load(["stale compatibility buffer"])
 
         report = generate_yearly_report(world_with_chars, 1001)
 
         assert "Canonical death" in report.notable_events
-        assert "stale compatibility buffer" not in report.notable_events
 
     def test_deaths_counted_from_events(self, world_with_chars):
         """deaths_this_year must come from event records, not world state."""

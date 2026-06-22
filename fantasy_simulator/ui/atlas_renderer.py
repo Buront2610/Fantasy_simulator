@@ -87,6 +87,11 @@ def render_atlas_overview(info: "MapRenderInfo") -> str:
         f"O={tr('map_legend_site_hub')}",
         f"@={tr('map_legend_site_marker')}",
         f"o={tr('map_legend_site_quiet')}",
+        f"C={tr('map_legend_site_city')}",
+        f"v={tr('map_legend_site_village')}",
+        f"D={tr('map_legend_site_dungeon')}",
+        f"T={tr_term('forest')}",
+        f"^={tr_term('mountain')}",
         f"!={tr('map_legend_danger_high')}",
         f"$={tr('map_legend_traffic_high')}",
         f"?={tr('map_legend_rumor_high')}",
@@ -151,9 +156,18 @@ def render_atlas_minimal(info: "MapRenderInfo") -> str:
     for idx, cell in enumerate(cells_sorted, 1):
         overlay = _overlay_suffix(cell)
         overlay_str = f" [{overlay}]" if overlay else ""
+        profile = getattr(cell, "visual_profile", None)
+        profile_enabled = getattr(profile, "archetype", "generic") != "generic"
+        marker = ""
+        profile_label = ""
+        if profile_enabled:
+            marker = f"{getattr(profile, 'world_marker_primary', '')}{getattr(profile, 'world_marker_suffix', '')}"
+            profile_label = tr(getattr(profile, "short_label_key", "map_profile_generic_short"))
+        marker_str = f" {marker}" if marker else ""
+        profile_str = f" - {profile_label}" if profile_label else ""
         lines.append(
             f"  {idx:>2}. {cell.canonical_name}"
-            f" ({tr_term(cell.region_type)}){overlay_str}"
+            f" ({tr_term(cell.region_type)}){marker_str}{overlay_str}{profile_str}"
         )
 
     if info.routes:

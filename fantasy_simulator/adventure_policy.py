@@ -115,14 +115,15 @@ class AdventurePolicyEngine:
         danger_mod = 0.5 + self.run.danger_level / 100.0
         policy_mod = POLICY_INJURY_MOD.get(self.run.policy, 1.0)
         chance = BASE_INJURY_CHANCE * ability_mod * danger_mod * policy_mod
-        return max(0.04, min(0.22, chance))
+        return max(0.02, min(0.45, chance))
 
     def compute_loot_chance(self, members: List["Character"]) -> float:
         lore = self.lore_score(members)
         ability_mod = lore / STAT_BASELINE
         policy_mod = POLICY_LOOT_MOD.get(self.run.policy, 1.0)
-        chance = 0.76 * ability_mod * policy_mod
-        return max(0.20, min(0.95, chance))
+        danger_mod = 0.85 + self.run.danger_level / 200.0
+        chance = 0.60 * ability_mod * policy_mod * danger_mod
+        return max(0.05, min(0.95, chance))
 
     def should_auto_retreat(self, members: List["Character"]) -> bool:
         if self.run.retreat_rule == RETREAT_ON_SERIOUS:
