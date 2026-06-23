@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ..combat_log_index import CombatLogEntryView, build_combat_log_index
+from ..combat_system.log_index import CombatLogEntryView, build_combat_log_index
 from ..event_rendering import render_event_record
 from ..i18n import tr
 from ..simulator import Simulator

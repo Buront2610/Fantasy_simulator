@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from fantasy_simulator.local_map_generation import generate_local_map
+from fantasy_simulator.world_map.local_generation import generate_local_map
 
 
 def _cell(

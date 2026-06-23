@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import pytest
 
 from fantasy_simulator.terrain import RouteEdge
-from fantasy_simulator.world_topology_queries import (
+from fantasy_simulator.world_topology.queries import (
     propagation_neighboring_locations,
     reachable_location_ids,
     travel_neighboring_locations,

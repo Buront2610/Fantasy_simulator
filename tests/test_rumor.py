@@ -1,4 +1,4 @@
-"""Tests for rumor.py - Rumor system, generation, and notification density."""
+"""Tests for the rumor package: generation, lifecycle, and notification density."""
 
 import random
 

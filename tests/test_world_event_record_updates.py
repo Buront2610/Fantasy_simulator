@@ -5,13 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from fantasy_simulator.event_models import WorldEventRecord
-from fantasy_simulator.world_event_record_updates import (
+from fantasy_simulator.world_event.record_updates import (
     event_record_with_added_tags,
     event_record_with_location_id,
     event_record_with_normalized_location_references,
     normalize_event_record_locations,
 )
-from fantasy_simulator.world_load_normalizer import rebuild_recent_event_ids
+from fantasy_simulator.world_structure.load_normalizer import rebuild_recent_event_ids
 
 
 @dataclass

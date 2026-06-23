@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from ..world_persistence_serializer import serialize_world_state
+from ..world_persistence.serializer import serialize_world_state
 
 
 def all_characters(world: Any) -> list[Any]:

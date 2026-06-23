@@ -6,7 +6,7 @@ import shutil
 from typing import List, Optional
 
 from ..i18n import tr, tr_term
-from ..local_map_generation import generate_local_map
+from ..world_map.local_generation import generate_local_map
 from .atlas_canvas import _ROUTE_LINE, _bresenham
 from .map_view_models import LocalMapCue, MapCellInfo, MapRenderInfo, RouteRenderInfo
 from .ui_helpers import display_width, fit_display_width

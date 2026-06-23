@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from fantasy_simulator.terrain import RouteEdge, Site
 from fantasy_simulator.world import World
-from fantasy_simulator.world_route_graph import RouteCollection, rebuild_route_index, replace_routes, routes_for_site
+from fantasy_simulator.world_topology.route_graph import (
+    RouteCollection,
+    rebuild_route_index,
+    replace_routes,
+    routes_for_site,
+)
 
 
 def test_rebuild_route_index_indexes_both_endpoints_and_attaches_observer() -> None:

@@ -8,9 +8,9 @@ across the full year instead of pinning them to a few scripted months.
 
 from __future__ import annotations
 
-from ..events_lifecycle import character_lifespan_years, natural_death_chance, should_record_aging_event
+from ..events.lifecycle import character_lifespan_years, natural_death_chance, should_record_aging_event
 from ..i18n import tr
-from ..world_history_retention import compact_world_history
+from ..world_history.retention import compact_world_history
 from .calendar import annual_probability_to_fraction, distributed_budget
 from .population import population_pressure_factor, run_population_maintenance
 from .timeline_calendar import propagation_month_window

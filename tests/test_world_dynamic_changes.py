@@ -288,7 +288,7 @@ def test_world_change_description_uses_non_empty_fallback_when_rendering_fails(m
     world = World()
 
     monkeypatch.setattr(
-        "fantasy_simulator.world_memory_api.render_event_record",
+        "fantasy_simulator.world_memory.api.render_event_record",
         lambda _record: "",
     )
 

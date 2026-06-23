@@ -32,7 +32,7 @@
 - **証拠（戦術）**: `world_change/` の commands（8種）→ specifications → changesets → reducers →
   domain_events の流れ。`FactionId` 等の値オブジェクト、`validate_declare_war_command` の
   コマンド検証。`world_*_api.py` / `_facade.py` のアグリゲート・ファサード、
-  `WorldEventRecorderPort`（`world_event_api.py:43`）の明示的ポート
+  `WorldEventRecorderPort`（`world_event/api.py:43`）の明示的ポート
 - **乖離**: 境界づけられたコンテキストが物理化されているのは新しい部分のみ
   （`world_change/` `observation/` `language/`）。最古かつ最大の「world」コンテキストは
   ルート直下 103 モジュールのフラット名前空間で、コンテキストが命名規則（`world_*`）にしか
@@ -46,7 +46,7 @@
   print/input/open 禁止、決定論層の random/datetime import 禁止。`removal_condition` 付き
   override 32 件の負債台帳。`InputBackend` / `RenderBackend` / `Combatant` 等の Protocol が
   ポート＆アダプタの語彙でドメイン・UI 両層に分布
-- **乖離**: 既知の穴 — `world.py:265` の ui 遅延 import、`character_creator_interactive.py` の
+- **乖離**: 既知の穴 — `world.py:265` の ui 遅延 import、`character_creator/interactive.py` の
   ui 直 import、ルートドメイン層→ui の禁止ルール不在。ミックスインの暗黙的 self 共有
   （カプセル化の弱点。外部設計書 docx も同一指摘）
 
@@ -125,7 +125,7 @@
 | # | 優先 | 対象 | 問題 | 対応方針 |
 |---|---|---|---|---|
 | R1 | 高 | イベント台帳ハイブリッドの線引き | どの状態がイベント由来か暗黙的。季節デルタバグの根。WorldArc 導入で同型バグを再生産するリスク | ADR-0003 の続編として「プロセス状態は必ずシリアライズ対象」「一時補正は保存値でなく読み出し時合成の派生値」を明文化。WorldArc 実装の前提規約にする |
-| R2 | 高 | ルートドメイン→ui 依存 | `world.py:265`、`character_creator_interactive.py`。クリーンアーキテクチャの既知の穴 | ガードに `root_domain_stays_ui_free` ルール追加。`render_map` は deprecation、対話キャラ生成は ui/ へ移設 |
+| R2 | 高 | ルートドメイン→ui 依存 | `world.py:265`、`character_creator/interactive.py`。クリーンアーキテクチャの既知の穴 | ガードに `root_domain_stays_ui_free` ルール追加。`render_map` は deprecation、対話キャラ生成は ui/ へ移設 |
 | R3 | 高 | DbC 二流派の規約化 | fail-fast と clamp の使い分けが暗黙的で、AI エージェントが流儀を判断できない | CLAUDE.md に 1 節追加: 「識別子・参照・永続化境界 = fail-fast / ゲームプレイ数値 = clamp」 |
 | R4 | 中 | world コンテキストの物理化 | ルート 103 モジュールのフラット名前空間。戦略的 DDD の未達部分 | `world_state/`（または `worldcore/`）へ段階移設。acyclic ルールの対象に追加。CLAUDE.md のアーキテクチャ図を追従 |
 | R5 | 中 | ミックスインの暗黙 self 共有 | Simulator 8 ミックスインが暗黙の属性共有に依存。型チェックの弱点 | AppService 導入（docx UI-0）時に、ミックスイン間の共有状態を明示的な依存（コンストラクタ注入 or TYPE_CHECKING 宣言の徹底）へ寄せる |

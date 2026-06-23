@@ -27,7 +27,7 @@
 2. `architecture_guard.json` overrides の負債台帳化
 3. `EventHistoryIndex` の write path 最適化
 4. PR-K / architecture fitness guard merge 後の roadmap / docs 現行化
-5. `world_persistence.py` の domain 別 serializer / hydrator 分割
+5. `world_persistence/` の domain 別 serializer / hydrator 分割
 6. 通常イベントの semantic rendering coverage 拡大
 7. performance regression guard の追加
 8. auto-pause 走査の集約
@@ -175,7 +175,7 @@ full signature 作成や full rebuild が繰り返される構造を避ける。
 
 ### Phase 1-E: Persistence serializer / hydrator split
 
-**目的**: `world_persistence.py` の横断的 hydrate / serialize を domain ごとに分割し、保存互換を維持したまま
+**目的**: `world_persistence/` の横断的 hydrate / serialize を domain ごとに分割し、保存互換を維持したまま
 変更リスクを下げる。
 
 **分割順序**:
@@ -337,7 +337,7 @@ self-loop、duplicate route id、duplicate endpoint pair の invariant を colle
 
 - `architecture_guard.json` overrides 数と、accepted / reducible / intentional の内訳
 - 各計測指標の owner / 更新頻度 / 記録 PR
-- `world_persistence.py` の complexity override 有無
+- `world_persistence/` の complexity override 有無
 - event append 通常 path における `EventHistoryIndex.ensure_current()` / full rebuild 呼び出し回数
 - `advance_months(60)` 相当の seeded path における event index full rebuild 回数
 - PR-K / PR #78 後の状態に同期済みの roadmap / context docs 数

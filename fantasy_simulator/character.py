@@ -8,7 +8,7 @@ import random
 import uuid
 from typing import Any, Callable, Dict, List, Optional
 
-from .character_domain import (
+from .character_model.domain import (
     CharacterAbilities,
     CharacterNarrativeState,
     Relationship,
@@ -17,10 +17,10 @@ from .character_domain import (
     clamp_relationship_score,
     clamp_skill_level,
 )
-from .character_lifespan import legacy_lifespan_years
-from .character_personality import normalize_personality, normalize_personality_feats
-from .character_presentation import character_stat_block, random_stats as roll_random_stats
-from .character_serialization import deserialize_character, serialize_character
+from .character_model.lifespan import legacy_lifespan_years
+from .character_model.personality import normalize_personality, normalize_personality_feats
+from .character_model.presentation import character_stat_block, random_stats as roll_random_stats
+from .character_model.serialization import deserialize_character, serialize_character
 from .content.world_data import NAME_TO_LOCATION_ID, fallback_location_id
 from .i18n import tr
 

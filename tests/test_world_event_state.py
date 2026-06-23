@@ -4,7 +4,7 @@ import pytest
 
 from fantasy_simulator.event_models import WorldEventRecord
 from fantasy_simulator.world import World
-from fantasy_simulator.world_event_state import (
+from fantasy_simulator.world_event.state import (
     apply_event_impact_to_location,
     append_canonical_event_record,
 )
@@ -235,7 +235,7 @@ def test_append_canonical_event_record_rejects_duplicate_record_id() -> None:
 
 def test_apply_event_impact_fails_fast_on_invalid_rule_attribute() -> None:
     world = World()
-    from fantasy_simulator import world_event_state as wes
+    from fantasy_simulator.world_event import state as wes
 
     custom_rules = wes.clone_default_event_impact_rules()
     custom_rules["broken_kind"] = {"unknown_attr": 1}
@@ -254,7 +254,7 @@ def test_apply_event_impact_fails_fast_on_invalid_rule_attribute() -> None:
 
 def test_apply_event_impact_fails_fast_on_invalid_rule_delta_type() -> None:
     world = World()
-    from fantasy_simulator import world_event_state as wes
+    from fantasy_simulator.world_event import state as wes
 
     custom_rules = wes.clone_default_event_impact_rules()
     custom_rules["broken_kind"] = {"danger": "1"}

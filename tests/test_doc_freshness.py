@@ -189,7 +189,7 @@ def test_implementation_plan_mentions_current_observation_and_type_gate_debt_pay
 
 def test_architecture_doc_tracks_strict_quality_gate_scope() -> None:
     assert "focused mypy targets" in ARCHITECTURE_TEXT
-    assert "newly split `world_*` API/facade/helper modules" in ARCHITECTURE_TEXT
+    assert "Newly split maintenance packages" in ARCHITECTURE_TEXT
 
 
 def test_user_docs_mention_strict_quality_gate() -> None:

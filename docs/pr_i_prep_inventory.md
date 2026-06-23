@@ -33,7 +33,7 @@ PR-I の前提整備として、「今すぐ直すべき漏れ」と「今は触
 | --- | --- | --- |
 | `fantasy_simulator/narrative/context.py` `epitaph_for_character()` | 最小テンプレート選択のみ。`relation_hint` / `title_hint` / `favorite` は future hook | relation tags / memorial / report metadata を入力へつなぐ |
 | `fantasy_simulator/narrative/context.py` `alias_for_event()` | death/notable の 2 系統のみ。`relation_hint` は future hook | relation hint や event metadata から alias family を分岐可能にする |
-| monthly/yearly report の叙述 | `reports.py` 自体は canonical projection として安定 | PR-I では report text を narrative 化しても、選ばれる素材は deterministic に保つ |
+| monthly/yearly report の叙述 | `reports/` 自体は canonical projection として安定 | PR-I では report text を narrative 化しても、選ばれる素材は deterministic に保つ |
 | location memory の語り | memorial / alias / trace は world state に保存済み | PR-I では「どう語るか」を narrative layer に寄せるが、state 自体は world 側のまま |
 
 ### PR-I 前に固定しておく前提

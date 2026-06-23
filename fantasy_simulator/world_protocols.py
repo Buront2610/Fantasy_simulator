@@ -1,36 +1,5 @@
-"""Structural protocols for small world helper modules."""
+"""Backward-compatible world protocol imports."""
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
-from typing import List, Protocol
-
-from .event_models import WorldEventRecord
-from .terrain import AtlasLayout, RouteEdge, Site, TerrainMap
-
-
-class MutableEventLogWorld(Protocol):
-    """World attributes needed by the event-log facade."""
-
-    MAX_EVENT_LOG: int
-    event_records: Sequence[WorldEventRecord]
-
-
-class TopologyRuntimeWorld(Protocol):
-    """World attributes needed when applying reconstructed topology state."""
-
-    terrain_map: TerrainMap | None
-    sites: List[Site]
-    routes: Iterable[RouteEdge]
-    _route_graph_explicit: bool
-    atlas_layout: AtlasLayout | None
-
-    def _rebuild_site_index(self) -> None: ...
-
-    def _rebuild_route_index(self) -> None: ...
-
-
-class RouteIndexChangeHandler(Protocol):
-    """Callback used by observable route collections."""
-
-    def __call__(self) -> None: ...
+from .world_core.protocols import *  # noqa: F401,F403

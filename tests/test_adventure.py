@@ -305,7 +305,7 @@ def test_completed_dungeon_adventure_updates_durable_site_causality():
         resolution_year=world.year + 1,
     )
 
-    from fantasy_simulator.adventure_site_state import apply_adventure_site_state
+    from fantasy_simulator.adventure.site_state import apply_adventure_site_state
 
     apply_adventure_site_state(world, run)
 

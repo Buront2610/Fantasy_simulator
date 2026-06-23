@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import pytest
 
 from fantasy_simulator.world import World
-from fantasy_simulator.world_state_propagation import (
+from fantasy_simulator.world_state.propagation import (
     decay_toward_baseline,
     propagate_state_changes,
 )
@@ -182,7 +182,7 @@ def test_propagation_rules_fail_fast_on_invalid_delta_type() -> None:
     def _neighbors(_loc_id: str) -> list[_FakeLoc]:
         return [n1] if _loc_id == "src" else []
 
-    from fantasy_simulator import world_state_propagation as wsp
+    from fantasy_simulator.world_state import propagation as wsp
 
     custom_rules = wsp.clone_default_propagation_rules()
     custom_rules["danger"]["cap"] = "15"

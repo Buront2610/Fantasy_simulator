@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Iterable, List, Tuple
 
-from .character_creator_template_data import TEMPLATES
+from .character_creator.template_data import TEMPLATES
 
 TEMPLATE_REQUIRED_IDENTITIES = {
     (template["race"], template["job"])

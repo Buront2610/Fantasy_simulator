@@ -3,8 +3,8 @@ from __future__ import annotations
 from fantasy_simulator.event_models import WorldEventRecord
 from fantasy_simulator.i18n import get_locale, set_locale
 from fantasy_simulator.world import World
-from fantasy_simulator import world_event_log_facade
-from fantasy_simulator.world_event_log import format_event_log_entry, project_event_log_lines
+from fantasy_simulator.world_event import log_facade
+from fantasy_simulator.world_event.log import format_event_log_entry, project_event_log_lines
 
 
 def _translate(key: str, **kwargs: object) -> str:
@@ -139,14 +139,14 @@ def test_event_log_facade_projects_canonical_records_only() -> None:
         WorldEventRecord(kind="battle", year=1042, month=3, day=4, description="Third"),
     ])
 
-    assert list(world_event_log_facade.event_log_view(world)) == [
+    assert list(log_facade.event_log_view(world)) == [
         "[Year 1042, Month 3, Day 3] Second",
         "[Year 1042, Month 3, Day 4] Third",
     ]
-    assert world_event_log_facade.event_log_lines(world, last_n=1) == [
+    assert log_facade.event_log_lines(world, last_n=1) == [
         "[Year 1042, Month 3, Day 4] Third",
     ]
-    assert world_event_log_facade.event_log_lines(world, last_n=0) == []
+    assert log_facade.event_log_lines(world, last_n=0) == []
 
 
 def test_event_log_view_with_zero_max_event_log_returns_empty_view() -> None:
@@ -162,8 +162,8 @@ def test_event_log_view_with_zero_max_event_log_returns_empty_view() -> None:
 
     world = _World()
 
-    assert list(world_event_log_facade.event_log_view(world)) == []
-    assert world_event_log_facade.event_log_lines(world) == []
+    assert list(log_facade.event_log_view(world)) == []
+    assert log_facade.event_log_lines(world) == []
 
 
 def test_event_log_has_no_display_assignment_path() -> None:

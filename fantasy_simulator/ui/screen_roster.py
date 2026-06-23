@@ -4,15 +4,15 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..character_founder_background import render_founder_summary
-from ..character_personality import (
+from ..character_model.founder_background import render_founder_summary
+from ..character_model.personality import (
     personality_context_from_events,
     render_personality_archetype,
     render_personality_context_factors,
     render_personality_feats,
     render_personality_summary,
 )
-from ..combat_log_index import CombatLogEntryView, build_combat_log_index
+from ..combat_system.log_index import CombatLogEntryView, build_combat_log_index
 from ..event_rendering import render_event_record
 from ..i18n import tr, tr_term
 from ..world import World

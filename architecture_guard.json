@@ -44,7 +44,7 @@
       "name": "reports_stays_ui_free",
       "description": "Report generation is domain/application output data, not a UI renderer.",
       "include": [
-        "fantasy_simulator/reports.py"
+        "fantasy_simulator/reports/*.py"
       ],
       "forbid": [
         "fantasy_simulator.ui"
@@ -119,6 +119,21 @@
       ]
     },
     {
+      "name": "world_map_is_headless_projection",
+      "description": "World-map view models and ASCII projection helpers must not own UI flows, persistence, or simulation orchestration.",
+      "include": [
+        "fantasy_simulator/world_map/*.py"
+      ],
+      "forbid": [
+        "fantasy_simulator.persistence",
+        "fantasy_simulator.simulation",
+        "fantasy_simulator.ui",
+        "prompt_toolkit",
+        "rich",
+        "textual"
+      ]
+    },
+    {
       "name": "world_change_reducers_are_deterministic",
       "description": "Reducers and specifications must receive time/randomness as inputs.",
       "include": [
@@ -141,9 +156,9 @@
       ],
       "exclude": [
         "fantasy_simulator/character.py",
-        "fantasy_simulator/character_creator.py",
-        "fantasy_simulator/events.py",
-        "fantasy_simulator/terrain.py",
+        "fantasy_simulator/character_creator/__init__.py",
+        "fantasy_simulator/events/__init__.py",
+        "fantasy_simulator/terrain/__init__.py",
         "fantasy_simulator/world.py",
         "fantasy_simulator/persistence/migrations.py"
       ],
@@ -174,7 +189,7 @@
         "fantasy_simulator/**/*.py"
       ],
       "exclude": [
-        "fantasy_simulator/world_memory_api.py"
+        "fantasy_simulator/world_memory/api.py"
       ],
       "forbid_calls": [
         "rename_location",
@@ -231,18 +246,18 @@
         "removal_condition": "Remove when fantasy_simulator/language/phonology.py::default_feature_sets fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
-        "target": "fantasy_simulator/events_lifecycle.py::check_dying_resolution",
+        "target": "fantasy_simulator/events/lifecycle.py::check_dying_resolution",
         "reason": "Lifecycle resolver keeps death-staging compatibility until policy extraction.",
         "max_function_lines": 82,
         "owner": "architecture-maintainers",
-        "removal_condition": "Remove when fantasy_simulator/events_lifecycle.py::check_dying_resolution fits the default complexity budgets or is split behind a narrower compatibility adapter."
+        "removal_condition": "Remove when fantasy_simulator/events/lifecycle.py::check_dying_resolution fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
-        "target": "fantasy_simulator/reports.py::generate_monthly_report",
+        "target": "fantasy_simulator/reports/__init__.py::generate_monthly_report",
         "reason": "Compatibility report composer with several public sections; keep stable while projections migrate.",
         "max_function_lines": 121,
         "owner": "architecture-maintainers",
-        "removal_condition": "Remove when fantasy_simulator/reports.py::generate_monthly_report fits the default complexity budgets or is split behind a narrower compatibility adapter."
+        "removal_condition": "Remove when fantasy_simulator/reports/__init__.py::generate_monthly_report fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/persistence/migration_steps.py::migrate_v2_to_v3",
@@ -268,11 +283,11 @@
         "removal_condition": "Remove when fantasy_simulator/simulation/engine_pause.py::EnginePauseMixin fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
-        "target": "fantasy_simulator/terrain_atlas_landmass.py::_cluster_atlas_sites",
+        "target": "fantasy_simulator/terrain/atlas_landmass.py::_cluster_atlas_sites",
         "reason": "Geometry clustering algorithm with nested spatial checks; preserve behavior before extraction.",
         "max_cognitive_complexity": 37,
         "owner": "architecture-maintainers",
-        "removal_condition": "Remove when fantasy_simulator/terrain_atlas_landmass.py::_cluster_atlas_sites fits the default complexity budgets or is split behind a narrower compatibility adapter."
+        "removal_condition": "Remove when fantasy_simulator/terrain/atlas_landmass.py::_cluster_atlas_sites fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/ui/atlas_routes.py::_draw_routes",
@@ -328,11 +343,11 @@
         "removal_condition": "Remove when fantasy_simulator/ui/map_world_overview.py::render_world_overview fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
-        "target": "fantasy_simulator/world_memory_api.py::WorldMemoryMixin",
+        "target": "fantasy_simulator/world_memory/api.py::WorldMemoryMixin",
         "reason": "World memory facade is still a broad dynamic-world compatibility surface during module split.",
         "max_class_lines": 450,
         "owner": "architecture-maintainers",
-        "removal_condition": "Remove when fantasy_simulator/world_memory_api.py::WorldMemoryMixin fits the default class-line budget or is split behind narrower compatibility adapters."
+        "removal_condition": "Remove when fantasy_simulator/world_memory/api.py::WorldMemoryMixin fits the default class-line budget or is split behind narrower compatibility adapters."
       },
       {
         "target": "fantasy_simulator/content/setting_bundle_schema_world.py::WorldDefinition",
@@ -384,26 +399,26 @@
         "removal_condition": "Remove when fantasy_simulator/ui/render_backend.py::RichRenderBackend fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
-        "target": "fantasy_simulator/world_actor_api.py::WorldActorMixin",
+        "target": "fantasy_simulator/world_actor/api.py::WorldActorMixin",
         "reason": "World actor facade remains a compatibility surface during world module split.",
         "max_public_methods": 13,
         "owner": "architecture-maintainers",
-        "removal_condition": "Remove when fantasy_simulator/world_actor_api.py::WorldActorMixin fits the default complexity budgets or is split behind a narrower compatibility adapter."
+        "removal_condition": "Remove when fantasy_simulator/world_actor/api.py::WorldActorMixin fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
-        "target": "fantasy_simulator/world_calendar_api.py::WorldCalendarMixin",
+        "target": "fantasy_simulator/world_calendar/api.py::WorldCalendarMixin",
         "reason": "World calendar facade exposes current calendar transition API.",
         "max_public_methods": 18,
         "owner": "architecture-maintainers",
-        "removal_condition": "Remove when fantasy_simulator/world_calendar_api.py::WorldCalendarMixin fits the default complexity budgets or is split behind a narrower compatibility adapter."
+        "removal_condition": "Remove when fantasy_simulator/world_calendar/api.py::WorldCalendarMixin fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
-        "target": "fantasy_simulator/world_state_propagation.py::propagate_state_changes",
+        "target": "fantasy_simulator/world_state/propagation.py::propagate_state_changes",
         "reason": "Propagation applies several authored effects in one compatibility entrypoint.",
         "max_cyclomatic_complexity": 16,
         "max_cognitive_complexity": 35,
         "owner": "architecture-maintainers",
-        "removal_condition": "Remove when fantasy_simulator/world_state_propagation.py::propagate_state_changes fits the default complexity budgets or is split behind a narrower compatibility adapter."
+        "removal_condition": "Remove when fantasy_simulator/world_state/propagation.py::propagate_state_changes fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
         "target": "fantasy_simulator/world.py::World",
@@ -421,11 +436,11 @@
         "removal_condition": "Remove when fantasy_simulator/world.py fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
-        "target": "fantasy_simulator/world_structure_api.py::WorldStructureMixin",
+        "target": "fantasy_simulator/world_structure/api.py::WorldStructureMixin",
         "reason": "World structure facade is still a broad compatibility surface.",
         "max_class_lines": 237,
         "owner": "architecture-maintainers",
-        "removal_condition": "Remove when fantasy_simulator/world_structure_api.py::WorldStructureMixin fits the default complexity budgets or is split behind a narrower compatibility adapter."
+        "removal_condition": "Remove when fantasy_simulator/world_structure/api.py::WorldStructureMixin fits the default complexity budgets or is split behind a narrower compatibility adapter."
       }
     ]
   }

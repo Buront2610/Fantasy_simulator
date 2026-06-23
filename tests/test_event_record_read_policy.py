@@ -20,8 +20,6 @@ def test_new_view_model_layer_does_not_reference_event_log():
 def test_production_code_does_not_call_display_only_log_event_adapter():
     offenders = []
     for path in PRODUCTION_ROOT.rglob("*.py"):
-        if path.name == "world_event_log_api.py":
-            continue
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "log_event":

@@ -20,7 +20,7 @@
 
 - `event_records`
   - canonical write: `World.record_event()`
-  - canonical read: `simulation/queries.py` (`get_summary`, `events_by_kind`), `reports.py`
+  - canonical read: `simulation/queries.py` (`get_summary`, `events_by_kind`), `reports/`
 - `event_log`
   - read-only projection: `World.event_log`
   - UI read path: `simulation/queries.py#get_event_log()` 経由のみ
@@ -46,16 +46,16 @@
 - authoring 用の bundle 差し替え UX（複数 world package 運用）は PR-J の機能作業。
 - `ALL_SKILLS` は共有カタログとして `world_data` 依存を継続するが、非 lore/race/job 領域の互換カタログであり、この負債解消対象からは外す。
 
-## TD-3 Responsibility Split (`world.py` / `events.py`)
+## TD-3 Responsibility Split (`world.py` / `events/`)
 
 ### Done in this repo state
 
-- `events.py` から純粋データ契約（`EventResult` / `WorldEventRecord` / `generate_record_id`）を
+- `events/` から純粋データ契約（`EventResult` / `WorldEventRecord` / `generate_record_id`）を
   `event_models.py` へ抽出し、イベント生成の副作用ロジックと分離した。
-- `world.py` の event log projection は `world_event_log.py` へ抽出し、ログ整形/投影を純関数化した。
-- event-driven な location state mutation / canonical record append を `world_event_state.py`
+- `world.py` の event log projection は `world_event/log.py` へ抽出し、ログ整形/投影を純関数化した。
+- event-driven な location state mutation / canonical record append を `world_event/state.py`
   へ抽出し、`World` は orchestration と互換API維持に集中する構造へ再配置した。
-- decay / propagation（設計書 §5.6）を `world_state_propagation.py` へ抽出し、
+- decay / propagation（設計書 §5.6）を `world_state/propagation.py` へ抽出し、
   `World.propagate_state()` は orchestrator に縮約した。
 - 既存 facade（`from fantasy_simulator.events import ...`, `World.record_event()`）は維持。
 - legacy field 削除 / import 正規ルート / mutable copy 方針は `docs/td3_design_decisions.md` に記録。

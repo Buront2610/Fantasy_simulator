@@ -170,7 +170,7 @@ def route_verification_profile(changed_files: Sequence[str], target_area: str | 
         return "strict"
     if any(path.startswith("fantasy_simulator/ui/") for path in areas):
         return "strict"
-    if any(path == "fantasy_simulator/reports.py" for path in areas):
+    if any(path.startswith("fantasy_simulator/reports/") for path in areas):
         return "strict"
     if any(path.startswith("docs/architecture") or path.startswith("docs/implementation_plan") for path in areas):
         return "standard"
@@ -215,9 +215,9 @@ def semantic_audit_required(changed_files: Sequence[str]) -> bool:
         "docs/implementation_plan.md",
         "fantasy_simulator/narrative/",
         "fantasy_simulator/ui/",
-        "fantasy_simulator/reports.py",
+        "fantasy_simulator/reports",
         "fantasy_simulator/world.py",
-        "fantasy_simulator/events.py",
+        "fantasy_simulator/events/",
     )
     return any(any(path.startswith(prefix) for prefix in required_prefixes) for path in changed_files)
 

@@ -1,7 +1,7 @@
 """Integration tests for UIContext — prove backends are wired end-to-end.
 
 These tests verify that ``screens.py``, ``main.py``, and
-``character_creator.py`` truly route all I/O through the injected
+``character_creator/`` truly routes all I/O through the injected
 ``InputBackend`` and ``RenderBackend``, making the UI layer fully
 swappable.
 """
@@ -21,7 +21,7 @@ from fantasy_simulator.character import Character
 from fantasy_simulator.i18n import set_locale
 from fantasy_simulator.ui.ui_context import UIContext
 from fantasy_simulator.world import World
-from tests.ui_test_doubles import RecordingRenderBackend, ScriptedInputBackend
+from tests.support.ui_doubles import RecordingRenderBackend, ScriptedInputBackend
 
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")

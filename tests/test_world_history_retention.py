@@ -4,7 +4,7 @@ from fantasy_simulator.adventure import AdventureRun
 from fantasy_simulator.event_models import WorldEventRecord
 from fantasy_simulator.rumor_models import Rumor
 from fantasy_simulator.world import World
-from fantasy_simulator.world_history_retention import compact_world_history
+from fantasy_simulator.world_history.retention import compact_world_history
 
 
 def test_history_retention_keeps_required_events_and_prunes_old_noise() -> None:

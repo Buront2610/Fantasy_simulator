@@ -17,7 +17,7 @@ from ..observation import (
     build_war_map_projection,
     build_world_change_report_projection,
 )
-from ..world_event_index import location_ids_for_record
+from ..world_event.index import location_ids_for_record
 from ..location_observation import (
     LocationObservationView,
     RumorSummaryView,

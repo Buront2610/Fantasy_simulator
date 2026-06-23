@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from fantasy_simulator.world_location_references import LocationReferenceResolver
-from fantasy_simulator.world_structure_api import WorldStructureMixin
+from fantasy_simulator.world_location.references import LocationReferenceResolver
+from fantasy_simulator.world_structure.api import WorldStructureMixin
 
 
 class _ResolverBackedWorld(WorldStructureMixin):

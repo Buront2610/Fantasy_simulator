@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from ..adventure import AdventureRun
 from ..event_models import WorldEventRecord
-from ..world_event_index import location_ids_for_record
+from ..world_event.index import location_ids_for_record
 
 if TYPE_CHECKING:
     from ..world import World

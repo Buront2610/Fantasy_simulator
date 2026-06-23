@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from fantasy_simulator.world_actor_index import add_adventure
+from fantasy_simulator.world_actor.index import add_adventure
 
 
 @dataclass

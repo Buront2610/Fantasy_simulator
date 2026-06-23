@@ -21,7 +21,7 @@ names, historical sound change, and world-facing endonyms.
     toponym generation, productive-rule selection, and runtime evolution.
 
 `World` owns only the active runtime state and delegates language work through
-`world_language.py`. Static bundle data must remain immutable during
+`world_language/`. Static bundle data must remain immutable during
 simulation; all historical drift lives in `LanguageRuntimeState`.
 
 ## Static Vs Runtime

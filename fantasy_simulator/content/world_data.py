@@ -190,7 +190,7 @@ def get_location_state_defaults(
 
 
 # ---------------------------------------------------------------------------
-# Event flavour fragments used by events.py
+# Event flavour fragments used by events/
 # ---------------------------------------------------------------------------
 
 DISCOVERY_ITEMS = [

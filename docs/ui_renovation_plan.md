@@ -206,7 +206,7 @@ map renderer は最低でも次のモードを持つ。
 - [x] `screens.py` / `ui_helpers.py` の責務を棚卸しし、`ui/` パッケージを作成する
 - [x] `screens.py` の `_show_results()` 等で `action == tr("...")` による分岐をキーベースの選択に変更し、ロケール依存の制御フローを解消する
 - [x] `InputBackend` と `RenderBackend` を導入する
-- [x] `screens.py` / `main.py` / `character_creator.py` の全 I/O を backend 経由に移行する
+- [x] `screens.py` / `main.py` / `character_creator/` の全 I/O を backend 経由に移行する
 - [x] presenter / view-model の最小層を導入する（`ui/presenters.py`, `ui/view_models.py`）
 - [x] 月報カードなど一部表示を `WorldEventRecord` 起点の view model へ切り替える
 - [ ] `wcwidth` による幅計算ユーティリティを整理する
