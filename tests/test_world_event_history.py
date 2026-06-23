@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from fantasy_simulator.event_models import WorldEventRecord
-from fantasy_simulator.world_event_history import record_world_event
-from fantasy_simulator.world_event_index import EventHistoryIndex
+from fantasy_simulator.world_event.history import record_world_event
+from fantasy_simulator.world_event.index import EventHistoryIndex
 
 
 @dataclass
@@ -115,7 +115,7 @@ def test_record_world_event_write_path_avoids_full_signature_rebuild(monkeypatch
     def fail_signature(_records):
         raise AssertionError("canonical append should not rebuild the full event signature")
 
-    monkeypatch.setattr("fantasy_simulator.world_event_index._event_signature", fail_signature)
+    monkeypatch.setattr("fantasy_simulator.world_event.index._event_signature", fail_signature)
 
     stored = record_world_event(
         record=WorldEventRecord(record_id="evt_2", kind="journey", location_id="loc_1"),

@@ -6,7 +6,7 @@ from fantasy_simulator.character import Character
 from fantasy_simulator.event_models import WorldEventRecord
 from fantasy_simulator.event_rendering import render_event_record
 from fantasy_simulator.events import EventSystem
-from fantasy_simulator.events_activity import resolve_journey_event
+from fantasy_simulator.events.activity import resolve_journey_event
 from fantasy_simulator.i18n import get_locale, set_locale
 from fantasy_simulator.persistence.save_load import load_simulation, save_simulation
 from fantasy_simulator.simulator import Simulator

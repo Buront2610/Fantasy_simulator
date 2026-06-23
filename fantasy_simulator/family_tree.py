@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Iterable
 
-from .character_founder_background import render_founder_summary
+from .character_model.founder_background import render_founder_summary
 from .i18n import tr, tr_term
 
 

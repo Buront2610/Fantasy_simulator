@@ -18,7 +18,7 @@ from fantasy_simulator.ui.screens import (
 from fantasy_simulator.ui.ui_context import UIContext
 from fantasy_simulator.world import World
 from fantasy_simulator.adventure import AdventureRun, POLICY_TREASURE
-from tests.ui_test_doubles import RecordingRenderBackend, ScriptedInputBackend
+from tests.support.ui_doubles import RecordingRenderBackend, ScriptedInputBackend
 
 
 class _NoopInput:

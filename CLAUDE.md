@@ -55,14 +55,31 @@ fantasy_simulator/
 │   ├── event_recorder.py            → event_records 記録
 │   ├── adventure_coordinator.py     → 冒険進行調停
 │   └── queries.py                   → summary / story / report 参照
-├── events.py                        → イベント生成・解決
-├── adventure.py                     → 複数ステップの冒険進行と保留選択
-├── world.py                         → ワールド、LocationState、world memory、terrain連携
-├── terrain.py                       → TerrainMap / Site / RouteEdge / AtlasLayout
-├── character.py                     → キャラクターモデル（能力値、スキル、関係性）
-├── character_creator.py             → キャラクター生成（ランダム、テンプレート、対話式）
-├── reports.py                       → 月報・年報のビュー生成
-├── rumor.py                         → 噂の生成・ライフサイクル
+├── events/                          → イベント生成・解決
+├── adventure/                       → 複数ステップの冒険進行と保留選択
+├── world.py                         → World 公開ファサード
+├── world_actor/                     → キャラクター/冒険 index と actor-facing World mixin
+├── world_arc/                       → 長期 world arc モデルと管理
+├── world_calendar/                  → カレンダー解決・World mixin
+├── world_core/                      → World 共有 record / protocol
+├── world_dynamics/                  → world pressure・動的変化・era runtime
+├── world_event/                     → event history / log / state mutation helper
+├── world_history/                   → 長期履歴 retention
+├── world_language/                  → 言語進化・World mixin
+├── world_location/                  → LocationState・lookup・reference・structure helper
+├── world_map/                       → renderer 非依存の map view model / ASCII / local map 生成
+├── world_memory/                    → location memory / conflict memory mixin
+├── world_persistence/               → World serialization / hydration / terrain persistence
+├── world_state/                     → location-state decay / propagation
+├── world_structure/                 → load normalization / reference repair / structure rebuild
+├── world_topology/                  → route graph / topology query / runtime restore
+├── terrain/                         → TerrainMap / Site / RouteEdge / AtlasLayout
+├── character.py                     → Character 公開ファサード
+├── character_model/                 → 値オブジェクト・性格・表示・シリアライズ補助
+├── character_creator/               → キャラクター生成（ランダム、テンプレート、対話式）
+├── combat_system/                   → 戦闘解決・戦闘ログ read model
+├── reports/                         → 月報・年報のビュー生成
+├── rumor/                           → 噂の生成・ライフサイクル
 ├── narrative/
 │   ├── context.py                   → 最小 NarrativeContext
 │   ├── template_history.py          → テンプレート冷却履歴
@@ -86,6 +103,9 @@ fantasy_simulator/
     ├── engine.py                    → ローカライゼーションエンジン（tr, tr_term, set_locale）
     ├── ja.py                        → 日本語テキスト・用語
     └── en.py                        → 英語テキスト・用語
+tests/
+├── test_*.py                        → 各モジュールのテスト
+└── support/                         → 共有テスト支援コード
 ```
 
 ## Coding Conventions
@@ -95,7 +115,8 @@ fantasy_simulator/
 - **インポート順**: 標準ライブラリ → サードパーティ → ローカル
 - **ローカライゼーション**: ユーザー向け文字列は `i18n/engine.py` の `tr()` / `tr_term()` 経由で取得。テキストは `i18n/ja.py` / `i18n/en.py` に分離。ハードコードしない
 - **シリアライゼーション**: `to_dict()` / `from_dict()` パターンでJSON化
-- **テスト**: 各モジュールに対応するテストファイルが `tests/test_<module>.py` に存在。共有fixtureは各テストファイル内で定義（conftest.pyは現在sys.path設定のみ）
+- **テスト**: 各モジュールに対応するテストファイルが `tests/test_<module>.py` に存在。共有支援コードは `tests/support/` に置く（conftest.pyは現在sys.path設定のみ）
+- **互換 shim**: 旧ルート直下モジュール名は再エクスポートとして残す。新規実装・新規 import は `character_model/`, `combat_system/`, `world_map/`, `world_*` など責務別パッケージを優先する
 
 ## NEVER
 
@@ -110,6 +131,7 @@ fantasy_simulator/
 
 - 新しい機能やバグ修正には対応するテストを追加する
 - テストは `tests/test_<module>.py` の命名規則に従う
+- 複数テストで使う支援コードは `tests/support/` に置く
 - テストは独立して実行可能であること（順序依存しない）
 - モック使用時はパッチ対象を正確に指定する（`unittest.mock.patch`）
 - ローカルで `flake8` + `pytest` を通してからコミットする（CIと同一コマンド）

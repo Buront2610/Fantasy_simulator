@@ -6,7 +6,7 @@
 
 - Static bundle data lives in `WorldDefinition.languages` and `language_communities`.
 - Runtime drift lives in `language_runtime_states` and `language_evolution_history`.
-- `World` owns persisted state, while `fantasy_simulator/world_language.py` coordinates yearly language updates and debug views.
+- `World` owns persisted state, while `fantasy_simulator/world_language/` coordinates yearly language updates and debug views.
 
 ## Community Fallback Contract
 

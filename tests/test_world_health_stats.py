@@ -10,7 +10,7 @@ from fantasy_simulator.simulator import Simulator
 from fantasy_simulator.testing.world_metrics import collect_world_health_metrics, write_world_health_report
 from fantasy_simulator.world import World
 
-from .balance_expectations import (
+from tests.support.balance_expectations import (
     MIN_ALIVE_AFTER_HEALTH_RUN,
     MIN_TOTAL_IMMIGRATIONS,
     MIN_TOTAL_COMBAT_EVENTS,

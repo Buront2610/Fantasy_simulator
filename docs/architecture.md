@@ -13,13 +13,19 @@ form that tests can enforce.
 - `fantasy_simulator/ui/`: rendering, input abstraction, presenters, view
   models, and CLI screen orchestration.
 - `fantasy_simulator/persistence/`: save/load and schema migration.
-- `fantasy_simulator/world.py`, `events.py`, `character.py`, `terrain.py`,
-  `reports.py`, `rumor.py`: domain and reporting primitives shared by higher
-  layers.
+  - `fantasy_simulator/world.py`, `character.py`, `events/`, `adventure/`,
+    `terrain/`, `reports/`, and `rumor/`: public facades and domain/reporting
+    primitives shared by higher layers.
+  - `character_model/`, `combat_system/`, `world_map/`, and the split
+    `world_*` packages hold the narrower implementation surfaces behind those
+    public facades.
 - `fantasy_simulator/world_change/`: headless PR-K command, state machine,
   event-adapter, changeset, and reducer primitives for dynamic world changes.
 - `fantasy_simulator/observation/`: headless read-model projections for reports,
   atlas/region/detail views, story, and rumor surfaces.
+- `fantasy_simulator/world_map/`: headless map read models, ASCII projection,
+  and local map generation. UI modules render these payloads but should not own
+  the projection logic.
 
 ## Dependency Rules
 
@@ -29,6 +35,8 @@ form that tests can enforce.
   `fantasy_simulator/main.py` is the CLI composition-root exception.
 - `world_change/` must not import `ui/`, `persistence/`, Rich, or Textual.
 - `observation/` must not import `ui/`, `persistence/`, Rich, or Textual.
+- `world_map/` must not import `ui/`, `simulation/`, `persistence/`, Rich, or
+  Textual.
 - Core UI modules (`input_backend.py`, `render_backend.py`, `ui_context.py`,
   `ui_helpers.py`, `presenters.py`, `view_models.py`, `map_renderer.py`,
   `atlas_renderer.py`) must not import `simulation/` or `persistence/`.
@@ -100,6 +108,10 @@ form that tests can enforce.
 - `docs/session_handoffs/` is for concise repo-local handoffs; keep entries
   short and factual, anchored to the template, and avoid carrying more than
   the latest relevant dated note.
+- Legacy root modules such as `character_domain.py`, `combat.py`,
+  `combat_log_index.py`, and `world_*_api.py` are compatibility shims after the
+  package split. New code should import from the owning package unless it is
+  deliberately preserving a public compatibility path.
 - `scripts/quality_gate.py` provides `minimal`, `standard`, `playtest`,
   `strict`, and `exhaustive` verification profiles for agent workflows. The `standard` profile is
   the routine guardrail suite for architecture constraints, quality-gate
@@ -109,10 +121,9 @@ form that tests can enforce.
   and playtest bands without a full-suite pytest pre-pass, so it
   remains suitable for local agent turns with bounded command time. The
   `exhaustive` profile runs static checks plus one full pytest pass for final
-  release-style validation. The newly split `world_*` API/facade/helper modules
-  belong in the focused mypy target list when they become maintenance surfaces,
-  unless `scripts/quality_gate.py` records an explicit temporary exclusion
-  reason.
+  release-style validation. Newly split maintenance packages belong in the
+  focused mypy target list once they become owned surfaces, unless
+  `scripts/quality_gate.py` records an explicit temporary exclusion reason.
 - `scripts/architecture_guard.py` plus `architecture_guard.json` define the
   machine-checkable architecture fitness rules for CI/CD: dependency
   boundaries, headless-domain I/O bans, deterministic reducer imports, and

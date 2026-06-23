@@ -14,7 +14,7 @@ from fantasy_simulator.reports import generate_monthly_report, generate_yearly_r
 from fantasy_simulator.simulator import Simulator
 from fantasy_simulator.world import World
 from fantasy_simulator.world_change import RouteUpdate, WorldChangeSet, apply_world_change_set
-from fantasy_simulator.world_location_state import clamp_state
+from fantasy_simulator.world_location.state import clamp_state
 
 
 def _event_payloads(records: list[WorldEventRecord]) -> list[dict]:

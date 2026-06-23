@@ -14,13 +14,13 @@ migration / load boundary で canonical fields へ吸収し、現行保存には
 - 旧 payload の exact projection は捨て、旧データは `description` / actor / kind / date
   など現行 record fields へ持ち上げる。
 
-## 2) Import surface (`events.py` vs `event_models.py`)
+## 2) Import surface (`events/` vs `event_models.py`)
 
-**Decision**: 新規実装は `event_models.py` を正規参照とし、`events.py` は互換 facade として維持する。
+**Decision**: 新規実装は `event_models.py` を正規参照とし、`events/` は互換 facade として維持する。
 
 **ルール**:
 - 新規の型参照 (`EventResult`, `WorldEventRecord`, `generate_record_id`) は `event_models.py` を直接 import する。
-- 既存コード・外部利用者向けに `events.py` の re-export (`__all__`) は維持する。
+- 既存コード・外部利用者向けに `fantasy_simulator.events` の re-export (`__all__`) は維持する。
 
 ## 3) Contract style (`normalize` vs `fail-fast`)
 

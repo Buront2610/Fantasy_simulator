@@ -6,7 +6,7 @@ from copy import deepcopy
 from typing import Any, Iterable
 
 from fantasy_simulator.event_models import WorldEventRecord
-from fantasy_simulator.world_event_index import location_ids_for_record
+from fantasy_simulator.world_event.index import location_ids_for_record
 
 
 def as_string(value: Any) -> str | None:

@@ -4,15 +4,15 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..combat import resolve_combat
+from ..combat_system.resolution import resolve_combat
 from ..event_models import LOCATION_TAG_PREFIX, WorldEventRecord, generate_record_id
 from ..event_rendering import render_event_record
 from ..observation import build_war_map_projection
 from ..rumor import generate_tracked_rumor_from_world_change
 from ..terrain import BIOME_TYPES
-from .. import world_language_facade
-from ..world_arcs import active_world_arcs, attach_record_to_arc, last_arc_event_id
-from ..world_location_state import clamp_state
+from ..world_language import facade as world_language_facade
+from ..world_arc.management import active_world_arcs, attach_record_to_arc, last_arc_event_id
+from ..world_location.state import clamp_state
 
 NATURAL_ERA_KEYS = (
     "age_of_reckoning",

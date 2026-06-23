@@ -13,39 +13,39 @@ from .rule_override_resolution import (
     clone_default_event_impact_rules,
     clone_default_propagation_rules,
 )
-from .world_calendar_api import WorldCalendarMixin
-from .world_event_api import WorldEventMixin
-from .world_event_log_api import WorldEventLogMixin
-from .world_language_api import WorldLanguageMixin
-from .world_actor_api import WorldActorMixin
-from .world_era_api import WorldEraMixin
-from .world_memory_api import WorldConflictMixin, WorldLocationLookupMixin, WorldMemoryMixin
-from .world_structure_api import WorldStructureMixin
-from .world_topology_api import WorldTopologyMixin
-from .world_bundle_transition import (
+from .world_calendar.api import WorldCalendarMixin
+from .world_event.api import WorldEventMixin
+from .world_event.log_api import WorldEventLogMixin
+from .world_language.api import WorldLanguageMixin
+from .world_actor.api import WorldActorMixin
+from .world_dynamics.era_api import WorldEraMixin
+from .world_memory.api import WorldConflictMixin, WorldLocationLookupMixin, WorldMemoryMixin
+from .world_structure.api import WorldStructureMixin
+from .world_topology.api import WorldTopologyMixin
+from .world_structure.bundle_transition import (
     apply_setting_bundle as apply_world_setting_bundle,
     set_setting_bundle_metadata,
     topology_signature,
 )
-from .world_location_references import LocationReferenceResolver
+from .world_location.references import LocationReferenceResolver
 from .world_persistence import (
     hydrate_world_state,
     serialize_world_state,
 )
-from .world_route_graph import (
+from .world_topology.route_graph import (
     RouteCollection,
     replace_routes,
 )
-from .world_event_index import EventHistoryIndex
-from .world_state_runtime import (
+from .world_event.index import EventHistoryIndex
+from .world_state.runtime import (
     decay_world_state,
     propagate_world_state,
 )
-from .world_location_state import (
+from .world_location.state import (
     LocationState,
     clamp_state as _clamp_state,
 )
-from .world_records import CalendarChangeRecord, MemorialRecord
+from .world_core.records import CalendarChangeRecord, MemorialRecord
 from .content.setting_bundle import (
     CalendarDefinition,
     SettingBundle,
@@ -262,7 +262,7 @@ class World(
         This is a backward-compatible wrapper around the renderer-agnostic
         map snapshot and stable ASCII renderer.
         """
-        from .map_ascii_renderer import render_world_map_ascii
+        from .world_map.ascii_renderer import render_world_map_ascii
 
         return render_world_map_ascii(self, highlight_location)
 

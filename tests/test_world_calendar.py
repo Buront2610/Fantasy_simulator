@@ -7,7 +7,7 @@ from fantasy_simulator.world_calendar import (
     apply_calendar_definition_history,
     calendar_definition_for_date_ref,
 )
-from fantasy_simulator import world_calendar_facade
+from fantasy_simulator.world_calendar import facade as world_calendar_facade
 
 
 def test_calendar_definition_for_date_ref_uses_latest_history_before_target_date() -> None:

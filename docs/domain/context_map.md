@@ -17,6 +17,7 @@ replacing `docs/architecture.md`.
 | Event History | Owns canonical `WorldEventRecord` and adapters. | Makes changes durable and queryable. |
 | Simulation Timeline | Advances time and schedules possible commands. | Initiates changes without owning rules. |
 | Observation | Builds projections and view models. | Reads changes without mutating state. |
+| World Map Projection | Builds renderer-independent map payloads and local map cues. | Surfaces changes spatially without owning UI flows. |
 | Narrative / Rumor | Turns history and memory into rumor/story text. | Consumes projections and records. |
 | Persistence / Migration | Saves snapshots and migrates older data. | Preserves compatibility. |
 | UI Application | Handles CLI/Rich/future Textual orchestration. | Renders view models. |
@@ -45,6 +46,7 @@ Event History
 
 World Runtime + Event History
   -> Observation projections
+  -> World Map projections
   -> ViewModels
   -> UI / report / rumor / story rendering
 
@@ -79,6 +81,8 @@ persistence, concrete bundle loading, and developer tools are adapters.
 - World Change may emit domain events and canonical records.
 - Reducers may apply prepared `ChangeSet` values to World Runtime.
 - Observation may read World Runtime and Event History.
+- World Map Projection may read World Runtime and Event History to build
+  renderer-independent map payloads.
 - UI/renderers may read ViewModels.
 - Persistence may snapshot World Runtime and Event History.
 - Compatibility adapters may project canonical records for old APIs.
@@ -89,6 +93,8 @@ persistence, concrete bundle loading, and developer tools are adapters.
 - World Change must not call save/load directly.
 - World Change reducers must not draw random numbers.
 - Observation must not mutate World Runtime.
+- World Map Projection must not import UI, simulation orchestration, or
+  persistence adapters.
 - UI must not create new PR-K reports by directly reading `World.event_log`.
 - UI must not use `events_by_type()` as a new primary read path.
 - Persistence must not import UI.
@@ -141,9 +147,15 @@ fantasy_simulator/observation/
   war_map_projection.py
   era_timeline_projection.py
   world_change_report_projection.py
+
+fantasy_simulator/world_map/
+  view_models.py
+  ascii_renderer.py
+  local_generation.py
+  place_profile.py
 ```
 
-Existing modules such as `reports.py`, `rumor.py`, `ui/view_models.py`, and
+Existing modules such as `reports/`, `rumor/`, `ui/view_models.py`, and
 `ui/presenters.py` may remain integration points while boundaries settle.
 
 ## C4-Lite Summary

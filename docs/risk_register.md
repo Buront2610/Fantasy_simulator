@@ -8,7 +8,7 @@ work and its serialization guardrails.
 - RR-001 route graph contract.
   Status: completed in the current branch worktree.
   Evidence: explicit empty bundle route graphs remain disconnected after
-  save/load; route adjacency is owned by `world_route_graph.py`; serialized
+  save/load; route adjacency is owned by `world_topology/route_graph.py`; serialized
   topology rejects duplicate route IDs, duplicate route pairs, malformed route
   scalars, and route overlays whose endpoints disagree with the canonical
   graph.

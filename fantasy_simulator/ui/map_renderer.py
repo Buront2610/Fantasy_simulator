@@ -1,7 +1,7 @@
 """
 map_renderer.py - Compatibility facade for map rendering.
 
-The renderer-agnostic map snapshots live in ``map_view_models``.  The
+The renderer-agnostic map snapshots live in ``world_map.view_models``.  The
 world/region observation renderers live in ``map_overview_renderer`` and
 single-site detail rendering lives in ``map_location_renderer``.  This module
 keeps the historic import surface stable and retains the legacy ASCII grid
@@ -10,8 +10,8 @@ renderer used by ``world.render_map()``.
 
 from __future__ import annotations
 
-from ..map_ascii_renderer import render_map_ascii
-from ..map_view_models import (
+from ..world_map.ascii_renderer import render_map_ascii
+from ..world_map.view_models import (
     MapCellInfo,
     MapRenderInfo,
     RouteRenderInfo,

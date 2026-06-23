@@ -96,9 +96,9 @@ def test_si5_dead_chars_not_in_active_adventures(world_fixture: World):
 def test_phase1_no_legacy_character_location_references():
     project_root = Path(__file__).resolve().parents[1]
     source_files = [
-        project_root / "fantasy_simulator" / "adventure.py",
+        project_root / "fantasy_simulator" / "adventure" / "__init__.py",
         project_root / "fantasy_simulator" / "character.py",
-        project_root / "fantasy_simulator" / "events.py",
+        project_root / "fantasy_simulator" / "events" / "__init__.py",
         project_root / "main.py",
         project_root / "fantasy_simulator" / "persistence" / "save_load.py",
         project_root / "fantasy_simulator" / "ui" / "screens.py",

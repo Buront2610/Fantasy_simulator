@@ -17,7 +17,7 @@ from .migration_context import (
     site_tags_by_location_id,
 )
 from .migration_event_records import canonicalize_legacy_event_adapters
-from ..world_arcs import reconstruct_world_arcs_from_records
+from ..world_arc.management import reconstruct_world_arcs_from_records
 
 
 def migrate_v0_to_v1(data: Dict[str, Any]) -> Dict[str, Any]:

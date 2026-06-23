@@ -175,18 +175,32 @@ fantasy_simulator/          # Main package
   __main__.py               # python -m fantasy_simulator entry point
   main.py                   # CLI logic
   character.py              # Core character model
-  character_creator.py      # Random, template, and interactive character creation
+  character_creator/        # Random, template, and interactive character creation
+  character_model/          # Character value objects, serialization, personality, and presentation helpers
+  combat_system/            # Combat resolution and combat-log read models
   world.py                  # World state, locations, memory, terrain hooks, serialization
-  terrain.py                # Terrain / site / route / atlas layout models
+  terrain/                  # Terrain / site / route / atlas layout models
   event_models.py           # Canonical EventResult / WorldEventRecord contracts
-  events.py                 # Event generation facade (re-exports event contracts)
-  world_event_log.py        # Compatibility event-log projection helpers
-  world_event_state.py      # Event-driven world-state mutation helpers
-  world_state_propagation.py # Location-state decay / propagation helpers
-  adventure.py              # Multi-step adventure progression
+  events/                   # Event generation facade (re-exports event contracts)
+  world_event/              # Event history indexes, log projections, and state mutation helpers
+  world_location/           # Location state, lookup, reference, and structure helpers
+  world_calendar/           # Calendar resolution, facade, and World mixin helpers
+  world_core/               # Shared world records and structural protocols
+  world_dynamics/           # World pressure, dynamic mutation, and transient era runtime helpers
+  world_language/           # Language evolution, facade, and World mixin helpers
+  world_topology/           # Route graph, topology queries, runtime, and restore helpers
+  world_persistence/        # World serialization, hydration, and terrain persistence helpers
+  world_actor/              # Character/adventure indexing and actor-facing World mixin helpers
+  world_arc/                # Long-running world arc model and management helpers
+  world_history/            # Long-run history retention helpers
+  world_map/                # Headless map view models, ASCII rendering, and local map generation
+  world_memory/             # Location memory helpers and memory/conflict World mixins
+  world_state/              # Location-state decay and propagation helpers
+  world_structure/          # World structure rebuild, load normalization, and reference repair helpers
+  adventure/                # Multi-step adventure progression
   simulator.py              # Backward-compatible import path (delegates to simulation/)
-  reports.py                # Monthly and yearly report view generation
-  rumor.py                  # Rumor generation and lifecycle helpers
+  reports/                  # Monthly and yearly report view generation
+  rumor/                    # Rumor generation and lifecycle helpers
   simulation/               # Simulator split into single-responsibility modules
     __init__.py             # Re-exports Simulator
     engine.py               # Core Simulator class (orchestration, loops, serialization)
@@ -226,6 +240,7 @@ fantasy_simulator/          # Main package
     en.py                   # English text and terms
 main.py                     # Compatibility wrapper (delegates to package)
 tests/                      # Automated tests
+  support/                  # Shared test support utilities
 docs/
   implementation_plan.md    # Implementation roadmap and phase order
   architecture.md           # Current architectural guardrails and canonical data rules

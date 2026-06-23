@@ -25,7 +25,7 @@ from fantasy_simulator.ui.map_renderer import (
 )
 from fantasy_simulator.ui.view_models import build_monthly_report_card_view, build_world_dashboard_view
 from fantasy_simulator.world import World
-from tests.harness_test_utils import build_seeded_world, content_lines
+from tests.support.harness import build_seeded_world, content_lines
 
 
 def _extract_section(text: str, header: str) -> list[str]:

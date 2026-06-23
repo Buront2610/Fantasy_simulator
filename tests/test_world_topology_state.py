@@ -10,7 +10,7 @@ from fantasy_simulator.content.setting_bundle import (
 )
 from fantasy_simulator.terrain import RouteEdge
 from fantasy_simulator.world import World
-from fantasy_simulator.world_topology_state import (
+from fantasy_simulator.world_topology.state import (
     overlay_serialized_route_state,
     restore_serialized_topology,
 )

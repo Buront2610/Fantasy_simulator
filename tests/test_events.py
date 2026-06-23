@@ -8,9 +8,9 @@ import pytest
 from fantasy_simulator.character import Character
 from fantasy_simulator.content.setting_bundle import RaceDefinition, SettingBundle, SiteSeedDefinition, WorldDefinition
 from fantasy_simulator.events import EventResult, EventSystem
-from fantasy_simulator import events_selection
-from fantasy_simulator.events_family import resolve_birth_event
-from fantasy_simulator.events_relationships import resolve_relationship_turning_point_event
+from fantasy_simulator.events import selection as events_selection
+from fantasy_simulator.events.family import resolve_birth_event
+from fantasy_simulator.events.relationships import resolve_relationship_turning_point_event
 from fantasy_simulator.event_models import WorldEventRecord
 from fantasy_simulator.event_rendering import render_event_record
 from fantasy_simulator.i18n import get_locale, set_locale

@@ -9,11 +9,16 @@ Fantasy Simulator: Python CLI世界シミュレーション（Aethoria）。Pyth
 - **エントリーポイント**: `python -m fantasy_simulator` → `fantasy_simulator/main.py`（互換: `python main.py`）
 - **シミュレーション**: `simulation/engine.py` が月次進行を統括し、`simulation/` 配下へ責務分割済み。
   `simulator.py` は後方互換ラッパー
-- **イベント/冒険**: `events.py` がイベント生成、`adventure.py` が冒険進行と保留選択を担当
+- **キャラクター**: `character.py` は公開 `Character` ファサード。値オブジェクト・性格・表示・シリアライズ補助は
+  `character_model/`、生成フローは `character_creator/` に置く
+- **戦闘**: 戦闘解決と戦闘ログ read model は `combat_system/`。`combat.py` / `combat_log_index.py` は互換ラッパー
+- **イベント/冒険**: `events/` がイベント生成、`adventure/` が冒険進行と保留選択を担当
 - **ワールドモデル**: `world.py` が `LocationState`・world memory・state propagation を管理。
-  `terrain.py` が terrain/site/route/atlas layout を担当
+  world mixin / helper は `world_*` パッケージ群、`terrain/` が terrain/site/route/atlas layout を担当
 - **UI**: `ui/screens.py` が画面制御、`ui/map_renderer.py` / `ui/atlas_renderer.py` が地図描画、
   `ui/presenters.py` / `ui/view_models.py` が表示整形を担当
+- **地図投影**: renderer 非依存の地図 view model / ASCII / local map 生成は `world_map/`。UI側の
+  `ui/map_renderer.py` / `ui/map_view_models.py` は互換ファサード
 - **永続化**: `persistence/save_load.py`（JSON）、`persistence/migrations.py`（現行 schema v9）
 - **叙述補助**: `narrative/context.py` と `narrative/template_history.py` が最小 NarrativeContext を提供
 
@@ -27,14 +32,31 @@ Fantasy_simulator/
 │   ├── __main__.py                      # python -m fantasy_simulator
 │   ├── main.py                          # CLIメニューループ本体
 │   ├── character.py                     # Character クラス
-│   ├── character_creator.py             # キャラクター生成
+│   ├── character_creator/               # キャラクター生成
+│   ├── character_model/                 # Character 値オブジェクト・性格・表示・シリアライズ補助
+│   ├── combat_system/                   # 戦闘解決・戦闘ログ read model
 │   ├── world.py                         # World クラス、LocationState
-│   ├── terrain.py                       # TerrainMap / Site / RouteEdge / AtlasLayout
+│   ├── terrain/                         # TerrainMap / Site / RouteEdge / AtlasLayout
 │   ├── simulator.py                     # Simulator クラス（年次ループ）
-│   ├── events.py                        # EventSystem クラス
-│   ├── adventure.py                     # Adventure クラス
-│   ├── reports.py                       # 月報・年報生成
-│   ├── rumor.py                         # 噂システム
+│   ├── events/                          # EventSystem クラス
+│   ├── adventure/                       # Adventure クラスと進行補助
+│   ├── reports/                         # 月報・年報生成
+│   ├── rumor/                           # 噂システム
+│   ├── world_actor/                     # キャラクター/冒険 index と actor-facing World mixin
+│   ├── world_arc/                       # 長期 world arc モデルと管理
+│   ├── world_calendar/                  # カレンダー解決・World mixin
+│   ├── world_core/                      # World 共有 record / protocol
+│   ├── world_dynamics/                  # world pressure・動的変化・era runtime
+│   ├── world_event/                     # event history / log / state mutation helper
+│   ├── world_history/                   # 長期履歴 retention
+│   ├── world_language/                  # 言語進化・World mixin
+│   ├── world_location/                  # LocationState・lookup・reference・structure helper
+│   ├── world_map/                       # renderer 非依存の map view model / ASCII / local map 生成
+│   ├── world_memory/                    # location memory / conflict memory mixin
+│   ├── world_persistence/               # World serialization / hydration / terrain persistence
+│   ├── world_state/                     # location-state decay / propagation
+│   ├── world_structure/                 # load normalization / reference repair / structure rebuild
+│   ├── world_topology/                  # route graph / topology query / runtime restore
 │   ├── narrative/
 │   │   ├── context.py                   # 最小 NarrativeContext
 │   │   ├── template_history.py          # テンプレート冷却履歴
@@ -66,7 +88,8 @@ Fantasy_simulator/
 │       ├── ja.py                        # 日本語データ
 │       └── en.py                        # 英語データ
 ├── tests/
-│   └── test_*.py                        # 各モジュールのテスト
+│   ├── test_*.py                        # 各モジュールのテスト
+│   └── support/                         # 共有テスト支援コード
 ├── .github/workflows/
 │   └── test.yml                         # CI設定
 ├── CLAUDE.md                            # Claude Code設定
@@ -79,7 +102,8 @@ Fantasy_simulator/
 - 行の最大長: 120文字
 - ユーザー向け文字列は `tr()` / `tr_term()` 経由（i18n）
 - シリアライズは `to_dict()` / `from_dict()` パターン
-- テストは `tests/test_<module>.py`
+- テストは `tests/test_<module>.py`。共有支援コードは `tests/support/`
+- ルート直下の旧モジュール名は互換 shim として残す。新規実装・新規 import は責務別パッケージを優先する
 
 ## Design Conventions（設計規約）
 
@@ -145,7 +169,7 @@ python scripts/quality_gate.py exhaustive
 - `content/world_data.py` のゲームバランスに関わる値
 - `character.py` のシリアライゼーション構造
 - `simulation/engine.py` / `simulation/timeline.py` の進行ループ変更
-- `world.py` / `terrain.py` の保存互換や world representation に関わる変更
+- `world.py` / `terrain/` の保存互換や world representation に関わる変更
 
 ### 変更禁止（確認必須）
 - `.github/workflows/` CI設定

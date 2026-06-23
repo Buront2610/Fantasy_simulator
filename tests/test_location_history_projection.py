@@ -5,7 +5,7 @@ from fantasy_simulator.i18n import get_locale, set_locale
 from fantasy_simulator.observation import build_location_history_projection
 from fantasy_simulator.ui.map_renderer import build_map_info
 from fantasy_simulator.world import World
-from fantasy_simulator.world_location_state import clamp_state
+from fantasy_simulator.world_location.state import clamp_state
 
 
 def test_location_history_projection_reports_current_name_without_history() -> None:

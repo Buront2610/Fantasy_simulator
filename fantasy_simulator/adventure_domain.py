@@ -1,8 +1,8 @@
-"""Compatibility facade for adventure domain helpers."""
+"""Backward-compatible adventure domain facade imports."""
 
 from __future__ import annotations
 
-from . import adventure_exports as _adventure_exports
-from .adventure_exports import *  # noqa: F401,F403
+from .adventure import domain as _adventure_domain
+from .adventure.domain import *  # noqa: F401,F403
 
-__all__ = _adventure_exports.__all__
+__all__ = _adventure_domain.__all__

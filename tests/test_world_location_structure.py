@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from fantasy_simulator.world import World
-from fantasy_simulator.world_location_structure import (
+from fantasy_simulator.world_location.structure import (
     copy_location_runtime_state,
     default_location_entries,
     grid_matches_site_seeds,

@@ -135,12 +135,27 @@ def test_exhaustive_profile_runs_static_checks_and_full_pytest():
 def test_pyproject_includes_type_gate_scaffolding():
     assert "[tool.mypy]" in PYPROJECT_TEXT
     assert 'follow_imports = "silent"' in PYPROJECT_TEXT
+    assert '"fantasy_simulator/character_model"' in PYPROJECT_TEXT
+    assert '"fantasy_simulator/combat_system"' in PYPROJECT_TEXT
     assert '"fantasy_simulator/content"' in PYPROJECT_TEXT
     assert '"fantasy_simulator/ids.py"' in PYPROJECT_TEXT
     assert '"fantasy_simulator/observation"' in PYPROJECT_TEXT
+    assert '"fantasy_simulator/terrain"' in PYPROJECT_TEXT
+    assert '"fantasy_simulator/world_event"' in PYPROJECT_TEXT
+    assert '"fantasy_simulator/world_location"' in PYPROJECT_TEXT
     assert '"fantasy_simulator/world_change"' in PYPROJECT_TEXT
-    assert '"fantasy_simulator/world_actor_api.py"' in PYPROJECT_TEXT
-    assert '"fantasy_simulator/world_topology_queries.py"' in PYPROJECT_TEXT
+    assert '"fantasy_simulator/world_actor"' in PYPROJECT_TEXT
+    assert '"fantasy_simulator/world_arc"' in PYPROJECT_TEXT
+    assert '"fantasy_simulator/world_calendar"' in PYPROJECT_TEXT
+    assert '"fantasy_simulator/world_core"' in PYPROJECT_TEXT
+    assert '"fantasy_simulator/world_dynamics"' in PYPROJECT_TEXT
+    assert '"fantasy_simulator/world_language"' in PYPROJECT_TEXT
+    assert '"fantasy_simulator/world_persistence"' in PYPROJECT_TEXT
+    assert '"fantasy_simulator/world_map"' in PYPROJECT_TEXT
+    assert '"fantasy_simulator/world_history"' in PYPROJECT_TEXT
+    assert '"fantasy_simulator/world_state"' in PYPROJECT_TEXT
+    assert '"fantasy_simulator/world_structure"' in PYPROJECT_TEXT
+    assert '"fantasy_simulator/world_topology"' in PYPROJECT_TEXT
     assert '"fantasy_simulator/worldgen"' in PYPROJECT_TEXT
     assert '"tools/worldgen_poc"' in PYPROJECT_TEXT
     assert "check_untyped_defs = true" in PYPROJECT_TEXT
@@ -162,6 +177,71 @@ def test_world_typecheck_targets_are_complete_or_explicitly_excluded():
         and Path(target).name.startswith("world_")
         and Path(target).suffix == ".py"
     }
+    if "fantasy_simulator/world_event" in TYPECHECK_TARGETS:
+        covered |= {
+            path.as_posix().removeprefix(PROJECT_ROOT.as_posix() + "/")
+            for path in (PROJECT_ROOT / "fantasy_simulator").glob("world_event_*.py")
+        }
+    if "fantasy_simulator/world_actor" in TYPECHECK_TARGETS:
+        covered |= {
+            path.as_posix().removeprefix(PROJECT_ROOT.as_posix() + "/")
+            for path in (PROJECT_ROOT / "fantasy_simulator").glob("world_actor_*.py")
+        }
+    if "fantasy_simulator/world_arc" in TYPECHECK_TARGETS:
+        covered.add("fantasy_simulator/world_arcs.py")
+    if "fantasy_simulator/world_calendar" in TYPECHECK_TARGETS:
+        covered |= {
+            path.as_posix().removeprefix(PROJECT_ROOT.as_posix() + "/")
+            for path in (PROJECT_ROOT / "fantasy_simulator").glob("world_calendar_*.py")
+        }
+    if "fantasy_simulator/world_core" in TYPECHECK_TARGETS:
+        covered.update({
+            "fantasy_simulator/world_protocols.py",
+            "fantasy_simulator/world_records.py",
+        })
+    if "fantasy_simulator/world_dynamics" in TYPECHECK_TARGETS:
+        covered.update({
+            "fantasy_simulator/world_conflict_pressure.py",
+            "fantasy_simulator/world_dynamic_changes.py",
+            "fantasy_simulator/world_era_api.py",
+        })
+    if "fantasy_simulator/world_location" in TYPECHECK_TARGETS:
+        covered |= {
+            path.as_posix().removeprefix(PROJECT_ROOT.as_posix() + "/")
+            for path in (PROJECT_ROOT / "fantasy_simulator").glob("world_location_*.py")
+        }
+    if "fantasy_simulator/world_history" in TYPECHECK_TARGETS:
+        covered.add("fantasy_simulator/world_history_retention.py")
+    if "fantasy_simulator/world_memory" in TYPECHECK_TARGETS:
+        covered.add("fantasy_simulator/world_memory_api.py")
+    if "fantasy_simulator/world_persistence" in TYPECHECK_TARGETS:
+        covered |= {
+            path.as_posix().removeprefix(PROJECT_ROOT.as_posix() + "/")
+            for path in (PROJECT_ROOT / "fantasy_simulator").glob("world_persistence_*.py")
+        }
+    if "fantasy_simulator/world_state" in TYPECHECK_TARGETS:
+        covered |= {
+            path.as_posix().removeprefix(PROJECT_ROOT.as_posix() + "/")
+            for path in (PROJECT_ROOT / "fantasy_simulator").glob("world_state_*.py")
+        }
+    if "fantasy_simulator/world_structure" in TYPECHECK_TARGETS:
+        covered.update({
+            "fantasy_simulator/world_bundle_transition.py",
+            "fantasy_simulator/world_load_normalizer.py",
+            "fantasy_simulator/world_reference_repair.py",
+            "fantasy_simulator/world_structure_api.py",
+        })
+    if "fantasy_simulator/world_language" in TYPECHECK_TARGETS:
+        covered |= {
+            path.as_posix().removeprefix(PROJECT_ROOT.as_posix() + "/")
+            for path in (PROJECT_ROOT / "fantasy_simulator").glob("world_language_*.py")
+        }
+    if "fantasy_simulator/world_topology" in TYPECHECK_TARGETS:
+        covered |= {
+            path.as_posix().removeprefix(PROJECT_ROOT.as_posix() + "/")
+            for path in (PROJECT_ROOT / "fantasy_simulator").glob("world_topology_*.py")
+        }
+        covered.add("fantasy_simulator/world_route_graph.py")
     excluded = set(WORLD_TYPECHECK_EXCLUSIONS)
 
     assert covered | excluded == world_modules

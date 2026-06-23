@@ -1,7 +1,7 @@
 """Canonical event data models and ID generation helpers.
 
 This module isolates pure data contracts (DbC-friendly) from event-generation
-side effects implemented in ``events.py``.
+side effects implemented in ``events/``.
 
 Contract policy:
 - structural requirements may fail fast (e.g. missing required keys)

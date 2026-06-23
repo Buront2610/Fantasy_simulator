@@ -12,7 +12,7 @@ from fantasy_simulator.ui.ui_helpers import display_width
 from fantasy_simulator.ui.map_view_models import build_map_info
 from fantasy_simulator.ui.screens import render_world_map_views_for_location
 from fantasy_simulator.world import World
-from tests.harness_test_utils import build_seeded_world, content_lines
+from tests.support.harness import build_seeded_world, content_lines
 
 
 TARGET_LOCATION_ID = "loc_the_verdant_vale"

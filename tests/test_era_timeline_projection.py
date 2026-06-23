@@ -5,7 +5,7 @@ from fantasy_simulator.observation import build_era_timeline_projection
 from fantasy_simulator.reports import format_yearly_report, generate_yearly_report
 from fantasy_simulator.ui.map_renderer import build_map_info
 from fantasy_simulator.world import World
-from fantasy_simulator.world_location_state import clamp_state
+from fantasy_simulator.world_location.state import clamp_state
 from fantasy_simulator.world_change.event_contracts import validate_world_change_event_contract
 
 
