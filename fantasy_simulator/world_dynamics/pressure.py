@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Protocol, cast
 
-from ..event_models import WorldEventRecord
-from ..event_rendering import render_event_record
+from ..world_event.models import WorldEventRecord
+from ..world_event.rendering import render_event_record
 from ..i18n import tr
 from ..world_location.state import clamp_state
 

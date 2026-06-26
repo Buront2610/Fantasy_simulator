@@ -1,6 +1,6 @@
-from fantasy_simulator.event_rendering import render_event_record
+from fantasy_simulator.world_event.rendering import render_event_record
 from fantasy_simulator.i18n import get_locale, set_locale
-from fantasy_simulator.location_observation import build_location_observation_view
+from fantasy_simulator.world_location.observation import build_location_observation_view
 from fantasy_simulator.reports import generate_monthly_report, generate_yearly_report
 from fantasy_simulator.world import World
 

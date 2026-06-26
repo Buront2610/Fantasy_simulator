@@ -8,10 +8,10 @@ from __future__ import annotations
 
 from typing import Callable, Dict, List, Mapping, Optional, Protocol, Set
 
-from ..event_models import WorldEventRecord
+from .models import WorldEventRecord
 from .index import location_ids_for_record
 from .record_updates import event_record_with_normalized_location_references
-from ..rule_override_resolution import (
+from ..world_dynamics.rule_overrides import (
     DEFAULT_EVENT_IMPACT_RULES,
     clone_default_event_impact_rules as _clone_default_event_impact_rules,
     validate_event_impact_rules,

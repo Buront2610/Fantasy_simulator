@@ -5,8 +5,8 @@ from __future__ import annotations
 import random
 from typing import TYPE_CHECKING, Any, Dict, Sequence
 
-from ..event_models import EventResult
-from ..event_story import prefix_description_with_story_hook
+from ..world_event.models import EventResult
+from ..world_event.story import prefix_description_with_story_hook
 from ..i18n import tr, tr_for_locale, tr_term
 
 if TYPE_CHECKING:

@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable, Container, Iterable, Mapping
 
-from fantasy_simulator.event_models import WorldEventRecord
-from fantasy_simulator.ids import EraKey, FactionId, LocationId, RouteId
+from fantasy_simulator.world_event.models import WorldEventRecord
+from fantasy_simulator.world_core.ids import EraKey, FactionId, LocationId, RouteId
 
 from .commands import (
     DeclareWarCommand,

@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, MutableMapping, Optional
 
-from ..event_models import WorldEventRecord
-from ..ids import EraKey, EventRecordId
+from ..world_event.models import WorldEventRecord
+from ..world_core.ids import EraKey, EventRecordId
 from ..world_change import (
     DriftCivilizationPhaseCommand,
     ShiftEraCommand,

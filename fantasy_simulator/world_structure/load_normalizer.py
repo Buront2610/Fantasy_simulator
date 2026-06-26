@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Callable, Iterable, List, Mapping, MutableSequence, Protocol, Sequence
 
-from ..event_models import WorldEventRecord
+from ..world_event.models import WorldEventRecord
 from ..world_event.index import location_ids_for_record
 from ..world_event.record_updates import event_record_with_normalized_location_references
 

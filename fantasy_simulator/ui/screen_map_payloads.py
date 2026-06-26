@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..i18n import tr
-from ..location_names import build_toponym_etymology, render_toponym_etymology_line
+from ..world_location.names import build_toponym_etymology, render_toponym_etymology_line
 from ..world import World
 from .presenters import RumorPresenter
 from .view_models import build_location_observation_view

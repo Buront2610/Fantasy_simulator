@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Iterable
 
-from .character_model.founder_background import render_founder_summary
-from .i18n import tr, tr_term
+from ..i18n import tr, tr_term
+from .founder_background import render_founder_summary
 
 
 @dataclass(frozen=True)

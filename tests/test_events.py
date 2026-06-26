@@ -11,8 +11,8 @@ from fantasy_simulator.events import EventResult, EventSystem
 from fantasy_simulator.events import selection as events_selection
 from fantasy_simulator.events.family import resolve_birth_event
 from fantasy_simulator.events.relationships import resolve_relationship_turning_point_event
-from fantasy_simulator.event_models import WorldEventRecord
-from fantasy_simulator.event_rendering import render_event_record
+from fantasy_simulator.world_event.models import WorldEventRecord
+from fantasy_simulator.world_event.rendering import render_event_record
 from fantasy_simulator.i18n import get_locale, set_locale
 from fantasy_simulator.world import World
 

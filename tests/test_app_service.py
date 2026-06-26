@@ -8,8 +8,8 @@ import pytest
 
 from fantasy_simulator.app import FantasyAppService
 from fantasy_simulator.character import Character
-from fantasy_simulator.event_models import WorldEventRecord
-from fantasy_simulator.simulator import Simulator
+from fantasy_simulator.world_event.models import WorldEventRecord
+from fantasy_simulator.simulation import Simulator
 from fantasy_simulator.world import World
 
 

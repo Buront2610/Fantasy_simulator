@@ -3,7 +3,7 @@ from __future__ import annotations
 import random
 
 from fantasy_simulator.character import Character
-from fantasy_simulator.combat import SPELL_EFFECTS, resolve_combat
+from fantasy_simulator.combat_system.resolution import SPELL_EFFECTS, resolve_combat
 
 
 def _make_char(name: str, *, strength: int, constitution: int) -> Character:

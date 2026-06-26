@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List
 
-from fantasy_simulator.ids import CultureId, FactionId, normalize_slug_id
+from fantasy_simulator.world_core.ids import CultureId, FactionId, normalize_slug_id
 
 
 def setting_entry_key(name: str) -> str:

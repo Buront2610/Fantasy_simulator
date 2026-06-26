@@ -6,10 +6,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple
 
-from .event_models import WorldEventRecord
+from .world_event.models import WorldEventRecord
 from .language.engine import LanguageEngine, fallback_evolution_targets
 from .language.state import LanguageEvolutionRecord, LanguageRuntimeState, LocationNameHistoryRecord
-from .rule_override_resolution import (
+from .world_dynamics.rule_overrides import (
     clone_default_event_impact_rules,
     clone_default_propagation_rules,
 )

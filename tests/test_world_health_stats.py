@@ -6,7 +6,7 @@ import pytest
 
 from fantasy_simulator.character_creator import CharacterCreator
 from fantasy_simulator.simulation.world_change_driver import generate_war_arc_pulse
-from fantasy_simulator.simulator import Simulator
+from fantasy_simulator.simulation import Simulator
 from fantasy_simulator.testing.world_metrics import collect_world_health_metrics, write_world_health_report
 from fantasy_simulator.world import World
 

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Callable, Iterable, Mapping, MutableSequence, Protocol
 
-from ..event_models import WorldEventRecord
+from ..world_event.models import WorldEventRecord
 from ..world_event.record_updates import event_record_with_added_tags, event_record_with_normalized_location_references
 
 

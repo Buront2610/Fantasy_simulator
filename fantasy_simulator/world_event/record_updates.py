@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Any, Callable, Iterable
 
-from ..event_models import LOCATION_TAG_PREFIX, WorldEventRecord
+from .models import LOCATION_TAG_PREFIX, WorldEventRecord
 
 
 def event_record_with_location_id(

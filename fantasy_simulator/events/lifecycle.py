@@ -5,8 +5,8 @@ from __future__ import annotations
 import random
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
-from ..death_resolution import mark_character_dead
-from ..event_models import EventResult, generate_record_id
+from ..character_model.death_resolution import mark_character_dead
+from ..world_event.models import EventResult, generate_record_id
 from ..i18n import tr
 from ..simulation.calendar import annual_probability_to_fraction
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from fantasy_simulator.ids import (
+from fantasy_simulator.world_core.ids import (
     CharacterId,
     CultureId,
     EraKey,
@@ -12,7 +12,7 @@ from fantasy_simulator.ids import (
     RouteId,
     TerrainCellId,
 )
-import fantasy_simulator.ids as ids
+import fantasy_simulator.world_core.ids as ids
 from fantasy_simulator.terrain import BIOME_TYPES
 from fantasy_simulator.world import World
 from fantasy_simulator.world_change import (

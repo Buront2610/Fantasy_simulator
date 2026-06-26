@@ -14,7 +14,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 from ..adventure import AdventureRun
-from ..event_models import EventResult, WorldEventRecord, generate_record_id
+from ..world_event.models import EventResult, WorldEventRecord, generate_record_id
 
 if TYPE_CHECKING:
     from random import Random

@@ -8,7 +8,7 @@ Fantasy Simulator: Python CLI世界シミュレーション（Aethoria）。Pyth
 
 - **エントリーポイント**: `python -m fantasy_simulator` → `fantasy_simulator/main.py`（互換: `python main.py`）
 - **シミュレーション**: `simulation/engine.py` が月次進行を統括し、`simulation/` 配下へ責務分割済み。
-  `simulator.py` は後方互換ラッパー
+  旧 root-level import の互換 alias は廃止済み。
 - **キャラクター**: `character.py` は公開 `Character` ファサード。値オブジェクト・性格・表示・シリアライズ補助は
   `character_model/`、生成フローは `character_creator/` に置く
 - **戦闘**: 戦闘解決と戦闘ログ read model は `combat_system/`。`combat.py` / `combat_log_index.py` は互換ラッパー
@@ -37,7 +37,6 @@ Fantasy_simulator/
 │   ├── combat_system/                   # 戦闘解決・戦闘ログ read model
 │   ├── world.py                         # World クラス、LocationState
 │   ├── terrain/                         # TerrainMap / Site / RouteEdge / AtlasLayout
-│   ├── simulator.py                     # Simulator クラス（年次ループ）
 │   ├── events/                          # EventSystem クラス
 │   ├── adventure/                       # Adventure クラスと進行補助
 │   ├── reports/                         # 月報・年報生成
@@ -47,7 +46,7 @@ Fantasy_simulator/
 │   ├── world_calendar/                  # カレンダー解決・World mixin
 │   ├── world_core/                      # World 共有 record / protocol
 │   ├── world_dynamics/                  # world pressure・動的変化・era runtime
-│   ├── world_event/                     # event history / log / state mutation helper
+│   ├── world_event/                     # event contracts / rendering / history / log / state mutation helper
 │   ├── world_history/                   # 長期履歴 retention
 │   ├── world_language/                  # 言語進化・World mixin
 │   ├── world_location/                  # LocationState・lookup・reference・structure helper
@@ -103,7 +102,7 @@ Fantasy_simulator/
 - ユーザー向け文字列は `tr()` / `tr_term()` 経由（i18n）
 - シリアライズは `to_dict()` / `from_dict()` パターン
 - テストは `tests/test_<module>.py`。共有支援コードは `tests/support/`
-- ルート直下の旧モジュール名は互換 shim として残す。新規実装・新規 import は責務別パッケージを優先する
+- ルート直下の旧モジュール名互換 shim は廃止済み。新規 import は責務別パッケージを使う
 
 ## Design Conventions（設計規約）
 

@@ -11,7 +11,7 @@ import tempfile
 from typing import Any, Optional
 
 from .migrations import CURRENT_VERSION, migrate
-from ..simulator import Simulator
+from ..simulation import Simulator
 
 logger = logging.getLogger(__name__)
 

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from . import log_facade as event_log_facade
 
 if TYPE_CHECKING:
-    from ..event_models import WorldEventRecord
+    from .models import WorldEventRecord
 
 
 class WorldEventLogMixin:

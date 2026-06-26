@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import List
 
-from ..event_models import WorldEventRecord
+from .models import WorldEventRecord
 from .index import EventHistoryIndex
 
 

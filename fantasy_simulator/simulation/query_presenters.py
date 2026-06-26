@@ -5,8 +5,8 @@ from __future__ import annotations
 import re
 from typing import Dict, Iterable, List
 
-from ..event_models import WorldEventRecord
-from ..event_rendering import EventRenderContext, render_event_record
+from ..world_event.models import WorldEventRecord
+from ..world_event.rendering import EventRenderContext, render_event_record
 from ..i18n import tr, tr_term
 from ..narrative.constants import EVENT_KINDS_FATAL
 

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Dict, List
 
-from ..character_templates import supported_template_names
 from ..content.setting_bundle import SettingBundle
+from .templates import supported_template_names
 
 
 class CharacterCreatorCatalogMixin:

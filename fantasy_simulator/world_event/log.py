@@ -9,8 +9,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any, Callable, Iterable, Iterator, List, Optional, overload
 
-from ..event_models import WorldEventRecord
-from ..event_rendering import EventRenderContext, render_event_record
+from .models import WorldEventRecord
+from .rendering import EventRenderContext, render_event_record
 
 Translator = Callable[..., str]
 

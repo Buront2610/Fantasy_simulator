@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from fantasy_simulator.event_models import LOCATION_TAG_PREFIX, WorldEventRecord
+from fantasy_simulator.world_event.models import LOCATION_TAG_PREFIX, WorldEventRecord
 
 from .domain_events import (
     CivilizationPhaseDrifted,

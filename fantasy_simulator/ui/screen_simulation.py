@@ -7,7 +7,7 @@ from typing import Any
 
 from ..character_creator import CharacterCreator
 from ..i18n import tr
-from ..simulator import Simulator
+from ..simulation import Simulator
 from ..world import World
 from .event_log_presenter import render_live_event_lines
 from .ui_context import UIContext, _default_ctx

@@ -6,7 +6,7 @@ import random
 from hashlib import blake2s
 from typing import Any
 
-from .i18n import tr
+from ..i18n import tr
 
 
 _STORY_HOOK_KEYS: dict[str, tuple[str, ...]] = {

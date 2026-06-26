@@ -6,12 +6,12 @@ import json
 
 import pytest
 
-from fantasy_simulator.event_models import WorldEventRecord
-from fantasy_simulator.ids import RouteId
+from fantasy_simulator.world_event.models import WorldEventRecord
+from fantasy_simulator.world_core.ids import RouteId
 from fantasy_simulator.observation import build_era_timeline_projection, build_war_map_projection
 from fantasy_simulator.persistence.save_load import load_simulation, save_simulation
 from fantasy_simulator.reports import generate_monthly_report, generate_yearly_report
-from fantasy_simulator.simulator import Simulator
+from fantasy_simulator.simulation import Simulator
 from fantasy_simulator.world import World
 from fantasy_simulator.world_change import RouteUpdate, WorldChangeSet, apply_world_change_set
 from fantasy_simulator.world_location.state import clamp_state

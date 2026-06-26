@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from fantasy_simulator.event_models import WorldEventRecord
-from fantasy_simulator.ids import LocationId
+from fantasy_simulator.world_event.models import WorldEventRecord
+from fantasy_simulator.world_core.ids import LocationId
 from fantasy_simulator.world_change import (
     RenameLocationCommand,
     apply_world_change_set,

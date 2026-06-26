@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-from fantasy_simulator.event_models import LOCATION_TAG_PREFIX, WorldEventRecord
+from fantasy_simulator.world_event.models import LOCATION_TAG_PREFIX, WorldEventRecord
 
 from .state_machines import WORLD_SCORE_KEYS
 

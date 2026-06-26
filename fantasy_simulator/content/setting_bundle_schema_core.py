@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Mapping
 
-from ..rule_override_resolution import (
+from ..world_dynamics.rule_overrides import (
     resolve_event_impact_rule_overrides,
     resolve_propagation_rule_overrides,
 )

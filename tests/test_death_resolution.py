@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fantasy_simulator.adventure import AdventureRun
 from fantasy_simulator.character import Character
-from fantasy_simulator.death_resolution import (
+from fantasy_simulator.character_model.death_resolution import (
     handle_death_side_effects,
     mark_character_dead,
     resolve_active_adventure_for_death,

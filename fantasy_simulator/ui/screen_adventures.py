@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any
 
 from ..i18n import tr, tr_term
-from ..simulator import Simulator
 from ..world import World
 from .combat_log_presenter import combat_log_lines_for_adventure
 from .presenters import AdventurePresenter
@@ -29,7 +28,7 @@ def _party_display_names(world: World, run: Any, max_shown: int = 3) -> str:
     return label
 
 
-def _show_adventure_summaries(sim: Simulator, ctx: UIContext | None = None) -> None:
+def _show_adventure_summaries(sim: Any, ctx: UIContext | None = None) -> None:
     ctx = _default_ctx(ctx)
     out = ctx.out
 
@@ -67,7 +66,7 @@ def _show_adventure_summaries(sim: Simulator, ctx: UIContext | None = None) -> N
     ctx.inp.pause()
 
 
-def _show_adventure_details(sim: Simulator, ctx: UIContext | None = None) -> None:
+def _show_adventure_details(sim: Any, ctx: UIContext | None = None) -> None:
     ctx = _default_ctx(ctx)
     out = ctx.out
 
@@ -129,7 +128,7 @@ def _show_adventure_details(sim: Simulator, ctx: UIContext | None = None) -> Non
     ctx.inp.pause()
 
 
-def _resolve_pending_adventure_choice(sim: Simulator, ctx: UIContext | None = None) -> None:
+def _resolve_pending_adventure_choice(sim: Any, ctx: UIContext | None = None) -> None:
     ctx = _default_ctx(ctx)
     out = ctx.out
 

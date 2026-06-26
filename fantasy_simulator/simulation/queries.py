@@ -8,8 +8,8 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING, Dict, List, Optional
 
-from ..event_models import WorldEventRecord
-from ..event_rendering import render_event_record
+from ..world_event.models import WorldEventRecord
+from ..world_event.rendering import render_event_record
 from ..i18n import tr
 from ..reports import (
     format_monthly_report,
@@ -17,7 +17,7 @@ from ..reports import (
     generate_monthly_report,
     generate_yearly_report,
 )
-from ..location_observation import (
+from ..world_location.observation import (
     build_location_observation_view,
     build_rumor_summary_views,
     render_query_location_observation_sections,

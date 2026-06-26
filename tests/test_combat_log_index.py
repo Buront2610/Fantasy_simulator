@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from fantasy_simulator.adventure import AdventureRun
 from fantasy_simulator.character import Character
-from fantasy_simulator.combat_log_index import build_combat_log_index
-from fantasy_simulator.event_models import WorldEventRecord
+from fantasy_simulator.combat_system.log_index import build_combat_log_index
+from fantasy_simulator.world_event.models import WorldEventRecord
 from fantasy_simulator.world import World
 
 

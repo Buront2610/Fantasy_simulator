@@ -62,14 +62,14 @@ class TestSimulationSubPackageImport:
         from fantasy_simulator.simulation.engine import Simulator
         assert Simulator is not None
 
-    def test_import_from_simulator_compat(self):
-        from fantasy_simulator.simulator import Simulator
+    def test_import_from_canonical_simulation_package(self):
+        from fantasy_simulator.simulation import Simulator
         assert Simulator is not None
 
     def test_all_paths_resolve_to_same_class(self):
         from fantasy_simulator.simulation import Simulator as A
         from fantasy_simulator.simulation.engine import Simulator as B
-        from fantasy_simulator.simulator import Simulator as C
+        from fantasy_simulator.simulation import Simulator as C
         assert A is B
         assert B is C
 

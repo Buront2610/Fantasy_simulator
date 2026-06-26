@@ -18,7 +18,7 @@ import random as _random
 
 from fantasy_simulator.character import Character
 from fantasy_simulator.character_creator import CharacterCreator
-from fantasy_simulator.event_models import EventResult
+from fantasy_simulator.world_event.models import EventResult
 from fantasy_simulator.events import WorldEventRecord
 from fantasy_simulator.simulation.population import (
     choose_migration_destination,
@@ -26,7 +26,7 @@ from fantasy_simulator.simulation.population import (
     population_capacity,
     population_pressure_factor,
 )
-from fantasy_simulator.simulator import Simulator
+from fantasy_simulator.simulation import Simulator
 from fantasy_simulator.world import LocationState, World
 
 

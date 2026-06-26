@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Any, List
 
 from ..i18n import tr
-from ..location_observation import (
+from ..world_location.observation import (
     LocationObservationView,
     RumorSummaryView,
     render_location_observation_sections,

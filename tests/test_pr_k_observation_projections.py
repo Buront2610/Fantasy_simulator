@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fantasy_simulator.event_models import WorldEventRecord
+from fantasy_simulator.world_event.models import WorldEventRecord
 from fantasy_simulator.observation import (
     build_era_timeline_projection,
     build_location_history_projection,

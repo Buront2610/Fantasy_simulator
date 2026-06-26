@@ -19,7 +19,7 @@ from fantasy_simulator.simulation.world_change_driver import (
     generate_terrain_world_change,
     generate_war_world_change,
 )
-from fantasy_simulator.simulator import Simulator
+from fantasy_simulator.simulation import Simulator
 from fantasy_simulator.ui.map_renderer import build_map_info
 from fantasy_simulator.ui.screen_map_payloads import render_world_map_views_for_location
 from fantasy_simulator.ui.view_models import build_monthly_report_card_view, build_world_dashboard_view

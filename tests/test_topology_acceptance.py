@@ -3,11 +3,11 @@ from __future__ import annotations
 import io
 from contextlib import redirect_stdout
 
-from fantasy_simulator.event_models import WorldEventRecord
+from fantasy_simulator.world_event.models import WorldEventRecord
 from fantasy_simulator.i18n import set_locale
 from fantasy_simulator.persistence.save_load import load_simulation, save_simulation
 from fantasy_simulator.reports import generate_monthly_report
-from fantasy_simulator.simulator import Simulator
+from fantasy_simulator.simulation import Simulator
 from fantasy_simulator.terrain import RouteEdge, Site, TerrainCell, TerrainMap
 from fantasy_simulator.ui.render_backend import PrintRenderBackend
 from fantasy_simulator.ui.screens import _show_location_history

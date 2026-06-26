@@ -6,7 +6,7 @@ from collections.abc import MutableMapping as MutableMappingABC
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable, MutableMapping, Protocol, cast
 
-from fantasy_simulator.event_models import WorldEventRecord
+from fantasy_simulator.world_event.models import WorldEventRecord
 
 from .changesets import (
     EraRuntimeUpdate,

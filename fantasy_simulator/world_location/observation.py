@@ -5,12 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, TYPE_CHECKING
 
-from .event_rendering import render_event_record
-from .i18n import tr, tr_term
-from .location_names import ToponymEtymology, build_toponym_etymology, render_toponym_etymology_line
+from ..i18n import tr, tr_term
+from ..world_event.rendering import render_event_record
+from ..world_location.names import ToponymEtymology, build_toponym_etymology, render_toponym_etymology_line
 
 if TYPE_CHECKING:
-    from .world import World
+    from ..world import World
 
 
 @dataclass

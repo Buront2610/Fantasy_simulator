@@ -18,7 +18,7 @@ from fantasy_simulator.observation import (
 )
 from fantasy_simulator.persistence.save_load import load_simulation, save_simulation
 from fantasy_simulator.reports import generate_monthly_report, generate_yearly_report
-from fantasy_simulator.simulator import Simulator
+from fantasy_simulator.simulation import Simulator
 from fantasy_simulator.ui.map_renderer import (
     build_map_info,
     render_location_detail,

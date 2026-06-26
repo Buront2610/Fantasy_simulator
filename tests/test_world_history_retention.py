@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from fantasy_simulator.adventure import AdventureRun
-from fantasy_simulator.event_models import WorldEventRecord
-from fantasy_simulator.rumor_models import Rumor
+from fantasy_simulator.world_event.models import WorldEventRecord
+from fantasy_simulator.rumor.models import Rumor
 from fantasy_simulator.world import World
 from fantasy_simulator.world_history.retention import compact_world_history
 

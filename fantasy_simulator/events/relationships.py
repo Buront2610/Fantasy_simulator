@@ -20,9 +20,9 @@ from ..character_model.personality import (
     render_personality_context_factors,
     romance_delta_from_personality,
 )
-from ..event_causality import latest_pair_event_ids, pair_cause_event_ids
-from ..event_models import EventResult, generate_record_id
-from ..event_story import prefix_description_with_story_hook
+from ..world_event.causality import latest_pair_event_ids, pair_cause_event_ids
+from ..world_event.models import EventResult, generate_record_id
+from ..world_event.story import prefix_description_with_story_hook
 from ..i18n import tr
 
 if TYPE_CHECKING:

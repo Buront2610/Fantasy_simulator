@@ -20,7 +20,7 @@ from fantasy_simulator.events import WorldEventRecord
 from fantasy_simulator.i18n import get_locale, set_locale
 from fantasy_simulator.world import World
 from fantasy_simulator.character import Character
-from fantasy_simulator.simulator import Simulator
+from fantasy_simulator.simulation import Simulator
 
 
 # ------------------------------------------------------------------

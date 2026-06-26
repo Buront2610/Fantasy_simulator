@@ -13,7 +13,7 @@ from ..character_model.personality import (
     render_personality_summary,
 )
 from ..combat_system.log_index import CombatLogEntryView, build_combat_log_index
-from ..event_rendering import render_event_record
+from ..world_event.rendering import render_event_record
 from ..i18n import tr, tr_term
 from ..world import World
 from .screen_input import _get_numeric_choice

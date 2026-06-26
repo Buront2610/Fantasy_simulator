@@ -13,8 +13,8 @@ import uuid
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from ..content.world_data import ALL_SKILLS, DISCOVERY_ITEMS, JOURNEY_EVENTS
-from ..death_resolution import handle_death_side_effects
-from ..event_models import EventResult, WorldEventRecord, generate_record_id
+from ..character_model.death_resolution import handle_death_side_effects
+from ..world_event.models import EventResult, WorldEventRecord, generate_record_id
 from .activity import resolve_discovery_event, resolve_journey_event, resolve_skill_training_event
 from .combat import resolve_battle_event
 from .lifecycle import (

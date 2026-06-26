@@ -5,7 +5,7 @@ from __future__ import annotations
 import random
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
-from ..event_models import EventResult
+from ..world_event.models import EventResult
 from .family import resolve_birth_event
 from .relationships import resolve_relationship_turning_point_event
 from ..simulation.population import has_population_capacity

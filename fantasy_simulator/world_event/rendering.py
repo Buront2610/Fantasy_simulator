@@ -5,9 +5,9 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Callable, Optional, Protocol
 
-from .content.setting_bundle_inspection import setting_entry_key
-from .event_models import WorldEventRecord
-from .i18n import get_locale, tr_for_locale, tr_term_for_locale
+from ..content.setting_bundle_inspection import setting_entry_key
+from ..i18n import get_locale, tr_for_locale, tr_term_for_locale
+from .models import WorldEventRecord
 
 
 Translator = Callable[..., str]

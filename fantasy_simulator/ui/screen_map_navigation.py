@@ -6,7 +6,6 @@ import shutil
 from typing import Any
 
 from ..i18n import tr, tr_term
-from ..simulator import Simulator
 from ..world import World
 from .screen_input import _get_numeric_choice
 from .screen_history import _show_location_history_for_location
@@ -254,7 +253,7 @@ def _choose_from_all_locations(world: World, ctx: UIContext) -> Any | None:
     return _choose_location(locations, ctx)
 
 
-def _show_world_map(sim: Simulator, ctx: UIContext | None = None) -> None:
+def _show_world_map(sim: Any, ctx: UIContext | None = None) -> None:
     """Three-layer map navigation: overview -> region -> detail."""
     from .map_renderer import build_map_info
 

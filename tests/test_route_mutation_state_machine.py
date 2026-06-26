@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from fantasy_simulator.event_models import WorldEventRecord
-from fantasy_simulator.ids import RouteId
+from fantasy_simulator.world_event.models import WorldEventRecord
+from fantasy_simulator.world_core.ids import RouteId
 from fantasy_simulator.terrain import RouteEdge
 from fantasy_simulator.world_change import (
     SetRouteBlockedCommand,

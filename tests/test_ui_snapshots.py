@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 from fantasy_simulator.character import Character
 from fantasy_simulator.i18n import set_locale
-from fantasy_simulator.simulator import Simulator
+from fantasy_simulator.simulation import Simulator
 from fantasy_simulator.ui.render_backend import PrintRenderBackend
 from fantasy_simulator.ui.screens import (
     _show_adventure_summaries,

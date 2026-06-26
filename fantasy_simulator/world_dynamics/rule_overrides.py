@@ -5,7 +5,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Dict, Mapping
 
-from .world_topology import (
+from ..world_topology import (
     PROPAGATION_TOPOLOGY_TRAVEL,
     VALID_PROPAGATION_TOPOLOGIES,
 )

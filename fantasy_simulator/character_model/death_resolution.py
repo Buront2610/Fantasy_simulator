@@ -9,11 +9,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from .i18n import tr
+from ..i18n import tr
 
 if TYPE_CHECKING:
-    from .character import Character
-    from .world import World
+    from ..character import Character
+    from ..world import World
 
 
 def handle_death_side_effects(char: "Character", world: "World") -> None:

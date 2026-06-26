@@ -2,19 +2,18 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
-from ..event_rendering import render_event_record
+from ..world_event.rendering import render_event_record
 from ..i18n import tr
-from ..location_observation import RumorSummaryView, build_rumor_summary_views, render_rumor_brief
-from ..simulator import Simulator
+from ..world_location.observation import RumorSummaryView, build_rumor_summary_views, render_rumor_brief
 from .ui_context import UIContext, _default_ctx
 
 if TYPE_CHECKING:
     from ..world import World
 
 
-def _show_rumor_board(sim: Simulator, ctx: UIContext | None = None) -> None:
+def _show_rumor_board(sim: Any, ctx: UIContext | None = None) -> None:
     """Render active rumors as a compact inspection board."""
     ctx = _default_ctx(ctx)
     out = ctx.out
@@ -80,7 +79,7 @@ def _read_location_filter(world: "World", ctx: UIContext) -> str | None:
     return None
 
 
-def _show_rumor_detail(sim: Simulator, rumor: RumorSummaryView, ctx: UIContext) -> None:
+def _show_rumor_detail(sim: Any, rumor: RumorSummaryView, ctx: UIContext) -> None:
     out = ctx.out
     out.print_line()
     out.print_heading(f"  {tr('rumor_board_detail_title')}")

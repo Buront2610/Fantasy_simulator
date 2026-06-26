@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Callable, Tuple
 
 from ..content.setting_bundle import SettingBundle, validate_setting_bundle
-from ..rule_override_resolution import (
+from ..world_dynamics.rule_overrides import (
     resolve_event_impact_rule_overrides,
     resolve_propagation_rule_overrides,
 )

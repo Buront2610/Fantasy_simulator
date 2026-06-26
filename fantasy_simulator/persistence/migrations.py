@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Dict
 
-from ..schema import CURRENT_SCHEMA_VERSION
+from ..world_core.schema import CURRENT_SCHEMA_VERSION
 from ..content.world_data import (
     DEFAULT_LOCATIONS,
     NAME_TO_LOCATION_ID,

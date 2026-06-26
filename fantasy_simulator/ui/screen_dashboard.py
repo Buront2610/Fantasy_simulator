@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from ..i18n import tr
-from ..simulator import Simulator
 from .screen_history import _show_character_story
 from .screen_map_navigation import _show_detail_for_location
 from .ui_context import UIContext, _default_ctx
 from .view_models import FollowUpActionView, WorldDashboardView, build_world_dashboard_view
 
 
-def _show_world_dashboard(sim: Simulator, ctx: UIContext | None = None) -> None:
+def _show_world_dashboard(sim: Any, ctx: UIContext | None = None) -> None:
     """Render a compact world-state dashboard for observer play."""
     ctx = _default_ctx(ctx)
     view = build_world_dashboard_view(
@@ -74,7 +75,7 @@ def _render_world_dashboard(view: WorldDashboardView, ctx: UIContext) -> None:
         )
 
 
-def _handle_dashboard_follow_up(sim: Simulator, view: WorldDashboardView, ctx: UIContext) -> None:
+def _handle_dashboard_follow_up(sim: Any, view: WorldDashboardView, ctx: UIContext) -> None:
     if not view.follow_up_actions:
         ctx.inp.pause()
         return
@@ -88,7 +89,7 @@ def _handle_dashboard_follow_up(sim: Simulator, view: WorldDashboardView, ctx: U
     _open_dashboard_follow_up(sim, view.follow_up_actions[int(action_key) - 1], ctx)
 
 
-def _open_dashboard_follow_up(sim: Simulator, action: FollowUpActionView, ctx: UIContext) -> None:
+def _open_dashboard_follow_up(sim: Any, action: FollowUpActionView, ctx: UIContext) -> None:
     world = sim.world
     if action.target_type == "character":
         character = world.get_character_by_id(action.target_id)

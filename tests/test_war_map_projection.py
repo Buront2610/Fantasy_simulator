@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from fantasy_simulator.event_models import WorldEventRecord
+from fantasy_simulator.world_event.models import WorldEventRecord
 from fantasy_simulator.content.setting_bundle import FactionRelationshipDefinition
 from fantasy_simulator.i18n import get_locale, set_locale
 from fantasy_simulator.observation import build_war_map_projection
 from fantasy_simulator.persistence.save_load import load_simulation, save_simulation
 from fantasy_simulator.reports import format_monthly_report, generate_monthly_report
-from fantasy_simulator.simulator import Simulator
+from fantasy_simulator.simulation import Simulator
 from fantasy_simulator.ui.map_renderer import build_map_info, render_region_map
 from fantasy_simulator.world import World
 from fantasy_simulator.world_change.event_contracts import validate_world_change_event_contract

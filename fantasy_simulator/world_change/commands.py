@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Mapping
 
-from fantasy_simulator.ids import EraKey, EventRecordId, FactionId, LocationId, RouteId, TerrainCellId
+from fantasy_simulator.world_core.ids import EraKey, EventRecordId, FactionId, LocationId, RouteId, TerrainCellId
 
 
 @dataclass(frozen=True)

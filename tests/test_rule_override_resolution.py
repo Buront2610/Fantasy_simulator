@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from fantasy_simulator.rule_override_resolution import (
+from fantasy_simulator.world_dynamics.rule_overrides import (
     clone_default_event_impact_rules,
     clone_default_propagation_rules,
     resolve_event_impact_rule_overrides,

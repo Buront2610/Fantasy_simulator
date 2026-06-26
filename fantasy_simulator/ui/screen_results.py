@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from ..i18n import tr
-from ..simulator import Simulator
 from .event_log_presenter import (
     build_event_log_entries,
     event_log_summary_line,
@@ -72,7 +73,7 @@ def _result_menu_options() -> list[tuple[str, str]]:
     ]
 
 
-def _show_event_log(sim: Simulator, ctx: UIContext, last_n: int | None = None) -> None:
+def _show_event_log(sim: Any, ctx: UIContext, last_n: int | None = None) -> None:
     ctx.out.print_line()
     records = list(getattr(sim.world, "event_records", []))
     shown = records[-last_n:] if last_n is not None else records
@@ -98,7 +99,7 @@ def _show_event_log(sim: Simulator, ctx: UIContext, last_n: int | None = None) -
     ctx.inp.pause()
 
 
-def _update_dirty_state_for_action(action: str, sim: Simulator, ctx: UIContext) -> bool | None:
+def _update_dirty_state_for_action(action: str, sim: Any, ctx: UIContext) -> bool | None:
     if action == "advance_1_day":
         _advance_days(sim, 1, ctx=ctx, live=True)
         return True
@@ -122,7 +123,7 @@ def _update_dirty_state_for_action(action: str, sim: Simulator, ctx: UIContext) 
     return None
 
 
-def _show_result_view(action: str, sim: Simulator, ctx: UIContext) -> bool:
+def _show_result_view(action: str, sim: Any, ctx: UIContext) -> bool:
     if action == "world_dashboard":
         _show_world_dashboard(sim, ctx=ctx)
     elif action == "yearly_report":
@@ -164,7 +165,7 @@ def _show_result_view(action: str, sim: Simulator, ctx: UIContext) -> bool:
     return True
 
 
-def _show_results(sim: Simulator, ctx: UIContext | None = None) -> None:
+def _show_results(sim: Any, ctx: UIContext | None = None) -> None:
     ctx = _default_ctx(ctx)
     out = ctx.out
     has_unsaved_changes = True

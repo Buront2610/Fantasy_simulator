@@ -17,7 +17,7 @@ from fantasy_simulator.reports import (
     generate_yearly_report,
 )
 from fantasy_simulator.rumor import Rumor
-from fantasy_simulator.simulator import Simulator
+from fantasy_simulator.simulation import Simulator
 from fantasy_simulator.world import World
 
 

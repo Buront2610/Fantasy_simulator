@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import json
 
-from fantasy_simulator.event_models import WorldEventRecord
+from fantasy_simulator.world_event.models import WorldEventRecord
 from fantasy_simulator.persistence.migrations import _migrate_v8_to_v9
 from fantasy_simulator.persistence.save_load import load_simulation, save_simulation
 from fantasy_simulator.simulation.world_change_driver import generate_war_arc_pulse
-from fantasy_simulator.simulator import Simulator
+from fantasy_simulator.simulation import Simulator
 from fantasy_simulator.world import World
 
 

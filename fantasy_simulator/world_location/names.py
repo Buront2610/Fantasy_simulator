@@ -5,11 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, TYPE_CHECKING
 
-from .i18n import tr
+from ..i18n import tr
 
 if TYPE_CHECKING:
-    from .content.setting_bundle import LanguageDefinition, SiteSeedDefinition
-    from .world import World
+    from ..content.setting_bundle import LanguageDefinition, SiteSeedDefinition
+    from ..world import World
 
 
 @dataclass(frozen=True)

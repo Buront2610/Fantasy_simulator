@@ -9,9 +9,9 @@ from ..character import Character, random_stats
 from ..character_model.founder_background import attach_founder_background
 from ..character_model.personality import generate_personality_feats_for_character, generate_personality_for_character
 from .naming import GENDERS, random_name
-from ..character_templates import TEMPLATES
 from ..content.setting_bundle import NamingRulesDefinition
 from ..i18n import tr, tr_term
+from .templates import TEMPLATES
 
 
 NamingRulesResolver = Callable[..., NamingRulesDefinition]
