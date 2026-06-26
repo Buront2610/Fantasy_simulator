@@ -7,9 +7,9 @@ from typing import Mapping
 
 import pytest
 
-from fantasy_simulator.event_models import WorldEventRecord
-from fantasy_simulator.event_rendering import render_event_record
-from fantasy_simulator.ids import EraKey
+from fantasy_simulator.world_event.models import WorldEventRecord
+from fantasy_simulator.world_event.rendering import render_event_record
+from fantasy_simulator.world_core.ids import EraKey
 from fantasy_simulator.i18n import get_locale, set_locale
 from fantasy_simulator.terrain import RouteEdge
 from fantasy_simulator.world import World

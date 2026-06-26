@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..character import MAX_RELATION_TAG_SOURCE_EVENTS
-from ..event_models import WorldEventRecord
+from ..world_event.models import WorldEventRecord
 
 
 EVENT_HISTORY_TARGET_RECORDS = 2500

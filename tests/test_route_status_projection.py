@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fantasy_simulator.event_models import WorldEventRecord
+from fantasy_simulator.world_event.models import WorldEventRecord
 from fantasy_simulator.i18n import get_locale, set_locale
 from fantasy_simulator.observation import build_route_status_projection
 from fantasy_simulator.ui.map_renderer import build_map_info

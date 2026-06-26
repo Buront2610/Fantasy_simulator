@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from fantasy_simulator.character import Character
-from fantasy_simulator.event_models import WorldEventRecord
-from fantasy_simulator.family_tree import build_family_tree, render_family_tree_lines
+from fantasy_simulator.world_event.models import WorldEventRecord
+from fantasy_simulator.character_model.family_tree import build_family_tree, render_family_tree_lines
 from fantasy_simulator.world import World
 
 

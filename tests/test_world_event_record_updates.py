@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from fantasy_simulator.event_models import WorldEventRecord
+from fantasy_simulator.world_event.models import WorldEventRecord
 from fantasy_simulator.world_event.record_updates import (
     event_record_with_added_tags,
     event_record_with_location_id,

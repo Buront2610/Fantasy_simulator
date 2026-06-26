@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import List, TYPE_CHECKING
 
-from ..display_width import fit_display_width
+from .display_width import fit_display_width
 from ..i18n import tr, tr_term
 from .view_models import MapRenderInfo
 

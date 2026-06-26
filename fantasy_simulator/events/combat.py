@@ -6,9 +6,9 @@ import random
 from typing import TYPE_CHECKING, Any, Dict, List
 
 from ..combat_system.resolution import Combatant, CombatResolution, resolve_combat
-from ..event_causality import pair_cause_event_ids
-from ..event_models import EventResult, generate_record_id
-from ..event_story import prefix_description_with_story_hook
+from ..world_event.causality import pair_cause_event_ids
+from ..world_event.models import EventResult, generate_record_id
+from ..world_event.story import prefix_description_with_story_hook
 from ..i18n import tr
 
 if TYPE_CHECKING:

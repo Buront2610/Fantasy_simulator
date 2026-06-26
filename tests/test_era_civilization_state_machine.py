@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 
-from fantasy_simulator.event_models import WorldEventRecord
-from fantasy_simulator.event_rendering import render_event_record
-from fantasy_simulator.ids import EraKey
+from fantasy_simulator.world_event.models import WorldEventRecord
+from fantasy_simulator.world_event.rendering import render_event_record
+from fantasy_simulator.world_core.ids import EraKey
 from fantasy_simulator.observation import build_era_timeline_projection
 from fantasy_simulator.world_change import (
     DriftCivilizationPhaseCommand,

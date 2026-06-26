@@ -3,9 +3,9 @@ from __future__ import annotations
 import re
 from math import inf
 
-import fantasy_simulator.event_rendering as event_rendering
-from fantasy_simulator.event_models import EventResult, WorldEventRecord, generate_record_id
-from fantasy_simulator.event_rendering import render_event_record
+import fantasy_simulator.world_event.rendering as event_rendering
+from fantasy_simulator.world_event.models import EventResult, WorldEventRecord, generate_record_id
+from fantasy_simulator.world_event.rendering import render_event_record
 from fantasy_simulator.i18n import get_locale, set_locale
 from fantasy_simulator.world import World
 

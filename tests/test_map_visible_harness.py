@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from fantasy_simulator.event_models import WorldEventRecord
+from fantasy_simulator.world_event.models import WorldEventRecord
 from fantasy_simulator.i18n import get_locale, set_locale
 from fantasy_simulator.persistence.save_load import load_simulation, save_simulation
-from fantasy_simulator.simulator import Simulator
+from fantasy_simulator.simulation import Simulator
 from fantasy_simulator.ui.ui_helpers import display_width
 from fantasy_simulator.ui.map_view_models import build_map_info
 from fantasy_simulator.ui.screens import render_world_map_views_for_location

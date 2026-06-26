@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional
 
 from ..i18n import get_locale, set_locale
 from ..narrative.template_history import TemplateHistory
-from ..schema import CURRENT_SCHEMA_VERSION
+from ..world_core.schema import CURRENT_SCHEMA_VERSION
 
 
 class EnginePersistenceMixin:

@@ -5,8 +5,8 @@ from __future__ import annotations
 from typing import Any
 
 from ..combat_system.resolution import resolve_combat
-from ..event_models import LOCATION_TAG_PREFIX, WorldEventRecord, generate_record_id
-from ..event_rendering import render_event_record
+from ..world_event.models import LOCATION_TAG_PREFIX, WorldEventRecord, generate_record_id
+from ..world_event.rendering import render_event_record
 from ..observation import build_war_map_projection
 from ..rumor import generate_tracked_rumor_from_world_change
 from ..terrain import BIOME_TYPES

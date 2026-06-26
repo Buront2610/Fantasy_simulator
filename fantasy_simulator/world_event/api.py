@@ -6,7 +6,7 @@ from collections.abc import MutableMapping as MutableMappingABC
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
-from ..event_models import WorldEventRecord
+from .models import WorldEventRecord
 from .history import (
     latest_absolute_day_before_or_on as latest_event_absolute_day_before_or_on,
     record_world_event,

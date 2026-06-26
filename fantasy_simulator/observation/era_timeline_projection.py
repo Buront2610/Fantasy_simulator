@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Iterable
 
-from fantasy_simulator.event_models import WorldEventRecord
+from fantasy_simulator.world_event.models import WorldEventRecord
 
 from ._record_helpers import as_string, semantic_render_params, string_param
 

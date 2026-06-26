@@ -12,7 +12,7 @@ from .interactive import CharacterCreatorInteractiveMixin
 from .naming import CharacterCreatorNamingMixin
 from ..content.setting_bundle import SettingBundle, default_aethoria_bundle
 from ..content.world_data import ALL_SKILLS
-from ..language_engine import LanguageEngine
+from ..language.engine import LanguageEngine
 
 
 class CharacterCreator(

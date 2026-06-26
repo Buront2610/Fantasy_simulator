@@ -180,9 +180,8 @@ fantasy_simulator/          # Main package
   combat_system/            # Combat resolution and combat-log read models
   world.py                  # World state, locations, memory, terrain hooks, serialization
   terrain/                  # Terrain / site / route / atlas layout models
-  event_models.py           # Canonical EventResult / WorldEventRecord contracts
   events/                   # Event generation facade (re-exports event contracts)
-  world_event/              # Event history indexes, log projections, and state mutation helpers
+  world_event/              # Event contracts, rendering, history indexes, logs, and state mutation helpers
   world_location/           # Location state, lookup, reference, and structure helpers
   world_calendar/           # Calendar resolution, facade, and World mixin helpers
   world_core/               # Shared world records and structural protocols
@@ -198,7 +197,6 @@ fantasy_simulator/          # Main package
   world_state/              # Location-state decay and propagation helpers
   world_structure/          # World structure rebuild, load normalization, and reference repair helpers
   adventure/                # Multi-step adventure progression
-  simulator.py              # Backward-compatible import path (delegates to simulation/)
   reports/                  # Monthly and yearly report view generation
   rumor/                    # Rumor generation and lifecycle helpers
   simulation/               # Simulator split into single-responsibility modules

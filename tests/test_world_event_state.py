@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from fantasy_simulator.event_models import WorldEventRecord
+from fantasy_simulator.world_event.models import WorldEventRecord
 from fantasy_simulator.world import World
 from fantasy_simulator.world_event.state import (
     apply_event_impact_to_location,

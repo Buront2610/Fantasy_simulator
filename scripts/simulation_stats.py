@@ -9,7 +9,7 @@ from dataclasses import asdict, dataclass
 from typing import Any, Sequence
 
 from fantasy_simulator.character_creator import CharacterCreator
-from fantasy_simulator.simulator import Simulator
+from fantasy_simulator.simulation import Simulator
 from fantasy_simulator.world import World
 
 

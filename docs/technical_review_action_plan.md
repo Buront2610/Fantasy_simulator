@@ -235,7 +235,7 @@ full signature 作成や full rebuild が繰り返される構造を避ける。
 
 - 対象 family の new event records が `summary_key` と `render_params` だけで再レンダリングできる。
 - 旧 save / old records は description fallback で表示できる。
-- `event_models.py::WorldEventRecord` の責務が validation / serialization / projection に肥大化し続けない。
+- `world_event.models::WorldEventRecord` の責務が validation / serialization / projection に肥大化し続けない。
 
 ### Phase 2-C: Auto-pause 走査の集約
 

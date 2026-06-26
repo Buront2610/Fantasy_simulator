@@ -19,7 +19,9 @@ HEADLESS_BOUNDARY_FORBIDDEN_PREFIXES = (
     "fantasy_simulator.ui",
     "fantasy_simulator.world",
     "fantasy_simulator.persistence",
+    "fantasy_simulator.event_models",
     "fantasy_simulator.event_rendering",
+    "fantasy_simulator.world_event.rendering",
     "fantasy_simulator.world_persistence",
     "rich",
     "textual",
@@ -115,14 +117,16 @@ def test_headless_boundary_matcher_catches_narrow_adapter_edges() -> None:
         "fantasy_simulator.terrain_route_generation.RouteBuilder",
         "fantasy_simulator.ui.map_renderer",
         "fantasy_simulator.persistence.save_load",
+        "fantasy_simulator.event_models",
         "fantasy_simulator.event_rendering",
+        "fantasy_simulator.world_event.rendering",
         "fantasy_simulator.world_persistence",
         "rich.console",
         "textual.app",
     ]
     allowed_targets = [
         "fantasy_simulator.terrainology",
-        "fantasy_simulator.event_models",
+        "fantasy_simulator.world_event.models",
         "fantasy_simulator.world_change.commands",
         "fantasy_simulator.observation.route_status_projection",
     ]

@@ -16,12 +16,12 @@ from fantasy_simulator.content.setting_bundle import (
     SiteSeedDefinition,
     WorldDefinition,
 )
-from fantasy_simulator.event_models import WorldEventRecord
+from fantasy_simulator.world_event.models import WorldEventRecord
 from fantasy_simulator.i18n import set_locale
 from fantasy_simulator.language.schema import SoundChangeRuleDefinition
 from fantasy_simulator.language.state import LanguageEvolutionRecord
-from fantasy_simulator.location_names import build_toponym_etymology, render_toponym_etymology_line
-from fantasy_simulator.location_observation import (
+from fantasy_simulator.world_location.names import build_toponym_etymology, render_toponym_etymology_line
+from fantasy_simulator.world_location.observation import (
     build_location_observation_view,
     render_location_observation_sections,
 )

@@ -57,7 +57,7 @@ def test_si4_schema_version_always_present_in_save(tmp_path):
     """SI-4: schema_version is present in all saved data."""
     import json
     from fantasy_simulator.persistence.save_load import save_simulation
-    from fantasy_simulator.simulator import Simulator
+    from fantasy_simulator.simulation import Simulator
 
     world = World()
     world.add_character(Character("Test", 25, "Male", "Human", "Warrior"))
@@ -102,7 +102,7 @@ def test_phase1_no_legacy_character_location_references():
         project_root / "main.py",
         project_root / "fantasy_simulator" / "persistence" / "save_load.py",
         project_root / "fantasy_simulator" / "ui" / "screens.py",
-        project_root / "fantasy_simulator" / "simulator.py",
+        project_root / "fantasy_simulator" / "simulation" / "engine.py",
         project_root / "fantasy_simulator" / "world.py",
     ]
     pattern = re.compile(r"\.location\b")

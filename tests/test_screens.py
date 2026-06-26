@@ -11,7 +11,7 @@ from types import SimpleNamespace
 
 from fantasy_simulator.character import Character
 from fantasy_simulator.i18n import set_locale
-from fantasy_simulator.simulator import Simulator
+from fantasy_simulator.simulation import Simulator
 from fantasy_simulator.world import World
 
 
@@ -236,7 +236,7 @@ class TestAdventureAndLocationViews(unittest.TestCase):
         self.assertIn("Aldric & Lysara", text)
 
     def test_location_history_uses_i18n_count_tags(self) -> None:
-        from fantasy_simulator.event_models import WorldEventRecord
+        from fantasy_simulator.world_event.models import WorldEventRecord
         from fantasy_simulator.ui.screens import _show_location_history
         from fantasy_simulator.ui.ui_context import UIContext
         from fantasy_simulator.ui.render_backend import PrintRenderBackend
@@ -417,8 +417,8 @@ class TestAutoAdvanceScreen(unittest.TestCase):
 
 class TestWorldDashboardScreen(unittest.TestCase):
     def test_world_dashboard_surfaces_observer_state(self) -> None:
-        from fantasy_simulator.event_models import WorldEventRecord
-        from fantasy_simulator.rumor_models import Rumor
+        from fantasy_simulator.world_event.models import WorldEventRecord
+        from fantasy_simulator.rumor.models import Rumor
         from fantasy_simulator.ui.screen_dashboard import _show_world_dashboard
         from fantasy_simulator.ui.ui_context import UIContext
         from fantasy_simulator.ui.render_backend import PrintRenderBackend
@@ -494,7 +494,7 @@ class TestRumorBoardScreen(unittest.TestCase):
             pass
 
     def test_rumor_board_lists_active_rumors_with_context(self) -> None:
-        from fantasy_simulator.rumor_models import Rumor
+        from fantasy_simulator.rumor.models import Rumor
         from fantasy_simulator.ui.screen_rumors import _show_rumor_board
         from fantasy_simulator.ui.ui_context import UIContext
         from fantasy_simulator.ui.render_backend import PrintRenderBackend
@@ -537,7 +537,7 @@ class TestRumorBoardScreen(unittest.TestCase):
         self.assertNotIn("event: evt_road", text)
 
     def test_rumor_board_filters_by_location_query_and_clears_filter(self) -> None:
-        from fantasy_simulator.rumor_models import Rumor
+        from fantasy_simulator.rumor.models import Rumor
         from fantasy_simulator.ui.screen_rumors import _show_rumor_board
         from fantasy_simulator.ui.ui_context import UIContext
         from fantasy_simulator.ui.render_backend import PrintRenderBackend
@@ -575,7 +575,7 @@ class TestRumorBoardScreen(unittest.TestCase):
         self.assertIn("Forest rumor.", text)
 
     def test_rumor_board_handles_invalid_filter_choice_missing_event_and_empty_state(self) -> None:
-        from fantasy_simulator.rumor_models import Rumor
+        from fantasy_simulator.rumor.models import Rumor
         from fantasy_simulator.ui.screen_rumors import _show_rumor_board
         from fantasy_simulator.ui.ui_context import UIContext
         from fantasy_simulator.ui.render_backend import PrintRenderBackend
@@ -615,7 +615,7 @@ class TestRumorBoardScreen(unittest.TestCase):
         self.assertIn("No active rumors are circulating.", empty_text)
 
     def test_rumor_board_excludes_expired_rumors(self) -> None:
-        from fantasy_simulator.rumor_models import Rumor
+        from fantasy_simulator.rumor.models import Rumor
         from fantasy_simulator.ui.screen_rumors import _show_rumor_board
         from fantasy_simulator.ui.ui_context import UIContext
         from fantasy_simulator.ui.render_backend import PrintRenderBackend
@@ -644,8 +644,8 @@ class TestRumorBoardScreen(unittest.TestCase):
         self.assertNotIn("Expired rumor.", text)
 
     def test_rumor_board_detail_links_source_event_and_location(self) -> None:
-        from fantasy_simulator.event_models import WorldEventRecord
-        from fantasy_simulator.rumor_models import Rumor
+        from fantasy_simulator.world_event.models import WorldEventRecord
+        from fantasy_simulator.rumor.models import Rumor
         from fantasy_simulator.ui.screen_rumors import _show_rumor_board
         from fantasy_simulator.ui.ui_context import UIContext
         from fantasy_simulator.ui.render_backend import PrintRenderBackend
@@ -717,8 +717,8 @@ class TestRumorBoardScreen(unittest.TestCase):
         self.assertIn("Recent events", text)
 
     def test_rumor_board_does_not_render_internal_event_hashes(self) -> None:
-        from fantasy_simulator.event_models import WorldEventRecord
-        from fantasy_simulator.rumor_models import Rumor
+        from fantasy_simulator.world_event.models import WorldEventRecord
+        from fantasy_simulator.rumor.models import Rumor
         from fantasy_simulator.ui.screen_rumors import _show_rumor_board
         from fantasy_simulator.ui.ui_context import UIContext
         from fantasy_simulator.ui.render_backend import PrintRenderBackend

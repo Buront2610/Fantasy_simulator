@@ -15,11 +15,11 @@ from fantasy_simulator.content.setting_bundle import (
     SiteSeedDefinition,
     WorldDefinition,
 )
-from fantasy_simulator.event_models import EventResult
+from fantasy_simulator.world_event.models import EventResult
 from fantasy_simulator.language.schema import SoundChangeRuleDefinition
 from fantasy_simulator.persistence.migrations import CURRENT_VERSION
 from fantasy_simulator.persistence.save_load import load_simulation, save_simulation
-from fantasy_simulator.simulator import Simulator
+from fantasy_simulator.simulation import Simulator
 from fantasy_simulator.events import WorldEventRecord
 from fantasy_simulator.world import World
 from fantasy_simulator.reports import generate_monthly_report

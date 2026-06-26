@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fantasy_simulator.event_models import EventResult, WorldEventRecord
+from fantasy_simulator.world_event.models import EventResult, WorldEventRecord
 from fantasy_simulator.simulation.engine import Simulator
 from fantasy_simulator.world import World
 

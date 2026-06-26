@@ -14,8 +14,8 @@ from fantasy_simulator.character import (
     Relationship,
     random_stats,
 )
-from fantasy_simulator.character_lifespan import legacy_lifespan_years
-from fantasy_simulator.character_personality import (
+from fantasy_simulator.character_model.lifespan import legacy_lifespan_years
+from fantasy_simulator.character_model.personality import (
     generate_personality,
     personality_archetype_key,
     render_personality_archetype,

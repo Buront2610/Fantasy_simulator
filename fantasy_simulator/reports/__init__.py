@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Dict, List, Set
 
-from ..event_rendering import render_event_record
+from ..world_event.rendering import render_event_record
 from ..narrative.constants import EVENT_KINDS_FATAL
 from .formatting import format_monthly_report, format_yearly_report
 from .models import (
@@ -31,7 +31,7 @@ from ..observation import build_world_change_report_projection
 from ..world_event.index import location_ids_for_record
 
 if TYPE_CHECKING:
-    from ..event_models import WorldEventRecord
+    from ..world_event.models import WorldEventRecord
     from ..world import World
 
 __all__ = [

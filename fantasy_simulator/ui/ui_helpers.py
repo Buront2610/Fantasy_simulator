@@ -6,8 +6,8 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from .. import display_width as _display_width
 from ..i18n import tr
+from ..world_map import display_width as _display_width
 
 _wcwidth = _display_width._wcwidth
 _wcswidth = _display_width._wcswidth

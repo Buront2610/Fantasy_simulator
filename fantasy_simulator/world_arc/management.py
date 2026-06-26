@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Iterable, List, Optional
 
-from ..event_models import WorldEventRecord
+from ..world_event.models import WorldEventRecord
 from . import WorldArc
 
 

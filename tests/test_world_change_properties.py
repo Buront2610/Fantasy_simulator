@@ -6,8 +6,8 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from fantasy_simulator.event_models import WorldEventRecord
-from fantasy_simulator.ids import LocationId, RouteId
+from fantasy_simulator.world_event.models import WorldEventRecord
+from fantasy_simulator.world_core.ids import LocationId, RouteId
 from fantasy_simulator.terrain import RouteEdge, TerrainCell, TerrainMap
 from fantasy_simulator.world_change import (
     LocationRenameUpdate,

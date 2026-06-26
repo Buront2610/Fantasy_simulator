@@ -29,7 +29,7 @@ from fantasy_simulator.adventure import (
 )
 from fantasy_simulator.character import Character
 from fantasy_simulator.i18n import set_locale
-from fantasy_simulator.simulator import Simulator
+from fantasy_simulator.simulation import Simulator
 from fantasy_simulator.world import World
 
 

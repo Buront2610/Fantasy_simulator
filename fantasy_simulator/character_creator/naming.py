@@ -7,7 +7,7 @@ import random
 from typing import Any
 
 from ..content.setting_bundle import NamingRulesDefinition, SettingBundle
-from ..language_engine import LanguageEngine
+from ..language.engine import LanguageEngine
 
 
 GENDERS = ["Male", "Female", "Non-binary"]

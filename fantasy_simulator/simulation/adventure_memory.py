@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, List
 
 from ..adventure import AdventureRun, generate_adventure_id
-from ..adventure_site_state import apply_adventure_site_state
+from ..adventure.site_state import apply_adventure_site_state
 from ..i18n import tr
 from ..narrative.context import alias_for_event, build_narrative_context, derive_relation_hint, epitaph_for_character
 

@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from ..adventure import AdventureRun
     from ..character import Character
     from ..content.setting_bundle import SettingBundle
-    from ..event_models import WorldEventRecord
+    from ..world_event.models import WorldEventRecord
     from ..rumor import Rumor
     from ..world_location.references import LocationReferenceResolver
     from ..world_core.records import MemorialRecord

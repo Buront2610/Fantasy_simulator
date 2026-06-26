@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from fantasy_simulator.adventure import AdventureRun
 from fantasy_simulator.character import Character
-from fantasy_simulator.death_resolution import mark_character_dead
-from fantasy_simulator.event_models import WorldEventRecord
+from fantasy_simulator.character_model.death_resolution import mark_character_dead
+from fantasy_simulator.world_event.models import WorldEventRecord
 from fantasy_simulator.testing.world_metrics import (
     assert_population_floor,
     assert_no_dangling_adventure_members,

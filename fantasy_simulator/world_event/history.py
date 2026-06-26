@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Any, Callable, List, Mapping, Sequence
 
-from ..event_models import WorldEventRecord
+from .models import WorldEventRecord
 from .index import EventHistoryIndex
 from .state import SupportsEventIndex, append_canonical_event_record
 

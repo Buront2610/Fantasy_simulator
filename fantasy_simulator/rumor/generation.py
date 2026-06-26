@@ -6,7 +6,7 @@ import random
 import uuid
 from typing import TYPE_CHECKING, Any, List, Optional
 
-from ..event_rendering import render_event_record
+from ..world_event.rendering import render_event_record
 from ..i18n import tr
 from ..narrative.constants import EVENT_KINDS_FATAL
 from .constants import DISCLOSURE, MIN_SEVERITY_FOR_RUMOR, RUMOR_BASE_CHANCE
@@ -14,7 +14,7 @@ from .models import Rumor
 from ..world_event.index import location_ids_for_record
 
 if TYPE_CHECKING:
-    from ..event_models import WorldEventRecord
+    from ..world_event.models import WorldEventRecord
     from ..world import World
 
 

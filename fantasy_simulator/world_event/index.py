@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Set, Tuple
 
-from ..event_models import LOCATION_TAG_PREFIX, WorldEventRecord
+from .models import LOCATION_TAG_PREFIX, WorldEventRecord
 
 
 def _freeze_payload(value: Any) -> Any:

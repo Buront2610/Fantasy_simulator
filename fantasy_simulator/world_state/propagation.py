@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Protocol, Tuple
 
-from ..rule_override_resolution import (
+from ..world_dynamics.rule_overrides import (
     DEFAULT_PROPAGATION_RULES,
     clone_default_propagation_rules as _clone_default_propagation_rules,
     is_disabled_threshold,

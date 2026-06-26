@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from fantasy_simulator.event_models import WorldEventRecord
+from fantasy_simulator.world_event.models import WorldEventRecord
 from fantasy_simulator.i18n import get_locale, set_locale
-from fantasy_simulator.ids import LocationId
+from fantasy_simulator.world_core.ids import LocationId
 from fantasy_simulator.terrain import BIOME_TYPES, TerrainCell, TerrainMap
 from fantasy_simulator.ui.map_renderer import build_map_info, render_region_map
 from fantasy_simulator.world import World

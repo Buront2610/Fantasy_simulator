@@ -26,7 +26,7 @@ from fantasy_simulator.content.setting_bundle import (
 )
 from fantasy_simulator.i18n import get_locale, set_locale
 from fantasy_simulator.persistence.save_load import load_simulation, save_simulation
-from fantasy_simulator.simulator import Simulator
+from fantasy_simulator.simulation import Simulator
 from fantasy_simulator.world import World
 
 

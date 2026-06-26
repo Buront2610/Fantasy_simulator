@@ -6,7 +6,7 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Any, Iterable, List
 
-from ..event_rendering import render_event_record
+from ..world_event.rendering import render_event_record
 from ..i18n import tr
 from .combat_log_presenter import combat_round_count_for_event
 

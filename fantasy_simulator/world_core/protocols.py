@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence
 from typing import List, Protocol
 
-from ..event_models import WorldEventRecord
+from ..world_event.models import WorldEventRecord
 from ..terrain import AtlasLayout, RouteEdge, Site, TerrainMap
 
 

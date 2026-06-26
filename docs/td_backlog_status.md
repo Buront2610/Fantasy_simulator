@@ -51,7 +51,7 @@
 ### Done in this repo state
 
 - `events/` から純粋データ契約（`EventResult` / `WorldEventRecord` / `generate_record_id`）を
-  `event_models.py` へ抽出し、イベント生成の副作用ロジックと分離した。
+  現在は `world_event/models.py` に集約し、イベント生成の副作用ロジックと分離している。
 - `world.py` の event log projection は `world_event/log.py` へ抽出し、ログ整形/投影を純関数化した。
 - event-driven な location state mutation / canonical record append を `world_event/state.py`
   へ抽出し、`World` は orchestration と互換API維持に集中する構造へ再配置した。

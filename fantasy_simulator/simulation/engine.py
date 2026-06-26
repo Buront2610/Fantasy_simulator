@@ -20,7 +20,7 @@ import random
 from typing import TYPE_CHECKING, List, Optional
 
 from ..adventure import AdventureRun
-from ..event_models import WorldEventRecord
+from ..world_event.models import WorldEventRecord
 from ..events import EventSystem
 from ..narrative.template_history import TemplateHistory
 

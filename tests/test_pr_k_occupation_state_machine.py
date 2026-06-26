@@ -3,10 +3,10 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 
-from fantasy_simulator.event_models import WorldEventRecord
-from fantasy_simulator.event_rendering import render_event_record
+from fantasy_simulator.world_event.models import WorldEventRecord
+from fantasy_simulator.world_event.rendering import render_event_record
 from fantasy_simulator.i18n import get_locale, set_locale
-from fantasy_simulator.ids import FactionId, LocationId
+from fantasy_simulator.world_core.ids import FactionId, LocationId
 from fantasy_simulator.ui.map_renderer import build_map_info, render_region_map
 from fantasy_simulator.world import World
 from fantasy_simulator.world_change import (

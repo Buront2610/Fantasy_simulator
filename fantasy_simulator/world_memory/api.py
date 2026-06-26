@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Container, Dict, Iterable, List, Optional, Tuple
 
-from ..event_models import WorldEventRecord
-from ..event_rendering import render_event_record
-from ..ids import EventRecordId, FactionId, LocationId, RouteId
+from ..world_event.models import WorldEventRecord
+from ..world_event.rendering import render_event_record
+from ..world_core.ids import EventRecordId, FactionId, LocationId, RouteId
 from ..world_dynamics import pressure as world_conflict_pressure
 from ..world_arc import management as world_arcs
 from ..world_change import (

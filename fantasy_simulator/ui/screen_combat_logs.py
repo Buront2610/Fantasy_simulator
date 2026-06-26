@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from ..combat_system.log_index import CombatLogEntryView, build_combat_log_index
-from ..event_rendering import render_event_record
+from ..world_event.rendering import render_event_record
 from ..i18n import tr
-from ..simulator import Simulator
 from .combat_log_presenter import combat_log_lines_for_adventure_entry, combat_log_lines_for_event
 from .screen_input import _get_numeric_choice
 from .ui_context import UIContext, _default_ctx
 
 
-def _show_combat_logs(sim: Simulator, ctx: UIContext | None = None) -> None:
+def _show_combat_logs(sim: Any, ctx: UIContext | None = None) -> None:
     ctx = _default_ctx(ctx)
     action = ctx.choose_key(
         tr("combat_logs_prompt"),
@@ -27,7 +28,7 @@ def _show_combat_logs(sim: Simulator, ctx: UIContext | None = None) -> None:
         _show_character_combat_logs(sim, ctx)
 
 
-def _show_character_combat_logs(sim: Simulator, ctx: UIContext) -> None:
+def _show_character_combat_logs(sim: Any, ctx: UIContext) -> None:
     characters = sorted(sim.world.characters, key=lambda character: character.name)
     ctx.out.print_line()
     for index, character in enumerate(characters, 1):
@@ -45,7 +46,7 @@ def _show_character_combat_logs(sim: Simulator, ctx: UIContext) -> None:
 
 
 def _show_combat_log_entries(
-    sim: Simulator,
+    sim: Any,
     entries: tuple[CombatLogEntryView, ...],
     ctx: UIContext,
     *,
@@ -69,7 +70,7 @@ def _show_combat_log_entries(
     _show_combat_log_detail(sim, shown[choice], ctx)
 
 
-def _show_combat_log_detail(sim: Simulator, entry: CombatLogEntryView, ctx: UIContext) -> None:
+def _show_combat_log_detail(sim: Any, entry: CombatLogEntryView, ctx: UIContext) -> None:
     ctx.out.print_line()
     ctx.out.print_heading(f"  {_entry_summary(sim, entry)}")
     if entry.source_kind == "adventure_combat":
@@ -82,7 +83,7 @@ def _show_combat_log_detail(sim: Simulator, entry: CombatLogEntryView, ctx: UICo
     ctx.inp.pause()
 
 
-def _entry_summary(sim: Simulator, entry: CombatLogEntryView) -> str:
+def _entry_summary(sim: Any, entry: CombatLogEntryView) -> str:
     location = sim.world.location_name(entry.location_id) if entry.location_id else tr("combat_log_unknown")
     event_type_key = f"event_type_{entry.source_kind}"
     kind = tr(event_type_key)

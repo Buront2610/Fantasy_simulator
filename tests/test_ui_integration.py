@@ -60,7 +60,7 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         from fantasy_simulator.ui.screens import _show_results, _build_default_world
 
         world = _build_default_world(num_characters=4, seed=42)
-        from fantasy_simulator.simulator import Simulator
+        from fantasy_simulator.simulation import Simulator
         sim = Simulator(world, events_per_year=2)
         sim.advance_years(1)
 
@@ -77,7 +77,7 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         self.assertTrue(len(headings) >= 1, "No headings printed")
 
     def test_results_leave_warning_can_keep_reviewing_then_exit(self) -> None:
-        from fantasy_simulator.simulator import Simulator
+        from fantasy_simulator.simulation import Simulator
         from fantasy_simulator.ui.screens import _build_default_world, _show_results
 
         world = _build_default_world(num_characters=4, seed=42)
@@ -228,7 +228,7 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         from fantasy_simulator.ui.screens import _show_results, _build_default_world
 
         world = _build_default_world(num_characters=4, seed=42)
-        from fantasy_simulator.simulator import Simulator
+        from fantasy_simulator.simulation import Simulator
         sim = Simulator(world, events_per_year=2)
         sim.advance_years(1)
 
@@ -246,7 +246,7 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         from fantasy_simulator.ui.screens import _show_results, _build_default_world
 
         world = _build_default_world(num_characters=4, seed=42)
-        from fantasy_simulator.simulator import Simulator
+        from fantasy_simulator.simulation import Simulator
         sim = Simulator(world, events_per_year=2)
         sim.advance_years(1)
 
@@ -261,7 +261,7 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         from fantasy_simulator.ui.screens import _show_results, _build_default_world
 
         world = _build_default_world(num_characters=8, seed=42)
-        from fantasy_simulator.simulator import Simulator
+        from fantasy_simulator.simulation import Simulator
         sim = Simulator(world, events_per_year=8)
         sim.advance_years(3)
 
@@ -276,7 +276,7 @@ class TestShowResultsUsesBackends(unittest.TestCase):
 
     def test_event_log_groups_entries_with_category_and_metadata(self) -> None:
         from types import SimpleNamespace
-        from fantasy_simulator.event_models import WorldEventRecord
+        from fantasy_simulator.world_event.models import WorldEventRecord
         from fantasy_simulator.ui.screens import _show_results
 
         world = World()
@@ -329,7 +329,7 @@ class TestShowResultsUsesBackends(unittest.TestCase):
 
     def test_event_log_renders_causal_chain_without_internal_hashes(self) -> None:
         from types import SimpleNamespace
-        from fantasy_simulator.event_models import WorldEventRecord
+        from fantasy_simulator.world_event.models import WorldEventRecord
         from fantasy_simulator.ui.screens import _show_results
 
         cause_id = "0123456789abcdef0123456789abcdef"
@@ -369,7 +369,7 @@ class TestShowResultsUsesBackends(unittest.TestCase):
 
     def test_daily_live_stream_surfaces_quiet_days_and_adventure_status(self) -> None:
         from fantasy_simulator.adventure import AdventureRun
-        from fantasy_simulator.simulator import Simulator
+        from fantasy_simulator.simulation import Simulator
         from fantasy_simulator.ui.screen_simulation import _advance_daily_live
 
         world = World()
@@ -397,7 +397,7 @@ class TestShowResultsUsesBackends(unittest.TestCase):
     def test_event_log_renders_relationship_personality_and_catalyst_factors(self) -> None:
         import random
         from types import SimpleNamespace
-        from fantasy_simulator.event_models import WorldEventRecord
+        from fantasy_simulator.world_event.models import WorldEventRecord
         from fantasy_simulator.events import EventSystem
         from fantasy_simulator.ui.screens import _show_results
 
@@ -445,7 +445,7 @@ class TestShowResultsUsesBackends(unittest.TestCase):
 
     def test_event_log_summarizes_combat_rounds_without_expanding_details(self) -> None:
         from types import SimpleNamespace
-        from fantasy_simulator.event_models import WorldEventRecord
+        from fantasy_simulator.world_event.models import WorldEventRecord
         from fantasy_simulator.ui.screens import _show_results
 
         world = World()
@@ -489,7 +489,7 @@ class TestShowResultsUsesBackends(unittest.TestCase):
 
     def test_combat_log_menu_renders_latest_combat_without_full_event_log(self) -> None:
         from types import SimpleNamespace
-        from fantasy_simulator.event_models import WorldEventRecord
+        from fantasy_simulator.world_event.models import WorldEventRecord
         from fantasy_simulator.ui.screens import _show_results
 
         world = World()
@@ -533,7 +533,7 @@ class TestShowResultsUsesBackends(unittest.TestCase):
 
     def test_combat_log_menu_filters_by_character(self) -> None:
         from types import SimpleNamespace
-        from fantasy_simulator.event_models import WorldEventRecord
+        from fantasy_simulator.world_event.models import WorldEventRecord
         from fantasy_simulator.ui.screens import _show_results
 
         world = World()
@@ -568,7 +568,7 @@ class TestShowResultsUsesBackends(unittest.TestCase):
 
     def test_adventure_detail_renders_hazard_combat_rounds(self) -> None:
         from fantasy_simulator.adventure import AdventureRun
-        from fantasy_simulator.simulator import Simulator
+        from fantasy_simulator.simulation import Simulator
         from fantasy_simulator.ui.screens import _show_results
 
         world = World()
@@ -620,7 +620,7 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         self.assertIn("damage 4, decisive.", out.text)
 
     def test_world_dashboard_follow_up_opens_character_story(self) -> None:
-        from fantasy_simulator.simulator import Simulator
+        from fantasy_simulator.simulation import Simulator
         from fantasy_simulator.ui.screens import _show_results
 
         world = World()
@@ -641,7 +641,7 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         self.assertIn("Watched the capital gate.", out.text)
 
     def test_world_dashboard_follow_up_opens_location_map_detail(self) -> None:
-        from fantasy_simulator.simulator import Simulator
+        from fantasy_simulator.simulation import Simulator
         from fantasy_simulator.ui.screens import _show_results
 
         world = World()
@@ -663,7 +663,7 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         from fantasy_simulator.ui.screens import _show_results, _build_default_world
 
         world = _build_default_world(num_characters=4, seed=42)
-        from fantasy_simulator.simulator import Simulator
+        from fantasy_simulator.simulation import Simulator
         sim = Simulator(world, events_per_year=2)
         sim.advance_years(1)
 
@@ -686,7 +686,7 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         from fantasy_simulator.ui.screens import _show_results, _build_default_world
 
         world = _build_default_world(num_characters=4, seed=42)
-        from fantasy_simulator.simulator import Simulator
+        from fantasy_simulator.simulation import Simulator
         sim = Simulator(world, events_per_year=2)
         sim.advance_years(1)
 
@@ -709,7 +709,7 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         from fantasy_simulator.ui.screens import _show_results, _build_default_world
 
         world = _build_default_world(num_characters=4, seed=42)
-        from fantasy_simulator.simulator import Simulator
+        from fantasy_simulator.simulation import Simulator
         sim = Simulator(world, events_per_year=2)
         sim.advance_years(1)
 
@@ -732,7 +732,7 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         from fantasy_simulator.ui.screens import _show_results, _build_default_world
 
         world = _build_default_world(num_characters=4, seed=42)
-        from fantasy_simulator.simulator import Simulator
+        from fantasy_simulator.simulation import Simulator
         sim = Simulator(world, events_per_year=2)
         sim.advance_years(1)
 
@@ -754,7 +754,7 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         from fantasy_simulator.ui.screens import _show_results, _build_default_world
 
         world = _build_default_world(num_characters=4, seed=42)
-        from fantasy_simulator.simulator import Simulator
+        from fantasy_simulator.simulation import Simulator
         sim = Simulator(world, events_per_year=2)
         sim.advance_years(1)
 
@@ -769,7 +769,7 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         from fantasy_simulator.ui.screens import _show_results, _build_default_world
 
         world = _build_default_world(num_characters=4, seed=42)
-        from fantasy_simulator.simulator import Simulator
+        from fantasy_simulator.simulation import Simulator
         sim = Simulator(world, events_per_year=2)
         sim.advance_years(1)
 
@@ -796,7 +796,7 @@ class TestShowResultsUsesBackends(unittest.TestCase):
             "Scout",
             "A scout marked this gate after sunset.",
         )
-        from fantasy_simulator.simulator import Simulator
+        from fantasy_simulator.simulation import Simulator
         sim = Simulator(world, events_per_year=2)
         sim.advance_years(1)
 
@@ -817,7 +817,7 @@ class TestShowResultsUsesBackends(unittest.TestCase):
         from fantasy_simulator.ui.screens import _show_results, _build_default_world
 
         world = _build_default_world(num_characters=4, seed=42)
-        from fantasy_simulator.simulator import Simulator
+        from fantasy_simulator.simulation import Simulator
         sim = Simulator(world, events_per_year=2)
         sim.advance_years(1)
 
@@ -855,7 +855,7 @@ class TestShowRosterUsesBackends(unittest.TestCase):
         self.assertTrue(any("Alice" in c[1] for c in out.calls if len(c) > 1))
 
     def test_roster_profile_groups_background_family_history_and_combat(self) -> None:
-        from fantasy_simulator.event_models import WorldEventRecord
+        from fantasy_simulator.world_event.models import WorldEventRecord
         from fantasy_simulator.ui.screens import _show_roster
 
         world = World()
@@ -1234,7 +1234,7 @@ class TestNoPrintLeaks(unittest.TestCase):
     def test_advance_simulation_produces_no_stdout(self) -> None:
         """_advance_simulation must not leak to stdout."""
         from fantasy_simulator.ui.screens import _build_default_world, _advance_simulation
-        from fantasy_simulator.simulator import Simulator
+        from fantasy_simulator.simulation import Simulator
 
         world = _build_default_world(num_characters=4, seed=42)
         sim = Simulator(world, events_per_year=2)
@@ -1253,7 +1253,7 @@ class TestNoPrintLeaks(unittest.TestCase):
 
     def test_advance_simulation_heading_is_localized(self) -> None:
         from fantasy_simulator.ui.screens import _build_default_world, _advance_simulation
-        from fantasy_simulator.simulator import Simulator
+        from fantasy_simulator.simulation import Simulator
 
         set_locale("ja")
         try:
@@ -1273,7 +1273,7 @@ class TestNoPrintLeaks(unittest.TestCase):
             set_locale("en")
 
     def test_advance_days_live_outputs_daily_ticks_without_stdout(self) -> None:
-        from fantasy_simulator.simulator import Simulator
+        from fantasy_simulator.simulation import Simulator
         from fantasy_simulator.ui.screens import _advance_days, _build_default_world
 
         world = _build_default_world(num_characters=4, seed=42)
@@ -1293,8 +1293,8 @@ class TestNoPrintLeaks(unittest.TestCase):
         self.assertIn("Simulation advanced to Year 1000, Embermorn 3.", out.text)
 
     def test_advance_days_live_streams_every_new_event(self) -> None:
-        from fantasy_simulator.event_models import WorldEventRecord
-        from fantasy_simulator.simulator import Simulator
+        from fantasy_simulator.world_event.models import WorldEventRecord
+        from fantasy_simulator.simulation import Simulator
         from fantasy_simulator.ui.screens import _advance_days, _build_default_world
 
         world = _build_default_world(num_characters=4, seed=42)

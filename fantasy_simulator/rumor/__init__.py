@@ -7,7 +7,7 @@ imperfect information about events they did not directly observe.
 
 from __future__ import annotations
 
-from ..event_models import WorldEventRecord
+from ..world_event.models import WorldEventRecord
 from .constants import (
     DISCLOSURE,
     MAX_ACTIVE_RUMORS,

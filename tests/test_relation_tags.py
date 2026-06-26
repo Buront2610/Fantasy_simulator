@@ -12,8 +12,8 @@ import random
 import pytest
 
 from fantasy_simulator.character import Character
-from fantasy_simulator.event_causality import pair_cause_event_ids
-from fantasy_simulator.event_models import WorldEventRecord
+from fantasy_simulator.world_event.causality import pair_cause_event_ids
+from fantasy_simulator.world_event.models import WorldEventRecord
 from fantasy_simulator.events import EventSystem
 from fantasy_simulator.world import World
 

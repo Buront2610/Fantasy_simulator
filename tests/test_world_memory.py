@@ -29,7 +29,7 @@ from fantasy_simulator.narrative.context import (
     epitaph_for_character,
 )
 from fantasy_simulator.rumor import Rumor, RUMOR_MAX_AGE_MONTHS
-from fantasy_simulator.simulator import Simulator
+from fantasy_simulator.simulation import Simulator
 from fantasy_simulator.world import MemorialRecord, World
 from fantasy_simulator.simulation.adventure_coordinator import AdventureMixin
 from fantasy_simulator.narrative.template_history import TemplateHistory

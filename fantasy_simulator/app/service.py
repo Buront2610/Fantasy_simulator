@@ -7,8 +7,8 @@ from collections import Counter
 from collections.abc import Mapping
 from typing import Any, Dict, List
 
-from ..event_models import WorldEventRecord
-from ..simulator import Simulator
+from ..world_event.models import WorldEventRecord
+from ..simulation import Simulator
 from .contracts import AppCommandResult, EventSummaryView, WorldDashboardSnapshot
 
 

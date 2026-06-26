@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, TYPE_CHECKING
 
-from ..event_rendering import render_event_record
+from ..world_event.rendering import render_event_record
 from ..i18n import tr
 from ..observation import (
     build_era_timeline_projection,
@@ -18,7 +18,7 @@ from ..observation import (
     build_world_change_report_projection,
 )
 from ..world_event.index import location_ids_for_record
-from ..location_observation import (
+from ..world_location.observation import (
     LocationObservationView,
     RumorSummaryView,
     build_location_observation_view,

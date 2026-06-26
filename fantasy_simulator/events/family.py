@@ -5,9 +5,9 @@ from __future__ import annotations
 import random
 from typing import TYPE_CHECKING, Any, Dict, List
 
-from ..event_causality import pair_cause_event_ids
+from ..world_event.causality import pair_cause_event_ids
 from ..character_creator import CharacterCreator
-from ..event_models import EventResult, generate_record_id
+from ..world_event.models import EventResult, generate_record_id
 from ..i18n import tr
 
 if TYPE_CHECKING:

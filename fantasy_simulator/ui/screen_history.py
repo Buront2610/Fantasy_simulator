@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any
 
 from ..i18n import tr, tr_term
-from ..simulator import Simulator
 from ..world import World
 from .presenters import LocationPresenter, ReportPresenter
 from .screen_input import _get_numeric_choice
@@ -19,7 +18,7 @@ from .view_models import (
 )
 
 
-def _open_report_follow_up(sim: Simulator, action: FollowUpActionView, ctx: UIContext) -> None:
+def _open_report_follow_up(sim: Any, action: FollowUpActionView, ctx: UIContext) -> None:
     world = sim.world
     if action.target_type == "character":
         character = world.get_character_by_id(action.target_id)
@@ -45,7 +44,7 @@ def _month_season_hint(world: World, year: int) -> str:
     )
 
 
-def _show_monthly_report(sim: Simulator, ctx: UIContext | None = None) -> None:
+def _show_monthly_report(sim: Any, ctx: UIContext | None = None) -> None:
     """Show a monthly report card for the latest completed year."""
     ctx = _default_ctx(ctx)
     out = ctx.out
@@ -91,7 +90,7 @@ def _show_monthly_report(sim: Simulator, ctx: UIContext | None = None) -> None:
     ctx.inp.pause()
 
 
-def _show_yearly_report(sim: Simulator, ctx: UIContext | None = None) -> None:
+def _show_yearly_report(sim: Any, ctx: UIContext | None = None) -> None:
     """Show a yearly report card, with detailed text available on demand."""
     ctx = _default_ctx(ctx)
     out = ctx.out
@@ -115,7 +114,7 @@ def _show_yearly_report(sim: Simulator, ctx: UIContext | None = None) -> None:
     ctx.inp.pause()
 
 
-def _show_single_story(sim: Simulator, ctx: UIContext | None = None) -> None:
+def _show_single_story(sim: Any, ctx: UIContext | None = None) -> None:
     ctx = _default_ctx(ctx)
     out = ctx.out
     world = sim.world
@@ -139,7 +138,7 @@ def _show_single_story(sim: Simulator, ctx: UIContext | None = None) -> None:
     _show_character_story(sim, character.char_id, ctx=ctx)
 
 
-def _show_character_story(sim: Simulator, character_id: str, ctx: UIContext | None = None) -> None:
+def _show_character_story(sim: Any, character_id: str, ctx: UIContext | None = None) -> None:
     """Show one already-selected character story."""
     ctx = _default_ctx(ctx)
     ctx.out.print_line()

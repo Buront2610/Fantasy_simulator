@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Container, Iterable, Mapping, MutableMapping, Protocol
 
-from fantasy_simulator.ids import (
+from fantasy_simulator.world_core.ids import (
     EraKey,
     EventRecordId,
     FactionId,

@@ -6,11 +6,11 @@ import json
 from pathlib import Path
 from typing import Any
 
-from fantasy_simulator.event_models import WorldEventRecord
+from fantasy_simulator.world_event.models import WorldEventRecord
 from fantasy_simulator.observation import build_era_timeline_projection
 from fantasy_simulator.persistence.migrations import CURRENT_VERSION
 from fantasy_simulator.persistence.save_load import load_simulation
-from fantasy_simulator.simulator import Simulator
+from fantasy_simulator.simulation import Simulator
 from fantasy_simulator.world import World
 
 
