@@ -3,17 +3,17 @@
 from __future__ import annotations
 
 import unicodedata
+from importlib import import_module
 from typing import Any, List
 
 try:
-    from wcwidth import wcwidth as _imported_wcwidth
-    from wcwidth import wcswidth as _imported_wcswidth
+    _wcwidth_module = import_module("wcwidth")
 except ImportError:  # pragma: no cover - depends on optional ui extra
     _wcwidth: Any = None
     _wcswidth: Any = None
 else:
-    _wcwidth = _imported_wcwidth
-    _wcswidth = _imported_wcswidth
+    _wcwidth = getattr(_wcwidth_module, "wcwidth")
+    _wcswidth = getattr(_wcwidth_module, "wcswidth")
 
 
 def display_width(text: str) -> int:
