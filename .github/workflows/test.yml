@@ -33,11 +33,7 @@ jobs:
           fantasy_simulator/character_model
           fantasy_simulator/combat_system
           fantasy_simulator/content
-          fantasy_simulator/event_models.py
-          fantasy_simulator/event_rendering.py
           fantasy_simulator/events
-          fantasy_simulator/ids.py
-          fantasy_simulator/location_observation.py
           fantasy_simulator/observation
           fantasy_simulator/reports
           fantasy_simulator/rumor
