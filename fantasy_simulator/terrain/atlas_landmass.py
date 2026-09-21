@@ -129,10 +129,16 @@ def _build_cluster_land(
     ry = max(4.0, span_y + 3.0)
     seed_off = int(cx * 7 + cy * 13)
 
-    for py in range(ATLAS_CANVAS_H):
-        for px in range(ATLAS_CANVAS_W):
-            dx = (px - cx) / max(rx, 1.0)
-            dy = (py - cy) / max(ry, 1.0)
+    # The shoreline threshold is at most .85 + (.15+.10+.06) + (.25+.15+.10) = 1.66.
+    # A conservative radius of 2 excludes only cells that cannot pass the original predicate.
+    x_start, x_stop = max(0, math.floor(cx - 2 * rx)), min(ATLAS_CANVAS_W, math.ceil(cx + 2 * rx) + 1)
+    y_start, y_stop = max(0, math.floor(cy - 2 * ry)), min(ATLAS_CANVAS_H, math.ceil(cy + 2 * ry) + 1)
+    for py in range(y_start, y_stop):
+        dy = (py - cy) / ry  # ry >= 4 and rx >= 6 by construction.
+        for px in range(x_start, x_stop):
+            dx = (px - cx) / rx
+            if dx * dx + dy * dy >= 4:
+                continue
             dist = math.sqrt(dx * dx + dy * dy)
             angle = math.atan2(dy, dx)
             angular_noise = (
