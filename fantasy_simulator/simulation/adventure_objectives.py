@@ -4,6 +4,7 @@ from typing import Any
 
 from ..adventure.objective import AdventureObjective, default_objective
 from ..i18n import tr
+from ..adventure.roles import choose_companions
 
 
 def _report_reaches(world: Any, origin: str, source: str, spread: int) -> bool:
@@ -116,9 +117,7 @@ def try_start_rescue(simulator: Any, candidates: list[Any]) -> bool:
         for target, evidence in targets:
             if target.location_id not in reachable:
                 continue
-            members = [leader, *[actor for actor in candidates
-                                 if actor.char_id != leader.char_id and actor.location_id == leader.location_id
-                                 and actor.get_relationship(target.char_id) >= 0][:2]]
+            members = [leader, *choose_companions(leader, candidates, 2, target=target)]
             run = AdventureRun(leader.char_id, leader.name, leader.location_id, target.location_id,
                                simulator.world.year, adventure_id=generate_adventure_id(simulator.id_rng),
                                member_ids=[member.char_id for member in members],

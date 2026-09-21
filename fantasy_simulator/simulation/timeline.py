@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from ..events.lifecycle import character_lifespan_years, natural_death_chance, should_record_aging_event
 from ..i18n import tr
+from ..adventure.roles import party_care_factor
 from ..world_history.retention import compact_world_history
 from .calendar import annual_probability_to_fraction, distributed_budget
 from .population import population_pressure_factor, run_population_maintenance
@@ -84,6 +85,7 @@ class TimelineMixin:
     - ``rng``: RNG for simulation decisions
     """
 
+    elapsed_days: int  # Owned by Simulator; used to price current party care.
     # Seasonal modifiers applied to locations each month (design §5.7).
     SEASONAL_MODIFIERS = DEFAULT_SEASONAL_MODIFIERS
 
@@ -185,7 +187,8 @@ class TimelineMixin:
             char,
             self.world,
             rng=self.rng,
-            death_chance=cached_natural_death_chance(self, char, year_fraction),
+            death_chance=(cached_natural_death_chance(self, char, year_fraction)
+                          * party_care_factor(self.world, char, self.elapsed_days + 1)),
         )
         if result is None:
             return

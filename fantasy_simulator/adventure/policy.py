@@ -32,6 +32,7 @@ from .constants import (
 )
 from .protocols import AdventureRunLike
 from .schedule import PACE_DISCOVERY, PACE_RISK
+from .roles import capability
 
 if TYPE_CHECKING:
     from ..character import Character
@@ -112,6 +113,8 @@ class AdventurePolicyEngine:
 
     def compute_injury_chance(self, members: List["Character"]) -> float:
         combat = self.combat_score(members)
+        if self.run.objective is not None:
+            combat = 0.65 * capability(members, "frontline").score + 0.35 * capability(members, "scout").score
         ability_mod = STAT_BASELINE / max(combat, 1.0)
         danger_mod = 0.5 + self.run.danger_level / 100.0
         policy_mod = 1.0 if self.run.objective is not None else POLICY_INJURY_MOD.get(self.run.policy, 1.0)
@@ -122,7 +125,8 @@ class AdventurePolicyEngine:
         return max(0.02, min(0.45, chance))
 
     def compute_loot_chance(self, members: List["Character"]) -> float:
-        lore = self.lore_score(members)
+        lore = (capability(members, "lore").score if self.run.objective is not None
+                else self.lore_score(members))
         ability_mod = lore / STAT_BASELINE
         policy_mod = 1.0 if self.run.objective is not None else POLICY_LOOT_MOD.get(self.run.policy, 1.0)
         danger_mod = 0.85 + self.run.danger_level / 200.0

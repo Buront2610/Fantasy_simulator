@@ -21,6 +21,7 @@ from .hazards import (
 from .policy import AdventurePolicyEngine
 from .rescue import perform_rescue
 from .protocols import AdventureRunLike
+from .roles import capability
 from .results import AdventureFactKind, AdventureStepResult, step_fact_result
 from ..character_model.death_resolution import mark_character_dead
 from ..i18n import tr, tr_term
@@ -119,7 +120,10 @@ class AdventureStateMachine:
         critical_chance = min(injury_chance * BASE_CRITICAL_RATIO, 0.60)
         roll = rng.random()
         injured_member = character
-        if self.run.is_party and members:
+        if self.run.objective is not None:
+            holder = capability(members, "frontline").holder_id
+            injured_member = next((member for member in members if member.char_id == holder), character)
+        elif self.run.is_party and members:
             injured_member = rng.choice(members)
 
         if roll < injury_chance:

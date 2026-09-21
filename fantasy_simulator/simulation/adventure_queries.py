@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from ..world import World
 
 from ..adventure import AdventureRun
+from ..adventure.roles import ROLE_SKILLS, capability
 from ..i18n import tr
 from .adventure_transition import apply_adventure_transition
 
@@ -68,6 +69,8 @@ class AdventureQueryMixin:
                               pace=tr(f"adventure.pace_{goal.pace}"), status=tr(f"adventure.goal_{goal.status}"),
                               target=target.name if target else tr("adventure.no_target"),
                               retreat=tr(f"adventure.retreat_{run.retreat_rule}")))
+        if run.objective is not None and not run.is_resolved:
+            details.extend(self._adventure_role_details(run))
         if run.schedule is not None and not run.is_resolved:
             tick = self.elapsed_days + 1
             details.append(tr(
@@ -123,3 +126,14 @@ class AdventureQueryMixin:
             return False
         apply_adventure_transition(self, run, choice=True, option=option)
         return True
+
+    def _adventure_role_details(self, run: AdventureRun) -> List[str]:
+        members = run._party_members(self.world)
+        lines = []
+        for role in ROLE_SKILLS:
+            current = capability(members, role)
+            actor = self.world.get_character_by_id(current.holder_id) if current.holder_id else None
+            lines.append(tr("adventure.role_status", role=tr(f"adventure.role_{role}"),
+                            name=actor.name if actor else tr("adventure.role_unfilled"), score=round(current.score, 1),
+                            effect=tr(f"adventure.role_effect_{role}")))
+        return lines

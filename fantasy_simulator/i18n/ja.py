@@ -6,6 +6,18 @@ from typing import Dict
 
 
 TEXT_JA: Dict[str, str] = {
+    "adventure.role_effect_frontline": '危険遭遇の戦闘を担当',
+    "adventure.role_effect_scout": '道中の移動と遭遇回避を補助',
+    "adventure.role_effect_lore": '発見を補助',
+    "adventure.role_effect_medic": '物資がある間、負傷した同行者の悪化を抑制',
+
+    'adventure.role_status': '現在の{role}: {name}（補助込みの能力: {score}）: {effect}',
+    'adventure.role_frontline': '前衛',
+    'adventure.role_scout': '斥候',
+    'adventure.role_lore': '知識役',
+    'adventure.role_medic': '救護役',
+    'adventure.role_unfilled': '担当なし',
+
     'adventure.plan_label': '{purpose} / {pace}',
     'adventure.retreat_on_serious': '重傷者が出たら',
     'adventure.retreat_on_supply': '補給不足なら',

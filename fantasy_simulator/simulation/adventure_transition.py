@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from ..adventure.itinerary import affected_location_ids
+from ..adventure.roles import role_holders
 
 from ..adventure.results import AdventureStepResult, step_fact_result
 from ..adventure.validation import validate_adventure_run_payload
@@ -140,6 +141,7 @@ def _plan_step(
     draft: AdventureDraftWorld, character: Any, rng: Any, tick: int, *, choice: bool, option: str | None,
 ) -> AdventureStepResult:
     draft.tick = tick
+    duties = role_holders([draft.get_character_by_id(mid) for mid in draft.run.member_ids])
     blocked = arrive_if_due(draft, draft.run, tick) if character.alive else False
     scheduled_result = prepare_scheduled_step(draft.run, tick) if character.alive else None
     objective_result = (reassess_rescue(draft, draft.run)
@@ -163,14 +165,24 @@ def _plan_step(
         result = draft.run.step_result(character, draft, rng=rng)
     finalize_objective(draft, draft.run)
     _plan_following_steps(draft, tick)
-    return result
+    return _record_roles(result, duties) if draft.run.objective is not None else result
 
 
 def _plan_following_steps(draft: AdventureDraftWorld, tick: int) -> None:
     source = draft.source_run
     if draft.source_changed and source is not None and not source.is_resolved and source.schedule is not None:
         source.schedule.plan_next(source.state, tick)
-        plan_departure(draft.travel_network, source, tick)
+        plan_departure(draft.travel_network, source, tick,
+                       members=[draft.get_character_by_id(mid) for mid in source.member_ids])
     if draft.run.schedule is not None:
         draft.run.schedule.plan_next(draft.run.state, tick)
-        plan_departure(draft.travel_network, draft.run, tick)
+        plan_departure(draft.travel_network, draft.run, tick,
+                       members=[draft.get_character_by_id(mid) for mid in draft.run.member_ids])
+
+
+def _record_roles(result: AdventureStepResult, duties: dict[str, str]) -> AdventureStepResult:
+    operative = {"adventure_travel", "adventure_scouted", "adventure_discovery", "adventure_injured",
+                 "adventure_encounter", "adventure_rescued"}
+    facts = tuple(replace(fact, render_params={**fact.render_params, "party_roles": duties})
+                  if fact.kind in operative else fact for fact in result.facts)
+    return replace(result, facts=facts)
