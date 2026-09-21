@@ -43,6 +43,9 @@ class AdventureDraftWorld:
         self.original_source = source
         self.source_run = deepcopy(source) if source else None
         self.source_changed = False
+        source_id = run.objective.source_adventure_id if run.objective is not None else None
+        previous_run = world.get_adventure_by_id(source_id) if source_id else None
+        self.rescue_origin = previous_run.origin if previous_run is not None else None
         self.travel_network = capture_travel_network(world) if run.itinerary is not None else None
         self.original_characters = {member.char_id: member for member in affected_characters(world, run)}
         self.characters = {key: deepcopy(member) for key, member in self.original_characters.items()}

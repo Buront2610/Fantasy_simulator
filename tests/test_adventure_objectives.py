@@ -298,3 +298,20 @@ def test_saved_rescue_success_requires_actual_membership(rescue_case, status):
     data["objective"]["status"] = status
     with pytest.raises(ValueError, match="must belong"):
         AdventureRun.from_dict(data)
+
+
+@pytest.mark.parametrize("location,expected", [("dungeon", "completed"), ("home", "invalidated")])
+def test_leaving_old_party_is_not_the_same_as_returning_home(rescue_case, location, expected):
+    sim, run, _, target = rescue_case
+    source = AdventureRun(target.char_id, target.name, "home", "dungeon", sim.world.year,
+                          adventure_id="old-source", state="resolved", outcome="retreat")
+    sim.world.add_adventure(source)
+    sim.world.complete_adventure(source.adventure_id)
+    run.objective.source_adventure_id = source.adventure_id
+    target.location_id = location
+    finish(sim, run)
+    assert run.objective.status == expected
+    if expected == "invalidated":
+        assert run.objective.reason == "returned"
+    else:
+        assert target.location_id == "home" and target.injury_status == "injured"

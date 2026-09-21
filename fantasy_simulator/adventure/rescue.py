@@ -42,7 +42,7 @@ def reassess_rescue(world: Any, run: Any) -> AdventureStepResult | None:
         reason = "recovered"
     elif place is None:
         reason = "moving"
-    elif goal.source_adventure_id and target.active_adventure_id is None:
+    elif goal.source_adventure_id and target.active_adventure_id is None and place == world.rescue_origin:
         reason = "returned"
     if reason:
         goal.status, goal.reason = "invalidated", reason
