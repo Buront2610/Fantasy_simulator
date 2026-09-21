@@ -685,6 +685,8 @@ TEXT_JA: Dict[str, str] = {
     'event_type_injury_recovery': '負傷回復',
     'event_type_adventure_started': '冒険出発',
     'event_type_adventure_arrived': '冒険到着',
+    'event_type_adventure_scouted': '冒険中の偵察',
+    'event_type_adventure_retreat_started': '冒険撤退の開始',
     'event_type_adventure_choice': '冒険選択',
     'event_type_adventure_death': '冒険中の死亡',
     'event_type_adventure_injured': '冒険中の負傷',

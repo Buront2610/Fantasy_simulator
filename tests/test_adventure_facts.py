@@ -1,14 +1,24 @@
 """Adventure records describe decisions and outcomes, not guesses from final state."""
 
+from typing import get_args
+
 import pytest
 
 from fantasy_simulator.adventure import AdventureChoice, AdventureRun, CHOICE_PRESS_ON, CHOICE_PROCEED_CAUTIOUSLY
+from fantasy_simulator.adventure.results import AdventureFactKind
 from fantasy_simulator.character import Character
 from fantasy_simulator.i18n import tr_for_locale, tr_term_for_locale
 from fantasy_simulator.persistence.save_load import load_simulation, save_simulation
 from fantasy_simulator.simulation import Simulator
 from fantasy_simulator.world import World
 from fantasy_simulator.world_event.rendering import render_event_record
+
+
+@pytest.mark.parametrize("locale", ["ja", "en"])
+def test_fact_kinds_have_translated_report_labels(locale):
+    for kind in get_args(AdventureFactKind):
+        key = f"event_type_{kind}"
+        assert tr_for_locale(locale, key) != key
 
 
 class StepRng:

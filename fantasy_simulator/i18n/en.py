@@ -695,6 +695,8 @@ TEXT_EN: Dict[str, str] = {
     'event_type_injury_recovery': 'Injury recovery',
     'event_type_adventure_started': 'Adventure departure',
     'event_type_adventure_arrived': 'Adventure arrival',
+    'event_type_adventure_scouted': 'Adventure scouting',
+    'event_type_adventure_retreat_started': 'Adventure retreat started',
     'event_type_adventure_choice': 'Adventure choice',
     'event_type_adventure_death': 'Adventure death',
     'event_type_adventure_injured': 'Adventure injury',
