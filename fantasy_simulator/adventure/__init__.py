@@ -40,6 +40,7 @@ from .domain import (
 from .results import AdventureStepFact, AdventureStepResult
 from .schedule import AdventureSchedule
 from .itinerary import AdventureItinerary
+from .objective import AdventureObjective
 from .world_pressure import adventure_world_pressure
 from ..i18n import tr
 
@@ -141,6 +142,7 @@ class AdventureRun:
     danger_level: int = 50
     schedule: Optional[AdventureSchedule] = None
     itinerary: Optional[AdventureItinerary] = None
+    objective: Optional[AdventureObjective] = None
 
     def __post_init__(self) -> None:
         if not self.member_ids:

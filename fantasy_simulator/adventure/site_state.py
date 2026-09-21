@@ -38,6 +38,10 @@ def apply_adventure_site_state(world: Any, run: Any) -> None:
     location = world.get_location_by_id(run.destination)
     if location is None:
         return
+    if run.objective is not None and run.objective.purpose == "rescue":
+        if run.objective.status == "completed":
+            location.adventure_reputation = min(100, location.adventure_reputation + 8)
+        return
     progress_delta, reputation_delta = _OUTCOME_DELTAS.get(str(run.outcome), (1, 0))
     if getattr(run, "loot_summary", []):
         progress_delta += 10

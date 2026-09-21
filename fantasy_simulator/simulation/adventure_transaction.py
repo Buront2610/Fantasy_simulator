@@ -9,6 +9,7 @@ from random import Random
 from typing import Any, Literal
 
 from ..adventure.itinerary import affected_location_ids
+from .adventure_objectives import objective_participants, rescue_source_run
 
 from ..world_event.api import WorldEventRecorderPort
 
@@ -70,6 +71,10 @@ def affected_characters(world: Any, run: Any) -> list[Any]:
         if member.active_adventure_id not in (None, run.adventure_id):
             raise ValueError(f"Adventure member belongs to another run: {member_id!r}")
         characters[member_id] = member
+    for actor in objective_participants(world, run):
+        if actor is None:
+            raise ValueError("Unknown source adventure participant")
+        characters[actor.char_id] = actor
     for member in list(characters.values()):
         spouse = world.get_character_by_id(member.spouse_id) if member.spouse_id else None
         if spouse is not None:
@@ -88,7 +93,8 @@ class AdventureTransaction:
     def __init__(self, simulator: Any, run: Any, *, replacing_party: bool = False) -> None:
         self.sim = simulator
         self.world = simulator.world
-        party = [run, *affected_characters(self.world, run)]
+        source = rescue_source_run(self.world, run)
+        party = [run, *([source] if source else []), *affected_characters(self.world, run)]
         # Planned commits replace every party object's attributes with isolated copies.
         # Their original containers remain untouched, so retain those for rollback.
         # Starts mutate existing containers and still need deep snapshots.
@@ -97,7 +103,7 @@ class AdventureTransaction:
             simulator.memorial_template_history, simulator.alias_template_history,
         ))
         self.locations = []
-        for location_id in affected_location_ids(run):
+        for location_id in affected_location_ids(run, self.world):
             location = self.world.get_location_by_id(location_id)
             if location is None:
                 raise ValueError(f"Unknown adventure location: {location_id!r}")

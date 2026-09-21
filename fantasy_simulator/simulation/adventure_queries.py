@@ -61,6 +61,13 @@ class AdventureQueryMixin:
         if run is None:
             return []
         details = list(run.detail_log)
+        if run.objective is not None:
+            goal = run.objective
+            target = self.world.get_character_by_id(goal.target_id) if goal.target_id else None
+            details.append(tr("adventure.objective_status", purpose=tr(f"adventure.purpose_{goal.purpose}"),
+                              pace=tr(f"adventure.pace_{goal.pace}"), status=tr(f"adventure.goal_{goal.status}"),
+                              target=target.name if target else tr("adventure.no_target"),
+                              retreat=tr(f"adventure.retreat_{run.retreat_rule}")))
         if run.schedule is not None and not run.is_resolved:
             tick = self.elapsed_days + 1
             details.append(tr(

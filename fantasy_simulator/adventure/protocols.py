@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, List, Optional, Protocol
 
 from .schedule import AdventureSchedule
 from .itinerary import AdventureItinerary
+from .objective import AdventureObjective
 
 if TYPE_CHECKING:
     from ..world import World
@@ -39,6 +40,7 @@ class AdventureRunLike(Protocol):
     danger_level: int
     schedule: Optional[AdventureSchedule]
     itinerary: Optional[AdventureItinerary]
+    objective: Optional[AdventureObjective]
 
     @property
     def is_resolved(self) -> bool:

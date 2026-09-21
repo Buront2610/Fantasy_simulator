@@ -12,6 +12,8 @@ from ..adventure.results import AdventureStepResult, step_fact_result
 from ..adventure.validation import validate_adventure_run_payload
 from ..i18n import tr
 from ..adventure.routing import capture_travel_network, validate_itinerary_references
+from ..adventure.rescue import finalize_objective, reassess_rescue
+from .adventure_objectives import rescue_source_run
 from .adventure_travel import arrive_if_due, plan_departure, travel_step
 from .adventure_schedule import prepare_scheduled_step
 from .adventure_transaction import AdventureTransaction, affected_characters, clone_rng, copy_rng_state
@@ -32,14 +34,22 @@ class AdventureDraftWorld:
     there is deliberately no fallback that can mutate the live World.
     """
 
+    tick: int
+
     def __init__(self, world: Any, run: Any) -> None:
         self.year = world.year
         self.run = deepcopy(run)
+        source = rescue_source_run(world, run)
+        self.original_source = source
+        self.source_run = deepcopy(source) if source else None
+        self.source_changed = False
         self.travel_network = capture_travel_network(world) if run.itinerary is not None else None
         self.original_characters = {member.char_id: member for member in affected_characters(world, run)}
         self.characters = {key: deepcopy(member) for key, member in self.original_characters.items()}
+        self.presence = {key: world.character_presence_location_id(actor)
+                         for key, actor in self.original_characters.items()}
         self.locations = {}
-        for location_id in affected_location_ids(run):
+        for location_id in affected_location_ids(run, world):
             location = world.get_location_by_id(location_id)
             if location is None:
                 raise ValueError(f"Unknown adventure location: {location_id!r}")
@@ -57,8 +67,10 @@ class AdventureDraftWorld:
         return self.locations[location_id].canonical_name
 
     def get_adventure_by_id(self, adventure_id: str) -> Any:
+        if self.source_run is not None and adventure_id == self.source_run.adventure_id:
+            return self.source_run
         if adventure_id != self.run.adventure_id:
-            raise ValueError("Adventure transition cannot change another adventure")
+            raise ValueError("Adventure transition cannot change an unaffected adventure")
         return self.run
 
     def complete_adventure(self, adventure_id: str) -> None:
@@ -93,6 +105,8 @@ def apply_adventure_transition(simulator: Any, run: Any, *, choice: bool = False
     rng = clone_rng(simulator.rng)
     result = _plan_step(draft, character, rng, simulator.elapsed_days + 1, choice=choice, option=option)
     validate_adventure_run_payload(draft.run)
+    if draft.source_run is not None:
+        validate_adventure_run_payload(draft.source_run)
     if result.adventure_id != run.adventure_id or result.new_state != draft.run.state:
         raise ValueError("Adventure result conflicts with its planned state")
     for fact in result.facts:
@@ -101,6 +115,11 @@ def apply_adventure_transition(simulator: Any, run: Any, *, choice: bool = False
         if any(actor not in draft.characters for actor in (fact.primary_actor_id, *fact.secondary_actor_ids)):
             raise ValueError("Adventure fact refers to an unknown participant")
     with AdventureTransaction(simulator, run, replacing_party=True):
+        if draft.source_run is not None:
+            draft.original_source.__dict__.clear()
+            draft.original_source.__dict__.update(vars(draft.source_run))
+            if draft.source_run.is_resolved:
+                simulator.world.complete_adventure(draft.source_run.adventure_id)
         run.__dict__.clear()
         run.__dict__.update(vars(draft.run))
         for actor_id, original in draft.original_characters.items():
@@ -117,12 +136,18 @@ def apply_adventure_transition(simulator: Any, run: Any, *, choice: bool = False
 def _plan_step(
     draft: AdventureDraftWorld, character: Any, rng: Any, tick: int, *, choice: bool, option: str | None,
 ) -> AdventureStepResult:
+    draft.tick = tick
     blocked = arrive_if_due(draft, draft.run, tick) if character.alive else False
     scheduled_result = prepare_scheduled_step(draft.run, tick) if character.alive else None
+    objective_result = (reassess_rescue(draft, draft.run)
+                        if character.alive and scheduled_result is None else None)
     route_result = (travel_step(draft, draft.run, blocked=blocked)
-                    if character.alive and not choice and scheduled_result is None else None)
+                    if character.alive and not choice
+                    and scheduled_result is None and objective_result is None else None)
     if scheduled_result is not None:
         result = scheduled_result
+    elif objective_result is not None:
+        result = objective_result
     elif route_result is not None:
         result = route_result
     elif choice:
@@ -133,7 +158,16 @@ def _plan_step(
         result = _dead_leader_result(draft, character)
     else:
         result = draft.run.step_result(character, draft, rng=rng)
+    finalize_objective(draft, draft.run)
+    _plan_following_steps(draft, tick)
+    return result
+
+
+def _plan_following_steps(draft: AdventureDraftWorld, tick: int) -> None:
+    source = draft.source_run
+    if draft.source_changed and source is not None and not source.is_resolved and source.schedule is not None:
+        source.schedule.plan_next(source.state, tick)
+        plan_departure(draft.travel_network, source, tick)
     if draft.run.schedule is not None:
         draft.run.schedule.plan_next(draft.run.state, tick)
         plan_departure(draft.travel_network, draft.run, tick)
-    return result
