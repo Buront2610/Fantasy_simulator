@@ -34,9 +34,10 @@ from fantasy_simulator.world import World
 
 
 class FakeRng:
-    def __init__(self, random_values, choice_value=None):
+    def __init__(self, random_values, choice_value=None, combat_seed=None):
         self.random_values = list(random_values)
         self.choice_value = choice_value
+        self.combat_rng = random.Random(combat_seed) if combat_seed is not None else None
 
     def random(self):
         if self.random_values:
@@ -49,7 +50,7 @@ class FakeRng:
         return options[0]
 
     def randint(self, lo, hi):
-        return lo
+        return self.combat_rng.randint(lo, hi) if self.combat_rng is not None else lo
 
     def choices(self, population, weights=None, k=1):
         return [population[0]] * k
@@ -231,7 +232,7 @@ def test_injury_outcome_uses_injury_field_without_mutating_constitution():
     char.active_adventure_id = run.adventure_id
     before_constitution = char.constitution
 
-    run.step(char, world, rng=FakeRng([0.10]))
+    run.step(char, world, rng=FakeRng([0.10], combat_seed=0))
     summaries = run.step(char, world, rng=FakeRng([0.90]))
 
     assert summaries
@@ -843,7 +844,7 @@ def test_party_injury_can_target_companion():
 
     # Force injury branch and force injured target to companion.
     # First roll is supply tick (non-injury); second roll drives injury branch.
-    run.step(leader, world, rng=FakeRng([0.99, 0.01], choice_value=companion))
+    run.step(leader, world, rng=FakeRng([0.99, 0.01], choice_value=companion, combat_seed=0))
 
     assert companion.injury_status in ("injured", "serious", "dying")
     assert leader.injury_status == "none"
@@ -860,6 +861,7 @@ def test_party_returning_applies_injury_to_actual_injured_member():
     run = _make_party_run(leader, [leader, companion], world, policy=POLICY_ASSAULT)
     run.injury_status = "injured"
     run.injury_member_id = companion.char_id
+    companion.injury_status = "injured"
     run.state = "returning"
     run.step(leader, world, rng=FakeRng([0.99]))
 
@@ -1030,7 +1032,7 @@ def test_adventure_critical_band_can_create_dying_injury():
     world = World()
     world.add_character(hero)
 
-    run.step(hero, world, rng=FakeRng([0.30, 0.99]))
+    run.step(hero, world, rng=FakeRng([0.30, 0.99], combat_seed=0))
 
     assert hero.injury_status == "dying"
     assert run.outcome is None

@@ -295,6 +295,9 @@ TEXT_EN: Dict[str, str] = {
     'choice_dangerous_approach': '{name} found a dangerous approach into {destination}.',
     'detail_paused_at_entrance': '{name} paused for a decision at the entrance.',
     'summary_adventure_injured': '{name} was injured during the expedition and pulled back.',
+    'summary_adventure_hazard_unharmed': (
+        '{name} overcame the danger at {destination} without further injury and withdrew.'
+    ),
     'detail_adventure_injured': '{name} suffered an injury while exploring {destination} and decided to withdraw.',
     'summary_adventure_died': '{name} died on an adventure near {destination}.',
     'detail_adventure_died': '{name} was lost during the expedition at {destination} and never returned.',
@@ -680,6 +683,7 @@ TEXT_EN: Dict[str, str] = {
     'event_type_adventure_death': 'Adventure death',
     'event_type_adventure_injured': 'Adventure injury',
     'event_type_adventure_discovery': 'Adventure discovery',
+    'event_type_adventure_encounter': 'Adventure encounter',
     'event_type_adventure_returned_injured': 'Returned injured',
     'event_type_adventure_returned': 'Adventure return',
     'event_type_adventure_retreated': 'Adventure retreat',

@@ -133,6 +133,17 @@ class EventRecorderMixin:
             source_char.add_relation_tag(target_id, tag, source_event_id=record_id)
 
     @staticmethod
+    def _adventure_primary_actor(run: AdventureRun, kind: str) -> str:
+        """Resolve the subject of the recorded outcome, including non-leader party members."""
+        if kind in {"adventure_injured", "adventure_returned_injured"}:
+            return run.injury_member_id or run.character_id
+        if kind == "adventure_death":
+            return run.death_member_id or run.character_id
+        if kind == "adventure_encounter":
+            return str(run.combat_logs[-1]["member_id"])
+        return run.character_id
+
+    @staticmethod
     def _classify_adventure_summary(
         previous_state: str, run: AdventureRun,
     ) -> Tuple[str, str, int]:
@@ -143,6 +154,9 @@ class EventRecorderMixin:
         if previous_state == "exploring":
             if run.outcome == "death":
                 return "adventure_death", run.destination, 5
+            if run.combat_logs and run.combat_logs[-1].get("step") == run.steps_taken:
+                if run.combat_logs[-1].get("damage_taken") == 0:
+                    return "adventure_encounter", run.destination, 2
             if run.state == "returning" and run.injury_status != "none":
                 return "adventure_injured", run.destination, 3
             return "adventure_discovery", run.destination, 2

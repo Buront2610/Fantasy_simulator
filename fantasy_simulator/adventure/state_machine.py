@@ -20,6 +20,7 @@ from .hazards import (
 )
 from .policy import AdventurePolicyEngine
 from .protocols import AdventureRunLike
+from ..character_model.death_resolution import mark_character_dead
 from ..i18n import tr, tr_term
 
 if TYPE_CHECKING:
@@ -158,13 +159,19 @@ class AdventureStateMachine:
         self.run.state = "resolved"
         self.run.resolution_year = world.year
         history_target = character
+        # Character owns current health; the run may still describe an injury since treated or worsened.
+        members = [world.get_character_by_id(member_id) for member_id in self.run.member_ids]
+        current_members = [member for member in members if member is not None] or [character]
+        health_order = {"none": 0, "injured": 1, "serious": 2, "dying": 3}
+        injured_member = min(
+            current_members,
+            key=lambda member: (member.alive, -health_order[member.injury_status], member.char_id),
+        )
+        self.run.injury_status = injured_member.injury_status
+        self.run.injury_member_id = injured_member.char_id if injured_member.injury_status != "none" else None
         if self.run.outcome != "death":
-            if self.run.injury_status == "dying":
-                injured_member = world.get_character_by_id(self.run.injury_member_id or self.run.character_id)
-                if injured_member is None:
-                    injured_member = character
-                injured_member.alive = False
-                injured_member.active_adventure_id = None
+            if not injured_member.alive:
+                mark_character_dead(injured_member, world)
                 self.run.outcome = "death"
                 self.run.death_member_id = injured_member.char_id
                 summary = tr("summary_adventure_died", name=injured_member.name, destination=destination_name)
@@ -172,10 +179,6 @@ class AdventureStateMachine:
                 history_target = injured_member
             elif self.run.injury_status != "none":
                 self.run.outcome = "injury"
-                injured_member = world.get_character_by_id(self.run.injury_member_id or self.run.character_id)
-                if injured_member is None:
-                    injured_member = character
-                injured_member.injury_status = self.run.injury_status
                 summary = tr("summary_returned_injured", name=injured_member.name, destination=destination_name)
                 detail = tr("detail_returned_injured", name=injured_member.name, origin=origin_name)
                 history_target = injured_member

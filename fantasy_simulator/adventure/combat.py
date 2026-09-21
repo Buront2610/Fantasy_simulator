@@ -13,6 +13,7 @@ class AdventureHazardResult:
     severity_steps: int
     hazard_name: str
     rounds: int
+    member_lost: bool
 
 
 class AdventureHazardCombatant:
@@ -67,6 +68,8 @@ def resolve_adventure_hazard_combat(run: Any, member: Any, world: Any, rng: Any)
     hazard = _hazard_for_run(run, world)
     resolution = resolve_combat(member, hazard, rng)
     combat_log = resolution.combat_log_payload()
+    member_state = resolution.state_for(member.char_id)
+    member_lost = resolution.loser.char_id == member.char_id
     run.combat_logs.append({
         "step": int(getattr(run, "steps_taken", 0)),
         "location_id": run.destination,
@@ -78,12 +81,16 @@ def resolve_adventure_hazard_combat(run: Any, member: Any, world: Any, rng: Any)
         "loser_id": resolution.loser.char_id,
         "winner_power": resolution.winner_power,
         "loser_power": resolution.loser_power,
+        "end_reason": resolution.end_reason,
+        "remaining_vitality": member_state.remaining_vitality,
+        "damage_taken": member_state.damage_taken,
         "combat_log": combat_log,
     })
     return AdventureHazardResult(
-        severity_steps=_hazard_injury_severity(resolution.loser.char_id == member.char_id, run.danger_level),
+        severity_steps=_hazard_injury_severity(member_lost, run.danger_level, member_state.damage_taken),
         hazard_name=hazard.name,
         rounds=len(combat_log),
+        member_lost=member_lost,
     )
 
 
@@ -127,7 +134,9 @@ def _hazard_skills(region_type: str, danger: int) -> dict[str, int]:
     return {"Swordsmanship": base_level, "Battle Cry": max(1, base_level - 1)}
 
 
-def _hazard_injury_severity(member_lost: bool, danger_level: int) -> int:
+def _hazard_injury_severity(member_lost: bool, danger_level: int, damage_taken: int) -> int:
+    if damage_taken == 0:
+        return 0
     if member_lost and danger_level >= 75:
         return 2
     return 1

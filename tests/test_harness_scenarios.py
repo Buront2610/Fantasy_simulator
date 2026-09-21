@@ -508,9 +508,10 @@ def _assert_seeded_acceptance_bundle(bundle: dict[str, Any], *, locale: str) -> 
     assert bundle["month"] == 1
     assert bundle["event_record_count"] == 17
     assert bundle["event_log_count"] == 17
+    # The fixed-seed hazard dealt zero damage: record an encounter, not a fabricated injury.
     assert bundle["kind_counts"] == {
         "adventure_arrived": 2,
-        "adventure_injured": 1,
+        "adventure_encounter": 1,
         "adventure_started": 2,
         "aging": 2,
         "battle": 2,
@@ -536,7 +537,7 @@ def _assert_seeded_acceptance_bundle(bundle: dict[str, Any], *, locale: str) -> 
             "Avg: -12)",
             "    The Verdant Vale: An old grudge finally surfaced. Mokrar Zugufang defeated Brynvalra "
             "Brynuwood. Brynvalra Brynuwood suffered serious wounds in the fight.",
-            "    Ironvein Mine: Goraga Gorufang was injured during the expedition and pulled back.",
+            "    Ironvein Mine: 2 event(s)",
             "    Sandstone Outpost: Strange signs around Sandstone Outpost led Gwynsylwen Gwynthebryn onward. "
             "Gwynsylwen Gwynthebryn discovered a vein of star-metal ore near Sandstone Outpost. "
             "The discovery will prove useful in future battles.",
@@ -561,7 +562,7 @@ def _assert_seeded_acceptance_bundle(bundle: dict[str, Any], *, locale: str) -> 
             "平均: -12）",
             "    The Verdant Vale: 古い遺恨がついに表に出た。 Mokrar Zugufang は Brynvalra Brynuwood "
             "に勝利した。 Brynvalra Brynuwood は戦いで重傷を負った。",
-            "    Ironvein Mine: Goraga Gorufang は遠征中に負傷し、引き返した。",
+            "    Ironvein Mine: 2件の出来事",
             "    Sandstone Outpost: Sandstone Outpost 周辺の奇妙な兆しが、Gwynsylwen Gwynthebryn "
             "を先へ導いた。 Gwynsylwen Gwynthebryn は Sandstone Outpost 近くで 星鉄鉱の鉱脈 "
             "を発見した。その発見は、これからの戦いで大いに役立つだろう。",
@@ -573,20 +574,21 @@ def _assert_seeded_acceptance_bundle(bundle: dict[str, Any], *, locale: str) -> 
 
 
 def _assert_projection_contract(contract: dict[str, Any]) -> None:
+    # No forced injury or death on return: later RNG-dependent history follows that corrected state.
     assert contract["summary"] == {
-        "total_events": 36,
+        "total_events": 35,
         "kind_counts": {
             "adventure_arrived": 2,
             "adventure_discovery": 1,
-            "adventure_injured": 1,
-            "adventure_returned": 1,
+            "adventure_encounter": 1,
+            "adventure_retreated": 2,
             "adventure_started": 2,
-            "adventure_update": 1,
-            "aging": 4,
+            "aging": 3,
             "battle": 3,
-            "discovery": 2,
-            "journey": 7,
-            "meeting": 4,
+            "death": 1,
+            "discovery": 4,
+            "journey": 5,
+            "meeting": 3,
             "relationship_value_clash": 1,
             "skill_training": 7,
         }
@@ -610,10 +612,10 @@ def _assert_projection_contract(contract: dict[str, Any]) -> None:
         "memory_tags": (),
     }
     assert contract["memory_tags"] == [
-        ("loc_ironvein_mine", ("alias", "memorial", "trace")),
+        ("loc_ironvein_mine", ("trace",)),
         ("loc_the_grey_pass", ("trace",)),
     ]
-    assert contract["report_selection"]["yearly"]["total_events"] == 7
+    assert contract["report_selection"]["yearly"]["total_events"] == 5
     assert contract["report_selection"]["yearly"]["deaths_this_year"] == 0
     assert contract["report_selection"]["monthly"]["year"] == 1004
     assert contract["report_selection"]["monthly"]["month"] == 3
