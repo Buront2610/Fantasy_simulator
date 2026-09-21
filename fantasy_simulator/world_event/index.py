@@ -93,6 +93,18 @@ class EventHistoryIndex:
     def invalidate(self) -> None:
         self.signature = ()
 
+    def reset(self, records: List[WorldEventRecord]) -> None:
+        """Rebuild after rollback, including an empty or retention-trimmed history."""
+        self.signature = ()
+        self.record_ids = set()
+        self.by_id = {}
+        self.by_location = {}
+        self.by_actor = {}
+        self.by_year = {}
+        self.by_month = {}
+        self.by_kind = {}
+        self.ensure_current(records)
+
     def ensure_record_ids_current(self, records: List[WorldEventRecord]) -> None:
         """Keep only the duplicate-detection set current for canonical writes.
 

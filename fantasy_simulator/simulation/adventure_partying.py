@@ -6,11 +6,13 @@ from typing import TYPE_CHECKING, List
 
 from ..adventure import (
     SUPPLY_FULL,
+    AdventureRun,
     create_adventure_run,
     default_retreat_rule_for_policy,
     generate_adventure_id,
 )
 from ..i18n import tr
+from .adventure_transaction import AdventureTransaction, restore_start_rng_on_failure
 from .calendar import annual_probability_to_fraction
 from .population import population_pressure_factor
 
@@ -27,6 +29,7 @@ _PARTY_FORMATION_CHANCE = 0.30
 class AdventureStartMixin:
     """Mixin for creating solo and party adventures."""
 
+    @restore_start_rng_on_failure
     def _maybe_start_adventure(self, year_fraction: float = 1.0) -> None:
         """Start at most one new adventure during the current simulation step."""
         candidates = [
@@ -50,6 +53,7 @@ class AdventureStartMixin:
         else:
             self._start_solo_adventure(candidates)
 
+    @restore_start_rng_on_failure
     def _start_solo_adventure(self, candidates: List["Character"]) -> None:
         """Pick one candidate and start a solo adventure."""
         char = self.rng.choice(candidates)
@@ -57,25 +61,9 @@ class AdventureStartMixin:
             run = create_adventure_run(char, self.world, rng=self.rng, id_rng=self.id_rng)
         except ValueError:
             return
-        char.active_adventure_id = run.adventure_id
-        char.add_history(
-            tr(
-                "set_out_for_adventure",
-                year=self.world.year,
-                origin=self.world.location_name(run.origin),
-                destination=self.world.location_name(run.destination),
-            )
-        )
-        self.world.add_adventure(run)
-        record = self._record_world_event(
-            run.summary_log[-1],
-            kind="adventure_started",
-            location_id=run.origin,
-            primary_actor_id=char.char_id,
-            severity=2,
-        )
-        run.related_event_ids.append(record.record_id)
+        self._commit_adventure_start(run, [char])
 
+    @restore_start_rng_on_failure
     def _start_party_adventure(self, candidates: List["Character"]) -> None:
         """Form a small party from candidates and start a shared adventure."""
         leader = self.rng.choice(candidates)
@@ -112,26 +100,24 @@ class AdventureStartMixin:
                 tr("detail_party_set_out", party=party_names, origin=origin_name, destination=dest_name)
             ]
 
-        for member in members:
-            member.active_adventure_id = run.adventure_id
-            member.add_history(
-                tr(
-                    "set_out_for_adventure",
-                    year=self.world.year,
-                    origin=self.world.location_name(run.origin),
-                    destination=self.world.location_name(run.destination),
-                )
-            )
+        self._commit_adventure_start(run, members)
 
-        self.world.add_adventure(run)
-        record = self._record_world_event(
-            run.summary_log[-1],
-            kind="adventure_started",
-            location_id=run.origin,
-            primary_actor_id=leader.char_id,
-            severity=2,
-        )
-        run.related_event_ids.append(record.record_id)
+    def _commit_adventure_start(self, run: AdventureRun, members: List["Character"]) -> None:
+        if any(self.world.get_character_by_id(member.char_id) is not member for member in members):
+            raise ValueError("Adventure must start with live world character instances")
+        with AdventureTransaction(self, run):
+            for member in members:
+                member.active_adventure_id = run.adventure_id
+                member.add_history(tr(
+                    "set_out_for_adventure", year=self.world.year,
+                    origin=self.world.location_name(run.origin), destination=self.world.location_name(run.destination),
+                ))
+            self.world.add_adventure(run)
+            record = self._record_world_event(
+                run.summary_log[-1], kind="adventure_started", location_id=run.origin,
+                primary_actor_id=run.character_id, severity=2,
+            )
+            run.related_event_ids.append(record.record_id)
 
     def _select_party_policy(self, members: List["Character"]) -> str:
         """Select a party policy through the coordinator compatibility symbol."""

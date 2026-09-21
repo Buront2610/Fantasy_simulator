@@ -6,17 +6,13 @@ mixins for launch, memory, and query responsibilities.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 
 from ..adventure import AdventureRun, AdventureStepResult, select_party_policy
-from ..i18n import tr
-from ..adventure.results import step_fact_result
 from .adventure_memory import AdventureMemoryMixin
 from .adventure_partying import AdventureStartMixin
 from .adventure_queries import AdventureQueryMixin
-
-if TYPE_CHECKING:
-    from ..character import Character
+from .adventure_transition import apply_adventure_transition
 
 __all__ = ["AdventureMixin", "select_party_policy"]
 
@@ -49,20 +45,9 @@ class AdventureMixin(
                 run = self.world.get_adventure_by_id(adventure_id)
                 if run is None or run.is_resolved:
                     continue
-                char = self.world.get_character_by_id(run.character_id)
-                if char is None:
-                    continue
-                if not char.alive:
-                    self._resolve_dead_character_adventure(run, char)
-                    continue
                 had_pending_choice = run.pending_choice is not None
-                result = run.step_result(char, self.world, rng=self.rng)
-                self._record_adventure_step_result(run, result)
-                if not char.alive:
-                    self.event_system.handle_death_side_effects(char, self.world)
-                if run.is_resolved:
-                    self._complete_resolved_adventure(run)
-                elif not had_pending_choice and run.pending_choice is not None:
+                apply_adventure_transition(self, run)
+                if not run.is_resolved and not had_pending_choice and run.pending_choice is not None:
                     paused_until_next_year.add(run.adventure_id)
 
     def _record_adventure_step_result(self, run: AdventureRun, result: AdventureStepResult) -> None:
@@ -87,27 +72,3 @@ class AdventureMixin(
         self._apply_world_memory(run)
         self._recently_completed_adventures.append(run)
         self.world.complete_adventure(run.adventure_id)
-
-    def _resolve_dead_character_adventure(self, run: AdventureRun, char: "Character") -> None:
-        run.pending_choice = None
-        run.state = "resolved"
-        run.outcome = "death"
-        run.death_member_id = char.char_id
-        run.resolution_year = self.world.year
-        run._clear_member_adventures(self.world)
-        char.add_history(
-            tr(
-                "history_adventure_detail",
-                year=self.world.year,
-                detail=tr(
-                    "detail_adventure_died", name=char.name,
-                    destination=self.world.location_name(run.destination),
-                ),
-            )
-        )
-        self._record_adventure_step_result(run, step_fact_result(
-            run, "adventure_death", "summary_adventure_died",
-            {"name": char.name, "destination": self.world.location_name(run.destination)},
-            actor_id=char.char_id, severity=5,
-        ))
-        self._complete_resolved_adventure(run)

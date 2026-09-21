@@ -150,7 +150,9 @@ def test_simulator_records_actual_companion_and_damage_outcome(unharmed):
             return self.combat_rng.randint(lo, hi)
 
         def choice(self, sequence):
-            return companion if companion in sequence else sequence[0]
+            return next(
+                (member for member in sequence if getattr(member, "char_id", None) == companion.char_id), sequence[0],
+            )
 
     sim = Simulator(world, seed=0)
     sim.rng = EncounterRng(0)

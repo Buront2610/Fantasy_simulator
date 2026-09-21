@@ -273,13 +273,6 @@
         "removal_condition": "Remove when fantasy_simulator/persistence/migration_steps.py::migrate_v2_to_v3 fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },
       {
-        "target": "fantasy_simulator/simulation/adventure_coordinator.py::AdventureMixin._advance_adventures",
-        "reason": "Adventure advancement remains an orchestration adapter around multiple domain outcomes.",
-        "max_cognitive_complexity": 34,
-        "owner": "architecture-maintainers",
-        "removal_condition": "Remove when fantasy_simulator/simulation/adventure_coordinator.py::AdventureMixin._advance_adventures fits the default complexity budgets or is split behind a narrower compatibility adapter."
-      },
-      {
         "target": "fantasy_simulator/simulation/engine_pause.py::EnginePauseMixin",
         "reason": "Legacy mixin owns multiple pause reason adapters until notification policy is split further.",
         "max_class_lines": 302,

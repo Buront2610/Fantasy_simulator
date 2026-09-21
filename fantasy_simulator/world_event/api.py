@@ -49,7 +49,7 @@ class WorldEventRecorderPort:
     def record(self, record: WorldEventRecord) -> WorldEventRecord:
         return self._owner.record_event(record)
 
-    def snapshot(self) -> WorldEventRecorderSnapshot:
+    def snapshot(self, *, include_index: bool = True) -> WorldEventRecorderSnapshot:
         locations_by_identity: Dict[int, Any] = {}
         for source_name in ("_location_id_index", "grid"):
             source = getattr(self._owner, source_name, None)
@@ -61,7 +61,7 @@ class WorldEventRecorderPort:
 
         event_index = getattr(self._owner, "_event_index", None)
         event_index_state = None
-        if event_index is not None:
+        if event_index is not None and include_index:
             event_index_state = {
                 "signature": getattr(event_index, "signature", ()),
                 "record_ids": set(getattr(event_index, "record_ids", set())),
@@ -100,8 +100,8 @@ class WorldEventRecorderPort:
 
         event_index = getattr(self._owner, "_event_index", None)
         if event_index is None or snapshot.event_index_state is None:
-            if event_index is not None and hasattr(event_index, "invalidate"):
-                event_index.invalidate()
+            if event_index is not None:
+                event_index.reset(self._owner.event_records)
             return
         event_index.signature = snapshot.event_index_state["signature"]
         event_index.record_ids = set(snapshot.event_index_state["record_ids"])
