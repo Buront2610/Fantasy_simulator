@@ -217,7 +217,8 @@ def migrate_v6_to_v7(data: Dict[str, Any]) -> Dict[str, Any]:
         routes=world_data.get("routes", []),
         terrain_cells=world_data.get("terrain_map", {}).get("cells", []),
     )
-    world_data.setdefault("atlas_layout", build_default_atlas_layout(inputs).to_dict())
+    if "atlas_layout" not in world_data:
+        world_data["atlas_layout"] = build_default_atlas_layout(inputs).to_dict()
 
     data["schema_version"] = 7
     return data

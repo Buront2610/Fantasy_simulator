@@ -1,6 +1,9 @@
 """Tests for the profile-based quality gate runner."""
 
 from pathlib import Path
+import subprocess
+
+import pytest
 
 from scripts.quality_gate import (
     PLAYTEST_TARGETS,
@@ -8,6 +11,7 @@ from scripts.quality_gate import (
     TYPECHECK_TARGETS,
     WORLD_TYPECHECK_EXCLUSIONS,
     build_profile_commands,
+    _complexity_command,
 )
 
 
@@ -89,9 +93,28 @@ def test_standard_profile_runs_targeted_harness_suite():
 
 def test_standard_profile_can_prepend_changed_area_pytest():
     commands = build_profile_commands("standard", pytest_targets=["tests/test_character_creator.py"])
-    assert len(commands) == 2
-    assert commands[0].argv[-1] == "tests/test_character_creator.py"
-    assert commands[1].argv[-len(EXPECTED_STANDARD_TARGETS):] == EXPECTED_STANDARD_TARGETS
+    assert len(commands) == 1
+    assert commands[0].argv[4] == "tests/test_character_creator.py"
+    assert commands[0].argv[-len(EXPECTED_STANDARD_TARGETS):] == EXPECTED_STANDARD_TARGETS
+
+
+@pytest.mark.parametrize("profile", ["standard", "strict"])
+def test_changed_targets_do_not_run_standard_tests_twice(profile):
+    target = STANDARD_TARGETS[0]
+    commands = build_profile_commands(profile, pytest_targets=[target, target])
+    assert commands[0].argv.count(target) == 1
+    assert set(commands[0].argv[4:]) == set(STANDARD_TARGETS)
+
+
+def test_combined_lint_still_rejects_style_names_and_complexity(tmp_path):
+    source = tmp_path / "invalid.py"
+    branches = ''.join(f'    if value == {index}:\n        return {index}\n' for index in range(27))
+    source.write_text('def complicated(value):\n' + branches + '    return missing_name\n\n#' + 'x' * 130 + '\n')
+    result = subprocess.run(_complexity_command([str(source)]).argv, cwd=tmp_path,
+                            capture_output=True, text=True)
+    assert result.returncode == 1, result.stderr
+    for diagnostic in ("C901", "E501", "F821"):
+        assert diagnostic in result.stdout, result.stdout
 
 
 def test_playtest_profile_runs_world_health_bands():
@@ -105,31 +128,28 @@ def test_strict_profile_includes_bounded_guardrail_suite():
     commands = build_profile_commands("strict")
     assert [command.label for command in commands] == [
         "pytest",
-        "flake8",
-        "complexity",
+        "lint+complexity",
         "mypy",
         "playtest",
     ]
     assert commands[0].argv[-len(EXPECTED_STANDARD_TARGETS):] == EXPECTED_STANDARD_TARGETS
     assert "." in commands[1].argv
-    assert "--max-complexity=25" in commands[2].argv
-    assert "." in commands[2].argv
-    assert commands[3].argv[-len(TYPECHECK_TARGETS):] == TYPECHECK_TARGETS
-    assert commands[4].argv[-len(PLAYTEST_TARGETS):] == PLAYTEST_TARGETS
+    assert "--max-complexity=25" in commands[1].argv
+    assert commands[2].argv[-len(TYPECHECK_TARGETS):] == TYPECHECK_TARGETS
+    assert commands[3].argv[-len(PLAYTEST_TARGETS):] == PLAYTEST_TARGETS
 
 
 def test_exhaustive_profile_runs_static_checks_and_full_pytest():
     commands = build_profile_commands("exhaustive")
     assert [command.label for command in commands] == [
-        "flake8",
-        "complexity",
+        "lint+complexity",
         "mypy",
         "pytest",
     ]
     assert "." in commands[0].argv
-    assert "--max-complexity=25" in commands[1].argv
-    assert commands[2].argv[-len(TYPECHECK_TARGETS):] == TYPECHECK_TARGETS
-    assert len(commands[3].argv) == 4
+    assert "--max-complexity=25" in commands[0].argv
+    assert commands[1].argv[-len(TYPECHECK_TARGETS):] == TYPECHECK_TARGETS
+    assert len(commands[2].argv) == 4
 
 
 def test_pyproject_includes_type_gate_scaffolding():

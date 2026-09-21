@@ -45,8 +45,9 @@ def build_default_atlas_layout(
     mountain_coords: Optional[List[Tuple[int, int]]] = None,
 ) -> AtlasLayout:
     """Create the default persistent atlas layout for the current world."""
-    return AtlasLayout.from_dict(
-        build_default_atlas_layout_data(
+    # The generator owns fresh containers; deserializing them would copy the entire geometry again.
+    return AtlasLayout(
+        **build_default_atlas_layout_data(
             inputs,
             site_coords=site_coords,
             route_coords=route_coords,

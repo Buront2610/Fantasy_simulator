@@ -91,27 +91,10 @@ def _playtest_command(targets: Sequence[str] | None = None) -> CommandSpec:
     )
 
 
-def _flake8_command(targets: Sequence[str]) -> CommandSpec:
-    exclude_value = ",".join(DEFAULT_EXCLUDES)
-    return CommandSpec(
-        label="flake8",
-        argv=[
-            sys.executable,
-            "-m",
-            "flake8",
-            "--jobs",
-            "1",
-            "--max-line-length=120",
-            f"--exclude={exclude_value}",
-            *targets,
-        ],
-    )
-
-
 def _complexity_command(targets: Sequence[str]) -> CommandSpec:
     exclude_value = ",".join(DEFAULT_EXCLUDES)
     return CommandSpec(
-        label="complexity",
+        label="lint+complexity",
         argv=[
             sys.executable,
             "-m",
@@ -189,27 +172,25 @@ def build_profile_commands(profile: str, pytest_targets: Sequence[str] | None = 
         return [_pytest_command(targets)]
 
     commands: List[CommandSpec] = []
-    if targets:
-        commands.append(_pytest_command(targets))
-
     if profile == "standard":
-        commands.append(_pytest_command(STANDARD_TARGETS))
+        commands.append(_pytest_command(list(dict.fromkeys([*targets, *STANDARD_TARGETS]))))
         return commands
+
+    if targets and profile != "strict":
+        commands.append(_pytest_command(targets))
 
     if profile == "playtest":
         commands.append(_playtest_command())
         return commands
 
     if profile == "strict":
-        commands.append(_pytest_command(STANDARD_TARGETS))
-        commands.append(_flake8_command(LINT_TARGETS))
+        commands.append(_pytest_command(list(dict.fromkeys([*targets, *STANDARD_TARGETS]))))
         commands.append(_complexity_command(LINT_TARGETS))
         commands.append(_mypy_command(TYPECHECK_TARGETS))
         commands.append(_playtest_command())
         return commands
 
     if profile == "exhaustive":
-        commands.append(_flake8_command(LINT_TARGETS))
         commands.append(_complexity_command(LINT_TARGETS))
         commands.append(_mypy_command(TYPECHECK_TARGETS))
         commands.append(_pytest_command([]))
@@ -225,7 +206,7 @@ def _format_command(argv: Sequence[str]) -> str:
 def run_commands(commands: Iterable[CommandSpec], *, dry_run: bool = False) -> int:
     """Execute command specs in order, stopping on first failure."""
     for spec in commands:
-        print(f"[quality-gate] {spec.label}: {_format_command(spec.argv)}")
+        print(f"[quality-gate] {spec.label}: {_format_command(spec.argv)}", flush=True)
         if dry_run:
             continue
         result = subprocess.run(spec.argv, cwd=REPO_ROOT, check=False)
