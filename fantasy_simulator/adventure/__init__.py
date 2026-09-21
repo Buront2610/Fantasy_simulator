@@ -37,6 +37,7 @@ from .domain import (
     select_party_policy,
     validate_adventure_run_payload,
 )
+from .results import AdventureStepFact, AdventureStepResult
 from .world_pressure import adventure_world_pressure
 from ..i18n import tr
 
@@ -49,6 +50,8 @@ __all__ = [
     "ADVENTURE_DISCOVERIES",
     "AdventureChoice",
     "AdventureRun",
+    "AdventureStepFact",
+    "AdventureStepResult",
     "ALL_POLICIES",
     "ALL_RETREAT_RULES",
     "CHOICE_PRESS_ON",
@@ -195,6 +198,9 @@ class AdventureRun:
         return AdventureSerialization.from_dict(cls, AdventureChoice, data)
 
     def step(self, character: "Character", world: "World", rng: Any = random) -> List[str]:
+        return list(self.step_result(character, world, rng=rng).summaries)
+
+    def step_result(self, character: "Character", world: "World", rng: Any = random) -> AdventureStepResult:
         return AdventureStateMachine(self, AdventureChoice).step(character, world, rng=rng)
 
     def resolve_choice(
@@ -203,6 +209,11 @@ class AdventureRun:
         character: "Character",
         option: Optional[str] = None,
     ) -> List[str]:
+        return list(self.resolve_choice_result(world, character, option=option).summaries)
+
+    def resolve_choice_result(
+        self, world: "World", character: "Character", option: Optional[str] = None,
+    ) -> AdventureStepResult:
         return AdventureChoiceResolver(self).resolve(world, character, option=option)
 
     def _record(self, summary: str, detail: str) -> None:

@@ -78,15 +78,8 @@ class AdventureQueryMixin:
         if run is None or run.pending_choice is None:
             return False
         char = self.world.get_character_by_id(run.character_id)
-        if char is None:
+        if char is None or not char.alive:
             return False
-        summaries = run.resolve_choice(self.world, char, option=option)
-        for entry in summaries:
-            self._record_world_event(
-                entry,
-                kind="adventure_choice",
-                month=self.current_month,
-                location_id=run.destination,
-                primary_actor_id=run.character_id,
-            )
+        result = run.resolve_choice_result(self.world, char, option=option)
+        self._record_adventure_step_result(run, result)
         return True

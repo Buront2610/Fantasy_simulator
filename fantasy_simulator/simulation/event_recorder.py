@@ -11,9 +11,8 @@ canonical records only.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from ..adventure import AdventureRun
 from ..world_event.models import EventResult, WorldEventRecord, generate_record_id
 
 if TYPE_CHECKING:
@@ -76,6 +75,8 @@ class EventRecorderMixin:
         cause_event_ids: Optional[List[str]] = None,
         severity: int = 1,
         visibility: str = "public",
+        summary_key: str = "",
+        render_params: Optional[Dict[str, Any]] = None,
     ) -> WorldEventRecord:
         """Record a structured world event to canonical ``event_records``.
 
@@ -103,6 +104,8 @@ class EventRecorderMixin:
             primary_actor_id=primary_actor_id,
             secondary_actor_ids=[] if secondary_actor_ids is None else list(secondary_actor_ids),
             description=description,
+            summary_key=summary_key,
+            render_params={} if render_params is None else dict(render_params),
             severity=severity,
             visibility=visibility,
             calendar_key=self.world.calendar_definition.calendar_key,
@@ -131,43 +134,6 @@ class EventRecorderMixin:
             if source_char is None or not source_char.has_relation_tag(target_id, tag):
                 continue
             source_char.add_relation_tag(target_id, tag, source_event_id=record_id)
-
-    @staticmethod
-    def _adventure_primary_actor(run: AdventureRun, kind: str) -> str:
-        """Resolve the subject of the recorded outcome, including non-leader party members."""
-        if kind in {"adventure_injured", "adventure_returned_injured"}:
-            return run.injury_member_id or run.character_id
-        if kind == "adventure_death":
-            return run.death_member_id or run.character_id
-        if kind == "adventure_encounter":
-            return str(run.combat_logs[-1]["member_id"])
-        return run.character_id
-
-    @staticmethod
-    def _classify_adventure_summary(
-        previous_state: str, run: AdventureRun,
-    ) -> Tuple[str, str, int]:
-        if previous_state == "traveling":
-            return "adventure_arrived", run.destination, 2
-        if previous_state == "waiting_for_choice":
-            return "adventure_choice", run.destination, 1
-        if previous_state == "exploring":
-            if run.outcome == "death":
-                return "adventure_death", run.destination, 5
-            if run.combat_logs and run.combat_logs[-1].get("step") == run.steps_taken:
-                if run.combat_logs[-1].get("damage_taken") == 0:
-                    return "adventure_encounter", run.destination, 2
-            if run.state == "returning" and run.injury_status != "none":
-                return "adventure_injured", run.destination, 3
-            return "adventure_discovery", run.destination, 2
-        if previous_state == "returning":
-            if run.outcome == "injury":
-                return "adventure_returned_injured", run.origin, 3
-            if run.outcome == "safe_return":
-                return "adventure_returned", run.origin, 2
-            if run.outcome == "retreat":
-                return "adventure_retreated", run.origin, 1
-        return "adventure_update", run.destination, 1
 
     def _record_event(self, result: EventResult, location_id: Optional[str] = None) -> None:
         """Mirror an EventResult into the canonical structured store."""

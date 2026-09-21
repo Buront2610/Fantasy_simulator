@@ -506,11 +506,12 @@ def _restore_locale():
 def _assert_seeded_acceptance_bundle(bundle: dict[str, Any], *, locale: str) -> None:
     assert bundle["year"] == 1002
     assert bundle["month"] == 1
-    assert bundle["event_record_count"] == 17
-    assert bundle["event_log_count"] == 17
-    # The fixed-seed hazard dealt zero damage: record an encounter, not a fabricated injury.
+    assert bundle["event_record_count"] == 18
+    assert bundle["event_log_count"] == 18
+    # Include the previously unrecorded progress choice; the harmless encounter remains uninjured.
     assert bundle["kind_counts"] == {
         "adventure_arrived": 2,
+        "adventure_choice": 1,
         "adventure_encounter": 1,
         "adventure_started": 2,
         "aging": 2,
@@ -529,7 +530,7 @@ def _assert_seeded_acceptance_bundle(bundle: dict[str, Any], *, locale: str) -> 
         ]
         assert bundle["summary_lines"][0] == "  SIMULATION SUMMARY - Aethoria"
         assert bundle["summary_lines"][1] == "  Final year: 1002"
-        assert bundle["yearly_overview"] == ["    Total events recorded: 9"]
+        assert bundle["yearly_overview"] == ["    Total events recorded: 10"]
         assert bundle["yearly_regions"] == [
             "    The Verdant Vale: Mokrar Zugufang and Brynvalra Brynuwood found that their values cut "
             "against each other at The Verdant Vale. The memory of violence kept every word sharp. "
@@ -541,8 +542,8 @@ def _assert_seeded_acceptance_bundle(bundle: dict[str, Any], *, locale: str) -> 
             "    Sandstone Outpost: Strange signs around Sandstone Outpost led Gwynsylwen Gwynthebryn onward. "
             "Gwynsylwen Gwynthebryn discovered a vein of star-metal ore near Sandstone Outpost. "
             "The discovery will prove useful in future battles.",
+            "    The Grey Pass: 2 event(s)",
             "    Sunbaked Plains: 1 event(s)",
-            "    The Grey Pass: 1 event(s)",
         ]
         assert bundle["monthly_rumors"][-1] == "    Total events: 1"
         assert "  Notable moments:" in bundle["summary_lines"]
@@ -554,7 +555,7 @@ def _assert_seeded_acceptance_bundle(bundle: dict[str, Any], *, locale: str) -> 
         ]
         assert bundle["summary_lines"][0] == "  シミュレーション要約 - Aethoria"
         assert bundle["summary_lines"][1] == "  最終年: 1002"
-        assert bundle["yearly_overview"] == ["    記録イベント数: 9"]
+        assert bundle["yearly_overview"] == ["    記録イベント数: 10"]
         assert bundle["yearly_regions"] == [
             "    The Verdant Vale: Mokrar Zugufang と Brynvalra Brynuwood は The Verdant Vale "
             "で価値観の食い違いを露わにした。暴力の記憶が、すべての言葉を鋭くしていた。"
@@ -566,20 +567,21 @@ def _assert_seeded_acceptance_bundle(bundle: dict[str, Any], *, locale: str) -> 
             "    Sandstone Outpost: Sandstone Outpost 周辺の奇妙な兆しが、Gwynsylwen Gwynthebryn "
             "を先へ導いた。 Gwynsylwen Gwynthebryn は Sandstone Outpost 近くで 星鉄鉱の鉱脈 "
             "を発見した。その発見は、これからの戦いで大いに役立つだろう。",
+            "    The Grey Pass: 2件の出来事",
             "    Sunbaked Plains: 1件の出来事",
-            "    The Grey Pass: 1件の出来事",
         ]
         assert bundle["monthly_rumors"][-1] == "    イベント総数: 1"
         assert "  主な出来事:" in bundle["summary_lines"]
 
 
 def _assert_projection_contract(contract: dict[str, Any]) -> None:
-    # No forced injury or death on return: later RNG-dependent history follows that corrected state.
+    # Record progress choices and classify scouting from the actual branch, without discovery effects.
     assert contract["summary"] == {
-        "total_events": 35,
+        "total_events": 36,
         "kind_counts": {
             "adventure_arrived": 2,
-            "adventure_discovery": 1,
+            "adventure_choice": 1,
+            "adventure_scouted": 1,
             "adventure_encounter": 1,
             "adventure_retreated": 2,
             "adventure_started": 2,

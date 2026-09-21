@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, List
+from typing import TYPE_CHECKING, Any
 
+from .results import AdventureStepResult, step_fact_result
 from .combat import resolve_adventure_hazard_combat
 from ..character_model.death_resolution import mark_character_dead
 from ..i18n import tr
@@ -20,7 +21,7 @@ def resolve_hazard_band(
     world: "World",
     rng: Any,
     destination_name: str,
-) -> List[str]:
+) -> AdventureStepResult:
     if injured_member.injury_status == "dying":
         run.outcome = "death"
         run.state = "resolved"
@@ -33,7 +34,9 @@ def resolve_hazard_band(
         detail = tr("detail_adventure_died", name=injured_member.name, destination=destination_name)
         run._record(summary, detail)
         injured_member.add_history(tr("history_adventure_detail", year=world.year, detail=detail))
-        return [summary]
+        return step_fact_result(run, "adventure_death", "summary_adventure_died",
+                                {"name": injured_member.name, "destination": destination_name},
+                                actor_id=injured_member.char_id, severity=5)
 
     hazard_result = resolve_adventure_hazard_combat(run, injured_member, world, rng)
     return resolve_nonfatal_adventure_injury(
@@ -52,7 +55,7 @@ def resolve_critical_hazard(
     world: "World",
     rng: Any,
     destination_name: str,
-) -> List[str]:
+) -> AdventureStepResult:
     hazard_result = resolve_adventure_hazard_combat(run, injured_member, world, rng)
     severity_steps = hazard_result.severity_steps
     if hazard_result.member_lost and severity_steps > 0:
@@ -75,7 +78,8 @@ def resolve_nonfatal_adventure_injury(
     severity_steps: int = 1,
     hazard_name: str | None = None,
     combat_rounds: int | None = None,
-) -> List[str]:
+) -> AdventureStepResult:
+    previous_injury = injured_member.injury_status
     for _ in range(max(0, severity_steps)):
         if injured_member.injury_status == "dying":
             break
@@ -98,4 +102,11 @@ def resolve_nonfatal_adventure_injury(
         )
     run._record(summary, detail)
     run.state = "returning"
-    return [summary]
+    return step_fact_result(
+        run, "adventure_injured" if severity_steps > 0 else "adventure_encounter",
+        "summary_adventure_injured" if severity_steps > 0 else "summary_adventure_hazard_unharmed",
+        {"name": injured_member.name, "destination": destination_name,
+         "previous_injury": previous_injury, "injury_status": injured_member.injury_status,
+         "hazard_name": hazard_name, "combat_rounds": combat_rounds},
+        actor_id=injured_member.char_id, severity=3 if severity_steps > 0 else 2,
+    )
