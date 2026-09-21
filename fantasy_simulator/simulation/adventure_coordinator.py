@@ -63,7 +63,7 @@ class AdventureMixin(
                         entry,
                         kind=kind,
                         location_id=location_id,
-                        primary_actor_id=run.character_id,
+                        primary_actor_id=self._adventure_primary_actor(run, kind),
                         cause_event_ids=run.related_event_ids[-1:],
                         severity=severity,
                     )

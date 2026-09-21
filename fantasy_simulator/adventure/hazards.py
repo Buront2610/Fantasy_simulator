@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, List
 
 from .combat import resolve_adventure_hazard_combat
+from ..character_model.death_resolution import mark_character_dead
 from ..i18n import tr
 
 if TYPE_CHECKING:
@@ -24,8 +25,7 @@ def resolve_hazard_band(
         run.outcome = "death"
         run.state = "resolved"
         run.resolution_year = world.year
-        injured_member.alive = False
-        injured_member.active_adventure_id = None
+        mark_character_dead(injured_member, world)
         run.death_member_id = injured_member.char_id
         leader.active_adventure_id = None
         run._clear_member_adventures(world)
@@ -54,11 +54,14 @@ def resolve_critical_hazard(
     destination_name: str,
 ) -> List[str]:
     hazard_result = resolve_adventure_hazard_combat(run, injured_member, world, rng)
+    severity_steps = hazard_result.severity_steps
+    if hazard_result.member_lost and severity_steps > 0:
+        severity_steps = max(3, severity_steps)
     return resolve_nonfatal_adventure_injury(
         run,
         injured_member,
         destination_name,
-        severity_steps=max(3, hazard_result.severity_steps),
+        severity_steps=severity_steps,
         hazard_name=hazard_result.hazard_name,
         combat_rounds=hazard_result.rounds,
     )
@@ -73,14 +76,18 @@ def resolve_nonfatal_adventure_injury(
     hazard_name: str | None = None,
     combat_rounds: int | None = None,
 ) -> List[str]:
-    for _ in range(max(1, severity_steps)):
+    for _ in range(max(0, severity_steps)):
         if injured_member.injury_status == "dying":
             break
         injured_member.worsen_injury()
-    run.injury_status = injured_member.injury_status
-    run.injury_member_id = injured_member.char_id
-    summary = tr("summary_adventure_injured", name=injured_member.name)
-    detail = tr("detail_adventure_injured", name=injured_member.name, destination=destination_name)
+    if severity_steps > 0:
+        run.injury_status = injured_member.injury_status
+        run.injury_member_id = injured_member.char_id
+        summary = tr("summary_adventure_injured", name=injured_member.name)
+        detail = tr("detail_adventure_injured", name=injured_member.name, destination=destination_name)
+    else:
+        summary = tr("summary_adventure_hazard_unharmed", name=injured_member.name, destination=destination_name)
+        detail = summary
     if hazard_name is not None and combat_rounds is not None:
         detail += " " + tr(
             "detail_adventure_hazard_combat",
