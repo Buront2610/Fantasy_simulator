@@ -26,4 +26,5 @@ def prepare_scheduled_step(run: Any, tick: int) -> AdventureStepResult | None:
     return step_fact_result(
         run, "adventure_retreat_started", "summary_adventure_schedule_retreat",
         {"name": run.character_name, "reason": tr(f"adventure.limit_{reason}"), "limit": reason},
+        location_id=run.itinerary.current_site_id if run.itinerary is not None else None,
     )

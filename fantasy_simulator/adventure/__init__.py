@@ -39,6 +39,7 @@ from .domain import (
 )
 from .results import AdventureStepFact, AdventureStepResult
 from .schedule import AdventureSchedule
+from .itinerary import AdventureItinerary
 from .world_pressure import adventure_world_pressure
 from ..i18n import tr
 
@@ -139,6 +140,7 @@ class AdventureRun:
     supply_state: str = SUPPLY_FULL
     danger_level: int = 50
     schedule: Optional[AdventureSchedule] = None
+    itinerary: Optional[AdventureItinerary] = None
 
     def __post_init__(self) -> None:
         if not self.member_ids:
@@ -187,6 +189,11 @@ class AdventureRun:
         return self._policy_engine().default_option_for_context(context)
 
     def _clear_member_adventures(self, world: "World") -> None:
+        if self.itinerary is not None and self.is_resolved:
+            self.itinerary.active_leg = None
+            self.itinerary.remaining_legs = []
+            self.itinerary.waiting_for_route = False
+            self.itinerary.departure_tick = self.itinerary.arrival_tick = None
         for member_id in self.member_ids:
             member = world.get_character_by_id(member_id)
             if member is not None:
@@ -253,7 +260,7 @@ def create_adventure_run(
     if not candidates and not world.grid:
         raise ValueError("Cannot create adventure: world has no locations")
     if not candidates:
-        if world.routes:
+        if world.routes or world._route_graph_explicit:
             raise ValueError("Cannot create adventure: no reachable destinations")
         destination = world.random_location(rng=rng)
     else:

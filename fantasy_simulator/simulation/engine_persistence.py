@@ -141,6 +141,9 @@ class EnginePersistenceMixin:
             characters.append(character)
         world.characters = characters
         world.normalize_after_load()
+        from ..adventure.routing import validate_itinerary_references
+        for run in world.active_adventures:
+            validate_itinerary_references(world, run)
         sim = cls(
             world,
             events_per_year=data.get("events_per_year", 8),

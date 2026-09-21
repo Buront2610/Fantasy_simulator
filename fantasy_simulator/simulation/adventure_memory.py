@@ -18,7 +18,10 @@ class AdventureMemoryMixin:
 
     def _apply_world_memory(self, run: AdventureRun) -> None:
         """Record live traces, memorials, and aliases from a resolved adventure."""
-        dest = run.destination
+        itinerary = run.itinerary
+        if itinerary is not None and not itinerary.visited_destination and run.outcome != "death":
+            return
+        dest = itinerary.current_site_id if itinerary is not None and run.outcome == "death" else run.destination
         dest_name = self.world.location_name(dest)
 
         trace_text = self._build_adventure_trace_text(run, dest_name)
@@ -31,6 +34,10 @@ class AdventureMemoryMixin:
 
     def _build_adventure_trace_text(self, run: AdventureRun, dest_name: str) -> str:
         """Return localized live-trace text for a resolved adventure."""
+        if run.outcome == "death":
+            deceased = self.world.get_character_by_id(run.death_member_id or run.character_id)
+            return tr("live_trace_adventure_death", name=deceased.name if deceased else run.character_name,
+                      destination=dest_name, year=self.world.year)
         if run.is_party:
             members = [self.world.get_character_by_id(mid) for mid in run.member_ids]
             names = [m.name for m in members if m is not None]

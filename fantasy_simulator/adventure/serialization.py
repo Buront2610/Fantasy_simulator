@@ -8,6 +8,7 @@ from typing import Any, Dict, Type, TypeVar, cast
 from .constants import POLICY_CAUTIOUS, RETREAT_ON_SERIOUS, SUPPLY_FULL
 from .protocols import AdventureRunLike
 from .schedule import AdventureSchedule
+from .itinerary import AdventureItinerary
 from .validation import validate_adventure_run_payload
 
 
@@ -44,6 +45,7 @@ class AdventureSerialization:
             "supply_state": run.supply_state,
             "danger_level": run.danger_level,
             "schedule": run.schedule.to_dict() if run.schedule is not None else None,
+            "itinerary": run.itinerary.to_dict() if run.itinerary is not None else None,
         }
 
     @staticmethod
@@ -81,6 +83,7 @@ class AdventureSerialization:
             supply_state=data.get("supply_state", SUPPLY_FULL),
             danger_level=data.get("danger_level", 50),
             schedule=AdventureSchedule.from_dict(data["schedule"]) if data.get("schedule") is not None else None,
+            itinerary=AdventureItinerary.from_dict(data["itinerary"]) if data.get("itinerary") is not None else None,
         )
         validate_adventure_run_payload(run)
         return run

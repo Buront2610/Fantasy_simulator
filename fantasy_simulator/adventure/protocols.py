@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, List, Optional, Protocol
 
 from .schedule import AdventureSchedule
+from .itinerary import AdventureItinerary
 
 if TYPE_CHECKING:
     from ..world import World
@@ -37,6 +38,7 @@ class AdventureRunLike(Protocol):
     supply_state: str
     danger_level: int
     schedule: Optional[AdventureSchedule]
+    itinerary: Optional[AdventureItinerary]
 
     @property
     def is_resolved(self) -> bool:

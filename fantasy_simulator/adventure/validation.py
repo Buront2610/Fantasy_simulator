@@ -13,8 +13,7 @@ from .protocols import AdventureRunLike
 
 
 def validate_adventure_run_payload(run: AdventureRunLike) -> None:
-    if run.schedule is not None:
-        run.schedule.__post_init__()
+    validate_adventure_progress_state(run)
     if run.policy not in ALL_POLICIES:
         raise ValueError(f"policy must be one of {ALL_POLICIES}")
     if run.retreat_rule not in ALL_RETREAT_RULES:
@@ -34,3 +33,16 @@ def validate_adventure_run_payload(run: AdventureRunLike) -> None:
         or any(not isinstance(record_id, str) for record_id in run.related_event_ids)
     ):
         raise ValueError("related_event_ids must be a list of strings")
+
+
+def validate_adventure_progress_state(run: AdventureRunLike) -> None:
+    if run.itinerary is not None:
+        run.itinerary.validate()
+        if run.schedule is None:
+            raise ValueError("Physical itinerary requires a schedule")
+        if run.itinerary.active_leg is not None and run.schedule.next_step_tick != run.itinerary.arrival_tick:
+            raise ValueError("Travel arrival and next step must agree")
+        if run.itinerary.active_leg is not None and run.state not in ("traveling", "returning"):
+            raise ValueError("Active travel requires a travel state")
+    if run.schedule is not None:
+        run.schedule.__post_init__()

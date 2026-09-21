@@ -6,6 +6,19 @@ from typing import Dict
 
 
 TEXT_EN: Dict[str, str] = {
+    'live_trace_adventure_death': 'In {year}, {name} died during the expedition at {destination}.',
+    'adventure.in_transit_short': 'In transit',
+    'summary_adventure_travel': '{name} passed through {location} and continued the journey.',
+    'summary_adventure_route_blocked': '{name} found the route impassable and reconsidered the journey at {location}.',
+    'event_type_adventure_travel': 'Adventure travel',
+    'event_type_adventure_route_blocked': 'Adventure route blocked',
+    'adventure.in_transit': 'In transit: {origin} -> {destination} ({days} days to arrival)',
+    'adventure.route_waiting': 'Waiting at {location} for a passable route home.',
+    'adventure.at_site': 'Current location: {location}',
+    'events.adventure_travel.summary': '{name} passed through {location} and continued the journey.',
+    'events.adventure_route_blocked.summary': (
+        '{name} found the route impassable and reconsidered the journey at {location}.'
+    ),
     'summary_adventure_schedule_retreat': '{name} began returning because of {reason}.',
     'events.adventure_schedule_retreat.summary': '{name} began returning because of {reason}.',
     'adventure.limit_deadline': 'the deadline',

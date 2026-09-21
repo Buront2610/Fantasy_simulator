@@ -397,8 +397,8 @@
       },
       {
         "target": "fantasy_simulator/world_actor/api.py::WorldActorMixin",
-        "reason": "World actor facade remains a compatibility surface during world module split.",
-        "max_public_methods": 13,
+        "reason": "World actor facade includes one canonical physical-presence query shared by colocation and maps; extracting a one-method mixin would fragment that contract without reducing responsibility.",
+        "max_public_methods": 14,
         "owner": "architecture-maintainers",
         "removal_condition": "Remove when fantasy_simulator/world_actor/api.py::WorldActorMixin fits the default complexity budgets or is split behind a narrower compatibility adapter."
       },

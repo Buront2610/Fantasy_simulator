@@ -5,10 +5,10 @@ from __future__ import annotations
 import random
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
+from ..adventure.routing import validate_itinerary_references
 from .index import (
     add_adventure as add_adventure_to_index,
     add_character as add_character_to_index,
-    characters_at_location,
     complete_adventure as complete_adventure_in_index,
     default_resident_location_id,
     ensure_valid_character_locations as ensure_valid_character_locations_in_index,
@@ -125,8 +125,16 @@ class WorldActorMixin:
     def get_character_by_id(self, char_id: str) -> Optional[Character]:
         return self._char_index.get(char_id)
 
+    def character_presence_location_id(self, character: Character) -> str | None:
+        """Physical colocation; a party traversing an edge is at neither endpoint."""
+        run = self.get_adventure_by_id(character.active_adventure_id) if character.active_adventure_id else None
+        if run is not None and not run.is_resolved and run.itinerary is not None:
+            return run.itinerary.presence_location_id
+        return character.location_id
+
     def get_characters_at_location(self, location_id: str) -> List[Character]:
-        return characters_at_location(self.characters, location_id)
+        return [char for char in self.characters
+                if char.alive and self.character_presence_location_id(char) == location_id]
 
     def get_adventure_by_id(self, adventure_id: str) -> Optional[AdventureRun]:
         return self._adventure_index.get(adventure_id)
@@ -162,6 +170,8 @@ class WorldActorMixin:
             rebuild_recent_event_ids_fn=self.rebuild_recent_event_ids,
             rebuild_location_memorial_ids_fn=self._rebuild_location_memorial_ids,
         )
+        for run in self.active_adventures:
+            validate_itinerary_references(self, run, include_members=False)
 
     def _backfill_watched_actor_tags_after_load(self) -> None:
         """Freeze watched-actor report context for older untagged canonical records."""

@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
+
+from ..adventure.itinerary import AdventureItinerary
+
+if TYPE_CHECKING:
+    from ..world import World
 
 from ..adventure import AdventureRun
 from ..i18n import tr
@@ -11,6 +16,11 @@ from .adventure_transition import apply_adventure_transition
 
 class AdventureQueryMixin:
     """Mixin for player-facing adventure queries and choice APIs."""
+
+    if TYPE_CHECKING:
+        world: World
+        elapsed_days: int
+        _format_party_names_from_list: Callable[[List[str]], str]
 
     def get_adventure_summaries(self, include_active: bool = True) -> List[str]:
         """Return summary lines for known adventures."""
@@ -58,7 +68,19 @@ class AdventureQueryMixin:
                 provisions=run.schedule.remaining_provisions(tick, len(run.member_ids)),
                 deadline=max(0, run.schedule.deadline_tick - tick),
             ))
+        if run.itinerary is not None:
+            details.append(self._adventure_position_text(run.itinerary))
         return details
+
+    def _adventure_position_text(self, itinerary: AdventureItinerary) -> str:
+        if itinerary.active_leg is not None:
+            assert itinerary.arrival_tick is not None
+            return tr("adventure.in_transit",
+                      origin=self.world.location_name(itinerary.current_site_id),
+                      destination=self.world.location_name(itinerary.active_leg.destination),
+                      days=max(0, itinerary.arrival_tick - self.elapsed_days - 1))
+        key = "adventure.route_waiting" if itinerary.waiting_for_route else "adventure.at_site"
+        return tr(key, location=self.world.location_name(itinerary.current_site_id))
 
     def get_pending_adventure_choices(self) -> List[Dict[str, Any]]:
         """Return all unresolved adventure choices."""

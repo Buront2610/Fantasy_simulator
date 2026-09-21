@@ -31,6 +31,10 @@ _HAZARD_REGROWTH_DELTAS: dict[str, int] = {
 
 def apply_adventure_site_state(world: Any, run: Any) -> None:
     """Persist exploration progress and local reputation on an adventure destination."""
+    itinerary = getattr(run, "itinerary", None)
+    if itinerary is not None and (not itinerary.visited_destination
+                                  or (run.outcome == "death" and itinerary.current_site_id != run.destination)):
+        return
     location = world.get_location_by_id(run.destination)
     if location is None:
         return
