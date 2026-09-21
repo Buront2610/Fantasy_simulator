@@ -48,7 +48,10 @@ class AdventureStateMachine:
         if self.run.state == "traveling":
             return self._step_traveling(world, rng, destination_name, origin_name)
         if self.run.state == "exploring":
-            return self._step_exploring(character, world, rng, destination_name, origin_name)
+            result = self._step_exploring(character, world, rng, destination_name, origin_name)
+            if self.run.schedule is not None:
+                self.run.schedule.segment_mode = "standard"
+            return result
         if self.run.state == "returning":
             return self._step_returning(character, world, destination_name, origin_name)
         return AdventureStepResult(self.run.adventure_id, self.run.state)
@@ -106,7 +109,7 @@ class AdventureStateMachine:
             return step_fact_result(self.run, "adventure_retreat_started", "summary_party_retreated_auto",
                                     {"name": self.run.character_name, "destination": destination_name})
 
-        if self.run.is_party:
+        if self.run.is_party and self.run.schedule is None:
             self.policy.tick_supply(rng)
 
         injury_chance = self.policy.compute_injury_chance(members)

@@ -202,9 +202,7 @@ class TimelineMixin:
     def _run_adventure_phase(self, day_context: DayPhaseContext) -> None:
         """Start and advance adventures after health changes settle."""
         self._maybe_start_adventure(year_fraction=day_context.year_fraction_per_day)
-        adventure_steps = self._adventure_steps_for_day()
-        if adventure_steps > 0:
-            self._advance_adventures(steps=adventure_steps)
+        self._run_adventure_progression()
 
     def _run_random_event_phase(self, day_context: DayPhaseContext) -> None:
         """Generate free-form random events after deterministic daily systems."""

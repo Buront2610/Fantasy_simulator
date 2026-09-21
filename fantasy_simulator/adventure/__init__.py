@@ -38,6 +38,7 @@ from .domain import (
     validate_adventure_run_payload,
 )
 from .results import AdventureStepFact, AdventureStepResult
+from .schedule import AdventureSchedule
 from .world_pressure import adventure_world_pressure
 from ..i18n import tr
 
@@ -137,6 +138,7 @@ class AdventureRun:
     retreat_rule: str = RETREAT_ON_SERIOUS
     supply_state: str = SUPPLY_FULL
     danger_level: int = 50
+    schedule: Optional[AdventureSchedule] = None
 
     def __post_init__(self) -> None:
         if not self.member_ids:

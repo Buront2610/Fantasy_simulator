@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, List
+from math import ceil
+
+from ..adventure.schedule import AdventureSchedule
 
 from ..adventure import (
     SUPPLY_FULL,
@@ -106,6 +109,8 @@ class AdventureStartMixin:
         if any(self.world.get_character_by_id(member.char_id) is not member for member in members):
             raise ValueError("Adventure must start with live world character instances")
         with AdventureTransaction(self, run):
+            interval = max(1, ceil(self.world.days_per_year / max(1, self.adventure_steps_per_year)))
+            run.schedule = AdventureSchedule.begin(self.elapsed_days + 1, interval, len(members))
             for member in members:
                 member.active_adventure_id = run.adventure_id
                 member.add_history(tr(

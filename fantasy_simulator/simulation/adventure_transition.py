@@ -9,6 +9,7 @@ from typing import Any
 from ..adventure.results import AdventureStepResult, step_fact_result
 from ..adventure.validation import validate_adventure_run_payload
 from ..i18n import tr
+from .adventure_schedule import prepare_scheduled_step
 from .adventure_transaction import AdventureTransaction, affected_characters, clone_rng, copy_rng_state
 
 
@@ -83,7 +84,10 @@ def apply_adventure_transition(simulator: Any, run: Any, *, choice: bool = False
     draft = AdventureDraftWorld(simulator.world, run)
     character = draft.characters[run.character_id]
     rng = clone_rng(simulator.rng)
-    if choice:
+    scheduled_result = prepare_scheduled_step(draft.run, simulator.elapsed_days + 1) if character.alive else None
+    if scheduled_result is not None:
+        result = scheduled_result
+    elif choice:
         if not character.alive or run.pending_choice is None:
             raise ValueError("Adventure choice is no longer available")
         result = draft.run.resolve_choice_result(draft, character, option=option)
@@ -91,6 +95,8 @@ def apply_adventure_transition(simulator: Any, run: Any, *, choice: bool = False
         result = _dead_leader_result(draft, character)
     else:
         result = draft.run.step_result(character, draft, rng=rng)
+    if draft.run.schedule is not None:
+        draft.run.schedule.plan_next(draft.run.state, simulator.elapsed_days + 1)
     validate_adventure_run_payload(draft.run)
     if result.adventure_id != run.adventure_id or result.new_state != draft.run.state:
         raise ValueError("Adventure result conflicts with its planned state")

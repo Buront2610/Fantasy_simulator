@@ -241,6 +241,14 @@ def test_injury_outcome_uses_injury_field_without_mutating_constitution():
     assert char.constitution == before_constitution
 
 
+def _advance_scheduled_steps(sim, count):
+    for _ in range(count):
+        if not sim.world.active_adventures:
+            break
+        sim.elapsed_days = min(run.schedule.next_step_tick for run in sim.world.active_adventures) - 1
+        sim._advance_scheduled_adventures()
+
+
 def test_simulator_integrates_adventures_into_normal_year_loop(monkeypatch):
     world = World()
     char = _make_character()
@@ -251,7 +259,7 @@ def test_simulator_integrates_adventures_into_normal_year_loop(monkeypatch):
     sim.rng = FakeRng([0.9, 0.3, 0.1, 0.9])
 
     sim._start_solo_adventure([char])
-    sim._advance_adventures(steps=4)
+    _advance_scheduled_steps(sim, 4)
 
     assert len(world.completed_adventures) == 1
     run = world.completed_adventures[0]
@@ -270,7 +278,7 @@ def test_completed_adventure_updates_and_persists_site_state(tmp_path):
     sim.rng = FakeRng([0.9, 0.3, 0.1, 0.9])
 
     sim._start_solo_adventure([char])
-    sim._advance_adventures(steps=4)
+    _advance_scheduled_steps(sim, 4)
 
     run = world.completed_adventures[0]
     location = world.get_location_by_id(run.destination)
@@ -318,7 +326,7 @@ def test_completed_dungeon_adventure_updates_durable_site_causality():
     assert dungeon.hazard_regrowth == 0
 
 
-def test_pending_choice_persists_until_later_year(monkeypatch):
+def test_pending_choice_persists_until_next_scheduled_day(monkeypatch):
     world = World()
     char = _make_character()
     world.add_character(char)
@@ -327,14 +335,14 @@ def test_pending_choice_persists_until_later_year(monkeypatch):
     sim.rng = FakeRng([0.10, 0.9, 0.1, 0.9, 0.9])
 
     sim._start_solo_adventure([char])
-    sim._advance_adventures(steps=4)
+    _advance_scheduled_steps(sim, 1)
 
     assert len(world.active_adventures) == 1
     run = world.active_adventures[0]
     assert run.pending_choice is not None
     assert run.state == "waiting_for_choice"
 
-    sim._advance_adventures(steps=4)
+    _advance_scheduled_steps(sim, 4)
 
     assert world.active_adventures == []
     assert len(world.completed_adventures) == 1

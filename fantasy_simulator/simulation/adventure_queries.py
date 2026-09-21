@@ -50,7 +50,15 @@ class AdventureQueryMixin:
         run = self.world.get_adventure_by_id(adventure_id)
         if run is None:
             return []
-        return list(run.detail_log)
+        details = list(run.detail_log)
+        if run.schedule is not None and not run.is_resolved:
+            tick = self.elapsed_days + 1
+            details.append(tr(
+                "adventure.schedule_status", days=max(0, run.schedule.next_step_tick - tick),
+                provisions=run.schedule.remaining_provisions(tick, len(run.member_ids)),
+                deadline=max(0, run.schedule.deadline_tick - tick),
+            ))
+        return details
 
     def get_pending_adventure_choices(self) -> List[Dict[str, Any]]:
         """Return all unresolved adventure choices."""
@@ -65,6 +73,9 @@ class AdventureQueryMixin:
                         "prompt": run.pending_choice.prompt,
                         "options": list(run.pending_choice.options),
                         "default_option": run.pending_choice.default_option,
+                        "option_effects": {
+                            option: tr(f"adventure.effect_{option}") for option in run.pending_choice.options
+                        } if run.schedule is not None else {},
                     }
                 )
         return pending

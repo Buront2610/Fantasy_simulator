@@ -31,6 +31,7 @@ from .constants import (
     SUPPLY_LOW,
 )
 from .protocols import AdventureRunLike
+from .schedule import PACE_DISCOVERY, PACE_RISK
 
 if TYPE_CHECKING:
     from ..character import Character
@@ -115,6 +116,9 @@ class AdventurePolicyEngine:
         danger_mod = 0.5 + self.run.danger_level / 100.0
         policy_mod = POLICY_INJURY_MOD.get(self.run.policy, 1.0)
         chance = BASE_INJURY_CHANCE * ability_mod * danger_mod * policy_mod
+        chance = max(0.02, min(0.45, chance))
+        if self.run.schedule is not None:
+            chance *= PACE_RISK[self.run.schedule.segment_mode]
         return max(0.02, min(0.45, chance))
 
     def compute_loot_chance(self, members: List["Character"]) -> float:
@@ -123,6 +127,9 @@ class AdventurePolicyEngine:
         policy_mod = POLICY_LOOT_MOD.get(self.run.policy, 1.0)
         danger_mod = 0.85 + self.run.danger_level / 200.0
         chance = 0.60 * ability_mod * policy_mod * danger_mod
+        chance = max(0.05, min(0.95, chance))
+        if self.run.schedule is not None:
+            chance *= PACE_DISCOVERY[self.run.schedule.segment_mode]
         return max(0.05, min(0.95, chance))
 
     def should_auto_retreat(self, members: List["Character"]) -> bool:

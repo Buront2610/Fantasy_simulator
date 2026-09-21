@@ -304,6 +304,8 @@ def _render_params(
             params["loot"] = _display_term(params["loot_key"], locale=locale)
         if params.get("choice_key") is not None:
             params["choice"] = translate(params["choice_key"])
+        if params.get("limit") in ("deadline", "supplies"):
+            params["reason"] = translate(f"adventure.limit_{params['limit']}")
     _apply_term_params(params, locale=locale, translate=translate)
     _apply_location_params(params, world=world)
     _apply_world_change_params(record, params, world=world, translate=translate)

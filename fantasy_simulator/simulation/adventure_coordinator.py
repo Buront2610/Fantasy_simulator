@@ -43,12 +43,28 @@ class AdventureMixin(
                 if adventure_id in paused_until_next_year:
                     continue
                 run = self.world.get_adventure_by_id(adventure_id)
-                if run is None or run.is_resolved:
+                if run is None or run.is_resolved or run.schedule is not None:
                     continue
                 had_pending_choice = run.pending_choice is not None
                 apply_adventure_transition(self, run)
                 if not run.is_resolved and not had_pending_choice and run.pending_choice is not None:
                     paused_until_next_year.add(run.adventure_id)
+
+    def _run_adventure_progression(self) -> None:
+        self._advance_scheduled_adventures()
+        if any(run.schedule is None for run in self.world.active_adventures):
+            steps = self._adventure_steps_for_day()
+            if steps > 0:
+                self._advance_adventures(steps=steps)
+
+    def _advance_scheduled_adventures(self) -> None:
+        """Process each due operation once; waiting runs consume no progression RNG."""
+        if self.adventure_steps_per_year <= 0:
+            return
+        tick = self.elapsed_days + 1
+        for run in list(self.world.active_adventures):
+            if run.schedule is not None and not run.is_resolved and run.schedule.next_step_tick <= tick:
+                apply_adventure_transition(self, run)
 
     def _record_adventure_step_result(self, run: AdventureRun, result: AdventureStepResult) -> None:
         """Store facts as emitted; translated prose never determines their kind."""
