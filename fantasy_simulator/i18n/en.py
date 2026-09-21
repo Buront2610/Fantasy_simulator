@@ -6,6 +6,22 @@ from typing import Dict
 
 
 TEXT_EN: Dict[str, str] = {
+    # Structured adventure events retain the legacy display wording.
+    'events.adventure_arrived.summary': '{name} reached {destination} and began the expedition.',
+    'events.party_retreated_auto.summary': "{name}'s party retreated from {destination}.",
+    'events.adventure_discovery.summary': '{name} made a discovery at {destination}.',
+    'events.adventure_scouting.summary': '{name} scouted the area around {destination}.',
+    'events.adventure_died.summary': '{name} died on an adventure near {destination}.',
+    'events.returned_injured.summary': '{name} returned from {destination} injured.',
+    'events.returned_safely.summary': '{name} returned safely from {destination} with {loot}.',
+    'events.retreated_safely.summary': '{name} retreated from {destination} and returned safely.',
+    'events.adventure_injured.summary': '{name} was injured during the expedition and pulled back.',
+    'events.adventure_hazard_unharmed.summary': (
+        '{name} overcame the danger at {destination} without further injury and withdrew.'
+    ),
+    'events.choice_withdraw.summary': '{name} chose to withdraw from the expedition.',
+    'events.choice_made.summary': "{name} chose '{choice}' during the expedition.",
+
     'press_enter': '[Press ENTER to continue]',
     'your_choice': 'Your choice',
     'menu_option_column': 'Option',

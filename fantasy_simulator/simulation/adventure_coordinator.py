@@ -8,8 +8,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional
 
-from ..adventure import AdventureRun, select_party_policy
+from ..adventure import AdventureRun, AdventureStepResult, select_party_policy
 from ..i18n import tr
+from ..adventure.results import step_fact_result
 from .adventure_memory import AdventureMemoryMixin
 from .adventure_partying import AdventureStartMixin
 from .adventure_queries import AdventureQueryMixin
@@ -55,25 +56,27 @@ class AdventureMixin(
                     self._resolve_dead_character_adventure(run, char)
                     continue
                 had_pending_choice = run.pending_choice is not None
-                previous_state = run.state
-                summaries = run.step(char, self.world, rng=self.rng)
-                for entry in summaries:
-                    kind, location_id, severity = self._classify_adventure_summary(previous_state, run)
-                    record = self._record_world_event(
-                        entry,
-                        kind=kind,
-                        location_id=location_id,
-                        primary_actor_id=self._adventure_primary_actor(run, kind),
-                        cause_event_ids=run.related_event_ids[-1:],
-                        severity=severity,
-                    )
-                    run.related_event_ids.append(record.record_id)
+                result = run.step_result(char, self.world, rng=self.rng)
+                self._record_adventure_step_result(run, result)
                 if not char.alive:
                     self.event_system.handle_death_side_effects(char, self.world)
                 if run.is_resolved:
                     self._complete_resolved_adventure(run)
                 elif not had_pending_choice and run.pending_choice is not None:
                     paused_until_next_year.add(run.adventure_id)
+
+    def _record_adventure_step_result(self, run: AdventureRun, result: AdventureStepResult) -> None:
+        """Store facts as emitted; translated prose never determines their kind."""
+        if result.adventure_id != run.adventure_id:
+            raise ValueError("Adventure result belongs to another run")
+        for fact in result.facts:
+            record = self._record_world_event(
+                fact.description, kind=fact.kind, location_id=fact.location_id,
+                primary_actor_id=fact.primary_actor_id, secondary_actor_ids=list(fact.secondary_actor_ids),
+                cause_event_ids=list(fact.cause_event_ids), severity=fact.severity,
+                summary_key=fact.summary_key, render_params=fact.render_params,
+            )
+            run.related_event_ids.append(record.record_id)
 
     def _complete_resolved_adventure(self, run: AdventureRun) -> None:
         """Apply side effects and move a resolved adventure into completed storage."""
@@ -102,7 +105,9 @@ class AdventureMixin(
                 ),
             )
         )
-        self.event_system.handle_death_side_effects(char, self.world)
-        self._apply_world_memory(run)
-        self._recently_completed_adventures.append(run)
-        self.world.complete_adventure(run.adventure_id)
+        self._record_adventure_step_result(run, step_fact_result(
+            run, "adventure_death", "summary_adventure_died",
+            {"name": char.name, "destination": self.world.location_name(run.destination)},
+            actor_id=char.char_id, severity=5,
+        ))
+        self._complete_resolved_adventure(run)

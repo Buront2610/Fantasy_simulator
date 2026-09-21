@@ -35,12 +35,12 @@ def test_unharmed_encounter_does_not_worsen_health_or_claim_injury(critical):
     args = (run, hero, world, random.Random(0), "Thornwood")
     if not critical:
         args = (run, hero, hero, world, random.Random(0), "Thornwood")
-    summaries = resolve(*args)
+    result = resolve(*args)
     assert run.combat_logs[-1]["damage_taken"] == 0
     assert hero.injury_status == "none"
     assert run.injury_status == "none"
     assert run.injury_member_id is None
-    assert summaries == [tr("summary_adventure_hazard_unharmed", name=hero.name, destination="Thornwood")]
+    assert result.summaries == (tr("summary_adventure_hazard_unharmed", name=hero.name, destination="Thornwood"),)
     assert AdventureRun.from_dict(run.to_dict()).combat_logs == run.combat_logs
 
 

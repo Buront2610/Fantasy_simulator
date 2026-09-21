@@ -6,6 +6,20 @@ from typing import Dict
 
 
 TEXT_JA: Dict[str, str] = {
+    # Structured adventure events retain the legacy display wording.
+    'events.adventure_arrived.summary': '{name} は {destination} に到着し、探索を始めた。',
+    'events.party_retreated_auto.summary': '{name} たちのパーティは {destination} から撤退した。',
+    'events.adventure_discovery.summary': '{name} は {destination} で新たな発見をした。',
+    'events.adventure_scouting.summary': '{name} は {destination} 周辺を偵察した。',
+    'events.adventure_died.summary': '{name} は {destination} 付近での冒険中に命を落とした。',
+    'events.returned_injured.summary': '{name} は {destination} から負傷したまま帰還した。',
+    'events.returned_safely.summary': '{name} は {destination} から {loot} を持って無事に帰還した。',
+    'events.retreated_safely.summary': '{name} は {destination} から撤退し、無事に帰還した。',
+    'events.adventure_injured.summary': '{name} は遠征中に負傷し、引き返した。',
+    'events.adventure_hazard_unharmed.summary': '{name} は {destination} の危険を追加の負傷なく切り抜け、引き返した。',
+    'events.choice_withdraw.summary': '{name} は遠征から撤退する判断を下した。',
+    'events.choice_made.summary': "{name} は遠征中に '{choice}' を選んだ。",
+
     'press_enter': '[ENTERで続行]',
     'your_choice': '選択',
     'menu_option_column': '項目',

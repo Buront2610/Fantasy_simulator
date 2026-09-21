@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import random
-from typing import TYPE_CHECKING, Any, List, Type
+from typing import TYPE_CHECKING, Any, Type
 
 from .choices import AdventureChoiceResolver
 from .constants import (
@@ -20,6 +20,7 @@ from .hazards import (
 )
 from .policy import AdventurePolicyEngine
 from .protocols import AdventureRunLike
+from .results import AdventureFactKind, AdventureStepResult, step_fact_result
 from ..character_model.death_resolution import mark_character_dead
 from ..i18n import tr, tr_term
 
@@ -34,9 +35,9 @@ class AdventureStateMachine:
         self.choice_cls = choice_cls
         self.policy = AdventurePolicyEngine(run)
 
-    def step(self, character: "Character", world: "World", rng: Any = random) -> List[str]:
+    def step(self, character: "Character", world: "World", rng: Any = random) -> AdventureStepResult:
         if self.run.is_resolved:
-            return []
+            return AdventureStepResult(self.run.adventure_id, self.run.state)
 
         if self.run.state == "waiting_for_choice":
             return AdventureChoiceResolver(self.run).resolve(world, character, option=None)
@@ -50,7 +51,7 @@ class AdventureStateMachine:
             return self._step_exploring(character, world, rng, destination_name, origin_name)
         if self.run.state == "returning":
             return self._step_returning(character, world, destination_name, origin_name)
-        return []
+        return AdventureStepResult(self.run.adventure_id, self.run.state)
 
     def _step_traveling(
         self,
@@ -58,7 +59,7 @@ class AdventureStateMachine:
         rng: Any,
         destination_name: str,
         origin_name: str,
-    ) -> List[str]:
+    ) -> AdventureStepResult:
         self.run.steps_taken += 1
         summary = tr("summary_adventure_arrived", name=self.run.character_name, destination=destination_name)
         detail = tr(
@@ -83,7 +84,8 @@ class AdventureStateMachine:
             self.run.detail_log.append(tr("detail_paused_at_entrance", name=self.run.character_name))
         else:
             self.run.state = "exploring"
-        return [summary]
+        return step_fact_result(self.run, "adventure_arrived", "summary_adventure_arrived",
+                                {"name": self.run.character_name, "destination": destination_name}, severity=2)
 
     def _step_exploring(
         self,
@@ -92,7 +94,7 @@ class AdventureStateMachine:
         rng: Any,
         destination_name: str,
         origin_name: str,
-    ) -> List[str]:
+    ) -> AdventureStepResult:
         self.run.steps_taken += 1
         members = self.policy.party_members(world) or [character]
 
@@ -101,7 +103,8 @@ class AdventureStateMachine:
             summary = tr("summary_party_retreated_auto", name=self.run.character_name, destination=destination_name)
             detail = tr("detail_party_retreated_auto", name=self.run.character_name, destination=destination_name)
             self.run._record(summary, detail)
-            return [summary]
+            return step_fact_result(self.run, "adventure_retreat_started", "summary_party_retreated_auto",
+                                    {"name": self.run.character_name, "destination": destination_name})
 
         if self.run.is_party:
             self.policy.tick_supply(rng)
@@ -118,10 +121,12 @@ class AdventureStateMachine:
         if roll < critical_chance:
             return resolve_critical_hazard(self.run, injured_member, world, rng, destination_name)
 
+        kind: AdventureFactKind
         loot_chance = self.policy.compute_loot_chance(members)
         if rng.random() < loot_chance:
             discovery = rng.choice(ADVENTURE_DISCOVERIES)
             self.run.loot_summary.append(discovery)
+            kind, summary_key = "adventure_discovery", "summary_adventure_discovery"
             summary = tr("summary_adventure_discovery", name=self.run.character_name, destination=destination_name)
             detail = tr(
                 "detail_adventure_discovery",
@@ -131,6 +136,7 @@ class AdventureStateMachine:
             )
             self.run._record(summary, detail)
         else:
+            kind, summary_key = "adventure_scouted", "summary_adventure_scouting"
             summary = tr("summary_adventure_scouting", name=self.run.character_name, destination=destination_name)
             detail = tr("detail_adventure_scouting", name=self.run.character_name, destination=destination_name)
             self.run._record(summary, detail)
@@ -146,7 +152,11 @@ class AdventureStateMachine:
             self.run.detail_log.append(tr("detail_paused_to_delve", name=self.run.character_name))
         else:
             self.run.state = "returning"
-        return [self.run.summary_log[-1]]
+        return step_fact_result(
+            self.run, kind, summary_key,
+            {"name": self.run.character_name, "destination": destination_name,
+             "discovery": discovery if kind == "adventure_discovery" else None}, severity=2,
+        )
 
     def _step_returning(
         self,
@@ -154,11 +164,13 @@ class AdventureStateMachine:
         world: "World",
         destination_name: str,
         origin_name: str,
-    ) -> List[str]:
+    ) -> AdventureStepResult:
         self.run.steps_taken += 1
         self.run.state = "resolved"
         self.run.resolution_year = world.year
         history_target = character
+        kind: AdventureFactKind
+        kind, summary_key, severity = "adventure_death", "summary_adventure_died", 5
         # Character owns current health; the run may still describe an injury since treated or worsened.
         members = [world.get_character_by_id(member_id) for member_id in self.run.member_ids]
         current_members = [member for member in members if member is not None] or [character]
@@ -173,17 +185,20 @@ class AdventureStateMachine:
             if not injured_member.alive:
                 mark_character_dead(injured_member, world)
                 self.run.outcome = "death"
+                kind, summary_key, severity = "adventure_death", "summary_adventure_died", 5
                 self.run.death_member_id = injured_member.char_id
                 summary = tr("summary_adventure_died", name=injured_member.name, destination=destination_name)
                 detail = tr("detail_adventure_died", name=injured_member.name, destination=destination_name)
                 history_target = injured_member
             elif self.run.injury_status != "none":
                 self.run.outcome = "injury"
+                kind, summary_key, severity = "adventure_returned_injured", "summary_returned_injured", 3
                 summary = tr("summary_returned_injured", name=injured_member.name, destination=destination_name)
                 detail = tr("detail_returned_injured", name=injured_member.name, origin=origin_name)
                 history_target = injured_member
             elif self.run.loot_summary:
                 self.run.outcome = "safe_return"
+                kind, summary_key, severity = "adventure_returned", "summary_returned_safely", 2
                 summary = tr(
                     "summary_returned_safely",
                     name=self.run.character_name,
@@ -198,10 +213,19 @@ class AdventureStateMachine:
                 )
             else:
                 self.run.outcome = "retreat"
+                kind, summary_key, severity = "adventure_retreated", "summary_retreated_safely", 1
                 summary = tr("summary_retreated_safely", name=self.run.character_name, destination=destination_name)
                 detail = tr("detail_retreated_safely", name=self.run.character_name, origin=origin_name)
             self.run._record(summary, detail)
         character.active_adventure_id = None
         self.run._clear_member_adventures(world)
         history_target.add_history(tr("history_adventure_detail", year=world.year, detail=self.run.detail_log[-1]))
-        return [self.run.summary_log[-1]]
+        return step_fact_result(
+            self.run, kind, summary_key,
+            {"name": history_target.name, "destination": destination_name,
+             "loot": tr_term(self.run.loot_summary[-1]) if self.run.loot_summary else "",
+             "loot_key": self.run.loot_summary[-1] if self.run.loot_summary else None,
+             "injury_status": self.run.injury_status},
+            actor_id=history_target.char_id,
+            location_id=self.run.destination if kind == "adventure_death" else self.run.origin, severity=severity,
+        )
