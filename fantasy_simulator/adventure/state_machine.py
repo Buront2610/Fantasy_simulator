@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Any, Type
 
 from .choices import AdventureChoiceResolver
 from .constants import (
-    ADVENTURE_DISCOVERIES,
     BASE_CRITICAL_RATIO,
     CHOICE_PRESS_ON,
     CHOICE_PROCEED_CAUTIOUSLY,
@@ -22,6 +21,7 @@ from .policy import AdventurePolicyEngine
 from .rescue import perform_rescue
 from .protocols import AdventureRunLike
 from .roles import capability
+from .rewards import find_discovery
 from .results import AdventureFactKind, AdventureStepResult, step_fact_result
 from ..character_model.death_resolution import mark_character_dead
 from ..i18n import tr, tr_term
@@ -136,9 +136,11 @@ class AdventureStateMachine:
             return rescue_result
 
         kind: AdventureFactKind
+        discovery, asset_details = None, {}
         loot_chance = self.policy.compute_loot_chance(members)
-        if rng.random() < loot_chance:
-            discovery = rng.choice(ADVENTURE_DISCOVERIES)
+        reward = find_discovery(world, self.run, members, rng) if rng.random() < loot_chance else None
+        if reward is not None:
+            discovery, asset_details = reward.label, reward.details
             self.run.loot_summary.append(discovery)
             kind, summary_key = "adventure_discovery", "summary_adventure_discovery"
             summary = tr("summary_adventure_discovery", name=self.run.character_name, destination=destination_name)
@@ -169,7 +171,7 @@ class AdventureStateMachine:
         return step_fact_result(
             self.run, kind, summary_key,
             {"name": self.run.character_name, "destination": destination_name,
-             "discovery": discovery if kind == "adventure_discovery" else None}, severity=2,
+             "discovery": discovery, **asset_details}, severity=2,
         )
 
     def _step_returning(

@@ -6,6 +6,20 @@ from typing import Dict
 
 
 TEXT_JA: Dict[str, str] = {
+    "assets.header": '資産と保管状況',
+    "assets.unowned": '所有未確定',
+    "assets.unknown_position": '所在不明',
+    "assets.in_transit": '移動中',
+    "assets.last_known": '最後に確認された地点: {location}',
+    "assets.kind_moon_silver": '月銀',
+    "assets.kind_monster_trophy": '魔物素材',
+    "assets.kind_ancient_relic": '古代の護符',
+    "assets.kind_lore_fragment": '史料の断片',
+    "assets.inscription": '刻文: {text}',
+    "assets.ward_used": '{name}の護符が残りの力を1回消費し、負傷を一段階軽減した。',
+    "assets.stock_line": '{resource} ×{quantity} | 所有者: {owner} | 保管者: {holder} | {location}',
+    "assets.artifact_line": '{name} [{identifier}] | 所有者: {owner} | 保管者: {holder} | {location} | 残り使用回数: {charges}',
+
     "adventure.role_effect_frontline": '危険遭遇の戦闘を担当',
     "adventure.role_effect_scout": '道中の移動と遭遇回避を補助',
     "adventure.role_effect_lore": '発見を補助',

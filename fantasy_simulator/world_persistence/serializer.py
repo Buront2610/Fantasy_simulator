@@ -64,4 +64,6 @@ def serialize_world_state(world: Any) -> Dict[str, Any]:
     """Build the serialized payload for a world instance."""
     result = _serialize_base_world_state(world)
     _append_topology_payload(world, result)
+    if world.assets.seeded_sites or world.assets.stocks or world.assets.artifacts or world.assets.operations:
+        result["assets"] = world.assets.to_dict()
     return result

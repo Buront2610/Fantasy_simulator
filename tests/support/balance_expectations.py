@@ -19,5 +19,7 @@ MIN_TOTAL_MAGIC_COMBAT_ACTIONS = 1
 # Save-footprint guard for the 30y/20-character world-health smoke. This is a
 # tripwire, not a compression target: the review measured multi-MB growth over
 # much longer runs, so this band only catches sudden runaway history growth.
-MAX_WORLD_HEALTH_SAVE_JSON_BYTES = 1_500_000
+# Finite asset inventories and their canonical provenance add ~20 KB at seed42/30 years.
+# Keep gameplay bands unchanged; reserve 30 KB for this persistent, non-duplicated state.
+MAX_WORLD_HEALTH_SAVE_JSON_BYTES = 1_530_000
 MAX_WORLD_HEALTH_EVENT_RECORDS = 1_500

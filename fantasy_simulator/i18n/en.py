@@ -6,6 +6,21 @@ from typing import Dict
 
 
 TEXT_EN: Dict[str, str] = {
+    "assets.header": 'Assets and custody',
+    "assets.unowned": 'Unclaimed',
+    "assets.unknown_position": 'Unknown position',
+    "assets.in_transit": 'In transit',
+    "assets.last_known": 'Last known: {location}',
+    "assets.kind_moon_silver": 'Moon-silver',
+    "assets.kind_monster_trophy": 'Monster materials',
+    "assets.kind_ancient_relic": 'Ancient ward relic',
+    "assets.kind_lore_fragment": 'Historical fragment',
+    "assets.inscription": 'Inscription: {text}',
+    "assets.ward_used": "{name}'s relic spent one charge and absorbed one stage of injury.",
+    "assets.stock_line": '{resource} ×{quantity} | Owner: {owner} | Held by: {holder} | {location}',
+    "assets.artifact_line": ('{name} [{identifier}] | Owner: {owner}'
+                             ' | Held by: {holder} | {location} | Charges: {charges}'),
+
     "adventure.role_effect_frontline": 'takes hazard combat',
     "adventure.role_effect_scout": 'helps travel and avoids encounters',
     "adventure.role_effect_lore": 'helps discoveries',

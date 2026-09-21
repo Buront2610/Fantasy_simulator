@@ -39,6 +39,7 @@ class AdventureDraftWorld:
 
     def __init__(self, world: Any, run: Any) -> None:
         self.year = world.year
+        self.assets = deepcopy(world.assets)
         self.run = deepcopy(run)
         source = rescue_source_run(world, run)
         self.original_source = source
@@ -131,6 +132,7 @@ def apply_adventure_transition(simulator: Any, run: Any, *, choice: bool = False
             original.__dict__.update(vars(draft.characters[actor_id]))
         if run.itinerary is not None:
             simulator.world.mark_location_visited(run.itinerary.current_site_id)
+        simulator.world.assets = draft.assets
         copy_rng_state(simulator.rng, rng)
         simulator._record_adventure_step_result(run, result)
         if run.is_resolved:

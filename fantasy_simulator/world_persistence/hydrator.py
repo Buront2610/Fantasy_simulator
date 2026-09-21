@@ -7,6 +7,8 @@ from typing import Any, Callable, Dict, Mapping, Type
 from ..content.setting_bundle import CalendarDefinition, bundle_from_dict_validated
 from ..language.state import LanguageEvolutionRecord, LanguageRuntimeState, LocationNameHistoryRecord
 from ..terrain import AtlasLayout
+from ..assets.ledger import AssetLedger
+from ..assets.persistence import validate_asset_references
 from ..world_event.record_updates import normalize_event_record_locations
 from ..world_arc import WorldArc
 from .terrain import (
@@ -279,4 +281,6 @@ def hydrate_world_state(
     if "location_name_history" not in data:
         world._seed_initial_location_name_history()
     world.normalize_after_load()
+    world.assets = AssetLedger.from_dict(data.get("assets", {}))
+    validate_asset_references(world, characters=False)
     return world

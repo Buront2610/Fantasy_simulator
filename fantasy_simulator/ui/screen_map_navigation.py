@@ -7,6 +7,8 @@ from typing import Any
 
 from ..i18n import tr, tr_term
 from ..world import World
+from ..assets.models import AssetRef
+from .asset_presenter import asset_lines
 from .screen_input import _get_numeric_choice
 from .screen_history import _show_location_history_for_location
 from .screen_map_payloads import (
@@ -34,6 +36,8 @@ def _show_detail_for_location(
             include_observation_notes=True,
         )
     )
+    for line in asset_lines(world, AssetRef("site", loc.id)):
+        out.print_line(line)
     action = ctx.choose_key(
         tr("map_detail_followup_prompt"),
         [
