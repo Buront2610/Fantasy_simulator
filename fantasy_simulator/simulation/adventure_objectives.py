@@ -18,9 +18,12 @@ def _report_reaches(world: Any, origin: str, source: str, spread: int) -> bool:
 
 def _received_injury_reports(world: Any, leader: Any) -> dict[str, str]:
     """Trace reports to canonical events and require a passable dissemination path."""
+    # ID lookups validate mutation-sensitive signatures of the whole history. Capture
+    # fresh references once per decision instead of rescanning it for every rumor.
+    records = {record.record_id: record for record in world.event_records}
     reports = {}
     for rumor in world.rumors:
-        event = world.get_event_by_id(rumor.source_event_id) if rumor.source_event_id else None
+        event = records.get(rumor.source_event_id)
         if (rumor.is_expired or event is None or not rumor.source_location_id
                 or event.kind not in ("adventure_injured", "condition_worsened", "battle")):
             continue

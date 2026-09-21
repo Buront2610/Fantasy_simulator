@@ -1,6 +1,7 @@
 """Real rescue trips: knowledge, target changes, transfer, treatment and return."""
 
 from copy import deepcopy
+from dataclasses import replace
 
 import pytest
 
@@ -98,6 +99,9 @@ def test_rescue_information_requires_witness_or_reachable_rumor(rescue_case):
     rumor.spread_level = 2
     assert known_rescue_targets(sim.world, hero) == [(target, record.record_id)]
     hero.update_relationship(target.char_id, -50)
+    assert known_rescue_targets(sim.world, hero) == []
+    hero.update_relationship(target.char_id, 50)
+    sim.world.event_records[-1] = replace(record, kind="meeting")
     assert known_rescue_targets(sim.world, hero) == []
 
 
