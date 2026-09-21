@@ -29,6 +29,12 @@ MAX_CHARACTER_HISTORY = 120
 MAX_RELATION_TAG_SOURCE_EVENTS = 3
 
 
+def _validated_residence(value: Optional[str]) -> Optional[str]:
+    if value is not None and (not isinstance(value, str) or not value):
+        raise ValueError("residence_location_id must be a nonempty string or None")
+    return value
+
+
 def _tail(values: List[str], limit: int) -> List[str]:
     return list(values)[-limit:]
 
@@ -91,6 +97,7 @@ class Character:
         relationships: Optional[Dict[str, int]] = None,
         alive: bool = True,
         location_id: str = "",
+        residence_location_id: Optional[str] = None,
         favorite: bool = False,
         spotlighted: bool = False,
         playable: bool = False,
@@ -129,6 +136,7 @@ class Character:
         self.relationships: Dict[str, int] = _normalize_relationship_scores(relationships)
         self.alive = alive
         self.location_id = location_id
+        self.residence_location_id = _validated_residence(residence_location_id)
         self.favorite = favorite
         self.spotlighted = spotlighted
         self.playable = playable

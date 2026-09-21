@@ -15,6 +15,7 @@ from ..adventure import (
     generate_adventure_id,
 )
 from ..i18n import tr
+from .adventure_travel import initialize_itinerary
 from .adventure_transaction import AdventureTransaction, restore_start_rng_on_failure
 from .calendar import annual_probability_to_fraction
 from .population import population_pressure_factor
@@ -111,8 +112,11 @@ class AdventureStartMixin:
         with AdventureTransaction(self, run):
             interval = max(1, ceil(self.world.days_per_year / max(1, self.adventure_steps_per_year)))
             run.schedule = AdventureSchedule.begin(self.elapsed_days + 1, interval, len(members))
+            initialize_itinerary(self.world, run, self.elapsed_days + 1)
             for member in members:
                 member.active_adventure_id = run.adventure_id
+                if member.residence_location_id is None:
+                    member.residence_location_id = member.location_id
                 member.add_history(tr(
                     "set_out_for_adventure", year=self.world.year,
                     origin=self.world.location_name(run.origin), destination=self.world.location_name(run.destination),

@@ -8,6 +8,8 @@ from functools import wraps
 from random import Random
 from typing import Any, Literal
 
+from ..adventure.itinerary import affected_location_ids
+
 from ..world_event.api import WorldEventRecorderPort
 
 
@@ -95,7 +97,7 @@ class AdventureTransaction:
             simulator.memorial_template_history, simulator.alias_template_history,
         ))
         self.locations = []
-        for location_id in dict.fromkeys([run.origin, run.destination]):
+        for location_id in affected_location_ids(run):
             location = self.world.get_location_by_id(location_id)
             if location is None:
                 raise ValueError(f"Unknown adventure location: {location_id!r}")

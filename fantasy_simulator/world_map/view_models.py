@@ -200,8 +200,9 @@ def _terrain_snapshot(world: "World", x: int, y: int) -> tuple[str, str, int, in
 def _alive_counts_by_location(world: "World") -> Dict[str, int]:
     counts: Dict[str, int] = {}
     for character in world.characters:
-        if character.alive:
-            counts[character.location_id] = counts.get(character.location_id, 0) + 1
+        location_id = world.character_presence_location_id(character)
+        if character.alive and location_id is not None:
+            counts[location_id] = counts.get(location_id, 0) + 1
     return counts
 
 

@@ -506,81 +506,76 @@ def _restore_locale():
 def _assert_seeded_acceptance_bundle(bundle: dict[str, Any], *, locale: str) -> None:
     assert bundle["year"] == 1002
     assert bundle["month"] == 1
-    assert bundle["event_record_count"] == 17
-    assert bundle["event_log_count"] == 17
-    # Individual schedules and segment choices change event dates and subsequent RNG draws.
+    assert bundle["event_record_count"] == 22
+    assert bundle["event_log_count"] == 22
+    # Physical travel changes arrival dates, colocation and subsequent seeded event draws.
     assert bundle["kind_counts"] == (
         {'adventure_arrived': 1,
          'adventure_choice': 1,
-         'adventure_injured': 1,
-         'adventure_returned_injured': 1,
+         'adventure_discovery': 1,
          'adventure_started': 1,
          'aging': 2,
-         'battle': 2,
+         'battle': 1,
+         'condition_worsened': 1,
          'discovery': 1,
          'injury_recovery': 1,
-         'journey': 3,
-         'meeting': 2,
-         'relationship_value_clash': 1}
+         'journey': 5,
+         'meeting': 5,
+         'skill_training': 2}
     )
     if locale == "en":
-        assert bundle["monthly_notable"] == ['    - Goraga Gorufang was injured during the expedition and pulled back.']
+        assert bundle["monthly_notable"] == []
         assert bundle["summary_lines"][0] == "  SIMULATION SUMMARY - Aethoria"
         assert bundle["summary_lines"][1] == "  Final year: 1002"
-        assert bundle["yearly_overview"] == ['    Total events recorded: 8']
+        assert bundle["yearly_overview"] == ['    Total events recorded: 16']
         assert bundle["yearly_regions"] == (
-            ['    The Verdant Vale: An old grudge finally surfaced. Mokrar Zugufang defeated Brynvalra '
-             'Brynuwood. Brynvalra Brynuwood was injured in the fight.',
-             '    The Verdant Vale: Mokrar Zugufang and Brynvalra Brynuwood found that their values '
-             'cut against each other at The Verdant Vale. The memory of violence kept every word '
-             'sharp. (Mokrar Zugufang->Brynvalra Brynuwood: -32 / Brynvalra Brynuwood->Mokrar '
-             'Zugufang: -33 / Avg: -32)',
-             '    The Verdant Vale: An old grudge finally surfaced. Mokrar Zugufang defeated Brynvalra '
-             'Brynuwood. Brynvalra Brynuwood was injured in the fight.',
+            ['    The Verdant Vale: An old grudge finally surfaced. Mokrar Zugufang defeated '
+             'Brynvalra Brynuwood. Brynvalra Brynuwood was injured in the fight.',
+             '    The Grey Pass: 6 event(s)',
+             '    Frostpeak Summit: 1 event(s)',
              '    Obsidian Crater: 1 event(s)',
-             '    Skyveil Monastery: Goraga Gorufang returned from The Grey Pass injured.',
-             '    The Grey Pass: Goraga Gorufang was injured during the expedition and pulled back.']
+             '    Sandstone Outpost: 1 event(s)',
+             "    Skyveil Monastery: Goraga Gorufang's condition worsened to injured.",
+             '    Sunbaked Plains: 1 event(s)']
         )
-        assert bundle["monthly_rumors"][-1] == "    Total events: 1"
+        assert bundle["monthly_rumors"][-1] == '    Total events: 2'
         assert "  Notable moments:" in bundle["summary_lines"]
     else:
-        assert bundle["monthly_notable"] == ['    - Goraga Gorufang は遠征中に負傷し、引き返した。']
+        assert bundle["monthly_notable"] == []
         assert bundle["summary_lines"][0] == "  シミュレーション要約 - Aethoria"
         assert bundle["summary_lines"][1] == "  最終年: 1002"
-        assert bundle["yearly_overview"] == ['    記録イベント数: 8']
+        assert bundle["yearly_overview"] == ['    記録イベント数: 16']
         assert bundle["yearly_regions"] == (
             ['    The Verdant Vale: 古い遺恨がついに表に出た。 Mokrar Zugufang は Brynvalra Brynuwood に勝利した。 '
              'Brynvalra Brynuwood は戦いで負傷した。',
-             '    The Verdant Vale: Mokrar Zugufang と Brynvalra Brynuwood は The Verdant Vale '
-             'で価値観の食い違いを露わにした。暴力の記憶が、すべての言葉を鋭くしていた。（Mokrar Zugufang->Brynvalra Brynuwood: -32 / '
-             'Brynvalra Brynuwood->Mokrar Zugufang: -33 / 平均: -32）',
-             '    The Verdant Vale: 古い遺恨がついに表に出た。 Mokrar Zugufang は Brynvalra Brynuwood に勝利した。 '
-             'Brynvalra Brynuwood は戦いで負傷した。',
+             '    The Grey Pass: 6件の出来事',
+             '    Frostpeak Summit: 1件の出来事',
              '    Obsidian Crater: 1件の出来事',
-             '    Skyveil Monastery: Goraga Gorufang は The Grey Pass から負傷したまま帰還した。',
-             '    The Grey Pass: Goraga Gorufang は遠征中に負傷し、引き返した。']
+             '    Sandstone Outpost: 1件の出来事',
+             '    Skyveil Monastery: Goraga Gorufang の容態が悪化し、負傷中になった。',
+             '    Sunbaked Plains: 1件の出来事']
         )
-        assert bundle["monthly_rumors"][-1] == "    イベント総数: 1"
+        assert bundle["monthly_rumors"][-1] == '    イベント総数: 2'
         assert "  主な出来事:" in bundle["summary_lines"]
 
 
 def _assert_projection_contract(contract: dict[str, Any]) -> None:
-    # Scheduled arrival, choice, injury and return remain explicit facts in the projection.
+    # Physical arrival, choices, discoveries and return remain explicit projection facts.
     assert contract["summary"] == (
-        {'total_events': 32,
-         'kind_counts': {'adventure_arrived': 2,
+        {'total_events': 41,
+         'kind_counts': {'adventure_arrived': 1,
                          'adventure_choice': 2,
-                         'adventure_injured': 1,
-                         'adventure_returned_injured': 1,
-                         'adventure_started': 2,
+                         'adventure_discovery': 3,
+                         'adventure_returned': 1,
+                         'adventure_started': 1,
                          'aging': 4,
                          'battle': 2,
+                         'condition_worsened': 1,
                          'discovery': 3,
                          'injury_recovery': 3,
-                         'journey': 4,
-                         'meeting': 2,
-                         'relationship_value_clash': 1,
-                         'skill_training': 5}}
+                         'journey': 8,
+                         'meeting': 5,
+                         'skill_training': 7}}
     )
     assert len(contract["topology"]["site_ids"]) == 25
     assert "loc_the_verdant_vale" in contract["topology"]["site_ids"]
@@ -591,23 +586,21 @@ def _assert_projection_contract(contract: dict[str, Any]) -> None:
     assert ("aging",) in contract["event_tags"]
     assert ("discovery",) in contract["event_tags"]
     assert ("journey",) in contract["event_tags"]
-    assert ("relationship_value_clash",) in contract["event_tags"]
-    assert contract["relation_tags"] == [
-        ("1e27a1c0", "7f26144b", ("rival", "value_rift")),
-        ("7f26144b", "1e27a1c0", ("rival", "value_rift")),
-    ]
+    assert ("adventure_discovery",) in contract["event_tags"]
+    assert contract["relation_tags"] == [('1e27a1c0', '7f26144b', ('rival',)),
+                                         ('7f26144b', '1e27a1c0', ('rival',))]
     assert contract["detail_projection"] == {
         "location_id": "loc_elderroot_forest",
         "memory_tags": (),
     }
     assert contract["memory_tags"] == [('loc_the_grey_pass', ('trace',))]
-    assert contract["report_selection"]["yearly"]["total_events"] == 6
+    assert contract["report_selection"]["yearly"]["total_events"] == 3
     assert contract["report_selection"]["yearly"]["deaths_this_year"] == 0
     assert contract["report_selection"]["monthly"]["year"] == 1004
     assert contract["report_selection"]["monthly"]["month"] == 3
-    assert contract["report_selection"]["monthly"]["total_events"] == 1
+    assert contract["report_selection"]["monthly"]["total_events"] == 0
     assert contract["report_selection"]["monthly"]["notable_records"] == []
-    assert contract["report_selection"]["monthly"]["location_event_counts"] == {'loc_the_verdant_vale': 1}
+    assert contract["report_selection"]["monthly"]["location_event_counts"] == {}
 
 
 def test_seeded_acceptance_bundle_matches_english_projection() -> None:

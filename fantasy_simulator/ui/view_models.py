@@ -1155,11 +1155,12 @@ def _format_dashboard_actor(world: "World", character) -> str:
     marker_text = f" [{' / '.join(markers)}]" if markers else ""
     injury = tr(f"injury_status_{character.injury_status}")
     life_status = tr("alive") if character.alive else tr("status_dead")
+    location_id = world.character_presence_location_id(character)
     return tr(
         "dashboard_actor_status",
         name=character.name,
         markers=marker_text,
         status=life_status,
         injury=injury,
-        location=world.location_name(character.location_id),
+        location=world.location_name(location_id) if location_id is not None else tr("adventure.in_transit_short"),
     )

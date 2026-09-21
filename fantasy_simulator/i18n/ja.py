@@ -6,6 +6,17 @@ from typing import Dict
 
 
 TEXT_JA: Dict[str, str] = {
+    'live_trace_adventure_death': '{year}年、{name} は {destination} での遠征中に命を落とした。',
+    'adventure.in_transit_short': '経路を移動中',
+    'summary_adventure_travel': '{name} は {location} を通り、旅を続けている。',
+    'summary_adventure_route_blocked': '{name} は道が通れず、{location} で行程を見直した。',
+    'event_type_adventure_travel': '冒険の移動',
+    'event_type_adventure_route_blocked': '冒険の経路遮断',
+    'adventure.in_transit': '移動中: {origin} → {destination}（到着まで{days}日）',
+    'adventure.route_waiting': '{location} で通行可能な帰路を待っている。',
+    'adventure.at_site': '現在地点: {location}',
+    'events.adventure_travel.summary': '{name} は {location} を通り、旅を続けている。',
+    'events.adventure_route_blocked.summary': '{name} は道が通れず、{location} で行程を見直した。',
     'summary_adventure_schedule_retreat': '{name} は{reason}のため帰還を開始した。',
     'events.adventure_schedule_retreat.summary': '{name} は{reason}のため帰還を開始した。',
     'adventure.limit_deadline': '期限到達',
