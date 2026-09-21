@@ -110,7 +110,8 @@ def _is_required_record(record: WorldEventRecord, *, current_year: int, recent_y
 
 
 def _referenced_event_ids(world: Any) -> set[str]:
-    ids: set[str] = set()
+    assets = getattr(world, "assets", None)
+    ids = {op["event_id"] for op in assets.operations.values() if op.get("event_id")} if assets else set()
     for location in getattr(world, "grid", {}).values():
         ids.update(getattr(location, "recent_event_ids", []))
     for arc in getattr(world, "world_arcs", []):

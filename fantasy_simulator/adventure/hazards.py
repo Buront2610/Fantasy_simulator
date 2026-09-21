@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from .results import AdventureStepResult, step_fact_result
 from .combat import resolve_adventure_hazard_combat
+from .rewards import ward_injury, drop_casualty_assets
 from ..character_model.death_resolution import mark_character_dead
 from ..i18n import tr
 
@@ -46,6 +47,7 @@ def resolve_hazard_band(
         severity_steps=hazard_result.severity_steps,
         hazard_name=hazard_result.hazard_name,
         combat_rounds=hazard_result.rounds,
+        world=world,
     )
 
 
@@ -67,6 +69,7 @@ def resolve_critical_hazard(
         severity_steps=severity_steps,
         hazard_name=hazard_result.hazard_name,
         combat_rounds=hazard_result.rounds,
+        world=world,
     )
 
 
@@ -78,7 +81,11 @@ def resolve_nonfatal_adventure_injury(
     severity_steps: int = 1,
     hazard_name: str | None = None,
     combat_rounds: int | None = None,
+    world: Any = None,
 ) -> AdventureStepResult:
+    asset_details: dict[str, Any] = {}
+    if world is not None:
+        severity_steps, asset_details = ward_injury(world, run, injured_member, severity_steps)
     previous_injury = injured_member.injury_status
     for _ in range(max(0, severity_steps)):
         if injured_member.injury_status == "dying":
@@ -100,6 +107,12 @@ def resolve_nonfatal_adventure_injury(
             destination=destination_name,
             rounds=combat_rounds,
         )
+    if world is not None:
+        dropped = drop_casualty_assets(world, run, injured_member, severity_steps)
+        if dropped:
+            asset_details.setdefault("asset_operations", []).extend(dropped)
+        if asset_details.get("ward_artifact_id"):
+            detail += " " + tr("assets.ward_used", name=injured_member.name)
     run._record(summary, detail)
     run.state = "returning"
     return step_fact_result(
@@ -107,6 +120,6 @@ def resolve_nonfatal_adventure_injury(
         "summary_adventure_injured" if severity_steps > 0 else "summary_adventure_hazard_unharmed",
         {"name": injured_member.name, "destination": destination_name,
          "previous_injury": previous_injury, "injury_status": injured_member.injury_status,
-         "hazard_name": hazard_name, "combat_rounds": combat_rounds},
+         "hazard_name": hazard_name, "combat_rounds": combat_rounds, **asset_details},
         actor_id=injured_member.char_id, severity=3 if severity_steps > 0 else 2,
     )

@@ -93,6 +93,7 @@ class AdventureTransaction:
     def __init__(self, simulator: Any, run: Any, *, replacing_party: bool = False) -> None:
         self.sim = simulator
         self.world = simulator.world
+        self.assets = self.world.assets
         source = rescue_source_run(self.world, run)
         party = [run, *([source] if source else []), *affected_characters(self.world, run)]
         # Planned commits replace every party object's attributes with isolated copies.
@@ -128,6 +129,7 @@ class AdventureTransaction:
         return False
 
     def restore(self) -> None:
+        self.world.assets = self.assets
         for obj, state in self.objects:
             obj.__dict__.clear()
             obj.__dict__.update(state)

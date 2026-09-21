@@ -77,6 +77,7 @@ class AdventureMixin(
                 cause_event_ids=list(fact.cause_event_ids), severity=fact.severity,
                 summary_key=fact.summary_key, render_params=fact.render_params,
             )
+            self.world.assets.bind_event(fact.render_params.get("asset_operations", []), record.record_id)
             run.related_event_ids.append(record.record_id)
 
     def _complete_resolved_adventure(self, run: AdventureRun) -> None:

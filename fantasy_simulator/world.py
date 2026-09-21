@@ -4,6 +4,8 @@ world.py - World aggregate and compatibility exports.
 
 from __future__ import annotations
 
+from .assets.ledger import AssetLedger
+
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple
 
 from .world_event.models import WorldEventRecord
@@ -135,6 +137,7 @@ class World(
         self.propagation_rules: Dict[str, Dict[str, Any]] = clone_default_propagation_rules()
         self.rumors: List[Rumor] = []
         self.rumor_archive: List[Rumor] = []
+        self.assets = AssetLedger()
         self.active_adventures: List[AdventureRun] = []
         self.completed_adventures: List[AdventureRun] = []
         # PR-F: keyed by memorial_id
@@ -145,7 +148,6 @@ class World(
         self.language_evolution_history: List[LanguageEvolutionRecord] = []
         self.location_name_history: List[LocationNameHistoryRecord] = []
         self._language_runtime_states: Dict[str, LanguageRuntimeState] = {}
-        # PR-G: terrain / site / route layers
         self.terrain_map: Optional[TerrainMap] = None
         self.sites: List[Site] = []
         self._routes: RouteCollection = RouteCollection(on_change=self._mark_routes_dirty)

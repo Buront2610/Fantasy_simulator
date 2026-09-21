@@ -97,6 +97,8 @@ class EnginePersistenceMixin:
         Loader paths keep backward compatibility with older snapshots that still
         contain the legacy fields.
         """
+        from ..assets.persistence import validate_asset_references
+        validate_asset_references(self.world)
         return {
             "schema_version": CURRENT_SCHEMA_VERSION,
             "world": self.world.to_dict(),
@@ -141,6 +143,8 @@ class EnginePersistenceMixin:
             characters.append(character)
         world.characters = characters
         world.normalize_after_load()
+        from ..assets.persistence import validate_asset_references
+        validate_asset_references(world)
         from ..adventure.routing import validate_itinerary_references
         for run in world.active_adventures:
             validate_itinerary_references(world, run)

@@ -16,6 +16,8 @@ from ..combat_system.log_index import CombatLogEntryView, build_combat_log_index
 from ..world_event.rendering import render_event_record
 from ..i18n import tr, tr_term
 from ..world import World
+from ..assets.models import AssetRef
+from .asset_presenter import asset_lines
 from .screen_input import _get_numeric_choice
 from .ui_context import UIContext, _default_ctx
 from .ui_helpers import fit_display_width
@@ -95,6 +97,9 @@ def _show_character_profile(world: World, character: Any, ctx: UIContext) -> Non
     ctx.out.print_heading(f"  {tr('roster_profile_header', name=character.name)}")
     for line in _profile_summary_lines(world, character):
         ctx.out.print_line(f"  {line}")
+    holdings = asset_lines(world, AssetRef("character", character.char_id))
+    if holdings:
+        _print_profile_section(ctx, tr("assets.header"), holdings)
     _print_profile_section(ctx, tr("roster_profile_background"), _background_lines(character))
     _print_profile_section(ctx, tr("roster_profile_family"), _family_lines(world, character))
     _print_profile_section(ctx, tr("roster_profile_relationships"), _relationship_lines(world, character))
