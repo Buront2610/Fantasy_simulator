@@ -85,6 +85,20 @@ class CombatLogEntry:
 
 
 @dataclass(frozen=True, slots=True)
+class CombatantState:
+    """Final combat endurance, independent of the character's health state."""
+
+    char_id: str
+    starting_vitality: int
+    remaining_vitality: int
+    damage_dealt: int
+
+    @property
+    def damage_taken(self) -> int:
+        return self.starting_vitality - self.remaining_vitality
+
+
+@dataclass(frozen=True, slots=True)
 class CombatResolution:
     winner: Combatant
     loser: Combatant
@@ -93,22 +107,28 @@ class CombatResolution:
     winner_gains: dict[str, int]
     loser_losses: dict[str, int]
     log_entries: tuple[CombatLogEntry, ...] = field(default_factory=tuple)
+    end_reason: str = "round_limit"
+    final_states: tuple[CombatantState, ...] = field(default_factory=tuple)
 
     def combat_log_payload(self) -> list[dict[str, Any]]:
         return [entry.to_dict() for entry in self.log_entries]
+
+    def state_for(self, char_id: str) -> CombatantState:
+        for state in self.final_states:
+            if state.char_id == char_id:
+                return state
+        raise KeyError(char_id)
 
 
 _TACTICS = ("opening pressure", "guard break", "counterattack")
 MARTIAL_SKILLS = frozenset({
     "Swordsmanship",
-    "Shield Block",
     "Battle Cry",
-    "Endurance",
     "Archery",
     "Unarmed Combat",
-    "Heavy Armor",
     "Holy Strike",
 })
+GUARD_SKILLS = frozenset({"Shield Block", "Arcane Shield", "Divine Shield", "Evasion", "Heavy Armor", "Endurance"})
 SPELL_EFFECTS: dict[str, dict[str, int | str]] = {
     "Fireball": {"kind": "spell_attack", "attack_bonus": 5, "damage_bonus": 2},
     "Nature's Wrath": {"kind": "spell_attack", "attack_bonus": 4, "damage_bonus": 2},
@@ -122,6 +142,12 @@ MAX_COMBAT_ROUNDS = 5
 
 def resolve_combat(char1: Combatant, char2: Combatant, rng: Any = random) -> CombatResolution:
     """Resolve a reusable combat exchange without applying side effects."""
+    identifiers = (char1.char_id, char2.char_id)
+    if any(not isinstance(value, str) or not value.strip() for value in identifiers) or char1.char_id == char2.char_id:
+        raise ValueError("Combatants must have distinct nonempty IDs")
+    # Stable enumeration also makes assignment of random rolls independent of
+    # caller argument order. Skill and score ties use the same explicit policy.
+    char1, char2 = sorted((char1, char2), key=lambda char: char.char_id)
     vitality = {
         char1.char_id: _starting_vitality(char1),
         char2.char_id: _starting_vitality(char2),
@@ -145,7 +171,12 @@ def resolve_combat(char1: Combatant, char2: Combatant, rng: Any = random) -> Com
 
     char1_score = _final_combat_score(char1, vitality[char1.char_id], log_entries)
     char2_score = _final_combat_score(char2, vitality[char2.char_id], log_entries)
-    winner, loser = (char1, char2) if char1_score >= char2_score else (char2, char1)
+    if vitality[char1.char_id] == 0:
+        winner, loser = char2, char1
+    elif vitality[char2.char_id] == 0:
+        winner, loser = char1, char2
+    else:
+        winner, loser = (char1, char2) if char1_score >= char2_score else (char2, char1)
     winner_power, loser_power = (char1_score, char2_score) if winner is char1 else (char2_score, char1_score)
     winner_gains = {"strength": _randint(rng, 1, 3), "constitution": _randint(rng, 0, 2)}
     loser_losses = {"constitution": -_randint(rng, 2, 8), "strength": -_randint(rng, 0, 3)}
@@ -157,6 +188,16 @@ def resolve_combat(char1: Combatant, char2: Combatant, rng: Any = random) -> Com
         winner_gains=winner_gains,
         loser_losses=loser_losses,
         log_entries=tuple(_mark_decisive_entry(log_entries, winner, loser)),
+        end_reason="incapacitation" if vitality[loser.char_id] == 0 else "round_limit",
+        final_states=tuple(
+            CombatantState(
+                char_id=char.char_id,
+                starting_vitality=_starting_vitality(char),
+                remaining_vitality=vitality[char.char_id],
+                damage_dealt=sum(entry.damage for entry in log_entries if entry.actor_id == char.char_id),
+            )
+            for char in (char1, char2)
+        ),
     )
 
 
@@ -191,7 +232,7 @@ def _resolve_combat_round(
     attack_total = dice + attack_modifier
     target_number = defense_total
     margin = attack_total - defense_total
-    damage = _damage_for_margin(margin, skill_key)
+    damage = min(vitality[defender.char_id], _damage_for_margin(margin, skill_key))
     vitality[defender.char_id] = max(0, vitality[defender.char_id] - damage)
     return _log_entry(
         round_number,
@@ -213,7 +254,9 @@ def _resolve_combat_round(
 
 
 def _select_action(combatant: Combatant) -> tuple[str, str]:
-    spell_skill = _best_skill(combatant, SPELL_EFFECTS)
+    spell_skill = _best_skill(
+        combatant, (key for key, effect in SPELL_EFFECTS.items() if effect["kind"] in {"spell_attack", "weapon_art"}),
+    )
     martial_skill = _best_skill(combatant, MARTIAL_SKILLS)
     if spell_skill and _skill_level(combatant, spell_skill) >= max(2, _skill_level(combatant, martial_skill)):
         effect_kind = str(SPELL_EFFECTS[spell_skill].get("kind", "spell_attack"))
@@ -227,7 +270,7 @@ def _best_skill(combatant: Combatant, candidates: Any) -> str:
     skills = getattr(combatant, "skills", {})
     best_skill = ""
     best_level = 0
-    for skill_key in candidates:
+    for skill_key in sorted(candidates):
         level = int(skills.get(skill_key, 0))
         if level > best_level:
             best_skill = skill_key
@@ -251,7 +294,7 @@ def _attack_modifier(combatant: Combatant, skill_key: str, action_kind: str) -> 
 
 
 def _defense_total(combatant: Combatant, rng: Any) -> int:
-    guard_skill = _best_skill(combatant, ("Shield Block", "Arcane Shield", "Divine Shield", "Evasion"))
+    guard_skill = _best_skill(combatant, GUARD_SKILLS)
     effect = SPELL_EFFECTS.get(guard_skill, {})
     guard_bonus = int(effect.get("defense_bonus", 0))
     return 10 + combatant.dexterity // 6 + combatant.constitution // 8 + _skill_level(combatant, guard_skill) + (
