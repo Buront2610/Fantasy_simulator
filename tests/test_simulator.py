@@ -1268,7 +1268,8 @@ class TestWorldEventRecordIntegration:
         sim._start_solo_adventure([adventurer])
         run = sim.world.active_adventures[0]
         start_record = sim.world.get_event_by_id(run.related_event_ids[-1])
-        sim._advance_adventures(steps=1)
+        sim.elapsed_days = run.schedule.next_step_tick - 1
+        sim._advance_scheduled_adventures()
 
         adventure_records = [
             record for record in sim.world.event_records
