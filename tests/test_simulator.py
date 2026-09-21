@@ -1124,7 +1124,9 @@ class TestAdventureSafety:
                 return next(self.values, 0.99)
 
             def choice(self, options):
-                return companion if companion in options else options[0]
+                return next(
+                    (member for member in options if getattr(member, "char_id", None) == companion.char_id), options[0],
+                )
 
             def sample(self, population, k):
                 return list(population[:k])

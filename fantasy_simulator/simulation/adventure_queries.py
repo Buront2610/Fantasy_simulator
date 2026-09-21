@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from ..adventure import AdventureRun
 from ..i18n import tr
+from .adventure_transition import apply_adventure_transition
 
 
 class AdventureQueryMixin:
@@ -80,6 +81,5 @@ class AdventureQueryMixin:
         char = self.world.get_character_by_id(run.character_id)
         if char is None or not char.alive:
             return False
-        result = run.resolve_choice_result(self.world, char, option=option)
-        self._record_adventure_step_result(run, result)
+        apply_adventure_transition(self, run, choice=True, option=option)
         return True
