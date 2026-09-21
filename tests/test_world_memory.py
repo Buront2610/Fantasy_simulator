@@ -9,7 +9,6 @@ World serialization round-trips for all new fields.
 from __future__ import annotations
 
 import random
-from unittest.mock import MagicMock
 from typing import Any
 
 import pytest
@@ -938,7 +937,7 @@ class TestApplyWorldMemory:
         assert any_alias, "Expected at least one location alias after adventure deaths"
 
     def test_apply_world_memory_on_death_directly(self):
-        """Test _apply_world_memory directly via a mock AdventureRun."""
+        """Test legacy itinerary-free world memory with a real AdventureRun."""
         world = _make_world()
         world.year = 1010
         # Add a character
@@ -947,15 +946,18 @@ class TestApplyWorldMemory:
         char.location_id = "loc_aethoria_capital"
         world.add_character(char)
 
-        # Build a mock AdventureRun with death outcome
-        run = MagicMock(spec=AdventureRun)
-        run.destination = "loc_thornwood"
-        run.character_id = "cA"
-        run.character_name = "Aldric"
-        run.outcome = "death"
-        run.year_started = 1008
-        run.is_party = False
-        run.member_ids = ["cA"]
+        # Build a resolved legacy adventure with no physical itinerary
+        run = AdventureRun(
+            destination="loc_thornwood",
+            character_id="cA",
+            character_name="Aldric",
+            outcome="death",
+            year_started=1008,
+            member_ids=["cA"],
+            origin="loc_aethoria_capital",
+            state="resolved",
+            resolution_year=world.year,
+        )
 
         # Build a minimal mixin-like object
         class FakeMixin(AdventureMixin):
@@ -979,6 +981,7 @@ class TestApplyWorldMemory:
         assert len(world.memorials) == 1
         mem = next(iter(world.memorials.values()))
         assert mem.character_name == "Aldric"
+        assert "Aldric" in dest.live_traces[0]["text"]
         assert mem.cause == "adventure_death"
         # Alias generated
         assert len(dest.aliases) == 1
@@ -995,15 +998,18 @@ class TestApplyWorldMemory:
         world.add_character(leader)
         world.add_character(companion)
 
-        run = MagicMock(spec=AdventureRun)
-        run.destination = "loc_thornwood"
-        run.character_id = "cL"
-        run.character_name = "Leader"
-        run.death_member_id = "cC"
-        run.outcome = "death"
-        run.year_started = 1008
-        run.is_party = True
-        run.member_ids = ["cL", "cC"]
+        run = AdventureRun(
+            destination="loc_thornwood",
+            character_id="cL",
+            character_name="Leader",
+            death_member_id="cC",
+            outcome="death",
+            year_started=1008,
+            member_ids=["cL", "cC"],
+            origin="loc_aethoria_capital",
+            state="resolved",
+            resolution_year=world.year,
+        )
 
         mixin = object.__new__(AdventureMixin)
         mixin.world = world
@@ -1026,15 +1032,18 @@ class TestApplyWorldMemory:
         world.add_character(leader)
         world.add_character(companion)
 
-        run = MagicMock(spec=AdventureRun)
-        run.destination = "loc_thornwood"
-        run.character_id = "cL"
-        run.character_name = "Leader"
-        run.death_member_id = "cC"
-        run.outcome = "death"
-        run.year_started = 1008
-        run.is_party = True
-        run.member_ids = ["cL", "cC"]
+        run = AdventureRun(
+            destination="loc_thornwood",
+            character_id="cL",
+            character_name="Leader",
+            death_member_id="cC",
+            outcome="death",
+            year_started=1008,
+            member_ids=["cL", "cC"],
+            origin="loc_aethoria_capital",
+            state="resolved",
+            resolution_year=world.year,
+        )
 
         mixin = object.__new__(AdventureMixin)
         mixin.world = world
@@ -1057,15 +1066,18 @@ class TestApplyWorldMemory:
         char.add_relation_tag("partner", "spouse")
         world.add_character(char)
 
-        run = MagicMock(spec=AdventureRun)
-        run.destination = "loc_thornwood"
-        run.character_id = "cA"
-        run.character_name = "Aldric"
-        run.outcome = "death"
-        run.year_started = 1008
-        run.is_party = False
-        run.member_ids = ["cA"]
-        run.death_member_id = None
+        run = AdventureRun(
+            destination="loc_thornwood",
+            character_id="cA",
+            character_name="Aldric",
+            outcome="death",
+            year_started=1008,
+            member_ids=["cA"],
+            death_member_id=None,
+            origin="loc_aethoria_capital",
+            state="resolved",
+            resolution_year=world.year,
+        )
 
         mixin = object.__new__(AdventureMixin)
         mixin.world = world
@@ -1086,15 +1098,18 @@ class TestApplyWorldMemory:
         char.location_id = "loc_aethoria_capital"
         world.add_character(char)
 
-        run = MagicMock(spec=AdventureRun)
-        run.destination = "loc_thornwood"
-        run.character_id = "cA"
-        run.character_name = "Aldric"
-        run.outcome = "death"
-        run.year_started = 1008
-        run.is_party = False
-        run.member_ids = ["cA"]
-        run.death_member_id = None
+        run = AdventureRun(
+            destination="loc_thornwood",
+            character_id="cA",
+            character_name="Aldric",
+            outcome="death",
+            year_started=1008,
+            member_ids=["cA"],
+            death_member_id=None,
+            origin="loc_aethoria_capital",
+            state="resolved",
+            resolution_year=world.year,
+        )
 
         mixin = object.__new__(AdventureMixin)
         mixin.world = world
@@ -1119,15 +1134,18 @@ class TestApplyWorldMemory:
         world.add_character(leader)
         world.add_character(companion)
 
-        run = MagicMock(spec=AdventureRun)
-        run.destination = "loc_thornwood"
-        run.character_id = "cL"
-        run.character_name = "Leader"
-        run.death_member_id = "cC"
-        run.outcome = "death"
-        run.year_started = 1008
-        run.is_party = True
-        run.member_ids = ["cL", "cC"]
+        run = AdventureRun(
+            destination="loc_thornwood",
+            character_id="cL",
+            character_name="Leader",
+            death_member_id="cC",
+            outcome="death",
+            year_started=1008,
+            member_ids=["cL", "cC"],
+            origin="loc_aethoria_capital",
+            state="resolved",
+            resolution_year=world.year,
+        )
 
         mixin = object.__new__(AdventureMixin)
         mixin.world = world
@@ -1144,14 +1162,17 @@ class TestApplyWorldMemory:
         world = _make_world()
         world.year = 1010
 
-        run = MagicMock(spec=AdventureRun)
-        run.destination = "loc_thornwood"
-        run.character_id = "cB"
-        run.character_name = "Lysara"
-        run.outcome = "safe_return"
-        run.year_started = 1009
-        run.is_party = False
-        run.member_ids = ["cB"]
+        run = AdventureRun(
+            destination="loc_thornwood",
+            character_id="cB",
+            character_name="Lysara",
+            outcome="safe_return",
+            year_started=1009,
+            member_ids=["cB"],
+            origin="loc_aethoria_capital",
+            state="resolved",
+            resolution_year=world.year,
+        )
 
         mixin = object.__new__(AdventureMixin)
         mixin.world = world
@@ -1172,23 +1193,29 @@ class TestApplyWorldMemory:
         world = _make_world()
         world.year = 1010
 
-        safe_run = MagicMock(spec=AdventureRun)
-        safe_run.destination = "loc_thornwood"
-        safe_run.character_id = "c_safe"
-        safe_run.character_name = "Aldric"
-        safe_run.outcome = "safe_return"
-        safe_run.year_started = 1009
-        safe_run.is_party = False
-        safe_run.member_ids = ["c_safe"]
+        safe_run = AdventureRun(
+            destination="loc_thornwood",
+            character_id="c_safe",
+            character_name="Aldric",
+            outcome="safe_return",
+            year_started=1009,
+            member_ids=["c_safe"],
+            origin="loc_aethoria_capital",
+            state="resolved",
+            resolution_year=world.year,
+        )
 
-        retreat_run = MagicMock(spec=AdventureRun)
-        retreat_run.destination = "loc_thornwood"
-        retreat_run.character_id = "c_retreat"
-        retreat_run.character_name = "Lysara"
-        retreat_run.outcome = "retreat"
-        retreat_run.year_started = 1009
-        retreat_run.is_party = False
-        retreat_run.member_ids = ["c_retreat"]
+        retreat_run = AdventureRun(
+            destination="loc_thornwood",
+            character_id="c_retreat",
+            character_name="Lysara",
+            outcome="retreat",
+            year_started=1009,
+            member_ids=["c_retreat"],
+            origin="loc_aethoria_capital",
+            state="resolved",
+            resolution_year=world.year,
+        )
 
         mixin = object.__new__(AdventureMixin)
         mixin.world = world
