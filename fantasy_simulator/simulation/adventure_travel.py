@@ -4,6 +4,7 @@ from typing import Any
 from math import ceil
 
 from ..adventure.itinerary import AdventureItinerary
+from ..adventure.schedule import PACE_DURATION
 from ..adventure.results import AdventureFactKind, AdventureStepResult, step_fact_result
 from ..adventure.routing import capture_travel_network, leg_is_passable, shortest_itinerary
 
@@ -81,5 +82,6 @@ def plan_departure(network: Any, run: Any, tick: int) -> None:
     itinerary.active_leg, itinerary.remaining_legs = path[0], path[1:]
     itinerary.waiting_for_route = False
     itinerary.departure_tick = tick
-    itinerary.arrival_tick = tick + ceil(path[0].cost * run.schedule.interval_days)
+    pace = PACE_DURATION[run.objective.pace] if run.objective is not None else 1.0
+    itinerary.arrival_tick = tick + ceil(path[0].cost * run.schedule.interval_days * pace)
     run.schedule.next_step_tick = itinerary.arrival_tick

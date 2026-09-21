@@ -14,6 +14,7 @@ from .protocols import AdventureRunLike
 
 def validate_adventure_run_payload(run: AdventureRunLike) -> None:
     validate_adventure_progress_state(run)
+    validate_objective_state(run)
     if run.policy not in ALL_POLICIES:
         raise ValueError(f"policy must be one of {ALL_POLICIES}")
     if run.retreat_rule not in ALL_RETREAT_RULES:
@@ -46,3 +47,18 @@ def validate_adventure_progress_state(run: AdventureRunLike) -> None:
             raise ValueError("Active travel requires a travel state")
     if run.schedule is not None:
         run.schedule.__post_init__()
+
+
+def validate_objective_state(run: AdventureRunLike) -> None:
+    goal = run.objective
+    if goal is None:
+        return
+    goal.validate()
+    if goal.target_id == run.character_id or goal.source_adventure_id == run.adventure_id:
+        raise ValueError("A rescuer cannot target themselves or their own expedition")
+    if goal.purpose == "rescue":
+        joined = goal.target_id in run.member_ids
+        if goal.status in ("rescued", "completed") and not joined:
+            raise ValueError("A rescued target must belong to the rescuing party")
+        if goal.status == "active" and joined:
+            raise ValueError("An active rescue target cannot already belong to the rescuing party")

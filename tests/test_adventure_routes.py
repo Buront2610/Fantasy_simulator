@@ -6,6 +6,7 @@ import pytest
 
 from fantasy_simulator.adventure import AdventureRun
 from fantasy_simulator.adventure.itinerary import AdventureItinerary, TravelLeg
+from fantasy_simulator.adventure.objective import AdventureObjective
 from fantasy_simulator.adventure.routing import capture_travel_network, shortest_itinerary
 from fantasy_simulator.character import Character
 from fantasy_simulator.character_model.death_resolution import mark_character_dead
@@ -33,7 +34,7 @@ def expedition():
     world.add_character(hero)
     sim = Simulator(world, seed=42, adventure_steps_per_year=360)
     run = AdventureRun("hero", "Traveler", "home", "dungeon", world.year, adventure_id="route-test",
-                       summary_log=["departure"])
+                       summary_log=["departure"], objective=AdventureObjective())
     sim._commit_adventure_start(run, [hero])
     return sim, run, hero
 

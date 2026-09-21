@@ -562,20 +562,20 @@ def _assert_seeded_acceptance_bundle(bundle: dict[str, Any], *, locale: str) -> 
 def _assert_projection_contract(contract: dict[str, Any]) -> None:
     # Physical arrival, choices, discoveries and return remain explicit projection facts.
     assert contract["summary"] == (
-        {'total_events': 41,
+        {'total_events': 35,
          'kind_counts': {'adventure_arrived': 1,
-                         'adventure_choice': 2,
-                         'adventure_discovery': 3,
+                         'adventure_choice': 1,
+                         'adventure_discovery': 1,
                          'adventure_returned': 1,
                          'adventure_started': 1,
                          'aging': 4,
-                         'battle': 2,
+                         'battle': 1,
                          'condition_worsened': 1,
                          'discovery': 3,
-                         'injury_recovery': 3,
+                         'injury_recovery': 2,
                          'journey': 8,
                          'meeting': 5,
-                         'skill_training': 7}}
+                         'skill_training': 6}}
     )
     assert len(contract["topology"]["site_ids"]) == 25
     assert "loc_the_verdant_vale" in contract["topology"]["site_ids"]
@@ -594,13 +594,13 @@ def _assert_projection_contract(contract: dict[str, Any]) -> None:
         "memory_tags": (),
     }
     assert contract["memory_tags"] == [('loc_the_grey_pass', ('trace',))]
-    assert contract["report_selection"]["yearly"]["total_events"] == 3
+    assert contract["report_selection"]["yearly"]["total_events"] == 5
     assert contract["report_selection"]["yearly"]["deaths_this_year"] == 0
     assert contract["report_selection"]["monthly"]["year"] == 1004
     assert contract["report_selection"]["monthly"]["month"] == 3
-    assert contract["report_selection"]["monthly"]["total_events"] == 0
+    assert contract["report_selection"]["monthly"]["total_events"] == 1
     assert contract["report_selection"]["monthly"]["notable_records"] == []
-    assert contract["report_selection"]["monthly"]["location_event_counts"] == {}
+    assert contract["report_selection"]["monthly"]["location_event_counts"] == {'loc_the_grey_pass': 1}
 
 
 def test_seeded_acceptance_bundle_matches_english_projection() -> None:
@@ -624,9 +624,9 @@ def test_seeded_long_run_statistics_stay_in_expected_bounds() -> None:
 
     for summary in summaries:
         assert 6 <= summary["event_count"] <= 36
-        # Scheduled choices/returns can complete within this two-year window; seed 9 now has 22.
+        # Emergency departures and physical travel yield 26 non-aging facts for seed 9.
         # Keep the total-event, population, activity and rumor bounds unchanged.
-        assert 4 <= summary["non_aging_event_count"] <= 24
+        assert 4 <= summary["non_aging_event_count"] <= 28
         assert summary["kind_diversity"] >= 2
         assert summary["active_month_count"] >= 6
         assert summary["alive_count"] >= 3

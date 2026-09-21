@@ -114,7 +114,7 @@ class AdventurePolicyEngine:
         combat = self.combat_score(members)
         ability_mod = STAT_BASELINE / max(combat, 1.0)
         danger_mod = 0.5 + self.run.danger_level / 100.0
-        policy_mod = POLICY_INJURY_MOD.get(self.run.policy, 1.0)
+        policy_mod = 1.0 if self.run.objective is not None else POLICY_INJURY_MOD.get(self.run.policy, 1.0)
         chance = BASE_INJURY_CHANCE * ability_mod * danger_mod * policy_mod
         chance = max(0.02, min(0.45, chance))
         if self.run.schedule is not None:
@@ -124,7 +124,7 @@ class AdventurePolicyEngine:
     def compute_loot_chance(self, members: List["Character"]) -> float:
         lore = self.lore_score(members)
         ability_mod = lore / STAT_BASELINE
-        policy_mod = POLICY_LOOT_MOD.get(self.run.policy, 1.0)
+        policy_mod = 1.0 if self.run.objective is not None else POLICY_LOOT_MOD.get(self.run.policy, 1.0)
         danger_mod = 0.85 + self.run.danger_level / 200.0
         chance = 0.60 * ability_mod * policy_mod * danger_mod
         chance = max(0.05, min(0.95, chance))
@@ -151,6 +151,10 @@ class AdventurePolicyEngine:
                 self.run.supply_state = SUPPLY_CRITICAL
 
     def default_option_for_context(self, context: str) -> str:
+        if self.run.objective is not None:
+            if context == "approach":
+                return (CHOICE_PROCEED_CAUTIOUSLY if self.run.objective.pace == "cautious" else CHOICE_PRESS_ON)
+            return CHOICE_WITHDRAW
         if context == "approach":
             defaults = {
                 POLICY_CAUTIOUS: CHOICE_PROCEED_CAUTIOUSLY,

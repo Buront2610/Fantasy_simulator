@@ -64,6 +64,9 @@ def validate_itinerary_references(world: Any, run: Any, *, include_members: bool
         raise ValueError("Itinerary refers to an unknown location")
     if not include_members:
         return
+    if run.objective is not None and run.objective.target_id:
+        if world.get_character_by_id(run.objective.target_id) is None:
+            raise ValueError("Objective refers to an unknown rescue target")
     for member_id in run.member_ids:
         member = world.get_character_by_id(member_id)
         if member is None or member.location_id != itinerary.current_site_id:

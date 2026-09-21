@@ -48,7 +48,10 @@ def _show_adventure_summaries(sim: Any, ctx: UIContext | None = None) -> None:
         dest_name = sim.world.location_name(run.destination)
         if run.is_party:
             leader_display = _party_display_names(sim.world, run)
-            policy_label = tr(f"policy_{run.policy}")
+            policy_label = (tr("adventure.plan_label",
+                               purpose=tr(f"adventure.purpose_{run.objective.purpose}"),
+                               pace=tr(f"adventure.pace_{run.objective.pace}"))
+                            if run.objective is not None else tr(f"policy_{run.policy}"))
         else:
             leader_display = run.character_name
             policy_label = ""
@@ -105,7 +108,8 @@ def _show_adventure_details(sim: Any, ctx: UIContext | None = None) -> None:
         if not member_names:
             member_names = [run.character_name]
         out.print_line(f"  {tr('party_members_label'):<11}: {', '.join(member_names)}")
-        out.print_line(f"  {tr('party_policy_label'):<11}: {tr(f'policy_{run.policy}')}")
+        if run.objective is None:
+            out.print_line(f"  {tr('party_policy_label'):<11}: {tr(f'policy_{run.policy}')}")
         out.print_line(f"  {tr('party_supply_label'):<11}: {tr(f'supply_{run.supply_state}')}")
     out.print_line(f"  {tr('state'):<11}: {tr(f'state_{run.state}')}")
     out.print_line(

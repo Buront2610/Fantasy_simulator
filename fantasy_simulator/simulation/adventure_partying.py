@@ -16,6 +16,7 @@ from ..adventure import (
 )
 from ..i18n import tr
 from .adventure_travel import initialize_itinerary
+from .adventure_objectives import prepare_objective, try_start_rescue
 from .adventure_transaction import AdventureTransaction, restore_start_rng_on_failure
 from .calendar import annual_probability_to_fraction
 from .population import population_pressure_factor
@@ -42,6 +43,8 @@ class AdventureStartMixin:
             and c.injury_status not in ("injured", "serious", "dying")
         ]
         if not candidates:
+            return
+        if try_start_rescue(self, candidates):
             return
         annual_start_chance = min(0.65, 0.25 * population_pressure_factor(self.world))
         start_chance = (
@@ -111,7 +114,11 @@ class AdventureStartMixin:
             raise ValueError("Adventure must start with live world character instances")
         with AdventureTransaction(self, run):
             interval = max(1, ceil(self.world.days_per_year / max(1, self.adventure_steps_per_year)))
+            prepare_objective(self.world, run, members)
+            if run.objective.purpose == "rescue":
+                interval = min(interval, 7)
             run.schedule = AdventureSchedule.begin(self.elapsed_days + 1, interval, len(members))
+            run.schedule.segment_mode = run.objective.pace
             initialize_itinerary(self.world, run, self.elapsed_days + 1)
             for member in members:
                 member.active_adventure_id = run.adventure_id

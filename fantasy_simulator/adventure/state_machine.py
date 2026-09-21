@@ -19,6 +19,7 @@ from .hazards import (
     resolve_hazard_band,
 )
 from .policy import AdventurePolicyEngine
+from .rescue import perform_rescue
 from .protocols import AdventureRunLike
 from .results import AdventureFactKind, AdventureStepResult, step_fact_result
 from ..character_model.death_resolution import mark_character_dead
@@ -50,7 +51,9 @@ class AdventureStateMachine:
         if self.run.state == "exploring":
             result = self._step_exploring(character, world, rng, destination_name, origin_name)
             if self.run.schedule is not None:
-                self.run.schedule.segment_mode = "standard"
+                self.run.schedule.segment_mode = (
+                    self.run.objective.pace if self.run.objective is not None else "standard"
+                )
             return result
         if self.run.state == "returning":
             return self._step_returning(character, world, destination_name, origin_name)
@@ -101,7 +104,7 @@ class AdventureStateMachine:
         self.run.steps_taken += 1
         members = self.policy.party_members(world) or [character]
 
-        if self.run.is_party and self.policy.should_auto_retreat(members):
+        if (self.run.is_party or self.run.objective is not None) and self.policy.should_auto_retreat(members):
             self.run.state = "returning"
             summary = tr("summary_party_retreated_auto", name=self.run.character_name, destination=destination_name)
             detail = tr("detail_party_retreated_auto", name=self.run.character_name, destination=destination_name)
@@ -123,6 +126,10 @@ class AdventureStateMachine:
             return resolve_hazard_band(self.run, injured_member, character, world, rng, destination_name)
         if roll < critical_chance:
             return resolve_critical_hazard(self.run, injured_member, world, rng, destination_name)
+
+        rescue_result = perform_rescue(world, self.run)
+        if rescue_result is not None:
+            return rescue_result
 
         kind: AdventureFactKind
         loot_chance = self.policy.compute_loot_chance(members)

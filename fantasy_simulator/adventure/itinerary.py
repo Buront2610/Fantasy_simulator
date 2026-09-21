@@ -72,10 +72,14 @@ class AdventureItinerary:
         return result
 
 
-def affected_location_ids(run) -> list[str]:
+def affected_location_ids(run, world=None) -> list[str]:
     locations = [run.origin, run.destination]
     if run.itinerary is not None:
         locations.append(run.itinerary.current_site_id)
         if run.itinerary.active_leg is not None:
             locations.append(run.itinerary.active_leg.destination)
+    if world is not None and run.objective is not None and run.objective.target_id:
+        target = world.get_character_by_id(run.objective.target_id)
+        if target is not None and target.location_id:
+            locations.append(target.location_id)
     return list(dict.fromkeys(locations))
