@@ -3,12 +3,37 @@
 **プロジェクト名**: Fantasy Simulator  
 **世界名**: Aethoria（エイソリア）  
 **版**: Implementation Plan v2.0  
-**最終更新**: 2026-06-05 (PR-K 完了。次の mainline はマップ画面改善)
+**最終更新**: 2026-09-21 (統合設計 v1.0 の実装を開始。第一PRは戦闘決着の整合性)
 **位置づけ**: 本書は、現在の実装状況・既存の設計文書・追加レビュー評価を踏まえ、今後の公式な実装順序と文書の正本を定める実装計画書である。
 
 > **文書の優先順位**: 実装順序・完了条件・PR 分割・現状認識の正本は本書とする。`docs/next_version_plan.md` は中長期の設計目標、`docs/ui_renovation_plan.md` は UI 改造方針、`README.md` は現状の公開サマリーを担う。差分が出た場合は、まず本書に追記して吸収し、そのうえで README を同期する。
 
 ---
+
+## 0. 統合設計 v1.0 の実装順（2026-09-21）
+
+[統合設計書](integrated_design_v1.md) を新しい実装目標とする。
+以下の順序が、それ以前の地図改善中心の優先順位に優先する。
+既存の完了履歴と回帰検証は保持する。設計書の型を追加しただけでは完了としない。
+
+| 段階 | 実装・完了判定 | 状態 |
+|---|---|---|
+| M0 信頼性 | 戦闘・健康・冒険事実、保存後の継続、必要履歴の保持 | 第一PRで戦闘決着のみ実装 |
+| M1 文化と言語史 | 文化制度と親族、固定した語・言語段階・命名 | 後続PR |
+| M2 地域社会 | 人口台帳、生産・消費・実輸送、三集落 | 後続PR |
+| M3 継承 | 教育・宗教・誓約・遺物・知識を死亡後も継承 | 後続PR |
+| M4 冒険の成果 | 目的・行程・救助期限と資源消費、修復・運搬の後続効果 | 後続PR |
+| M5 歴史と危機 | 前史・遺跡層・保守を要する封印、代替対策と復興 | 後続PR |
+| M6 接触と規模 | 文明再編・接触・戦争・シナリオ競合と長期検証 | 後続PR |
+
+第一PRは §16.2 の戦闘決着と付録B T-02 に対応する。戦闘不能を戦闘力スコアより優先し、
+防御技能を攻撃として選ばず、同点を技能キー・人物IDで安定させる。記録する被害は実際の耐久減少量とする。
+固定乱数の単体試験に加え、通常の戦闘イベントで敗者・戦闘ログ・負傷対象が一致することを検証する。
+既存の長期 world-health バンドを変更せずに通す。耐久値は戦闘内の値であり Character の永続健康状態とは別。
+保存形式、冒険の救助/帰還、言語史、メニュー変更はこのPRの実装範囲に含めない。
+
+全体の完了には設計書の R-01〜R-07、T-01〜T-14、統合シナリオ A〜E が必要。
+このPRで設計全体または M0 全体を完了扱いにしない。次は実被害に応じた冒険負傷と健康正本の整合性。
 
 ## 1. 本書の目的
 
@@ -125,7 +150,7 @@ TD-1〜TD-4 の負債解消では、`World.event_records` 正規化、`SettingBu
 PR-J の初期 `SettingBundle` authoring と PR-K の動的世界変化は完了済みである。
 route block/reopen、location rename、occupation/control、war open/close、terrain-cell mutation、
 headless era/civilization projection、natural world-change generation、SettingBundle rule/baseline input の
-guardrail slice が揃ったため、次の mainline はマップ画面改善へ移る。
+guardrail slice が揃ったため、次の mainline は統合設計 v1.0（§0）へ移る。
 
 region map 自体の richer local semantics（門、市場、掲示板、河川、事故地点、痕跡の詳細化など）は、
 ここからの公式な後続拡張として扱う。
@@ -154,7 +179,7 @@ TD-1〜TD-4 の進行中に、観測 UI と authoring まわりでは次の debt
 12. ~~PR-J: 世界観設定整理と初期 Setting Bundle 構築~~ ✅ 完了
 13. ~~PR-K: 動的世界変化（war / renaming / terrain mutation / era shift / civilization drift）~~ ✅ 完了
     - route block/reopen、location rename、occupation/control、war open/close、terrain-cell mutation、headless era/civilization projection、characterization / golden masters、typed-ID ratchet、save/persistence policy、natural generation、SettingBundle rule/baseline input、user-visible world-change integration まで完了
-14. マップ画面改善 ← **active mainline**
+14. 統合設計 v1.0 ← **active mainline**
 15. PR-G3 / PR-G4 相当の worldgen PoC / 外部比較は並行任意の技術検証として扱う
 
 PR-K は完了済みである。route block/reopen、location rename、occupation/control、
@@ -1342,7 +1367,7 @@ PR-0 から PR-G2 まで完了し、可変ワールド基盤、terrain / site / 
 判断支援として圧縮表示する summary 層が加わり、近傍切り出し主体の段階から一歩前進した。
 
 TD-1〜TD-4 の負債解消は完了済みである。
-現在進めるべき実装は **マップ画面改善** である。
+現在進めるべき実装は **統合設計 v1.0**（§0） である。
 PR-K は完了済みであり、動的世界変化の契約・guardrail・主要挙動は次のUI改善で退行させない基盤として扱う。
 
 その理由は、現在の main ブランチでは PR-I と TD-1〜TD-4 まで完了し、
@@ -1376,7 +1401,7 @@ property-based invariant tests、standard / strict quality gate 接続を前提�
 13. ~~PR-J: 世界観設定整理と初期 Setting Bundle 構築~~ ✅
 14. ~~PR-K: 動的世界変化（war / renaming / terrain mutation / era shift / civilization drift）~~ ✅
     - route block/reopen、location rename、occupation/control、war open/close、terrain-cell mutation、headless era/civilization projection、characterization / golden masters、typed-ID ratchet、save/persistence policy、natural generation、SettingBundle rule/baseline input、user-visible world-change integration まで完了
-15. マップ画面改善 ← **active mainline**
+15. 統合設計 v1.0 ← **active mainline**
 16. PR-G3 / PR-G4: worldgen PoC / 比較実験（並行任意）
 
 ## 11. レビューを踏まえた補足判断
@@ -1441,7 +1466,7 @@ atlas / region / detail から成る観測 UI 初版まで到達した。
 TD-1〜TD-4 の負債解消は完了済みである。
 PR-I までで導入した canonical event store 方針、SettingBundle の土台、薄い Rich シェルは
 実運用に耐える guardrail へ接続済みであり、PR-K の動的世界変化も完了した。
-次の公式着手対象は **マップ画面改善** である。
+次の公式着手対象は **統合設計 v1.0**（§0） である。
 
 PR-J では、
 実際の基礎世界設定を整理し、空の seed data ではなく、

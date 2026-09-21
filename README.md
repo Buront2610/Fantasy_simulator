@@ -17,6 +17,7 @@ influence.
 - Character generation with random and template-based creation
 - Event system for meetings, journeys, discoveries, training, battles, aging,
   marriage, and natural death
+- Combat outcomes prioritize incapacitation, use stable tie-breaking, and record actual vitality loss
 - Character roster, story output, simulation summaries, and structured event logs
 - Auto-advance until meaningful pause conditions are met
 - Monthly and yearly reports derived from structured event records
@@ -318,9 +319,10 @@ supports:
   characterization/golden masters, typed-ID ratchet, save policy, natural
   generation, SettingBundle rule/baseline inputs, and user-visible
   world-change integration all have guardrail coverage.
-- The next mainline focus is map-screen improvement: make the existing
-  atlas/region/detail views better expose route state, current control,
-  world-change traces, and local decision cues without changing save shape.
+- The next mainline focus is integrated design v1.0, starting with combat
+  outcome consistency. The [implementation plan](docs/implementation_plan.md)
+  separates this first slice from the remaining health, language, culture,
+  economy and scenario work. The complete design is not yet implemented.
 - Treat the technical-review stream as PR-K support work: Python-version ADR,
   architecture override ledger metadata, and the v8 serializer/hydrator split
   reduce risk without changing the save JSON shape prematurely. The canonical

@@ -103,7 +103,7 @@ work and its serialization guardrails.
   Impact: agents may treat completed PR-K guardrails as unstarted, keep working
   the old active milestone, or skip the new map-screen improvement focus.
   Guardrail: `docs/implementation_plan.md` and README must describe PR-K as
-  complete and map-screen improvement as active mainline; PR-K completion
+  complete and integrated design v1.0 as active mainline; PR-K completion
   claims need state-machine, canonical-record, projection/view-model,
   UI/report, and test evidence.
 - Canonical event records drift from legacy adapters.
@@ -142,7 +142,7 @@ work and its serialization guardrails.
   Guardrail: `tests/test_doc_freshness.py` checks this contract and risk
   register for key precedence terms. README, implementation, and review context
   docs now distinguish completed PR-K mainline work from the active
-  map-screen improvement focus; future map/UI slices must keep that wording
+  integrated design v1.0 focus; future implementation slices must keep that wording
   current.
 - Hydration precedence changes without regression tests.
   Impact: unchanged save schemas still load differently because canonical
