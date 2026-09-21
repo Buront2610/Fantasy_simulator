@@ -13,6 +13,8 @@ from .protocols import AdventureRunLike
 
 
 def validate_adventure_run_payload(run: AdventureRunLike) -> None:
+    if run.schedule is not None:
+        run.schedule.__post_init__()
     if run.policy not in ALL_POLICIES:
         raise ValueError(f"policy must be one of {ALL_POLICIES}")
     if run.retreat_rule not in ALL_RETREAT_RULES:

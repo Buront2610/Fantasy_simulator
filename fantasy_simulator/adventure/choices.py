@@ -36,6 +36,10 @@ class AdventureChoiceResolver:
         if chosen not in self.run.pending_choice.options:
             chosen = self.run.pending_choice.default_option
         self.run.pending_choice.selected_option = chosen
+        if self.run.schedule is not None:
+            self.run.schedule.segment_mode = {
+                CHOICE_PROCEED_CAUTIOUSLY: "cautious", CHOICE_PRESS_ON: "swift",
+            }.get(chosen, "standard")
 
         detail = tr("detail_choice_made", name=self.run.character_name, choice=tr(f"choice_{chosen}"))
         self.run.detail_log.append(detail)

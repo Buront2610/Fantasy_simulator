@@ -6,6 +6,15 @@ from typing import Dict
 
 
 TEXT_JA: Dict[str, str] = {
+    'summary_adventure_schedule_retreat': '{name} は{reason}のため帰還を開始した。',
+    'events.adventure_schedule_retreat.summary': '{name} は{reason}のため帰還を開始した。',
+    'adventure.limit_deadline': '期限到達',
+    'adventure.limit_supplies': '補給切れ',
+    'adventure.schedule_status': '次の進行まで {days}日 / 補給 {provisions}人日分 / 期限まで {deadline}日',
+    'adventure.effect_proceed_cautiously': '次の一区間のみ：時間と補給消費が増え、危険が下がり、発見機会が増える。',
+    'adventure.effect_press_on': '次の一区間のみ：早く進み補給を節約するが、危険が増え、発見機会が減る。',
+    'adventure.effect_retreat': '探索を打ち切って帰還する。帰路の時間と補給は必要。',
+    'adventure.effect_withdraw': '探索を打ち切って帰還する。帰路の時間と補給は必要。',
     # Structured adventure events retain the legacy display wording.
     'events.adventure_arrived.summary': '{name} は {destination} に到着し、探索を始めた。',
     'events.party_retreated_auto.summary': '{name} たちのパーティは {destination} から撤退した。',

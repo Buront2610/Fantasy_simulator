@@ -158,6 +158,9 @@ def _resolve_pending_adventure_choice(sim: Any, ctx: UIContext | None = None) ->
     for i, option in enumerate(options, 1):
         default_marker = f" {tr('default_marker')}" if option == item["default_option"] else ""
         out.print_line(f"  {i:>2}. {tr(f'choice_{option}')}{default_marker}")
+        effect = item.get("option_effects", {}).get(option)
+        if effect:
+            out.print_line(f"      {effect}")
     option_idx = _get_numeric_choice(f"  {tr('enter_option_number')}", len(options), ctx=ctx)
     chosen_option = options[option_idx] if option_idx is not None else None
 

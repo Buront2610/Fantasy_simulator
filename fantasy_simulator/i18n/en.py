@@ -6,6 +6,21 @@ from typing import Dict
 
 
 TEXT_EN: Dict[str, str] = {
+    'summary_adventure_schedule_retreat': '{name} began returning because of {reason}.',
+    'events.adventure_schedule_retreat.summary': '{name} began returning because of {reason}.',
+    'adventure.limit_deadline': 'the deadline',
+    'adventure.limit_supplies': 'exhausted supplies',
+    'adventure.schedule_status': (
+        'Next step in {days} days / Supplies: {provisions} person-days / Deadline in {deadline} days'
+    ),
+    'adventure.effect_proceed_cautiously': (
+        'Next segment only: more time and supplies, less danger, more discovery opportunities.'
+    ),
+    'adventure.effect_press_on': (
+        'Next segment only: faster and fewer supplies, but more danger and fewer discovery opportunities.'
+    ),
+    'adventure.effect_retreat': 'End exploration and return. The return journey still takes time and supplies.',
+    'adventure.effect_withdraw': 'End exploration and return. The return journey still takes time and supplies.',
     # Structured adventure events retain the legacy display wording.
     'events.adventure_arrived.summary': '{name} reached {destination} and began the expedition.',
     'events.party_retreated_auto.summary': "{name}'s party retreated from {destination}.",

@@ -7,6 +7,7 @@ from typing import Any, Dict, Type, TypeVar, cast
 
 from .constants import POLICY_CAUTIOUS, RETREAT_ON_SERIOUS, SUPPLY_FULL
 from .protocols import AdventureRunLike
+from .schedule import AdventureSchedule
 from .validation import validate_adventure_run_payload
 
 
@@ -42,6 +43,7 @@ class AdventureSerialization:
             "retreat_rule": run.retreat_rule,
             "supply_state": run.supply_state,
             "danger_level": run.danger_level,
+            "schedule": run.schedule.to_dict() if run.schedule is not None else None,
         }
 
     @staticmethod
@@ -78,6 +80,7 @@ class AdventureSerialization:
             retreat_rule=data.get("retreat_rule", RETREAT_ON_SERIOUS),
             supply_state=data.get("supply_state", SUPPLY_FULL),
             danger_level=data.get("danger_level", 50),
+            schedule=AdventureSchedule.from_dict(data["schedule"]) if data.get("schedule") is not None else None,
         )
         validate_adventure_run_payload(run)
         return run
