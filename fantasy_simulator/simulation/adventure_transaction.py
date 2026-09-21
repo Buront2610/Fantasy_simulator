@@ -102,7 +102,7 @@ class AdventureTransaction:
             state = {item.name: deepcopy(getattr(location, item.name)) for item in fields(location)}
             self.locations.append((location, state))
         self.recorder = WorldEventRecorderPort(self.world)
-        self.history = self.recorder.snapshot(include_index=False)
+        self.event_snapshot = self.recorder.snapshot(include_index=False)
         self.lists = [(owner, name, getattr(owner, name), list(getattr(owner, name))) for owner, name in (
             (self.world, "active_adventures"), (self.world, "completed_adventures"),
             (simulator, "pending_notifications"), (simulator, "_recently_completed_adventures"),
@@ -133,6 +133,6 @@ class AdventureTransaction:
         self.world.memorials.update(self.memorials)
         self.world._adventure_index.clear()
         self.world._adventure_index.update(self.adventures)
-        self.recorder.restore(self.history)
+        self.recorder.restore(self.event_snapshot)
         for rng, state in self.rng_states:
             restore_rng(rng, state)
