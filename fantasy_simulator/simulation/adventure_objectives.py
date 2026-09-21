@@ -33,24 +33,32 @@ def _received_injury_reports(world: Any, leader: Any) -> dict[str, str]:
     return reports
 
 
+def _stranded_casualty(world: Any, actor: Any) -> bool:
+    if not actor.alive or actor.injury_status not in ("serious", "dying"):
+        return False
+    place = world.character_presence_location_id(actor)
+    if place is None:
+        return False
+    owner = world.get_adventure_by_id(actor.active_adventure_id) if actor.active_adventure_id else None
+    if owner is not None:
+        return owner.objective is None or owner.objective.purpose != "rescue"
+    # An injury alone does not establish a need for transport from a known home.
+    return actor.residence_location_id is not None and place != actor.residence_location_id
+
+
 def known_rescue_targets(world: Any, leader: Any) -> list[tuple[Any, str | None]]:
     """Find witnessed/reported casualties for which this actor is willing to depart."""
-    reports = _received_injury_reports(world, leader)
     assigned = {run.objective.target_id for run in world.active_adventures
                 if run.objective is not None and run.objective.purpose == "rescue"
                 and run.objective.status in ("active", "rescued")}
-    targets = []
-    for actor in world.characters:
-        place = world.character_presence_location_id(actor)
-        if actor.char_id == leader.char_id or not actor.alive or actor.injury_status not in ("serious", "dying"):
-            continue
-        owner = world.get_adventure_by_id(actor.active_adventure_id) if actor.active_adventure_id else None
-        if owner and owner.objective and owner.objective.purpose == "rescue":
-            continue
-        if actor.char_id in assigned or place is None or leader.get_relationship(actor.char_id) < -20:
-            continue
-        if place == leader.location_id or actor.char_id in reports:
-            targets.append((actor, reports.get(actor.char_id)))
+    candidates = [actor for actor in world.characters
+                  if actor.char_id != leader.char_id and actor.char_id not in assigned
+                  and _stranded_casualty(world, actor) and leader.get_relationship(actor.char_id) >= -20]
+    if not candidates:
+        return []
+    reports = _received_injury_reports(world, leader)
+    targets = [(actor, reports.get(actor.char_id)) for actor in candidates
+               if world.character_presence_location_id(actor) == leader.location_id or actor.char_id in reports]
     return sorted(targets, key=lambda item: (-leader.get_relationship(item[0].char_id), item[0].char_id))
 
 
@@ -98,7 +106,7 @@ def try_start_rescue(simulator: Any, candidates: list[Any]) -> bool:
     """One concrete emergency response per day, before the normal expedition lottery."""
     from ..adventure import AdventureRun, generate_adventure_id
 
-    if not any(c.alive and c.injury_status in ("serious", "dying") for c in simulator.world.characters):
+    if not any(_stranded_casualty(simulator.world, c) for c in simulator.world.characters):
         return False
     for leader in sorted(candidates, key=lambda actor: (-actor.wisdom, actor.char_id)):
         targets = known_rescue_targets(simulator.world, leader)

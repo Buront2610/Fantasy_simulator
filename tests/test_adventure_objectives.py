@@ -319,3 +319,35 @@ def test_leaving_old_party_is_not_the_same_as_returning_home(rescue_case, locati
         assert run.objective.reason == "returned"
     else:
         assert target.location_id == "home" and target.injury_status == "injured"
+
+
+@pytest.mark.parametrize("residence", ["dungeon", None])
+def test_injury_at_home_or_unknown_home_does_not_trigger_expedition(rescue_case, residence):
+    sim, run, hero, target = rescue_case
+    run.objective = AdventureObjective()
+    target.residence_location_id = residence
+    hero.location_id = target.location_id  # Witnesses do not turn home care into a rescue trip.
+    assert known_rescue_targets(sim.world, hero) == []
+    target.residence_location_id = "home"
+    assert known_rescue_targets(sim.world, hero) == [(target, None)]
+
+
+def test_target_returns_home_without_source_adventure(rescue_case):
+    sim, run, hero, target = rescue_case
+    target.location_id = "home"
+    finish(sim, run)
+    assert run.objective.status == "invalidated" and run.objective.reason == "returned"
+    assert target.injury_status == "serious"
+    assert hero.get_relationship(target.char_id) == 0
+
+
+def test_home_care_does_not_scan_remote_reports(rescue_case, monkeypatch):
+    sim, run, hero, target = rescue_case
+    run.objective = AdventureObjective()
+    target.location_id = target.residence_location_id
+
+    def unnecessary_scan(*_args):
+        pytest.fail("No stranded casualties: remote report scan is unnecessary")
+
+    monkeypatch.setattr("fantasy_simulator.simulation.adventure_objectives._received_injury_reports", unnecessary_scan)
+    assert known_rescue_targets(sim.world, hero) == []
