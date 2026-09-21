@@ -6,6 +6,18 @@ from typing import Dict
 
 
 TEXT_EN: Dict[str, str] = {
+    "adventure.role_effect_frontline": 'takes hazard combat',
+    "adventure.role_effect_scout": 'helps travel and avoids encounters',
+    "adventure.role_effect_lore": 'helps discoveries',
+    "adventure.role_effect_medic": 'helps injured companions while supplies last',
+
+    'adventure.role_status': 'Current {role}: {name} (capability incl. support: {score}); {effect}',
+    'adventure.role_frontline': 'frontline',
+    'adventure.role_scout': 'scout',
+    'adventure.role_lore': 'lore',
+    'adventure.role_medic': 'medic',
+    'adventure.role_unfilled': 'unfilled',
+
     'adventure.plan_label': '{purpose} / {pace}',
     'adventure.retreat_on_serious': 'serious injury',
     'adventure.retreat_on_supply': 'low supplies',

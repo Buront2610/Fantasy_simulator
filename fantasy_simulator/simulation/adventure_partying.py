@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, List
 from math import ceil
 
 from ..adventure.schedule import AdventureSchedule
+from ..adventure.roles import choose_companions
 
 from ..adventure import (
     SUPPLY_FULL,
@@ -74,11 +75,10 @@ class AdventureStartMixin:
     def _start_party_adventure(self, candidates: List["Character"]) -> None:
         """Form a small party from candidates and start a shared adventure."""
         leader = self.rng.choice(candidates)
-        same_location = [c for c in candidates if c.location_id == leader.location_id and c.char_id != leader.char_id]
         size = self.rng.choice(range(2, _MAX_PARTY_SIZE + 1))
         size = min(size, len(candidates))
         needed_companions = max(0, size - 1)
-        selected_companions = self.rng.sample(same_location, min(needed_companions, len(same_location)))
+        selected_companions = choose_companions(leader, candidates, needed_companions)
         members = [leader] + selected_companions
         leader = members[0]
 

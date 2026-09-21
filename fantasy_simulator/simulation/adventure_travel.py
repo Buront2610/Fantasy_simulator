@@ -5,6 +5,7 @@ from math import ceil
 
 from ..adventure.itinerary import AdventureItinerary
 from ..adventure.schedule import PACE_DURATION
+from ..adventure.roles import capability
 from ..adventure.results import AdventureFactKind, AdventureStepResult, step_fact_result
 from ..adventure.routing import capture_travel_network, leg_is_passable, shortest_itinerary
 
@@ -19,7 +20,7 @@ def initialize_itinerary(world: Any, run: Any, tick: int) -> None:
     duration = 2 * sum(ceil(leg.cost * interval) for leg in path) + 4 * interval
     run.schedule.deadline_tick = tick + duration
     run.schedule.initial_provisions = run.schedule.provisions = duration * len(run.member_ids)
-    plan_departure(network, run, tick)
+    plan_departure(network, run, tick, members=[world.get_character_by_id(mid) for mid in run.member_ids])
 
 
 def arrive_if_due(world: Any, run: Any, tick: int) -> bool:
@@ -66,7 +67,7 @@ def travel_step(world: Any, run: Any, *, blocked: bool = False) -> AdventureStep
     return result
 
 
-def plan_departure(network: Any, run: Any, tick: int) -> None:
+def plan_departure(network: Any, run: Any, tick: int, *, members: list[Any] | None = None) -> None:
     itinerary = run.itinerary
     if itinerary is None or run.state not in ("traveling", "returning"):
         return
@@ -83,5 +84,7 @@ def plan_departure(network: Any, run: Any, tick: int) -> None:
     itinerary.waiting_for_route = False
     itinerary.departure_tick = tick
     pace = PACE_DURATION[run.objective.pace] if run.objective is not None else 1.0
-    itinerary.arrival_tick = tick + ceil(path[0].cost * run.schedule.interval_days * pace)
+    scout = capability(members or [], "scout").score if run.objective is not None else 0.0
+    navigation = max(0.8, 1.0 - max(0.0, scout - 50.0) / 250.0)
+    itinerary.arrival_tick = tick + max(1, ceil(path[0].cost * run.schedule.interval_days * pace * navigation))
     run.schedule.next_step_tick = itinerary.arrival_tick
