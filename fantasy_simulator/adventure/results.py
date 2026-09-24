@@ -13,7 +13,7 @@ AdventureFactKind = Literal[
     "adventure_injured", "adventure_death", "adventure_returned", "adventure_returned_injured",
     "adventure_retreated", "adventure_retreat_started", "adventure_choice",
     "adventure_travel", "adventure_route_blocked", "adventure_rescued", "adventure_objective_invalidated",
-    "adventure_target_moved",
+    "adventure_target_moved", "adventure_cargo_delivered", "adventure_cargo_missing", "adventure_cargo_returned",
 ]
 
 

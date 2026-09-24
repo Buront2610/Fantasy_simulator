@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, List
 from math import ceil
 
 from ..adventure.schedule import AdventureSchedule
+from ..adventure.cargo import load_cargo
 from ..adventure.roles import choose_companions
 
 from ..adventure import (
@@ -34,6 +35,11 @@ _PARTY_FORMATION_CHANCE = 0.30
 
 class AdventureStartMixin:
     """Mixin for creating solo and party adventures."""
+
+    def start_cargo_transport(self, carrier_id: str, destination: str, resource: str, quantity: int,
+                              *, source_kind: str = "character") -> AdventureRun:
+        from .cargo_dispatch import start_transport
+        return start_transport(self, carrier_id, destination, resource, quantity, source_kind=source_kind)
 
     @restore_start_rng_on_failure
     def _maybe_start_adventure(self, year_fraction: float = 1.0) -> None:
@@ -120,6 +126,7 @@ class AdventureStartMixin:
             run.schedule = AdventureSchedule.begin(self.elapsed_days + 1, interval, len(members))
             run.schedule.segment_mode = run.objective.pace
             initialize_itinerary(self.world, run, self.elapsed_days + 1)
+            asset_operations = load_cargo(self.world, run, self.elapsed_days + 1)
             for member in members:
                 member.active_adventure_id = run.adventure_id
                 if member.residence_location_id is None:
@@ -132,7 +139,9 @@ class AdventureStartMixin:
             record = self._record_world_event(
                 run.summary_log[-1], kind="adventure_started", location_id=run.origin,
                 primary_actor_id=run.character_id, severity=2,
+                render_params={"asset_operations": asset_operations} if asset_operations else {},
             )
+            self.world.assets.bind_event(asset_operations, record.record_id)
             run.related_event_ids.append(record.record_id)
 
     def _select_party_policy(self, members: List["Character"]) -> str:

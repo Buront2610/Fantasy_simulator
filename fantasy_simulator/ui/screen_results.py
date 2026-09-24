@@ -16,6 +16,7 @@ from .screen_adventures import (
     _show_adventure_summaries,
 )
 from .screen_dashboard import _show_world_dashboard
+from .screen_cargo import request_cargo_transport
 from .screen_combat_logs import _show_combat_logs
 from .screen_history import (
     _show_location_history,
@@ -69,6 +70,7 @@ def _result_menu_options() -> list[tuple[str, str]]:
         ("all_character_stories", tr("all_character_stories")),
         ("simulation_summary", tr("simulation_summary")),
         ("location_history", tr("location_history_menu")),
+        ("transport_cargo", tr("cargo.menu")),
         ("back_to_main", tr("back_to_main")),
     ]
 
@@ -99,7 +101,9 @@ def _show_event_log(sim: Any, ctx: UIContext, last_n: int | None = None) -> None
     ctx.inp.pause()
 
 
-def _update_dirty_state_for_action(action: str, sim: Any, ctx: UIContext) -> bool | None:
+def _update_dirty_state_for_action(action: str, sim: Any, ctx: UIContext, current_dirty: bool = False) -> bool | None:
+    if action == "transport_cargo":
+        return request_cargo_transport(sim, ctx) or current_dirty
     if action == "advance_1_day":
         _advance_days(sim, 1, ctx=ctx, live=True)
         return True
@@ -177,7 +181,7 @@ def _show_results(sim: Any, ctx: UIContext | None = None) -> None:
         out.print_separator("=")
         action = ctx.choose_key(tr("what_to_view"), _result_menu_options())
 
-        dirty_state = _update_dirty_state_for_action(action, sim, ctx)
+        dirty_state = _update_dirty_state_for_action(action, sim, ctx, has_unsaved_changes)
         if dirty_state is not None:
             has_unsaved_changes = dirty_state
             continue

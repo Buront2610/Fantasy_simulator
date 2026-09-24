@@ -41,6 +41,10 @@ class AdventureMemoryMixin:
         if run.objective is not None and run.objective.purpose == "rescue":
             key = "live_trace_rescue_completed" if run.objective.status == "completed" else "live_trace_rescue_failed"
             return tr(key, name=run.character_name, destination=dest_name, year=self.world.year)
+        if run.objective is not None and run.objective.cargo is not None:
+            cargo = run.objective.cargo
+            return tr("cargo.trace", name=run.character_name, destination=dest_name,
+                      state=tr(f"cargo.state_{cargo.state}"), year=self.world.year)
         if run.is_party:
             members = [self.world.get_character_by_id(mid) for mid in run.member_ids]
             names = [m.name for m in members if m is not None]
