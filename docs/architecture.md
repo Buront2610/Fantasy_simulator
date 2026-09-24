@@ -19,6 +19,9 @@ form that tests can enforce.
   - `character_model/`, `combat_system/`, `world_map/`, and the split
     `world_*` packages hold the narrower implementation surfaces behind those
     public facades.
+  - `assets/`: the world's single ledger of finite resource stocks and unique
+    artifacts, keeping owner and custodian separate. Adventure rewards and
+    wards mutate it only on the closed adventure draft.
 - `fantasy_simulator/world_change/`: headless PR-K command, state machine,
   event-adapter, changeset, and reducer primitives for dynamic world changes.
 - `fantasy_simulator/observation/`: headless read-model projections for reports,

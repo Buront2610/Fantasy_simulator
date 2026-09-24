@@ -78,17 +78,26 @@ def choose_companions(leader: Any, candidates: list[Any], count: int, *, target:
     return members[1:]
 
 
-def party_care_factor(world: Any, patient: Any, tick: int) -> float:
-    """Funded accompanying care reduces deterioration, never unrelated aging."""
+def party_care_strength(world: Any, patient: Any, tick: int) -> float:
+    """Funded care by another present member: 0.0 (none) to 0.4, derived when read."""
     if patient.injury_status not in ("injured", "serious") or not patient.active_adventure_id:
-        return 1.0
+        return 0.0
     run = world.get_adventure_by_id(patient.active_adventure_id)
     if run is None or run.is_resolved or run.objective is None or run.schedule is None:
-        return 1.0
+        return 0.0
     if patient.char_id not in run.member_ids or run.schedule.remaining_provisions(tick, len(run.member_ids)) <= 0:
-        return 1.0
+        return 0.0
     companions = [world.get_character_by_id(mid) for mid in run.member_ids if mid != patient.char_id]
     companions = [actor for actor in companions if actor is not None
                   and actor.active_adventure_id == run.adventure_id and actor.location_id == patient.location_id]
-    score = capability(companions, "medic").score
-    return 1.0 - min(0.4, score / 250.0)
+    return min(0.4, capability(companions, "medic").score / 250.0)
+
+
+def party_care_factor(world: Any, patient: Any, tick: int) -> float:
+    """Funded accompanying care reduces deterioration, never unrelated aging."""
+    return 1.0 - party_care_strength(world, patient, tick)
+
+
+def party_recovery_factor(world: Any, patient: Any, tick: int) -> float:
+    """The same care treats wounds at any age; composed when read, so RNG draws stay unchanged."""
+    return 1.0 + party_care_strength(world, patient, tick)
