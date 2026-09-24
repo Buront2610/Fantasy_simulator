@@ -4,10 +4,9 @@ world.py - World aggregate and compatibility exports.
 
 from __future__ import annotations
 
-from .assets.ledger import AssetLedger
-
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple
 
+from .assets.ledger import AssetLedger
 from .world_event.models import WorldEventRecord
 from .language.engine import LanguageEngine, fallback_evolution_targets
 from .language.state import LanguageEvolutionRecord, LanguageRuntimeState, LocationNameHistoryRecord

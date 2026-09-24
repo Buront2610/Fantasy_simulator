@@ -37,7 +37,7 @@ TEXT_EN: Dict[str, str] = {
     "assets.kind_ancient_relic": 'Ancient ward relic',
     "assets.kind_lore_fragment": 'Historical fragment',
     "assets.inscription": 'Inscription: {text}',
-    "assets.ward_used": "{name}'s relic spent one charge and absorbed one stage of injury.",
+    "assets.ward_used": "{holder}'s relic spent one charge and absorbed one stage of {name}'s injury.",
     "assets.stock_line": '{resource} ×{quantity} | Owner: {owner} | Held by: {holder} | {location}',
     "assets.artifact_line": ('{name} [{identifier}] | Owner: {owner}'
                              ' | Held by: {holder} | {location} | Charges: {charges}'),

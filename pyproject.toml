@@ -45,6 +45,7 @@ python_version = "3.10"
 follow_imports = "silent"
 files = [
     "fantasy_simulator/adventure",
+    "fantasy_simulator/assets",
     "fantasy_simulator/character.py",
     "fantasy_simulator/character_model",
     "fantasy_simulator/combat_system",
@@ -59,6 +60,7 @@ files = [
     "fantasy_simulator/simulation/timeline_world_changes.py",
     "fantasy_simulator/simulation/world_change_driver.py",
     "fantasy_simulator/terrain",
+    "fantasy_simulator/ui/asset_presenter.py",
     "fantasy_simulator/ui/presenters.py",
     "fantasy_simulator/ui/view_models.py",
     "fantasy_simulator/world_actor",

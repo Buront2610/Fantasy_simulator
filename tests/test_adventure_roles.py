@@ -5,7 +5,9 @@ from copy import deepcopy
 import pytest
 
 from fantasy_simulator.adventure.itinerary import AdventureItinerary
-from fantasy_simulator.adventure.roles import capability, choose_companions, party_care_factor
+from fantasy_simulator.adventure.roles import (
+    capability, choose_companions, party_care_factor, party_recovery_factor,
+)
 from fantasy_simulator.adventure.policy import AdventurePolicyEngine
 from fantasy_simulator.character import Character
 from fantasy_simulator.i18n import get_locale, set_locale, tr
@@ -129,6 +131,29 @@ def test_care_needs_a_capable_present_funded_other_member(expedition, disabled):
         medic.skills.clear()
         patient.skills["First Aid"] = 10
     assert party_care_factor(sim.world, patient, 1) == 1
+
+
+@pytest.mark.parametrize("status, recovered", [("serious", "injured"), ("injured", "none")])
+def test_accompanying_medic_speeds_recovery_of_young_companion(
+    expedition, monkeypatch, status, recovered,  # noqa: F811
+):
+    sim, run, patient = expedition
+    assert patient.age == 25  # below natural decline; care must still matter
+    medic = actor("medic", skills={"First Aid": 10})
+    sim.world.add_character(medic)
+    run.member_ids.append(medic.char_id)
+    medic.active_adventure_id = run.adventure_id
+    patient.injury_status = status
+    base = 0.30 if status == "serious" else 0.50
+    monkeypatch.setattr(sim.rng, "random", lambda: base + 0.05)
+    medic.active_adventure_id = None
+    sim._recover_injuries(year_fraction=1.0)
+    assert patient.injury_status == status
+    medic.active_adventure_id = run.adventure_id
+    assert party_recovery_factor(sim.world, patient, sim.elapsed_days + 1) > 1.2
+    sim._recover_injuries(year_fraction=1.0)
+    assert patient.injury_status == recovered
+    assert sim.world.event_records[-1].kind == "injury_recovery"
 
 
 def test_helpers_still_consume_person_days(expedition):  # noqa: F811

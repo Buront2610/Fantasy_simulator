@@ -253,3 +253,80 @@ def test_artifact_preserves_known_history_text_without_inventing_unknown_metadat
     known = replace(item, maker_id="scribe", creation_year=12, inscription="A name from the old era",
                     inscription_language="old-tongue", inscription_stage="early")
     assert Artifact.from_dict(known.to_dict()) == known
+
+
+def _join_party(sim, run, char_id, **stats):
+    from fantasy_simulator.character import Character
+    member = Character(char_id.title(), 30, "Female", "Human", "Warrior", char_id=char_id,
+                       location_id=run.destination, **stats)
+    sim.world.add_character(member)
+    member.active_adventure_id = run.adventure_id
+    run.member_ids.append(member.char_id)
+    return member
+
+
+def _hazard_step(sim, run, hero, monkeypatch, severity):
+    run.state = "exploring"
+    run.itinerary = AdventureItinerary(run.destination, visited_destination=True)
+    hero.location_id = run.destination
+    monkeypatch.setattr(AdventurePolicyEngine, "compute_injury_chance", lambda *_: 1)
+    monkeypatch.setattr("fantasy_simulator.adventure.hazards.resolve_adventure_hazard_combat",
+                        lambda *_: AdventureHazardResult(severity, "test hazard", 1, False))
+    advance_due(sim, run)
+
+
+def test_ward_carried_by_companion_protects_injured_frontline(at_cache, monkeypatch):
+    sim, run, hero = at_cache
+    advance_due(sim, run)
+    artifact_id = next(key for key, item in sim.world.assets.artifacts.items() if item.owner is not None)
+    front = _join_party(sim, run, "front", strength=95, constitution=95)
+    _hazard_step(sim, run, hero, monkeypatch, 1)
+    item = sim.world.assets.artifacts[artifact_id]
+    assert front.injury_status == "none" and item.charges == 2
+    assert item.custodian == AssetRef("character", hero.char_id)
+    use = sim.world.assets.operations[item.history[-1]]
+    assert use["holder"] == {"kind": "character", "id": hero.char_id}
+    assert use["protected"] == {"kind": "character", "id": front.char_id}
+    record = sim.world.event_records[-1]
+    assert record.primary_actor_id == front.char_id and record.render_params["ward_holder_id"] == hero.char_id
+    restored = Simulator.from_dict(sim.to_dict())
+    assert restored.world.assets.operations[item.history[-1]]["protected"]["id"] == front.char_id
+
+
+def test_dead_companion_ward_does_not_protect_party(at_cache, monkeypatch):
+    sim, run, hero = at_cache
+    advance_due(sim, run)
+    artifact_id = next(key for key, item in sim.world.assets.artifacts.items() if item.owner is not None)
+    front = _join_party(sim, run, "front", strength=95, constitution=95)
+    hero.alive = False
+    world = SimpleNamespace(assets=sim.world.assets, tick=1, get_character_by_id=sim.world.get_character_by_id)
+    assert ward_injury(world, run, front, 1) == (1, {})
+    assert sim.world.assets.artifacts[artifact_id].charges == 3
+
+
+def test_hit_that_leaves_carrier_seriously_hurt_drops_items(at_cache, monkeypatch):
+    sim, run, hero = at_cache
+    advance_due(sim, run)
+    artifact_id = next(key for key, item in sim.world.assets.artifacts.items() if item.owner is not None)
+    hero.injury_status = "injured"
+    _hazard_step(sim, run, hero, monkeypatch, 2)
+    item = sim.world.assets.artifacts[artifact_id]
+    assert hero.injury_status == "serious" and item.charges == 2
+    assert item.custodian == AssetRef("site", "dungeon") and item.owner == AssetRef("character", hero.char_id)
+
+
+def test_hit_that_leaves_carrier_only_injured_keeps_items(at_cache, monkeypatch):
+    sim, run, hero = at_cache
+    advance_due(sim, run)
+    artifact_id = next(key for key, item in sim.world.assets.artifacts.items() if item.owner is not None)
+    _hazard_step(sim, run, hero, monkeypatch, 2)
+    item = sim.world.assets.artifacts[artifact_id]
+    assert hero.injury_status == "injured" and item.charges == 2
+    assert item.custodian == AssetRef("character", hero.char_id)
+
+
+def test_moving_unknown_artifact_is_rejected_as_invalid_reference():
+    ledger = AssetLedger()
+    with pytest.raises(ValueError, match="Unknown artifact"):
+        ledger.move_artifact("artifact:none", None, AssetRef("site", "x"), operation_id="op", tick=1,
+                             reason="discovered")

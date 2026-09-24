@@ -130,7 +130,8 @@ def _validate_artifact_history(ledger: Any, item: Artifact) -> None:
 
 
 def _operation_refs(operation: dict[str, Any]) -> set[AssetRef]:
-    return {AssetRef.from_dict(operation[field]) for field in ("owner", "holder", "new_owner", "new_holder")
+    return {AssetRef.from_dict(operation[field])
+            for field in ("owner", "holder", "new_owner", "new_holder", "protected")
             if operation.get(field) is not None}
 
 

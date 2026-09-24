@@ -57,6 +57,7 @@ fantasy_simulator/
 │   └── queries.py                   → summary / story / report 参照
 ├── events/                          → イベント生成・解決
 ├── adventure/                       → 複数ステップの冒険進行と保留選択
+├── assets/                          → 有限の資源在庫・固有遺物の単一台帳（所有者と保管者を分離）
 ├── world.py                         → World 公開ファサード
 ├── world_actor/                     → キャラクター/冒険 index と actor-facing World mixin
 ├── world_arc/                       → 長期 world arc モデルと管理

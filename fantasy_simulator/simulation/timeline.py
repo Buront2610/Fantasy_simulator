@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from ..events.lifecycle import character_lifespan_years, natural_death_chance, should_record_aging_event
 from ..i18n import tr
-from ..adventure.roles import party_care_factor
+from ..adventure.roles import party_care_factor, party_recovery_factor
 from ..world_history.retention import compact_world_history
 from .calendar import annual_probability_to_fraction, distributed_budget
 from .population import population_pressure_factor, run_population_maintenance
@@ -296,7 +296,7 @@ class TimelineMixin:
             if not char.alive or char.injury_status not in ("injured", "serious"):
                 continue
             if char.injury_status == "serious":
-                if self.rng.random() < serious_daily:
+                if self.rng.random() < serious_daily * party_recovery_factor(self.world, char, self.elapsed_days + 1):
                     char.injury_status = "injured"
                     message = tr(
                         "condition_improved",
@@ -317,7 +317,7 @@ class TimelineMixin:
                         primary_actor_id=char.char_id,
                     )
                 continue
-            if self.rng.random() < injured_daily:
+            if self.rng.random() < injured_daily * party_recovery_factor(self.world, char, self.elapsed_days + 1):
                 char.injury_status = "none"
                 message = tr("recovered_from_injuries", name=char.name)
                 char.add_history(tr("history_recovered_from_injuries", year=self.world.year))
