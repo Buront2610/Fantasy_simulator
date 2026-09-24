@@ -108,11 +108,13 @@ def resolve_nonfatal_adventure_injury(
             rounds=combat_rounds,
         )
     if world is not None:
-        dropped = drop_casualty_assets(world, run, injured_member, severity_steps)
+        dropped = drop_casualty_assets(world, run, injured_member, previous_injury)
         if dropped:
             asset_details.setdefault("asset_operations", []).extend(dropped)
         if asset_details.get("ward_artifact_id"):
-            detail += " " + tr("assets.ward_used", name=injured_member.name)
+            holder = world.get_character_by_id(asset_details["ward_holder_id"])
+            detail += " " + tr("assets.ward_used", holder=holder.name if holder else asset_details["ward_holder_id"],
+                               name=injured_member.name)
     run._record(summary, detail)
     run.state = "returning"
     return step_fact_result(

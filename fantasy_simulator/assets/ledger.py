@@ -77,27 +77,35 @@ class AssetLedger:
         self._validate_tick(tick)
         if self._already_applied(operation_id, request):
             return False
+        if artifact_id not in self.artifacts:
+            raise ValueError("Unknown artifact")
         current = self.artifacts[artifact_id]
         self.artifacts[artifact_id] = replace(current, owner=owner, custodian=holder,
                                               history=(*current.history, operation_id))
         self.operations[operation_id] = {**request, "event_id": None}
         return True
 
-    def consume_ward(self, holder: AssetRef, *, operation_id: str, tick: int) -> str | None:
+    def consume_ward(self, protected: AssetRef, holders: list[AssetRef], *, operation_id: str,
+                     tick: int) -> Artifact | None:
+        """Spend one charge of the first listed holder's ward; the holder keeps custody."""
         self._validate_tick(tick)
         if operation_id in self.operations:
             raise ValueError("Ward consumption must not be replayed as a new injury")
-        available = sorted(item.artifact_id for item in self.artifacts.values()
-                           if item.kind == "ancient_relic" and item.custodian == holder and item.charges > 0)
-        if not available:
+        for holder in holders:
+            available = sorted(item.artifact_id for item in self.artifacts.values()
+                               if item.kind == "ancient_relic" and item.custodian == holder and item.charges > 0)
+            if available:
+                break
+        else:
             return None
         item = self.artifacts[available[0]]
         self.artifacts[item.artifact_id] = replace(
             item, charges=item.charges - 1, history=(*item.history, operation_id),
         )
         self.operations[operation_id] = {"kind": "ward_used", "artifact_id": item.artifact_id,
-                                         "holder": holder.to_dict(), "tick": tick, "event_id": None}
-        return item.artifact_id
+                                         "holder": holder.to_dict(), "protected": protected.to_dict(),
+                                         "tick": tick, "event_id": None}
+        return self.artifacts[item.artifact_id]
 
     def drop_carried(self, holder: AssetRef, site: AssetRef, *, operation_id: str, tick: int) -> list[str]:
         """Move custody, preserving ownership. A casualty's possessions are not destroyed."""

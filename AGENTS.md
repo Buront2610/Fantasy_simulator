@@ -39,6 +39,7 @@ Fantasy_simulator/
 │   ├── terrain/                         # TerrainMap / Site / RouteEdge / AtlasLayout
 │   ├── events/                          # EventSystem クラス
 │   ├── adventure/                       # Adventure クラスと進行補助
+│   ├── assets/                          # 有限の資源在庫・固有遺物の単一台帳（所有者と保管者を分離）
 │   ├── reports/                         # 月報・年報生成
 │   ├── rumor/                           # 噂システム
 │   ├── world_actor/                     # キャラクター/冒険 index と actor-facing World mixin

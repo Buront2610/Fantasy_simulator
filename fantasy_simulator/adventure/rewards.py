@@ -6,8 +6,8 @@ from typing import Any
 from ..assets.models import AssetRef
 from .constants import ADVENTURE_DISCOVERIES
 
-LABELS = {"ancient_relic": "an ancient relic", "moon_silver": "a pouch of moon-silver",
-          "lore_fragment": "a fragment of lost lore", "monster_trophy": "a cache of monster trophies"}
+# Asset kinds reuse the legacy loot_summary labels, in the order candidates are offered.
+LABELS = dict(zip(("ancient_relic", "moon_silver", "lore_fragment", "monster_trophy"), ADVENTURE_DISCOVERIES))
 
 
 @dataclass(frozen=True)
@@ -72,17 +72,27 @@ def _divide_stock(ledger: Any, source: Any, recipients: list[Any], operation: st
 
 
 def ward_injury(world: Any, run: Any, character: Any, severity: int) -> tuple[int, dict[str, Any]]:
+    """A charged ward carried by any living member of the same party absorbs one injury stage."""
     if run.objective is None or severity <= 0:
         return severity, {}
+    others = sorted(member_id for member_id in run.member_ids if member_id != character.char_id)
+    holders = [AssetRef("character", character.char_id)]
+    for member_id in others:
+        member = world.get_character_by_id(member_id)
+        if member is not None and member.alive:
+            holders.append(AssetRef("character", member_id))
     op = f"ward:{run.adventure_id}:{run.steps_taken}"
-    artifact_id = world.assets.consume_ward(AssetRef("character", character.char_id), operation_id=op, tick=world.tick)
-    if artifact_id is None:
+    item = world.assets.consume_ward(holders[0], holders, operation_id=op, tick=world.tick)
+    if item is None:
         return severity, {}
-    return severity - 1, {"ward_artifact_id": artifact_id, "ward_prevented_steps": 1, "asset_operations": [op]}
+    return severity - 1, {"ward_artifact_id": item.artifact_id, "ward_holder_id": item.custodian.reference_id,
+                          "ward_prevented_steps": 1, "asset_operations": [op]}
 
 
-def drop_casualty_assets(world: Any, run: Any, character: Any, severity: int) -> list[str]:
-    if run.objective is None or severity < 2:
+def drop_casualty_assets(world: Any, run: Any, character: Any, previous_injury: str) -> list[str]:
+    """Only a hit that leaves the carrier seriously hurt (or worse) makes them lose what they carry."""
+    if (run.objective is None or character.injury_status == previous_injury
+            or character.injury_status not in ("serious", "dying")):
         return []
     return world.assets.drop_carried(
         AssetRef("character", character.char_id), AssetRef("site", run.itinerary.current_site_id),

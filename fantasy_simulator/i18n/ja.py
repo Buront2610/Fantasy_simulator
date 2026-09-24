@@ -16,7 +16,7 @@ TEXT_JA: Dict[str, str] = {
     "assets.kind_ancient_relic": '古代の護符',
     "assets.kind_lore_fragment": '史料の断片',
     "assets.inscription": '刻文: {text}',
-    "assets.ward_used": '{name}の護符が残りの力を1回消費し、負傷を一段階軽減した。',
+    "assets.ward_used": '{holder}の護符が残りの力を1回消費し、{name}の負傷を一段階軽減した。',
     "assets.stock_line": '{resource} ×{quantity} | 所有者: {owner} | 保管者: {holder} | {location}',
     "assets.artifact_line": '{name} [{identifier}] | 所有者: {owner} | 保管者: {holder} | {location} | 残り使用回数: {charges}',
 
