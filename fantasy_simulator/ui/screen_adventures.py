@@ -112,6 +112,10 @@ def _show_adventure_details(sim: Any, ctx: UIContext | None = None) -> None:
             out.print_line(f"  {tr('party_policy_label'):<11}: {tr(f'policy_{run.policy}')}")
         out.print_line(f"  {tr('party_supply_label'):<11}: {tr(f'supply_{run.supply_state}')}")
     out.print_line(f"  {tr('state'):<11}: {tr(f'state_{run.state}')}")
+    if run.objective is not None and run.objective.cargo is not None:
+        cargo = run.objective.cargo
+        out.print_line(tr("cargo.manifest", resource=tr(f"assets.kind_{cargo.resource}"), quantity=cargo.quantity,
+                          state=tr(f"cargo.state_{cargo.state}")))
     out.print_line(
         f"  {tr('outcome'):<11}: {tr(f'outcome_{run.outcome}') if run.outcome else tr('unresolved')}"
     )

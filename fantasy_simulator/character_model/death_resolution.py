@@ -41,6 +41,8 @@ def resolve_active_adventure_for_death(char: "Character", world: "World") -> Non
         run.pending_choice = None
         if run.objective is not None and run.objective.status in ("active", "rescued"):
             run.objective.status = "failed"
+            if run.objective.cargo is not None and run.objective.cargo.state == "in_transit":
+                run.objective.cargo.state = "stranded"
         run._clear_member_adventures(world)
         world.complete_adventure(adventure_id)
     char.active_adventure_id = None

@@ -22,6 +22,7 @@ from .rescue import perform_rescue
 from .protocols import AdventureRunLike
 from .roles import capability
 from .rewards import find_discovery
+from .cargo import complete_cargo_return, deliver_cargo
 from .results import AdventureFactKind, AdventureStepResult, step_fact_result
 from ..character_model.death_resolution import mark_character_dead
 from ..i18n import tr, tr_term
@@ -131,7 +132,7 @@ class AdventureStateMachine:
         if roll < critical_chance:
             return resolve_critical_hazard(self.run, injured_member, world, rng, destination_name)
 
-        rescue_result = perform_rescue(world, self.run)
+        rescue_result = deliver_cargo(world, self.run) or perform_rescue(world, self.run)
         if rescue_result is not None:
             return rescue_result
 
@@ -181,6 +182,9 @@ class AdventureStateMachine:
         destination_name: str,
         origin_name: str,
     ) -> AdventureStepResult:
+        cargo_return = complete_cargo_return(world, self.run, character)
+        if cargo_return is not None:
+            return cargo_return
         self.run.steps_taken += 1
         self.run.state = "resolved"
         self.run.resolution_year = world.year

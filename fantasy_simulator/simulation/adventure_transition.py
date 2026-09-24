@@ -8,6 +8,7 @@ from typing import Any
 
 from ..adventure.itinerary import affected_location_ids
 from ..adventure.roles import role_holders
+from ..adventure.cargo import settle_cargo
 
 from ..adventure.results import AdventureStepResult, step_fact_result
 from ..adventure.validation import validate_adventure_run_payload
@@ -165,6 +166,7 @@ def _plan_step(
         result = _dead_leader_result(draft, character)
     else:
         result = draft.run.step_result(character, draft, rng=rng)
+    result = settle_cargo(draft, draft.run, result)
     finalize_objective(draft, draft.run)
     _plan_following_steps(draft, tick)
     return _record_roles(result, duties) if draft.run.objective is not None else result
