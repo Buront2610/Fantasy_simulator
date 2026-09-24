@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from fantasy_simulator.adventure.cargo import deliver_cargo
+from fantasy_simulator.adventure.combat import AdventureHazardResult
 from fantasy_simulator.adventure.policy import AdventurePolicyEngine
 from fantasy_simulator.assets.models import AssetRef
 from fantasy_simulator.character import Character
@@ -194,4 +195,22 @@ def test_lost_cargo_cannot_be_fabricated_at_destination(cargo_world):
     assert run.objective.status == "failed" and run.objective.cargo.state == "stranded"
     assert sim.world.assets.stocks[("moon_silver", owner, AssetRef("site", "home"))] == 10
     assert ("moon_silver", owner, AssetRef("site", "destination")) not in sim.world.assets.stocks
+    Simulator.from_dict(sim.to_dict())
+
+
+def test_cumulative_serious_injury_leaves_goods_at_actual_site(cargo_world, monkeypatch):
+    sim, hero = cargo_world
+    run = depart(sim, hero)
+    advance_due(sim, run)
+    advance_due(sim, run)
+    hero.injury_status = "injured"
+    monkeypatch.setattr(AdventurePolicyEngine, "compute_injury_chance", lambda *_: 1)
+    monkeypatch.setattr("fantasy_simulator.adventure.hazards.resolve_adventure_hazard_combat",
+                        lambda *_: AdventureHazardResult(1, "cargo hazard", 1, False))
+    finish(sim, run)
+    owner = AssetRef("character", hero.char_id)
+    assert hero.injury_status == "serious" and hero.location_id == "home"
+    assert run.objective.cargo.state == "stranded" and run.objective.status == "failed"
+    assert sim.world.assets.stocks[("moon_silver", owner, AssetRef("site", "destination"))] == 6
+    assert f"cargo:{run.adventure_id}:deliver" not in sim.world.assets.operations
     Simulator.from_dict(sim.to_dict())
