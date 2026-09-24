@@ -36,6 +36,11 @@ _PARTY_FORMATION_CHANCE = 0.30
 class AdventureStartMixin:
     """Mixin for creating solo and party adventures."""
 
+    def start_cargo_transport(self, carrier_id: str, destination: str, resource: str, quantity: int,
+                              *, source_kind: str = "character") -> AdventureRun:
+        from .cargo_dispatch import start_transport
+        return start_transport(self, carrier_id, destination, resource, quantity, source_kind=source_kind)
+
     @restore_start_rng_on_failure
     def _maybe_start_adventure(self, year_fraction: float = 1.0) -> None:
         """Start at most one new adventure during the current simulation step."""

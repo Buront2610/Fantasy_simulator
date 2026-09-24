@@ -5,7 +5,6 @@ from typing import Any
 from ..adventure.cargo_model import CARGO_CAPACITY
 from ..assets.models import AssetRef
 from ..i18n import tr
-from ..simulation.cargo_dispatch import start_transport
 from .screen_input import _get_numeric_choice
 from .ui_context import UIContext
 
@@ -50,8 +49,8 @@ def request_cargo_transport(sim: Any, ctx: UIContext) -> bool:
         ctx.out.print_warning(tr("invalid_input"))
         return False
     try:
-        run = start_transport(sim, carrier.char_id, destinations[destination], resource, int(raw),
-                              source_kind=source_kind)
+        run = sim.start_cargo_transport(carrier.char_id, destinations[destination], resource, int(raw),
+                                        source_kind=source_kind)
     except ValueError:
         ctx.out.print_warning(tr("cargo.unavailable"))
         return False

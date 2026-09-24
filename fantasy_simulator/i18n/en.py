@@ -6,6 +6,9 @@ from typing import Dict
 
 
 TEXT_EN: Dict[str, str] = {
+    "event_type_adventure_cargo_delivered": "Cargo delivered",
+    "event_type_adventure_cargo_missing": "Delivery abandoned: missing cargo",
+    "event_type_adventure_cargo_returned": "Carrier returned after delivery",
     "cargo.trace": "Year {year}: {name}'s shipment to {destination}: {state}.",
     'adventure.purpose_transport': 'Transport',
     'cargo.menu': 'Transport owned resources',

@@ -6,6 +6,9 @@ from typing import Dict
 
 
 TEXT_JA: Dict[str, str] = {
+    "event_type_adventure_cargo_delivered": "荷物の配達",
+    "event_type_adventure_cargo_missing": "荷物不足による配達中止",
+    "event_type_adventure_cargo_returned": "配達後の帰還",
     "cargo.trace": "{year}年、{name}による{destination}への運搬: {state}。",
     'adventure.purpose_transport': '運搬',
     'cargo.menu': '所有資源を運搬する',
